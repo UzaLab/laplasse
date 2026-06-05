@@ -16,12 +16,11 @@ COPY apps/api ./apps/api
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 WORKDIR /app/apps/api
-RUN npx prisma generate
+RUN node_modules/.bin/prisma generate
 RUN pnpm build
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@10.34.1 --activate
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -29,12 +28,9 @@ ENV NODE_ENV=production
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./
-COPY apps/api/prisma ./prisma
-
-# Générer le client Prisma dans le runner
-RUN npx prisma generate
+COPY --from=builder /app/apps/api/prisma ./prisma
 
 EXPOSE 3001
 
-# Migration + démarrage
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+# Migration (avec le binaire copié) + démarrage
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
