@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.npm
+.pnpm-store/
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+
+# NestJS
+apps/api/dist/
+
+# Prisma — NE PAS ignorer les migrations (nécessaires pour déploiement)
+# apps/api/prisma/migrations/
+
+# Environment — JAMAIS commiter les .env réels
+.env
+.env.local
+.env.*.local
+!.env.example
+!apps/web/.env.example
+!apps/api/.env.example
+
+# Uploads
+apps/api/uploads/
+
+# Misc
+.DS_Store
+*.log
+.turbo/
+.claude/
+
+# Sentry
+.sentryclirc

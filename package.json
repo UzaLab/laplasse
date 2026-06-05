@@ -1,0 +1,29 @@
+{
+  "name": "laplasse",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev:kill": "fuser -k 3001/tcp 3000/tcp 2>/dev/null || true",
+    "dev": "pnpm dev:kill && pnpm --parallel --filter web --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "build": "pnpm --filter web build",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "db:migrate": "pnpm --filter api prisma migrate dev",
+    "db:seed": "pnpm --filter api prisma db seed",
+    "db:studio": "pnpm --filter api prisma studio",
+    "test": "pnpm --filter api test",
+    "test:cov": "pnpm --filter api test:cov",
+    "load-test": "node scripts/load-test.mjs",
+    "backup": "bash scripts/backup.sh"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0"
+  }
+}

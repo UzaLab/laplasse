@@ -1,0 +1,414 @@
+// LaPlasse — Prisma Schema v1.0
+// Datasource: PostgreSQL local (port 5433)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ─────────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  MERCHANT
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  GROWTH
+  PREMIUM
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  MENU
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+enum VerificationType {
+  PHONE
+  DOCUMENT
+  BUSINESS_ID
+  SOCIAL
+}
+
+enum ComplaintStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  TRIAL
+}
+
+enum InteractionType {
+  VIEW
+  CALL_CLICK
+  WHATSAPP_CLICK
+  DIRECTION_CLICK
+  WEBSITE_CLICK
+  SAVE
+  REVIEW
+  SHARE
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ─── USERS ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  phone         String?  @unique
+  full_name     String?
+  avatar        String?
+  role          Role     @default(USER)
+  city          String?
+  country       String?  @default("CI")
+  password_hash String?
+  is_active     Boolean  @default(true)
+  is_verified   Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  reviews          Review[]
+  favorites        Favorite[]
+  searches         SearchHistory[]
+  interactions     MerchantInteraction[]
+  merchant         Merchant?
+  notifications    Notification[]
+  analytics_events AnalyticsEvent[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+model AuthToken {
+  id         String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  type       String   // "refresh" | "otp" | "email_verify"
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([token])
+}
+
+// ─── MERCHANT CORE ─────────────────────────────────────────────────────────────
+
+model Merchant {
+  id                  String             @id @default(cuid())
+  business_name       String
+  slug                String             @unique
+  description         String?
+  category_id         String
+  owner_id            String             @unique
+  logo                String?
+  cover_image         String?
+  phone               String?
+  whatsapp            String?
+  email               String?
+  website             String?
+  verification_status VerificationStatus @default(UNVERIFIED)
+  trust_score         Int                @default(0)
+  subscription_plan   SubscriptionPlan   @default(FREE)
+  is_active           Boolean            @default(true)
+  is_sponsored        Boolean            @default(false)
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  owner         User                  @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  category      Category              @relation(fields: [category_id], references: [id])
+  location      MerchantLocation?
+  media         MerchantMedia[]
+  reviews       Review[]
+  favorites     Favorite[]
+  interactions  MerchantInteraction[]
+  verifications MerchantVerification[]
+  complaints    Complaint[]
+  subscription  Subscription?
+  hours         BusinessHour[]
+  tags          MerchantTag[]
+
+  @@index([slug])
+  @@index([category_id])
+  @@index([verification_status])
+  @@index([trust_score])
+  @@index([is_active])
+}
+
+model MerchantLocation {
+  id              String  @id @default(cuid())
+  merchant_id     String  @unique
+  country         String  @default("CI")
+  city            String
+  district        String?
+  address         String?
+  latitude        Float?
+  longitude       Float?
+  google_place_id String?
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([city])
+  @@index([district])
+  @@index([latitude, longitude])
+}
+
+model BusinessHour {
+  id          String  @id @default(cuid())
+  merchant_id String
+  day         Int     // 0=Lundi … 6=Dimanche
+  open_time   String? // "08:00"
+  close_time  String? // "22:00"
+  is_closed   Boolean @default(false)
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+}
+
+// ─── CATEGORIES ────────────────────────────────────────────────────────────────
+
+model Category {
+  id         String     @id @default(cuid())
+  name       String
+  slug       String     @unique
+  parent_id  String?
+  icon       String?
+  sort_order Int        @default(0)
+  is_active  Boolean    @default(true)
+  created_at DateTime   @default(now())
+
+  parent    Category?  @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+  merchants Merchant[]
+
+  @@index([slug])
+  @@index([parent_id])
+}
+
+// ─── MEDIA ─────────────────────────────────────────────────────────────────────
+
+model MerchantMedia {
+  id          String    @id @default(cuid())
+  merchant_id String
+  type        MediaType @default(IMAGE)
+  url         String
+  thumbnail   String?
+  order       Int       @default(0)
+  uploaded_by String
+  created_at  DateTime  @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+}
+
+// ─── TAGS ──────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  merchants MerchantTag[]
+}
+
+model MerchantTag {
+  merchant_id String
+  tag_id      String
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([merchant_id, tag_id])
+}
+
+// ─── REVIEWS & TRUST ───────────────────────────────────────────────────────────
+
+model Review {
+  id          String       @id @default(cuid())
+  merchant_id String
+  user_id     String
+  rating      Int          // 1–5
+  title       String?
+  content     String?
+  media       Json?        // URLs images (array)
+  status      ReviewStatus @default(PENDING)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([user_id])
+  @@index([status])
+}
+
+model Favorite {
+  id          String   @id @default(cuid())
+  user_id     String
+  merchant_id String
+  created_at  DateTime @default(now())
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, merchant_id])
+  @@index([user_id])
+  @@index([merchant_id])
+}
+
+// ─── VERIFICATION & MODERATION ─────────────────────────────────────────────────
+
+model MerchantVerification {
+  id                String           @id @default(cuid())
+  merchant_id       String
+  verification_type VerificationType
+  document_url      String?
+  status            String           @default("pending")
+  verified_by       String?
+  notes             String?
+  verified_at       DateTime?
+  created_at        DateTime         @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([status])
+}
+
+model Complaint {
+  id          String          @id @default(cuid())
+  merchant_id String
+  user_id     String
+  reason      String
+  description String?
+  status      ComplaintStatus @default(OPEN)
+  assigned_to String?
+  created_at  DateTime        @default(now())
+  resolved_at DateTime?
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([status])
+}
+
+// ─── SUBSCRIPTION ──────────────────────────────────────────────────────────────
+
+model Subscription {
+  id            String             @id @default(cuid())
+  merchant_id   String             @unique
+  plan          SubscriptionPlan   @default(FREE)
+  status        SubscriptionStatus @default(ACTIVE)
+  billing_cycle String?            // "monthly" | "yearly"
+  started_at    DateTime           @default(now())
+  expires_at    DateTime?
+  created_at    DateTime           @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([status])
+}
+
+// ─── ANALYTICS & BEHAVIOR ──────────────────────────────────────────────────────
+
+model SearchHistory {
+  id            String   @id @default(cuid())
+  user_id       String?
+  query         String
+  filters       Json?
+  city          String?
+  latitude      Float?
+  longitude     Float?
+  results_count Int      @default(0)
+  created_at    DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([query])
+  @@index([city])
+}
+
+model MerchantInteraction {
+  id          String          @id @default(cuid())
+  user_id     String?
+  merchant_id String
+  event_type  InteractionType
+  metadata    Json?
+  created_at  DateTime        @default(now())
+
+  user     User?    @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([user_id])
+  @@index([event_type])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  user_id    String?
+  event_name String
+  properties Json?
+  city       String?
+  created_at DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([event_name])
+  @@index([user_id])
+  @@index([created_at])
+}
+
+// ─── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id      String             @id @default(cuid())
+  user_id String
+  type    String             // "email" | "sms" | "push" | "whatsapp"
+  title   String
+  body    String
+  status  NotificationStatus @default(PENDING)
+  sent_at DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+}
