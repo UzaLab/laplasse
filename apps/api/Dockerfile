@@ -21,15 +21,17 @@ RUN pnpm build
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
-WORKDIR /app
+WORKDIR /app/apps/api
 
 ENV NODE_ENV=production
 
+# Garder la structure pnpm (store racine + symlinks apps/api)
+COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/node_modules ./node_modules
-COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/apps/api/prisma.config.ts ./
+COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
 
 EXPOSE 3001
 
