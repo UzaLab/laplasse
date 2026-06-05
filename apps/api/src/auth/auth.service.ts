@@ -107,6 +107,18 @@ export class AuthService {
     return this.generateTokens(user.id, user.email, user.role)
   }
 
+  async refreshFromToken(refreshToken: string) {
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub: string; email: string; role: string }>(
+        refreshToken,
+        { secret: this.config.get('JWT_SECRET') },
+      )
+      return this.refresh(payload.sub)
+    } catch {
+      throw new UnauthorizedException('Session expirée, reconnectez-vous')
+    }
+  }
+
   // ─── Me ───────────────────────────────────────────────────────────────────
 
   async getMe(userId: string) {

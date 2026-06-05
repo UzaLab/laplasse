@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { AuthService } from './auth.service'
-import { RegisterDto, LoginDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto'
+import { RegisterDto, LoginDto, RefreshTokenDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
@@ -40,10 +40,11 @@ export class AuthController {
     return this.authService.loginWithPhoneOtp(dto.phone, dto.code)
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @Post('refresh')
-  refresh(@CurrentUser() user: { id: string }) {
-    return this.authService.refresh(user.id)
+  @HttpCode(HttpStatus.OK)
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshFromToken(dto.refresh_token)
   }
 
   @UseGuards(JwtAuthGuard)
