@@ -86,11 +86,7 @@ export default function NotificationsPage() {
   return (
     <ProfileShell>
       <div className="mb-6 flex items-center justify-between">
-        <Link
-          href="/profile"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors"
-          style={{ textDecoration: 'none' }}
-        >
+        <Link href="/profile" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors" style={{ textDecoration: 'none' }}>
           <ArrowLeft size={15} /> Retour
         </Link>
         {unreadCount > 0 && (
@@ -112,6 +108,7 @@ export default function NotificationsPage() {
         </h1>
       </div>
 
+      <div className="max-w-2xl">
       {isLoading ? (
         <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-slate-300" /></div>
       ) : notifications.length === 0 ? (
@@ -147,6 +144,7 @@ export default function NotificationsPage() {
           </div>
         </div>
       )}
+      </div>
     </ProfileShell>
   )
 }

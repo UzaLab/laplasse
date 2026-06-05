@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck,
-  LogOut, Compass, Menu, X, Bell, HelpCircle,
+  LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -39,10 +39,13 @@ export function ProfileShell({ children }: ProfileShellProps) {
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 
   const mainNav: NavItem[] = [
-    { href: '/profile',  label: "Vue d'ensemble", icon: <LayoutDashboard size={17} /> },
-    { href: '/favoris',  label: 'Mes favoris',     icon: <Heart size={17} /> },
-    { href: '/profile/reviews',  label: 'Mes avis',       icon: <Star size={17} /> },
-    { href: '/profile/settings', label: 'Paramètres',     icon: <Settings size={17} /> },
+    { href: '/profile',               label: "Vue d'ensemble",  icon: <LayoutDashboard size={17} /> },
+    { href: '/favoris',               label: 'Mes favoris',     icon: <Heart size={17} /> },
+    { href: '/profile/reviews',       label: 'Mes avis',        icon: <Star size={17} /> },
+    { href: '/profile/loyalty',       label: 'Mes points',      icon: <Trophy size={17} /> },
+    { href: '/profile/referral',      label: 'Parrainage',      icon: <Gift size={17} /> },
+    { href: '/profile/notifications', label: 'Notifications',   icon: <Bell size={17} /> },
+    { href: '/profile/settings',      label: 'Paramètres',      icon: <Settings size={17} /> },
   ]
 
   const isMerchant = user?.role === 'MERCHANT' || !!user?.merchant
@@ -173,9 +176,13 @@ export function ProfileShell({ children }: ProfileShellProps) {
               <Compass size={15} /> Explorer
             </Link>
             <div className="w-px h-5 bg-slate-200 hidden sm:block" />
-            <button className="text-slate-400 hover:text-slate-700 transition-colors">
+            <Link
+              href="/profile/notifications"
+              className="text-slate-400 hover:text-slate-700 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
               <Bell size={18} />
-            </button>
+            </Link>
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">
@@ -194,9 +201,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8">
-          <div className="max-w-3xl mx-auto">
-            {children}
-          </div>
+          {children}
         </div>
       </main>
 

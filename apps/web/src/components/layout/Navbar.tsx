@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Search, User, Menu, LogOut, LayoutDashboard } from 'lucide-react'
+import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2 } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -104,6 +104,14 @@ export function Navbar() {
                     <p className="text-xs font-bold text-slate-900 truncate">{user.full_name}</p>
                     <p className="text-xs text-slate-400 truncate">{user.email}</p>
                   </div>
+                  <Link
+                    href="/profile"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <UserCircle2 size={15} /> Mon profil
+                  </Link>
                   {(user.role === 'MERCHANT' || user.merchant) && (
                     <Link
                       href="/merchant/dashboard"
