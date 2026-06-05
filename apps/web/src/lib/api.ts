@@ -1,4 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+function getApiUrl(): string {
+  // SSR dans Docker : URL interne Coolify (évite le loopback Traefik/SSL)
+  if (typeof window === 'undefined' && process.env.API_INTERNAL_URL) {
+    return process.env.API_INTERNAL_URL
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+}
 
 export class ApiError extends Error {
   constructor(
@@ -11,7 +17,7 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${getApiUrl()}${path}`, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
