@@ -1,0 +1,79 @@
+import Link from 'next/link'
+import { BookOpen, Globe, Share2, LinkIcon, Heart } from 'lucide-react'
+
+export function Footer() {
+  return (
+    <footer className="bg-white pt-20 pb-10 border-t border-slate-100">
+      <div className="max-w-7xl mx-auto px-6">
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+
+          {/* Brand */}
+          <div className="md:col-span-1">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
+                <BookOpen size={18} />
+              </div>
+              <span className="text-xl font-extrabold tracking-tight text-slate-900">LaPlasse</span>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">
+              La plateforme de référence pour découvrir, réserver et acheter auprès des
+              meilleurs établissements de Côte d'Ivoire.
+            </p>
+            <div className="flex gap-4">
+              {[Globe, Share2, LinkIcon].map((Icon, i) => (
+                <a
+                  key={i}
+                  href="#"
+                  className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
+                >
+                  <Icon size={18} />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Colonnes de liens */}
+          {[
+            {
+              title: 'Explorer',
+              links: ['Restaurants', 'Bars & Lounges', 'Spas & Bien-être', 'Concept Stores', 'Marketplace'],
+            },
+            {
+              title: 'Business',
+              links: ["Inscrire son lieu", "Accès Partenaire", "Solutions de paiement", "Tarifs Pro"],
+            },
+            {
+              title: 'Aide & Contact',
+              links: ["FAQ Utilisateurs", "Nous contacter", "Conditions Générales", "Confidentialité"],
+            },
+          ].map((col) => (
+            <div key={col.title}>
+              <h4 className="font-extrabold text-slate-900 mb-6">{col.title}</h4>
+              <ul className="space-y-4">
+                {col.links.map((label) => (
+                  <li key={label}>
+                    <Link
+                      href="#"
+                      className="text-sm font-medium text-slate-500 hover:text-brand-600 transition-colors"
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom */}
+        <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400 font-medium">
+          <p>© 2026 LaPlasse. Tous droits réservés.</p>
+          <p className="flex items-center gap-1">
+            Conçu avec <Heart size={14} className="text-red-500 fill-red-500" /> à Babi.
+          </p>
+        </div>
+      </div>
+    </footer>
+  )
+}

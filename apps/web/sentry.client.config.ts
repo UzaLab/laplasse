@@ -1,0 +1,38 @@
+import * as Sentry from '@sentry/nextjs'
+
+const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN
+
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+
+    // Capture 10% of transactions for perf monitoring (ajuster en prod)
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+
+    // Replay 1% of sessions, 100% des sessions avec erreurs
+    replaysSessionSampleRate: 0.01,
+    replaysOnErrorSampleRate: 1.0,
+
+    integrations: [
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: false,
+      }),
+    ],
+
+    // Ignorer les erreurs réseau non critiques
+    ignoreErrors: [
+      'Network Error',
+      'Failed to fetch',
+      'Load failed',
+      /^ResizeObserver loop/,
+    ],
+
+    beforeSend(event) {
+      // Ne pas envoyer les erreurs en dev si DSN de prod
+      if (process.env.NODE_ENV === 'development') return null
+      return event
+    },
+  })
+}

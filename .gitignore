@@ -32,3 +32,13 @@ apps/api/uploads/
 
 # Sentry
 .sentryclirc
+
+# WSL Windows artifacts
+*.Zone.Identifier
+**/*.Zone.Identifier
+
+# Coverage reports (générés par pnpm test:cov)
+apps/api/coverage/
+
+# Lock files alternatifs
+package-lock.json
