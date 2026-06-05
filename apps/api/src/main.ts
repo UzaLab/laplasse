@@ -38,12 +38,17 @@ async function bootstrap() {
   // Prefix global API
   app.setGlobalPrefix('api')
 
-  // CORS — autorise le frontend Next.js
+  // CORS — autorise le frontend Next.js (http + https)
+  const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+  const corsOrigins = [
+    'http://localhost:3000',
+    appUrl,
+    appUrl.replace(/^http:/, 'https:'),
+    appUrl.replace(/^https:/, 'http:'),
+  ].filter((v, i, arr) => arr.indexOf(v) === i)
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      process.env.APP_URL ?? 'http://localhost:3000',
-    ],
+    origin: corsOrigins,
     credentials: true,
   })
 

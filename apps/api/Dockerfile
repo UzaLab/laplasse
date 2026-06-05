@@ -34,4 +34,4 @@ COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy || echo '[warn] prisma migrate deploy failed'; exec node dist/src/main.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist/prisma/seed.js || echo '[warn] migrate/seed failed'; exec node dist/src/main.js"]
