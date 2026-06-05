@@ -25,7 +25,7 @@ const transports: winston.transport[] = [
   }),
 ]
 
-if (!isDev) {
+if (!isDev && process.env.LOG_TO_FILE === 'true') {
   transports.push(
     new (winston.transports as unknown as {
       DailyRotateFile: new (opts: object) => winston.transport
