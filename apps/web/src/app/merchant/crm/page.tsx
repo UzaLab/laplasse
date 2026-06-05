@@ -92,7 +92,7 @@ export default function MerchantCRMPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Total clients',    value: s?.total_customers ?? 0, icon: <Users size={18} />, color: 'text-slate-600', bg: 'bg-slate-50' },
           { label: 'Récents (30j)',    value: s?.recent_30d ?? 0,      icon: <UserCheck size={18} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },

@@ -185,18 +185,10 @@ export default function EditMerchantProfilePage() {
         )}
 
         <form id="edit-form" onSubmit={handleSubmit} className="space-y-5">
-          {FIELDS.map(f => (
-            <div key={f.key}>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">{f.label}</label>
-              {f.multiline ? (
-                <textarea
-                  value={form[f.key]}
-                  onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
-                  rows={4}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-sm outline-none transition-all resize-none"
-                />
-              ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {FIELDS.filter(f => f.key !== 'description').map(f => (
+              <div key={f.key}>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">{f.label}</label>
                 <input
                   type={f.type ?? 'text'}
                   value={form[f.key]}
@@ -204,11 +196,21 @@ export default function EditMerchantProfilePage() {
                   placeholder={f.placeholder}
                   className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-sm outline-none transition-all"
                 />
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Description</label>
+            <textarea
+              value={form.description}
+              onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Décrivez votre établissement…"
+              rows={4}
+              className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-sm outline-none transition-all resize-none"
+            />
+          </div>
 
-          <div className="pt-4">
+          <div className="pt-4 max-w-md">
             <button
               type="submit"
               disabled={saving}

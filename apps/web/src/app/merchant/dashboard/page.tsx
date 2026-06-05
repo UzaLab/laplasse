@@ -174,9 +174,11 @@ function DashboardContent() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : merchant ? (
-        <>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Colonne gauche */}
+          <div className="xl:col-span-1 space-y-6">
           {/* Header carte établissement */}
-          <div className="bg-slate-900 rounded-[28px] p-1 relative overflow-hidden mb-6">
+          <div className="bg-slate-900 rounded-[28px] p-1 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-72 h-72 bg-amber-400/15 rounded-full blur-[90px] -translate-y-1/3 translate-x-1/4 pointer-events-none" />
             <div className="bg-slate-900 rounded-[24px] p-6 relative z-10">
               <div className="flex items-start gap-4">
@@ -248,7 +250,7 @@ function DashboardContent() {
             if (score === 100) return null
             const missing = items.filter(i => !i.done)
             return (
-              <div className="bg-white border border-slate-100 rounded-[28px] p-6 mb-6">
+              <div className="bg-white border border-slate-100 rounded-[28px] p-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <AlertCircle size={15} className="text-amber-500" />
@@ -284,9 +286,12 @@ function DashboardContent() {
               </div>
             )
           })()}
+          </div>
 
+          {/* Colonne droite */}
+          <div className="xl:col-span-2 space-y-6">
           {/* Stats grid */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { icon: <Star size={18} />,  label: 'Avis reçus',  value: analytics ? analytics.reviews.count  : merchant.review_count,    color: 'amber' },
               { icon: <Users size={18} />, label: 'Favoris',      value: analytics ? analytics.favorites      : merchant.favorites_count,  color: 'rose' },
@@ -308,7 +313,7 @@ function DashboardContent() {
 
           {/* Chart */}
           {chartData && chartData.days.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-[28px] p-6 mb-6">
+            <div className="bg-white border border-slate-100 rounded-[28px] p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-sm">Vues — 30 derniers jours</h3>
@@ -338,6 +343,7 @@ function DashboardContent() {
               { href: '/merchant/hours',        icon: <Clock size={16} className="text-blue-500" />,    label: 'Gérer les horaires',      desc: 'Définir vos heures d\'ouverture' },
               { href: '/merchant/media',        icon: <Store size={16} className="text-emerald-500" />, label: 'Ajouter des photos',      desc: 'Logo, cover, galerie' },
               { href: '/merchant/analytics',    icon: <TrendingUp size={16} className="text-violet-500" />, label: 'Voir les statistiques', desc: 'Vues, clics, avis' },
+              { href: '/merchant/crm',          icon: <Users size={16} className="text-teal-500" />,       label: 'Clients CRM',           desc: 'Clients récurrents et inactifs' },
               { href: '/merchant/plans',        icon: <BadgeCheck size={16} className="text-rose-500" />, label: 'Plans & abonnements',   desc: 'Booster votre visibilité' },
             ].map((action, i, arr) => (
               <Link
@@ -357,7 +363,8 @@ function DashboardContent() {
               </Link>
             ))}
           </div>
-        </>
+          </div>
+        </div>
       ) : null}
     </MerchantShell>
   )

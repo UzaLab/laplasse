@@ -143,7 +143,7 @@ export default function MerchantMediaPage() {
         ) : data && (
           <>
             {/* Logo & Cover */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {([
                 { label: 'Logo', url: data.logo, field: 'logo' as const },
                 { label: 'Photo de couverture', url: data.cover_image, field: 'cover_image' as const },
@@ -164,6 +164,7 @@ export default function MerchantMediaPage() {
               ))}
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Upload fichier */}
             <div className="bg-white border border-slate-100 rounded-2xl p-5">
               <h3 className="font-bold text-slate-900 mb-3">Uploader une photo</h3>
@@ -209,6 +210,7 @@ export default function MerchantMediaPage() {
               </form>
               {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
             </div>
+            </div>
 
             {/* Gallery */}
             <div>
@@ -221,7 +223,7 @@ export default function MerchantMediaPage() {
                   <p className="text-slate-500 text-sm">Aucune photo dans la galerie</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {data.gallery.map(item => (
                     <div key={item.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden group relative">
                       <div className="aspect-square bg-slate-100">

@@ -118,6 +118,7 @@ export default function MerchantHoursPage() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {DAYS.map(({ day, label }) => {
               const entry = hours.find(h => h.day === day)!
               const isToday = new Date().getDay() === day
@@ -170,6 +171,7 @@ export default function MerchantHoursPage() {
                 </div>
               )
             })}
+            </div>
 
             {error && (
               <p className="text-sm text-red-600 font-medium">{error}</p>

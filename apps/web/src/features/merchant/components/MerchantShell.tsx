@@ -227,19 +227,17 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8">
-          <div className="max-w-3xl mx-auto">
-            {children}
-          </div>
+          {children}
         </div>
       </main>
 
       {/* Bottom nav mobile */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40">
         {[
-          { href: '/merchant/dashboard',    label: 'Dashboard', icon: '📊' },
-          { href: '/merchant/profile/edit', label: 'Profil',    icon: '✏️' },
-          { href: '/merchant/analytics',    label: 'Stats',     icon: '📈' },
-          { href: '/merchant/plans',        label: 'Plans',     icon: '⭐' },
+          { href: '/merchant/dashboard', label: 'Dashboard', icon: '📊' },
+          { href: '/merchant/crm',       label: 'Clients',   icon: '👥' },
+          { href: '/merchant/analytics', label: 'Stats',     icon: '📈' },
+          { href: '/merchant/media',     label: 'Médias',    icon: '📷' },
         ].map(({ href, label, icon }) => (
           <Link
             key={href}

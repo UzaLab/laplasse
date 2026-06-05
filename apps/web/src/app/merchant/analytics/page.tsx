@@ -76,7 +76,7 @@ export default function MerchantAnalyticsPage() {
         </div>
       ) : stats ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
             {cards.map(card => (
               <div key={card.label} className="bg-white border border-slate-100 rounded-[28px] p-5">
                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-3 ${
@@ -95,37 +95,39 @@ export default function MerchantAnalyticsPage() {
             ))}
           </div>
 
-          {chart && chart.days.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-[28px] p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">Vues — 30 derniers jours</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    <span className="font-bold text-slate-700">{chart.total}</span> visites au total
-                  </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {chart && chart.days.length > 0 && (
+              <div className="bg-white border border-slate-100 rounded-[28px] p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm">Vues — 30 derniers jours</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      <span className="font-bold text-slate-700">{chart.total}</span> visites au total
+                    </p>
+                  </div>
+                </div>
+                <AnalyticsChart data={chart.days} height={80} color="#f59e0b" />
+              </div>
+            )}
+
+            {stats.interactions.length > 0 && (
+              <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100">
+                  <h3 className="font-extrabold text-slate-900">Détail des interactions</h3>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {stats.interactions.map(i => (
+                    <div key={i.event_type} className="flex items-center justify-between px-6 py-4">
+                      <span className="text-sm font-medium text-slate-700">
+                        {EVENT_LABELS[i.event_type] ?? i.event_type}
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-900">{i.count}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <AnalyticsChart data={chart.days} height={80} color="#f59e0b" />
-            </div>
-          )}
-
-          {stats.interactions.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <h3 className="font-extrabold text-slate-900">Détail des interactions</h3>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {stats.interactions.map(i => (
-                  <div key={i.event_type} className="flex items-center justify-between px-6 py-4">
-                    <span className="text-sm font-medium text-slate-700">
-                      {EVENT_LABELS[i.event_type] ?? i.event_type}
-                    </span>
-                    <span className="text-sm font-extrabold text-slate-900">{i.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {stats.views === 0 && stats.reviews.count === 0 && (
             <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100">
