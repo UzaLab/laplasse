@@ -46,7 +46,7 @@ export default sentryDsn
       project: process.env.SENTRY_PROJECT,
       silent: true,
       widenClientFileUpload: true,
-      hideSourceMaps: true,
+      sourcemaps: { disable: true },
       disableLogger: true,
       automaticVercelMonitors: false,
     })
