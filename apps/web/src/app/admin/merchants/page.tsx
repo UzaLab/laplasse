@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { BadgeCheck, X, Loader2, CheckCircle2, Store, Zap } from 'lucide-react'
@@ -24,7 +24,7 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: 'bg-red-50 text-red-700 border-red-200',
 }
 
-export default function AdminMerchantsPage() {
+function AdminMerchantsContent() {
   const searchParams = useSearchParams()
   const { ready, access_token } = useAdminSession()
   const [merchants, setMerchants] = useState<AdminMerchant[]>([])
@@ -193,5 +193,13 @@ export default function AdminMerchantsPage() {
         )}
       </div>
     </AdminShell>
+  )
+}
+
+export default function AdminMerchantsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminMerchantsContent />
+    </Suspense>
   )
 }
