@@ -3,7 +3,7 @@
 > Synthèse opérationnelle extraite de `Implementation Blueprint.md`, `cibooks_master_report.md` et Tomes 0–24.
 > Document de référence pour toute contribution au code.
 
-**Version :** 1.3 — Juin 2026 (V0.8 clôturée)
+**Version :** 1.4 — Juin 2026 (V0.8 clôturée + CRM lite + R2 Storage)
 
 ---
 
@@ -506,18 +506,19 @@ Concept validé terrain à Cocody. Déploiement Coolify opérationnel (prod + pr
 | Referral system (codes, WhatsApp deep-link) | ✅ |
 | Promotions engine (marchands) | ✅ |
 | CI/CD GitHub Actions | ✅ (nécessite PAT scope `workflow`) |
-| CRM lite | ❌ → V1.0 |
-| Stockage médias production (R2) | ❌ → V1.0 |
+| CRM lite (`/merchant/crm` — segments récent/inactif/perdu) | ✅ |
+| Stockage médias R2 (StorageService S3-compatible, fallback disk) | ✅ |
+| Sidebar profil + navbar user link + layout pleine largeur | ✅ |
 | Push notifications (BullMQ + FCM) | ❌ → V1.0 |
 
 ### V1.0 — Objectifs
 - Expansion géographique (Yopougon, Marcory, Plateau)
-- CRM lite marchand (clients récurrents/inactifs)
-- Stockage médias Cloudflare R2
 - Push notifications (BullMQ + FCM)
-- Booking engine
+- Booking engine (réservations en ligne)
 - Mobile Money (Orange Money, Wave)
 - Domaine `laplasse.ci` (remplace sslip.io)
+- Config prod R2 : activer les env vars R2_* dans Coolify
+- UptimeRobot : pointer sur https://api.*.sslip.io/api/health
 
 ---
 

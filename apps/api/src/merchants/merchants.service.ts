@@ -1,14 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { mkdir, writeFile } from 'fs/promises'
-import { join } from 'path'
-import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { OtpService } from '../otp/otp.service'
+import { StorageService } from '../storage/storage.service'
 import { QueryMerchantsDto } from './dto/query-merchants.dto'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+
 
 const MERCHANT_PUBLIC_SELECT = {
   id: true,
@@ -51,6 +50,7 @@ export class MerchantsService {
     private readonly prisma: PrismaService,
     private readonly otp: OtpService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async findAll(query: QueryMerchantsDto) {
@@ -339,15 +339,7 @@ export class MerchantsService {
     const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
     if (!merchant) throw new NotFoundException('Merchant not found')
 
-    const ext = file.mimetype === 'image/png' ? 'png' : file.mimetype === 'image/webp' ? 'webp' : 'jpg'
-    const filename = `${randomUUID()}.${ext}`
-    const dir = join(process.cwd(), 'uploads', 'merchants', merchant.id)
-    await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, filename), file.buffer)
-
-    const baseUrl = this.config.get('API_PUBLIC_URL') ?? 'http://localhost:3001'
-    const url = `${baseUrl}/uploads/merchants/${merchant.id}/${filename}`
-
+    const url = await this.storage.upload(file.buffer, file.mimetype, `merchants/${merchant.id}`)
     return this.addMyMedia({ url, type: 'IMAGE' }, userId)
   }
 
@@ -678,6 +670,75 @@ export class MerchantsService {
       }
     }
     return { updated }
+  }
+
+  async getMyCRM(userId: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { owner_id: userId },
+      select: { id: true },
+    })
+    if (!merchant) throw new NotFoundException('Merchant not found')
+
+    const now = new Date()
+    const days30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const days90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    const days180 = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000)
+
+    // All reviewers of this merchant
+    const allReviews = await this.prisma.review.findMany({
+      where: { merchant_id: merchant.id, status: 'APPROVED' },
+      select: {
+        user_id: true,
+        rating: true,
+        created_at: true,
+        user: { select: { id: true, full_name: true, email: true, created_at: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    })
+
+    // Group reviews by user
+    const byUser = new Map<string, { user: typeof allReviews[0]['user']; reviews: typeof allReviews }>()
+    for (const r of allReviews) {
+      if (!byUser.has(r.user_id)) byUser.set(r.user_id, { user: r.user, reviews: [] })
+      byUser.get(r.user_id)!.reviews.push(r)
+    }
+
+    const customers = Array.from(byUser.values()).map(({ user, reviews }) => {
+      const lastReviewAt = reviews[0]?.created_at ?? null
+      const reviewCount = reviews.length
+      const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / reviewCount
+      const isRecent = lastReviewAt && lastReviewAt >= days30
+      const isInactive = lastReviewAt && lastReviewAt < days90 && lastReviewAt >= days180
+      const isLost = lastReviewAt && lastReviewAt < days180
+      const segment: 'recent' | 'inactive' | 'lost' | 'regular' =
+        isLost ? 'lost' : isInactive ? 'inactive' : isRecent ? 'recent' : 'regular'
+      return { ...user, reviewCount, avgRating: Math.round(avgRating * 10) / 10, lastReviewAt, segment }
+    })
+
+    const recent = customers.filter(c => c.segment === 'recent')
+    const inactive = customers.filter(c => c.segment === 'inactive')
+    const lost = customers.filter(c => c.segment === 'lost')
+    const regular = customers.filter(c => c.segment === 'regular')
+
+    // Recent reviewers this month (unique users)
+    const recentReviewers = new Set(
+      allReviews.filter(r => r.created_at >= days30).map(r => r.user_id),
+    ).size
+
+    return {
+      summary: {
+        total_customers: customers.length,
+        recent_30d: recent.length,
+        inactive_90d: inactive.length,
+        lost_180d: lost.length,
+        regular: regular.length,
+        recent_reviewers_30d: recentReviewers,
+      },
+      customers: customers.sort((a, b) => {
+        const segOrder = { recent: 0, regular: 1, inactive: 2, lost: 3 }
+        return segOrder[a.segment] - segOrder[b.segment]
+      }),
+    }
   }
 
   private formatMerchant(m: Record<string, unknown>) {

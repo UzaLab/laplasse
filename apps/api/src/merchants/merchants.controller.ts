@@ -151,6 +151,12 @@ export class MerchantsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me/crm')
+  getMyCRM(@CurrentUser() user: { id: string }) {
+    return this.merchantsService.getMyCRM(user.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('me/verify-phone/send')
   sendPhoneVerification(@CurrentUser() user: { id: string }) {
     return this.merchantsService.sendPhoneVerification(user.id)
