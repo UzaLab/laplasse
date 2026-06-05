@@ -3,7 +3,7 @@
 > Synthèse opérationnelle extraite de `Implementation Blueprint.md`, `cibooks_master_report.md` et Tomes 0–24.
 > Document de référence pour toute contribution au code.
 
-**Version :** 1.2 — Juin 2026
+**Version :** 1.3 — Juin 2026 (V0.8 clôturée)
 
 ---
 
@@ -383,9 +383,11 @@ Environnement : WSL2, Docker (PostgreSQL, Redis, Meilisearch), API `:3001`, Web 
 | **Trust Score dynamique** | ✅ | Recalcul multi-signaux (OTP, complétude, avis, plaintes, favoris) — endpoint admin |
 | **Smart Recommendations** | ✅ | Section "Vous aimerez aussi" sur `/m/[slug]` — même catégorie + district |
 | **Admin Growth Dashboard** | ✅ | KPIs acquisition/rétention, graphes inscriptions+recherches, bouton Trust Score recalc |
-| Loyalty Lite | ❌ | Report V1.0 |
-| Push notifications | ❌ | Report V1.0 |
-| Referral | ❌ | Report V1.0 |
+| **Loyalty Lite** | ✅ | Points XP (review +20, favori +5, share +10, parrainage +30, merchant signup +50) — tiers Explorer/Local/Insider/Ambassadeur — `/profile/loyalty` |
+| **Notifications in-app** | ✅ | `NotificationsModule` — types : review_approved, merchant_verified, loyalty_level_up, referral_reward, welcome — `/profile/notifications` |
+| **Referral** | ✅ | Codes `LP-XXXX`, deep-link WhatsApp, double récompense 30 pts — `/profile/referral` |
+| **Promotions engine** | ✅ | CRUD offres marchands PERCENTAGE/FIXED/FREE_ITEM/EARLY_ACCESS, activation temporelle — `GET /promotions/active` |
+| Push notifications | ❌ | Report V1.0 (BullMQ + FCM) |
 
 ### Statut V0.5 — features produit
 
@@ -489,6 +491,33 @@ NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 | `Tome 23` | Stack technique |
 | `Tome 24` | QA, validation, UX, edge cases |
 | `maquettes/*.md` | Références UI (HTML Tailwind) |
+
+---
+
+## 15. Roadmap V0.8 → V1.0
+
+### V0.8 — CLÔTURÉE (juin 2026)
+Concept validé terrain à Cocody. Déploiement Coolify opérationnel (prod + preprod).
+
+| Feature clé | Statut |
+|-------------|--------|
+| Loyalty Lite (XP, tiers, `/profile/loyalty`) | ✅ |
+| Notifications in-app | ✅ |
+| Referral system (codes, WhatsApp deep-link) | ✅ |
+| Promotions engine (marchands) | ✅ |
+| CI/CD GitHub Actions | ✅ (nécessite PAT scope `workflow`) |
+| CRM lite | ❌ → V1.0 |
+| Stockage médias production (R2) | ❌ → V1.0 |
+| Push notifications (BullMQ + FCM) | ❌ → V1.0 |
+
+### V1.0 — Objectifs
+- Expansion géographique (Yopougon, Marcory, Plateau)
+- CRM lite marchand (clients récurrents/inactifs)
+- Stockage médias Cloudflare R2
+- Push notifications (BullMQ + FCM)
+- Booking engine
+- Mobile Money (Orange Money, Wave)
+- Domaine `laplasse.ci` (remplace sslip.io)
 
 ---
 
