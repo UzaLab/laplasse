@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import * as Sentry from '@sentry/node'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'

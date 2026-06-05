@@ -19,21 +19,18 @@ WORKDIR /app/apps/api
 RUN node_modules/.bin/prisma generate
 RUN pnpm build
 
+# Bundle prod sans symlinks pnpm (node_modules autonome)
+WORKDIR /app
+RUN pnpm deploy --filter=api --prod /prod/api
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
-WORKDIR /app/apps/api
+WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Garder la structure pnpm (store racine + symlinks apps/api)
-COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/node_modules ./node_modules
-COPY --from=builder /app/apps/api/package.json ./package.json
-COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /prod/api ./
 
 EXPOSE 3001
 
-# Migration puis démarrage (ne pas bloquer si migrate a déjà été appliqué)
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy || echo '[warn] prisma migrate deploy failed'; exec node dist/src/main.js"]
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy || echo '[warn] prisma migrate deploy failed'; exec node dist/src/main.js"]
