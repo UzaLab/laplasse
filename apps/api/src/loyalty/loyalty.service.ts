@@ -63,7 +63,7 @@ export class LoyaltyService {
     return { account, transactions, tiers, pointsToNext }
   }
 
-  async earnPoints(userId: string, reason: string, metadata?: Record<string, unknown>) {
+  async earnPoints(userId: string, reason: string, metadata?: Record<string, unknown> | null) {
     const points = POINTS_TABLE[reason] ?? 0
     if (points === 0) return null
 
@@ -72,7 +72,7 @@ export class LoyaltyService {
 
     const [, updatedAccount] = await this.prisma.$transaction([
       this.prisma.loyaltyTransaction.create({
-        data: { account_id: account.id, points, reason, metadata },
+        data: { account_id: account.id, points, reason, metadata: metadata as never },
       }),
       this.prisma.loyaltyAccount.update({
         where: { id: account.id },

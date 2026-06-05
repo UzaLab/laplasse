@@ -22,12 +22,12 @@ export class NotificationsService {
     type: NotificationType,
     title: string,
     body: string,
-    data?: Record<string, unknown>,
+    data?: Record<string, unknown> | null,
     channel: 'in_app' | 'email' = 'in_app',
   ) {
     try {
       const notif = await this.prisma.notification.create({
-        data: { user_id: userId, type, channel, title, body, data, status: 'SENT', sent_at: new Date() },
+        data: { user_id: userId, type, channel, title, body, data: (data ?? undefined) as never, status: 'SENT', sent_at: new Date() },
       })
       this.logger.log(`Notification sent [${type}] → user:${userId}`)
       return notif
