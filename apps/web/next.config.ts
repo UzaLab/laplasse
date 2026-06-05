@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const apiOrigin = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/api\/?$/, "");
@@ -34,6 +35,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
+  outputFileTracingRoot: path.join(process.cwd(), "../.."),
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
