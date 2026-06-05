@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CreateReviewDto } from './dto/create-review.dto'
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly loyalty: LoyaltyService,
+  ) {}
 
   async create(dto: CreateReviewDto, userId: string) {
     if (dto.rating < 1 || dto.rating > 5) {
@@ -34,6 +38,9 @@ export class ReviewsService {
         user: { select: { id: true, full_name: true, avatar: true } },
       },
     })
+
+    // Gain de points loyalty pour l'auteur de l'avis
+    this.loyalty.earnPoints(userId, 'review', { merchant_id: dto.merchant_id }).catch(() => {})
 
     return review
   }

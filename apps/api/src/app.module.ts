@@ -14,6 +14,10 @@ import { AdminModule } from './admin/admin.module'
 import { ComplaintsModule } from './complaints/complaints.module'
 import { OtpModule } from './otp/otp.module'
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
+import { NotificationsModule } from './notifications/notifications.module'
+import { LoyaltyModule } from './loyalty/loyalty.module'
+import { ReferralModule } from './referral/referral.module'
+import { PromotionsModule } from './promotions/promotions.module'
 
 @Module({
   imports: [
@@ -30,6 +34,10 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard'
     FavoritesModule,
     AdminModule,
     ComplaintsModule,
+    NotificationsModule,
+    LoyaltyModule,
+    ReferralModule,
+    PromotionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

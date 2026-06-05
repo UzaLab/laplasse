@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const setAuth = useAuthStore(s => s.setAuth)
+  const refCode = searchParams.get('ref') ?? ''
 
   const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '' })
   const [showPass, setShowPass] = useState(false)
@@ -53,6 +55,16 @@ export default function RegisterPage() {
       }
 
       setAuth(data.user, data.access_token, data.refresh_token)
+
+      // Appliquer le code de parrainage si présent
+      if (refCode && data.access_token) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/referral/apply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.access_token}` },
+          body: JSON.stringify({ code: refCode }),
+        }).catch(() => {})
+      }
+
       router.push('/')
     } catch {
       setError('Erreur de connexion. Vérifiez votre réseau.')
@@ -205,5 +217,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterContent />
+    </Suspense>
   )
 }

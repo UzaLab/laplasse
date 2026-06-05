@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Heart, Star, Store, BadgeCheck, ChevronRight, Compass, Loader2, MapPin } from 'lucide-react'
+import { Heart, Star, Store, BadgeCheck, ChevronRight, Compass, Loader2, MapPin, Trophy, Gift, Bell } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
@@ -72,7 +72,10 @@ export default function ProfilePage() {
   const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
 
   const quickLinks = [
-    { label: 'Mes favoris',    href: '/favoris',          icon: <Heart size={16} className="text-red-500" /> },
+    { label: 'Mes favoris',       href: '/favoris',                  icon: <Heart size={16} className="text-red-500" /> },
+    { label: 'Mes points fidélité',href: '/profile/loyalty',         icon: <Trophy size={16} className="text-amber-500" /> },
+    { label: 'Parrainage',        href: '/profile/referral',         icon: <Gift size={16} className="text-emerald-500" /> },
+    { label: 'Notifications',     href: '/profile/notifications',    icon: <Bell size={16} className="text-slate-500" /> },
     ...(user.merchant
       ? [{ label: 'Dashboard marchand', href: '/merchant/dashboard', icon: <Store size={16} className="text-amber-500" /> }]
       : [{ label: 'Inscrire mon commerce', href: '/merchant/signup', icon: <Store size={16} className="text-slate-400" /> }]

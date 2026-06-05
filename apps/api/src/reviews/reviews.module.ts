@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common'
 import { ReviewsController } from './reviews.controller'
 import { ReviewsService } from './reviews.service'
+import { LoyaltyModule } from '../loyalty/loyalty.module'
 
 @Module({
+  imports: [LoyaltyModule],
   controllers: [ReviewsController],
   providers: [ReviewsService],
 })

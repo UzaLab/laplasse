@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ComplaintsService } from '../complaints/complaints.service'
 import { SearchService } from '../search/search.service'
 import { MerchantsService } from '../merchants/merchants.service'
+import { NotificationsService } from '../notifications/notifications.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +17,7 @@ export class AdminController {
     private readonly complaintsService: ComplaintsService,
     private readonly searchService: SearchService,
     private readonly merchantsService: MerchantsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
@@ -78,10 +80,19 @@ export class AdminController {
         trust_score: body.trust_score ?? undefined,
         is_active: body.status === 'VERIFIED',
       },
-      select: { id: true, business_name: true, verification_status: true, is_active: true },
+      select: {
+        id: true, business_name: true, verification_status: true, is_active: true,
+        owner_id: true,
+      },
     })
     // Sync Meilisearch après changement de statut
     this.searchService.syncMerchant(id).catch(() => {})
+    // Notification au propriétaire
+    if (body.status === 'VERIFIED') {
+      this.notifications.sendMerchantVerified(merchant.owner_id, merchant.business_name).catch(() => {})
+    } else if (body.status === 'PENDING') {
+      this.notifications.sendMerchantPending(merchant.owner_id, merchant.business_name).catch(() => {})
+    }
     return merchant
   }
 
@@ -139,11 +150,19 @@ export class AdminController {
       await this.prisma.review.delete({ where: { id } })
       return { deleted: true }
     }
-    return this.prisma.review.update({
+    const updated = await this.prisma.review.update({
       where: { id },
       data: { status: body.action === 'approve' ? 'APPROVED' : 'REJECTED' },
-      select: { id: true, status: true },
+      select: {
+        id: true, status: true,
+        user_id: true,
+        merchant: { select: { business_name: true } },
+      },
     })
+    if (body.action === 'approve') {
+      this.notifications.sendReviewApproved(updated.user_id, updated.merchant.business_name).catch(() => {})
+    }
+    return { id: updated.id, status: updated.status }
   }
 
   // ── Signalements ────────────────────────────────────────────────────────────

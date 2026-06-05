@@ -6,6 +6,8 @@ import { ConfigService } from '@nestjs/config'
 import { hash, compare } from 'bcryptjs'
 import { PrismaService } from '../prisma/prisma.service'
 import { OtpService } from '../otp/otp.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 import { RegisterDto, LoginDto } from './dto/auth.dto'
 
 @Injectable()
@@ -17,6 +19,8 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly otp: OtpService,
+    private readonly notifications: NotificationsService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   // ─── Register ─────────────────────────────────────────────────────────────
@@ -58,6 +62,12 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role)
     this.logger.log(`New user registered: ${user.email}`)
+
+    // Init loyalty + notification de bienvenue (non-bloquant)
+    Promise.all([
+      this.loyalty.getOrCreateAccount(user.id),
+      this.notifications.sendWelcome(user.id, user.full_name ?? undefined),
+    ]).catch(() => {})
 
     return { user, ...tokens }
   }
