@@ -59,6 +59,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       helmet:
         specifier: ^8.2.0
         version: 8.2.0
@@ -138,9 +141,6 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@20.19.41)(ts-node@10.9.2(@types/node@20.19.41)(typescript@5.9.3))

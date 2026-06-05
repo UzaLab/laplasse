@@ -34,5 +34,5 @@ COPY --from=builder /app/apps/api/prisma.config.ts ./
 
 EXPOSE 3001
 
-# Migration (avec le binaire copié) + démarrage
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main.js"]
+# Migration puis démarrage (ne pas bloquer si migrate a déjà été appliqué)
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy || echo '[warn] prisma migrate deploy failed'; exec node dist/src/main.js"]

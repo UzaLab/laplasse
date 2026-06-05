@@ -61,7 +61,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter())
 
   const port = process.env.PORT ?? 3001
-  await app.listen(port)
+  await app.listen(port, '0.0.0.0')
   console.log(`\n🚀 LaPlasse API running on http://localhost:${port}/api`)
   console.log(`   Health: http://localhost:${port}/api/health`)
   console.log(`   Env: ${process.env.NODE_ENV ?? 'development'}\n`)
