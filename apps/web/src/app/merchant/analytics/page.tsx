@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Eye, MessageCircle, Phone, Heart, Star, Loader2, Network } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
@@ -48,13 +49,14 @@ function MerchantAnalyticsContent() {
   const searchParams = useSearchParams()
   const isOrgScope = searchParams.get('scope') === 'organization'
   const { isAuthenticated, activeMerchantId, user } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [stats, setStats] = useState<Analytics | null>(null)
   const [orgStats, setOrgStats] = useState<OrgAnalytics | null>(null)
   const [chart, setChart] = useState<{ days: { date: string; count: number }[]; total: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/analytics'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/analytics'); return }
 
     if (isOrgScope && user?.organization?.id) {
       authApiFetch(`/organizations/${user.organization.id}/analytics`)
@@ -78,7 +80,7 @@ function MerchantAnalyticsContent() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [isAuthenticated, activeMerchantId, router, isOrgScope, user?.organization?.id])
 
-  if (!isAuthenticated) return null
+  if (hydrated && !isAuthenticated) return null
 
   const cards = stats ? [
     { label: 'Vues',      value: stats.views,              icon: <Eye size={20} />,         color: 'blue' },

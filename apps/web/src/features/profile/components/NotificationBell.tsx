@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Bell, Loader2 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { NotificationIcon } from '@/lib/icons'
 
 interface Notif {
@@ -18,7 +18,7 @@ interface Notif {
 }
 
 export function NotificationBell() {
-  const { isAuthenticated } = useAuthStore()
+  const { ready: authReady } = useAuthReady()
   const [open, setOpen] = useState(false)
   const [panelPos, setPanelPos] = useState({ top: 0, right: 16 })
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -31,7 +31,7 @@ export function NotificationBell() {
       if (!res.ok) return []
       return res.json()
     },
-    enabled: isAuthenticated,
+    enabled: authReady,
     refetchInterval: 60_000,
   })
 
@@ -69,7 +69,7 @@ export function NotificationBell() {
     setOpen(v => !v)
   }
 
-  if (!isAuthenticated) return null
+  if (!authReady) return null
 
   const unreadCount = notifications.filter(n => !n.read).length
   const preview = notifications.slice(0, 6)

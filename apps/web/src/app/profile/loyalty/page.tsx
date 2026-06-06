@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Trophy, Star, Zap, ArrowLeft, Loader2, ChevronUp, Heart, Share2, Gift, Store, ArrowUp, ArrowDown, Check } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
+import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 import { LOYALTY_TIER_ICONS } from '@/lib/icons'
 import type { LucideIcon } from 'lucide-react'
@@ -36,28 +35,19 @@ interface LoyaltyData {
 }
 
 export default function LoyaltyPage() {
-  const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile/loyalty')
-  }, [mounted, isAuthenticated, router])
+  const { ready: authReady, hydrated, isAuthenticated } = useRequireAuth('/profile/loyalty')
 
   const { data, isLoading } = useQuery<LoyaltyData>({
     queryKey: ['loyalty-account'],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/loyalty/my`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await authApiFetch('/loyalty/my')
       if (!res.ok) throw new Error('Erreur')
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted && access_token),
+    enabled: authReady,
   })
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

@@ -39,7 +39,25 @@ export class FavoritesService {
       },
       orderBy: { created_at: 'desc' },
     })
-    return favs.map(f => f.merchant)
+
+    const merchantIds = favs.map(f => f.merchant.id)
+    const ratings = merchantIds.length
+      ? await this.prisma.review.groupBy({
+          by: ['merchant_id'],
+          where: { merchant_id: { in: merchantIds }, status: 'APPROVED' },
+          _avg: { rating: true },
+        })
+      : []
+    const ratingByMerchant = Object.fromEntries(
+      ratings.map(r => [r.merchant_id, r._avg.rating]),
+    )
+
+    return favs
+      .map(f => ({
+        ...f.merchant,
+        avg_rating: ratingByMerchant[f.merchant.id] ?? null,
+      }))
+      .filter(m => m.id)
   }
 
   async isFavorited(merchantId: string, userId: string) {

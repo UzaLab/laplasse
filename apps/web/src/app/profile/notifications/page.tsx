@@ -1,10 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Bell, ArrowLeft, Loader2, CheckCheck } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
@@ -20,15 +18,8 @@ interface Notif {
 }
 
 export default function NotificationsPage() {
-  const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
+  const { ready: authReady, hydrated, isAuthenticated } = useRequireAuth('/profile/notifications')
   const qc = useQueryClient()
-
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile/notifications')
-  }, [mounted, isAuthenticated, router])
 
   const { data: notifications = [], isLoading } = useQuery<Notif[]>({
     queryKey: ['notifications'],
@@ -37,7 +28,7 @@ export default function NotificationsPage() {
       if (!res.ok) return []
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted),
+    enabled: authReady,
   })
 
   const markAllRead = useMutation({
@@ -54,7 +45,7 @@ export default function NotificationsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   })
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

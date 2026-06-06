@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Image as ImageIcon, Loader2, Plus, Trash2, Star, Crown } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
@@ -31,6 +32,7 @@ interface MediaData {
 export default function MerchantMediaPage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [data, setData] = useState<MediaData | null>(null)
   const [newUrl, setNewUrl] = useState('')
   const [loading, setLoading] = useState(true)
@@ -40,10 +42,10 @@ export default function MerchantMediaPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/media'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/media'); return }
     fetchMedia()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, activeMerchantId])
+  }, [hydrated, isAuthenticated, activeMerchantId])
 
   const fetchMedia = async () => {
     setLoading(true)

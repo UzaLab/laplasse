@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Smartphone, Loader2, CheckCircle2, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 
 export default function VerifyPhonePage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [step, setStep] = useState<'send' | 'verify' | 'done'>('send')
   const [code, setCode] = useState('')
   const [phoneMasked, setPhoneMasked] = useState('')
@@ -18,7 +20,7 @@ export default function VerifyPhonePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/verify-phone'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/verify-phone'); return }
     checkStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated])
@@ -68,7 +70,7 @@ export default function VerifyPhonePage() {
     setLoading(false)
   }
 
-  if (!isAuthenticated) return null
+  if (hydrated && !isAuthenticated) return null
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-6">

@@ -4,32 +4,28 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Edit2, Loader2, X, LogOut } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
+import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
-  const { isAuthenticated, user, access_token, logout } = useAuthStore()
-  const [mounted, setMounted]   = useState(false)
+  const { hydrated, isAuthenticated, user, logout } = useRequireAuth('/profile/settings')
   const [editing, setEditing]   = useState(false)
   const [name, setName]         = useState('')
   const [saving, setSaving]     = useState(false)
   const [saveMsg, setSaveMsg]   = useState('')
 
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile/settings')
-  }, [mounted, isAuthenticated, router])
   useEffect(() => {
     if (user?.full_name) setName(user.full_name)
   }, [user?.full_name])
 
   const handleSave = async () => {
-    if (!name.trim() || !access_token) return
+    if (!name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+      const res = await authApiFetch('/auth/me', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${access_token}` },
         body: JSON.stringify({ full_name: name.trim() }),
       })
       if (res.ok) {
@@ -41,7 +37,7 @@ export default function ProfileSettingsPage() {
     setSaving(false)
   }
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

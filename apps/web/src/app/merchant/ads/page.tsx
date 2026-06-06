@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Megaphone, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { getHighestPlan, PLAN_LIMITS } from '@/lib/planLimits'
 
@@ -20,6 +21,7 @@ interface Campaign {
 export default function MerchantAdsPage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId, user } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [pricing, setPricing] = useState<Record<string, Record<number, number>>>({})
   const [placement, setPlacement] = useState('SEARCH')
@@ -45,7 +47,7 @@ export default function MerchantAdsPage() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/ads'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/ads'); return }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, activeMerchantId])

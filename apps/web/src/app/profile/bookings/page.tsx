@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   CalendarCheck, Calendar, Clock, Users, Loader2, ChevronLeft, ChevronRight,
 } from 'lucide-react'
@@ -10,7 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 import { EditBookingModal, type EditableBooking } from '@/features/profile/components/EditBookingModal'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import type { BookingType } from '@/lib/bookingConfig'
 
 interface BookingRow {
@@ -113,27 +112,17 @@ async function fetchBookings(tab: Tab, page: number): Promise<BookingsResponse> 
 }
 
 export default function ProfileBookingsPage() {
-  const router = useRouter()
   const queryClient = useQueryClient()
-  const { isAuthenticated, user, access_token } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
+  const { ready: authReady, hydrated, isAuthenticated, user } = useRequireAuth('/profile/bookings')
   const [tab, setTab] = useState<Tab>('upcoming')
   const [page, setPage] = useState(1)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [editingBooking, setEditingBooking] = useState<EditableBooking | null>(null)
 
-  useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    if (mounted && !isAuthenticated) {
-      router.push('/login?redirect=/profile/bookings')
-    }
-  }, [mounted, isAuthenticated, router])
-
   const { data, isLoading } = useQuery({
     queryKey: ['my-bookings', user?.id, tab, page],
     queryFn: () => fetchBookings(tab, page),
-    enabled: !!(mounted && isAuthenticated && access_token),
+    enabled: authReady,
   })
 
   const switchTab = (next: Tab) => {
@@ -154,7 +143,7 @@ export default function ProfileBookingsPage() {
     }
   }
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

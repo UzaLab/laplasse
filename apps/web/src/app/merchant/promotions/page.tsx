@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tag, Loader2, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
@@ -22,6 +23,7 @@ interface Promotion {
 export default function MerchantPromotionsPage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [promos, setPromos] = useState<Promotion[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ title: '', description: '', type: 'PERCENTAGE', value: '10', starts_at: '', ends_at: '' })
@@ -34,7 +36,7 @@ export default function MerchantPromotionsPage() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/promotions'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/promotions'); return }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, activeMerchantId])

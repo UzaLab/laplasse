@@ -183,6 +183,7 @@ model Merchant {
   booking_settings MerchantBookingSettings?
   services         MerchantService[]
   staff            MerchantStaff[]
+  availability_blocks MerchantAvailabilityBlock[]
   ad_campaigns     AdCampaign[]
 
   @@index([slug])
@@ -616,6 +617,13 @@ enum BookingStatus {
   NO_SHOW
 }
 
+enum ServiceKind {
+  APPOINTMENT
+  TABLE_MENU
+  ROOM_TYPE
+  CONSULTATION
+}
+
 model MerchantBookingSettings {
   merchant_id         String  @id
   max_capacity        Int     @default(20)
@@ -628,18 +636,25 @@ model MerchantBookingSettings {
 }
 
 model MerchantService {
-  id           String  @id @default(cuid())
+  id           String      @id @default(cuid())
   merchant_id  String
   name         String
-  duration_min Int     @default(60)
+  service_kind ServiceKind @default(APPOINTMENT)
+  description  String?
+  duration_min Int         @default(60)
   price        Int?
-  is_active    Boolean @default(true)
-  created_at   DateTime @default(now())
+  capacity     Int?
+  staff_id     String?
+  is_active    Boolean     @default(true)
+  created_at   DateTime    @default(now())
 
-  merchant Merchant  @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  merchant Merchant       @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  staff    MerchantStaff? @relation(fields: [staff_id], references: [id], onDelete: SetNull)
   bookings Booking[]
+  blocks   MerchantAvailabilityBlock[]
 
   @@index([merchant_id])
+  @@index([staff_id])
 }
 
 model MerchantStaff {
@@ -650,10 +665,31 @@ model MerchantStaff {
   is_active   Boolean @default(true)
   created_at  DateTime @default(now())
 
-  merchant Merchant  @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  merchant Merchant                    @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
   bookings Booking[]
+  services MerchantService[]
+  blocks   MerchantAvailabilityBlock[]
 
   @@index([merchant_id])
+}
+
+model MerchantAvailabilityBlock {
+  id          String   @id @default(cuid())
+  merchant_id String
+  starts_at   DateTime
+  ends_at     DateTime
+  all_day     Boolean  @default(false)
+  staff_id    String?
+  service_id  String?
+  reason      String?
+  created_at  DateTime @default(now())
+
+  merchant Merchant         @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  staff    MerchantStaff?   @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+  service  MerchantService?   @relation(fields: [service_id], references: [id], onDelete: SetNull)
+
+  @@index([merchant_id])
+  @@index([starts_at, ends_at])
 }
 
 model Booking {

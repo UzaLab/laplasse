@@ -47,6 +47,17 @@ export class BookingsService {
     const catConfig = getCategoryBookingConfig(merchant.category.slug)
     const enabled = limits.booking && catConfig.enabled && !!catConfig.type
 
+    const settings = await this.prisma.merchantBookingSettings.upsert({
+      where: { merchant_id: merchantId },
+      create: { merchant_id: merchantId },
+      update: {},
+    })
+
+    const roomServices = merchant.services.filter(s => s.service_kind === 'ROOM_TYPE')
+    const roomTypes = roomServices.length
+      ? roomServices.map(s => s.name)
+      : ['Single', 'Double', 'Suite', 'Family']
+
     return {
       enabled,
       booking_type: catConfig.type,
@@ -55,7 +66,9 @@ export class BookingsService {
       category_slug: merchant.category.slug,
       services: merchant.services,
       staff: merchant.staff,
-      room_types: ['Single', 'Double', 'Suite', 'Family'],
+      room_types: roomTypes,
+      room_services: roomServices,
+      booking_settings: settings,
     }
   }
 

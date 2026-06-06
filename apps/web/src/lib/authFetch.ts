@@ -3,13 +3,25 @@ import { useAuthStore } from '@/stores/authStore'
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 
 let refreshPromise: Promise<string | null> | null = null
+let hydrationPromise: Promise<void> | null = null
+
+function waitForAuthHydration(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (useAuthStore.persist.hasHydrated()) return Promise.resolve()
+  if (!hydrationPromise) {
+    hydrationPromise = new Promise(resolve => {
+      useAuthStore.persist.onFinishHydration(() => {
+        hydrationPromise = null
+        resolve()
+      })
+    })
+  }
+  return hydrationPromise
+}
 
 async function refreshAccessToken(): Promise<string | null> {
   const { refresh_token, setAuth, user, logout } = useAuthStore.getState()
-  if (!refresh_token) {
-    logout()
-    return null
-  }
+  if (!refresh_token) return null
 
   try {
     const res = await fetch(`${API_URL}/auth/refresh`, {
@@ -18,7 +30,7 @@ async function refreshAccessToken(): Promise<string | null> {
       body: JSON.stringify({ refresh_token }),
     })
     if (!res.ok) {
-      logout()
+      if (res.status === 401 || res.status === 403) logout()
       return null
     }
     const data = await res.json()
@@ -29,7 +41,7 @@ async function refreshAccessToken(): Promise<string | null> {
     logout()
     return null
   } catch {
-    logout()
+    // Erreur réseau — conserver la session, ne pas déconnecter
     return null
   }
 }
@@ -68,10 +80,14 @@ export async function authApiFetch(
   options?: RequestInit,
   retried = false,
 ): Promise<Response> {
+  await waitForAuthHydration()
+
   const token = useAuthStore.getState().access_token
   if (!token) {
-    redirectToLogin()
-    return new Response(null, { status: 401 })
+    return new Response(
+      JSON.stringify({ message: 'Non authentifié' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } },
+    )
   }
 
   try {
@@ -104,6 +120,8 @@ export async function authFetch<T>(
   options?: RequestInit,
   retried = false,
 ): Promise<T | null> {
+  await waitForAuthHydration()
+
   try {
     const res = await fetch(`${API_URL}${path}`, {
       ...options,

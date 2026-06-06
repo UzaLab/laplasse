@@ -10,6 +10,7 @@ export interface PlanLimits {
   promotions: boolean
   booking: boolean
   advancedBooking: boolean
+  offeringsManagement: boolean
   searchBoost: number
   orgAllowed: boolean
   adsSelfService: boolean
@@ -32,6 +33,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     promotions: false,
     booking: false,
     advancedBooking: false,
+    offeringsManagement: false,
     searchBoost: 0,
     orgAllowed: false,
     adsSelfService: false,
@@ -45,6 +47,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     promotions: true,
     booking: true,
     advancedBooking: false,
+    offeringsManagement: false,
     searchBoost: 1,
     orgAllowed: false,
     adsSelfService: false,
@@ -58,6 +61,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     promotions: true,
     booking: true,
     advancedBooking: true,
+    offeringsManagement: false,
     searchBoost: 2,
     orgAllowed: true,
     adsSelfService: true,
@@ -71,6 +75,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     promotions: true,
     booking: true,
     advancedBooking: true,
+    offeringsManagement: true,
     searchBoost: 3,
     orgAllowed: true,
     adsSelfService: true,

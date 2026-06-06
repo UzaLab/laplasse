@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, CheckCircle2, SaveIcon, Clock, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
@@ -36,6 +37,7 @@ const FIELDS: Field[] = [
 export default function EditMerchantProfilePage() {
   const router = useRouter()
   const { isAuthenticated, user, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
 
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
   const [form, setForm] = useState<FormData>({
@@ -48,7 +50,7 @@ export default function EditMerchantProfilePage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login'); return }
     if (user?.role === 'USER') { router.push('/'); return }
     fetchProfile()
   // eslint-disable-next-line react-hooks/exhaustive-deps

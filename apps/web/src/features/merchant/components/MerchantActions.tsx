@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Heart, Share2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { useRouter } from 'next/navigation'
 import { authApiFetch } from '@/lib/authFetch'
 
@@ -15,26 +16,18 @@ interface MerchantActionsProps {
 
 export function MerchantActions({ merchantId, merchantName, merchantSlug, variant = 'hero' }: MerchantActionsProps) {
   const { isAuthenticated } = useAuthStore()
+  const { ready: authReady } = useAuthReady()
   const router = useRouter()
   const [isFav, setIsFav] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
-      return
-    }
-    return useAuthStore.persist.onFinishHydration(() => setHydrated(true))
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated || !isAuthenticated) return
+    if (!authReady) return
     authApiFetch(`/favorites/${merchantId}/check`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.is_favorited !== undefined) setIsFav(d.is_favorited) })
       .catch(() => {})
-  }, [hydrated, isAuthenticated, merchantId])
+  }, [authReady, merchantId])
 
   const handleShare = async () => {
     const url = `${window.location.origin}/m/${merchantSlug}`

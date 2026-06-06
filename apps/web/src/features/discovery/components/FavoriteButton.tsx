@@ -5,6 +5,7 @@ import { Heart } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { authApiFetch } from '@/lib/authFetch'
 
 interface FavoriteButtonProps {
@@ -27,26 +28,18 @@ export function FavoriteButton({
   ariaLabel = 'Ajouter aux favoris',
 }: FavoriteButtonProps) {
   const { isAuthenticated } = useAuthStore()
+  const { ready: authReady } = useAuthReady()
   const router = useRouter()
   const [isFav, setIsFav] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
-      return
-    }
-    return useAuthStore.persist.onFinishHydration(() => setHydrated(true))
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated || !isAuthenticated) return
+    if (!authReady) return
     authApiFetch(`/favorites/${merchantId}/check`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.is_favorited !== undefined) setIsFav(d.is_favorited) })
       .catch(() => {})
-  }, [hydrated, isAuthenticated, merchantId])
+  }, [authReady, merchantId])
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault()

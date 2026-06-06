@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Clock, Loader2, CheckCircle2, Save } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
@@ -35,6 +36,7 @@ const DEFAULT_HOURS: HourEntry[] = DAYS.map(d => ({
 export default function MerchantHoursPage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [hours, setHours] = useState<HourEntry[]>(DEFAULT_HOURS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,7 +44,7 @@ export default function MerchantHoursPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/hours'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/hours'); return }
     fetchHours()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, activeMerchantId])
@@ -89,7 +91,7 @@ export default function MerchantHoursPage() {
     setSaving(false)
   }
 
-  if (!isAuthenticated) return null
+  if (hydrated && !isAuthenticated) return null
 
   return (
     <MerchantShell>

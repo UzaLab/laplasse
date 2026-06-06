@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Share2, Copy, Check, ArrowLeft, Loader2, Users, Gift } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
+import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 
 interface ReferralStats {
@@ -16,29 +16,20 @@ interface ReferralStats {
 }
 
 export default function ReferralPage() {
-  const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
+  const { ready: authReady, hydrated, isAuthenticated } = useRequireAuth('/profile/referral')
   const [copied, setCopied] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile/referral')
-  }, [mounted, isAuthenticated, router])
 
   const { data, isLoading } = useQuery<ReferralStats>({
     queryKey: ['referral-stats'],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/referral/stats`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await authApiFetch('/referral/stats')
       if (!res.ok) throw new Error('Erreur')
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted && access_token),
+    enabled: authReady,
   })
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

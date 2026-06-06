@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Star, Compass, Loader2, MapPin } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
+import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 
 interface UserReview {
@@ -19,28 +18,19 @@ interface UserReview {
 }
 
 export default function ProfileReviewsPage() {
-  const router = useRouter()
-  const { isAuthenticated, user, access_token } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile/reviews')
-  }, [mounted, isAuthenticated, router])
+  const { ready: authReady, hydrated, isAuthenticated, user } = useRequireAuth('/profile/reviews')
 
   const { data: reviews = [], isLoading } = useQuery<UserReview[]>({
     queryKey: ['my-reviews', user?.id],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/reviews/mine`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await authApiFetch('/reviews/mine')
       if (!res.ok) return []
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted && access_token),
+    enabled: authReady,
   })
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

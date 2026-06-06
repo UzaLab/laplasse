@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Check, Zap, Crown, Star, Loader2, BadgeCheck } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { PaymentSimulator } from '@/features/merchant/components/PaymentSimulator'
@@ -90,6 +89,7 @@ const PLANS: Plan[] = [
     color: 'purple',
     features: [
       'Tout du plan Growth',
+      'Offres & disponibilités (tarifs, blocages)',
       'Établissements illimités',
       'Organisation avancée',
       'Annonce sponsorisée (top résultats)',
@@ -102,31 +102,24 @@ const PLANS: Plan[] = [
 ]
 
 export default function MerchantPlansPage() {
-  const router = useRouter()
-  const { isAuthenticated, user, activeMerchantId } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
+  const { ready: authReady, hydrated, isAuthenticated, user, activeMerchantId } = useRequireAuth('/merchant/plans')
   const [currentPlan, setCurrentPlan] = useState<string | null>(null)
   const [simulatorPlan, setSimulatorPlan] = useState<{ id: SubscriptionPlan; name: string } | null>(null)
 
-  useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/merchant/plans')
-  }, [mounted, isAuthenticated, router])
-
-  useEffect(() => {
-    if (!isAuthenticated) return
+    if (!authReady) return
     merchantApiFetch('/merchants/me/profile', activeMerchantId)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.subscription_plan) setCurrentPlan(d.subscription_plan) })
       .catch(() => {})
-  }, [isAuthenticated, activeMerchantId])
+  }, [authReady, activeMerchantId])
 
   const handleSelectPlan = (planId: SubscriptionPlan, planName: string) => {
     if (planId === 'FREE') return
     setSimulatorPlan({ id: planId, name: planName })
   }
 
-  if (!mounted) {
+  if (!hydrated) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-slate-300" size={28} /></div>
   }
 

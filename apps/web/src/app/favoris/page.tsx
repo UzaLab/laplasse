@@ -1,43 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Heart, BadgeCheck, MapPin, MessageCircle, Loader2, Store } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
+import { authApiFetch } from '@/lib/authFetch'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 
 interface FavMerchant {
   id: string; business_name: string; slug: string; cover_image: string | null
-  verification_status: string; trust_score: number; whatsapp: string | null
+  verification_status: string; trust_score: number; avg_rating?: number | null; whatsapp: string | null
   category: { name: string; slug: string; icon: string | null }
   location: { city: string; district: string | null } | null
 }
 
 export default function FavorisPage() {
-  const router = useRouter()
-  const { isAuthenticated, user, access_token } = useAuthStore()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/favoris')
-  }, [mounted, isAuthenticated, router])
+  const { ready: authReady, hydrated, isAuthenticated, user } = useRequireAuth('/favoris')
 
   const { data: favorites = [], isLoading } = useQuery<FavMerchant[]>({
     queryKey: ['favorites', user?.id],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/favorites`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await authApiFetch('/favorites')
       if (!res.ok) return []
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted && access_token),
+    enabled: authReady,
   })
 
-  if (!mounted) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />

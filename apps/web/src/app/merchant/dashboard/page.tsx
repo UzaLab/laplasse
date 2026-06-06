@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { useMerchant } from '@/features/discovery/hooks/useDiscovery'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
@@ -44,10 +45,11 @@ function DashboardContent() {
   const searchParams = useSearchParams()
   const isNew = searchParams.get('new') === 'true'
   const { isAuthenticated, user, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [phoneVerified, setPhoneVerified] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login?redirect=/merchant/dashboard')
+    if (hydrated && !isAuthenticated) router.push('/login?redirect=/merchant/dashboard')
   }, [isAuthenticated, router])
 
   const { data: myProfile, isLoading: loadingProfile } = useQuery<{
@@ -67,7 +69,7 @@ function DashboardContent() {
   const isLoading = loadingProfile || loadingMerchant
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (hydrated && !isAuthenticated) return
     merchantApiFetch('/merchants/me/verify-phone/status', activeMerchantId)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setPhoneVerified(d.phone_verified) })

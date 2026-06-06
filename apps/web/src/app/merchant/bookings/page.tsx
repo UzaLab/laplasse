@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Loader2, Check, X, Clock } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
@@ -38,6 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function MerchantBookingsPage() {
   const router = useRouter()
   const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
@@ -50,7 +52,7 @@ export default function MerchantBookingsPage() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login?redirect=/merchant/bookings'); return }
+    if (hydrated && !isAuthenticated) { router.push('/login?redirect=/merchant/bookings'); return }
     fetchBookings()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, activeMerchantId])
@@ -66,7 +68,7 @@ export default function MerchantBookingsPage() {
     setProcessing(null)
   }
 
-  if (!isAuthenticated) return null
+  if (hydrated && !isAuthenticated) return null
 
   return (
     <MerchantShell>

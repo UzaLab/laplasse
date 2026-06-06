@@ -8,6 +8,7 @@ import {
   Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users, UserCircle2,
   ChevronDown, Plus, Building2, Network, Calendar, Tag, Megaphone, Scissors,
 } from 'lucide-react'
+import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
@@ -92,11 +93,16 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     { href: '/merchant/bookings',     label: 'Réservations',     icon: <Calendar size={17} /> },
   ]
 
+  const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)
+  const canOfferings = PLAN_LIMITS[activeMerchantPlan]?.offeringsManagement ?? false
+
   const editNav: NavItem[] = [
     { href: '/merchant/profile/edit', label: 'Modifier le profil', icon: <Edit size={17} /> },
     { href: '/merchant/hours',        label: 'Horaires',            icon: <Clock size={17} /> },
     { href: '/merchant/media',        label: 'Photos & médias',     icon: <Image size={17} /> },
-    { href: '/merchant/staff',        label: 'Prestations & équipe', icon: <Scissors size={17} /> },
+    ...(canOfferings
+      ? [{ href: '/merchant/offerings', label: 'Offres & disponibilités', icon: <Scissors size={17} /> }]
+      : []),
   ]
 
   const growthNav: NavItem[] = [

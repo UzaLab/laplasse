@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   Heart, Star, Trophy, Gift, Bell, Hand, Calendar, Users,
   Loader2, MapPin, ArrowRight, Award,
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
@@ -29,7 +28,15 @@ interface FavMerchant {
   slug: string
   cover_image: string | null
   trust_score: number
+  avg_rating: number | null
   category: { name: string; slug: string }
+  location?: { city: string; district: string | null } | null
+}
+
+function formatMerchantRating(m: FavMerchant) {
+  if (m.avg_rating != null) return m.avg_rating.toFixed(1)
+  if (m.trust_score > 0) return (m.trust_score / 20).toFixed(1)
+  return null
 }
 
 interface BookingRow {
@@ -55,14 +62,10 @@ const TIER_LABELS: Record<string, string> = {
 }
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const { isAuthenticated, user } = useAuthStore()
+  const { ready: authReady, hydrated, isAuthenticated, user } = useRequireAuth('/profile')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
-  useEffect(() => {
-    if (mounted && !isAuthenticated) router.push('/login?redirect=/profile')
-  }, [mounted, isAuthenticated, router])
 
   const { data: reviews = [], isLoading: loadingReviews } = useQuery<UserReview[]>({
     queryKey: ['my-reviews', user?.id],
@@ -71,7 +74,7 @@ export default function ProfilePage() {
       if (!res.ok) return []
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted),
+    enabled: authReady,
   })
 
   const { data: favorites = [], isLoading: loadingFavorites } = useQuery<FavMerchant[]>({
@@ -79,9 +82,10 @@ export default function ProfilePage() {
     queryFn: async () => {
       const res = await authApiFetch('/favorites')
       if (!res.ok) return []
-      return res.json()
+      const data = await res.json()
+      return Array.isArray(data) ? data : []
     },
-    enabled: !!(isAuthenticated && mounted),
+    enabled: authReady,
   })
 
   const { data: bookings = [] } = useQuery<BookingRow[]>({
@@ -92,7 +96,7 @@ export default function ProfilePage() {
       const data = await res.json()
       return Array.isArray(data) ? data : (data.items ?? [])
     },
-    enabled: !!(isAuthenticated && mounted),
+    enabled: authReady,
   })
 
   const { data: loyalty } = useQuery<LoyaltyData>({
@@ -102,10 +106,10 @@ export default function ProfilePage() {
       if (!res.ok) return null
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted),
+    enabled: authReady,
   })
 
-  if (!mounted) {
+  if (!mounted || !hydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -139,7 +143,7 @@ export default function ProfilePage() {
 
   return (
     <ProfileShell>
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto min-w-0">
 
         {/* Welcome */}
         <div className="mb-8">
@@ -266,7 +270,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Row 2 — Avis + Favoris */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 min-w-0">
           {/* Derniers avis */}
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -328,8 +332,8 @@ export default function ProfilePage() {
           </div>
 
           {/* Favoris */}
-          <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm flex flex-col min-w-0">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                 <Heart size={20} className="text-red-500 fill-red-100" /> Lieux favoris
               </h3>
@@ -337,7 +341,7 @@ export default function ProfilePage() {
                 Gérer
               </Link>
             </div>
-            <div className="p-6">
+            <div className="p-6 min-w-0">
               {loadingFavorites ? (
                 <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-slate-300" /></div>
               ) : favorites.length === 0 ? (
@@ -354,39 +358,64 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                    {favorites.slice(0, 6).map(m => (
-                      <Link
-                        key={m.id}
-                        href={`/m/${m.slug}`}
-                        className="min-w-[160px] group shrink-0"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        <div className="aspect-[4/5] rounded-2xl overflow-hidden relative mb-3 shadow-sm border border-slate-100 group-hover:border-amber-300 transition-colors">
-                          {m.cover_image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={m.cover_image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                          ) : (
-                            <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-                              <MapPin size={24} className="text-slate-300" />
+                  <div className="-mx-6 px-6 flex gap-4 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory">
+                    {favorites.slice(0, 6).map(m => {
+                      const rating = formatMerchantRating(m)
+                      return (
+                        <Link
+                          key={m.id}
+                          href={`/m/${m.slug}`}
+                          className="w-[160px] shrink-0 snap-start group"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div className="aspect-[4/5] rounded-2xl overflow-hidden relative mb-3 shadow-sm border border-slate-100 group-hover:border-amber-300 transition-colors bg-slate-100">
+                            {m.cover_image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={m.cover_image}
+                                alt={m.business_name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <MapPin size={24} className="text-slate-300" />
+                              </div>
+                            )}
+                            <div className="absolute top-2 right-2 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-red-500">
+                              <Heart size={14} className="fill-current" />
                             </div>
-                          )}
-                          <div className="absolute bottom-2 left-2 right-2">
-                            <span className="bg-slate-900/80 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-lg truncate block">
-                              {m.category.name}
-                            </span>
+                            {m.category?.name && (
+                              <div className="absolute bottom-2 left-2 right-2">
+                                <span className="bg-slate-900/80 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-lg truncate block">
+                                  {m.category.name}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <h4 className="font-bold text-slate-900 text-sm truncate">{m.business_name}</h4>
-                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                          <Star size={12} className="text-amber-500 fill-amber-500" /> {(m.trust_score / 20).toFixed(1)}
-                        </p>
-                      </Link>
-                    ))}
+                          <h4 className="font-bold text-slate-900 text-sm truncate">{m.business_name}</h4>
+                          {(rating || m.location?.district) && (
+                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
+                              {rating && (
+                                <>
+                                  <Star size={12} className="text-amber-500 fill-amber-500 shrink-0" />
+                                  <span>{rating}</span>
+                                </>
+                              )}
+                              {rating && m.location?.district && (
+                                <span className="text-slate-300">·</span>
+                              )}
+                              {m.location?.district && (
+                                <span className="truncate">{m.location.district}</span>
+                              )}
+                            </p>
+                          )}
+                        </Link>
+                      )
+                    })}
                   </div>
                   <Link
                     href="/search"
-                    className="block w-full py-3 rounded-xl border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors text-center"
+                    className="block w-full py-3 rounded-xl border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors text-center mt-4"
                     style={{ textDecoration: 'none' }}
                   >
                     Découvrir de nouveaux lieux

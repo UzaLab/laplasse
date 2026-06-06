@@ -6,7 +6,7 @@ import { Calendar, Loader2, Users, Clock, MapPin } from 'lucide-react'
 import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
 import type { BookingConfig } from '@/lib/bookingConfig'
-import { BOOKING_TYPE_LABELS } from '@/lib/bookingConfig'
+import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
 
 interface BookingFormProps {
   merchantId: string
@@ -58,8 +58,11 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
     }
   }, [user])
 
+  const bookingType = config?.booking_type ?? null
+  const isRoom = bookingType === 'ROOM'
+
   useEffect(() => {
-    if (!date || !config?.enabled) return
+    if (!date || !config?.enabled || isRoom) return
     setSlotsLoading(true)
     const params = new URLSearchParams({ date })
     if (form.service_id) params.set('serviceId', form.service_id)
@@ -72,13 +75,34 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
       })
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false))
-  }, [date, merchantId, form.service_id, form.staff_id, config?.enabled])
+  }, [date, merchantId, form.service_id, form.staff_id, config?.enabled, isRoom])
+
+  useEffect(() => {
+    if (!config || bookingType !== 'ROOM') return
+    const roomOptions = (config.room_services?.length ? config.room_services : config.services.filter(
+      s => s.service_kind === 'ROOM_TYPE',
+    ))
+    if (roomOptions.length && !form.service_id) {
+      const first = roomOptions[0]
+      setForm(f => ({ ...f, service_id: first.id, room_type: first.name }))
+    }
+  }, [config, bookingType, form.service_id])
 
   if (!config) return null
   if (!config.enabled) return null
 
-  const bookingType = config.booking_type!
-  const isRoom = bookingType === 'ROOM'
+  const resolvedBookingType = config.booking_type!
+  const roomOptions = (config.room_services?.length ? config.room_services : config.services.filter(
+    s => s.service_kind === 'ROOM_TYPE',
+  )) ?? []
+  const hasRoomServices = roomOptions.length > 0
+  const showServices = config.services.length > 0 && (
+    resolvedBookingType === 'APPOINTMENT'
+    || resolvedBookingType === 'CONSULTATION'
+    || (resolvedBookingType === 'TABLE' && config.services.some(s => s.service_kind === 'TABLE_MENU'))
+  )
+  const selectedService = config.services.find(s => s.id === form.service_id)
+    ?? roomOptions.find(s => s.id === form.service_id)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -109,7 +133,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           service_id: form.service_id || undefined,
           staff_id: form.staff_id || undefined,
           room_type: isRoom ? form.room_type : undefined,
-          booking_type: bookingType,
+          booking_type: resolvedBookingType,
           notes: form.notes || undefined,
         }),
       })
@@ -132,7 +156,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         <Calendar size={28} className="text-emerald-600 mx-auto mb-2" />
         <p className="font-bold text-emerald-800">Demande envoyée !</p>
         <p className="text-sm text-emerald-600 mt-1">
-          {merchantName} confirmera votre {BOOKING_TYPE_LABELS[bookingType].toLowerCase()} sous peu.
+          {merchantName} confirmera votre {BOOKING_TYPE_LABELS[resolvedBookingType].toLowerCase()} sous peu.
         </p>
         {isAuthenticated && (
           <Link href="/profile/bookings" className="text-sm font-bold text-emerald-700 underline mt-3 inline-block">
@@ -149,27 +173,31 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         <Calendar size={18} className="text-amber-500" /> {config.cta}
       </h3>
       <p className="text-xs text-slate-400 mb-4">
-        {BOOKING_TYPE_LABELS[bookingType]} — créneaux selon horaires d&apos;ouverture
+        {BOOKING_TYPE_LABELS[resolvedBookingType]} — créneaux selon horaires d&apos;ouverture
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        {bookingType === 'APPOINTMENT' && config.services.length > 0 && (
+        {showServices && (
           <select
-            required
+            required={resolvedBookingType === 'APPOINTMENT' || resolvedBookingType === 'CONSULTATION'}
             value={form.service_id}
             onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}
             className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
           >
-            <option value="">Choisir une prestation *</option>
+            <option value="">
+              {resolvedBookingType === 'TABLE' ? 'Menu / formule (optionnel)' : 'Choisir une prestation *'}
+            </option>
             {config.services.map(s => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.duration_min} min{s.price ? ` — ${s.price.toLocaleString('fr-FR')} F` : ''})
+                {s.name}
+                {s.duration_min ? ` (${s.duration_min} min)` : ''}
+                {s.price != null ? ` — ${formatPrice(s.price)}` : ''}
               </option>
             ))}
           </select>
         )}
 
-        {bookingType === 'APPOINTMENT' && config.staff.length > 0 && (
+        {resolvedBookingType === 'APPOINTMENT' && config.staff.length > 0 && (
           <select
             value={form.staff_id}
             onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))}
@@ -183,15 +211,46 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         )}
 
         {isRoom && (
-          <select
-            value={form.room_type}
-            onChange={e => setForm(f => ({ ...f, room_type: e.target.value }))}
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
-          >
-            {config.room_types.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
+          hasRoomServices ? (
+            <select
+              required
+              value={form.service_id}
+              onChange={e => {
+                const svc = roomOptions.find(s => s.id === e.target.value)
+                setForm(f => ({
+                  ...f,
+                  service_id: e.target.value,
+                  room_type: svc?.name ?? f.room_type,
+                }))
+              }}
+              className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+            >
+              {roomOptions.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                  {r.price != null ? ` — ${formatPrice(r.price)}/nuit` : ''}
+                  {r.capacity && r.capacity > 1 ? ` (${r.capacity} dispo.)` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={form.room_type}
+              onChange={e => setForm(f => ({ ...f, room_type: e.target.value }))}
+              className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+            >
+              {config.room_types.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          )
+        )}
+
+        {selectedService?.price != null && (
+          <p className="text-sm font-bold text-amber-700 bg-amber-50 rounded-xl px-4 py-2">
+            Tarif indicatif : {formatPrice(selectedService.price)}
+            {isRoom ? ' / nuit' : ''}
+          </p>
         )}
 
         <input
@@ -240,7 +299,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
                     }`}
                   >
                     {s.time}
-                    {s.remaining !== undefined && bookingType === 'TABLE' && (
+                    {s.remaining !== undefined && resolvedBookingType === 'TABLE' && (
                       <span className="text-[10px] ml-1 opacity-70">({s.remaining})</span>
                     )}
                   </button>
@@ -267,7 +326,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
         />
 
-        {(bookingType === 'TABLE' || isRoom) && (
+        {(resolvedBookingType === 'TABLE' || isRoom) && (
           <div className="relative">
             <Users size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
