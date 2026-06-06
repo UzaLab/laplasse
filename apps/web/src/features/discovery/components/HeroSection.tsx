@@ -5,7 +5,7 @@ import { SearchAutocomplete } from './SearchAutocomplete'
 
 export function HeroSection() {
   return (
-    <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+    <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-x-hidden overflow-y-visible">
       {/* Blob amber */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-100 rounded-full blur-[100px] -z-10 opacity-60 translate-x-1/3 -translate-y-1/3" />
       {/* Blob blue */}

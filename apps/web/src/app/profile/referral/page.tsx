@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Share2, Copy, Check, ArrowLeft, Loader2, Users } from 'lucide-react'
+import { Share2, Copy, Check, ArrowLeft, Loader2, Users, Gift } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
@@ -76,7 +76,7 @@ export default function ReferralPage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-[50px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex-1">
-            <div className="text-4xl mb-2">🎁</div>
+            <div className="text-4xl mb-2"><Gift size={36} strokeWidth={1.75} className="text-white/90" /></div>
             <h1 className="text-2xl font-black mb-1">Parrainez vos amis</h1>
             <p className="opacity-80 text-sm">Gagnez <strong>30 points</strong> pour chaque ami qui rejoint LaPlasse avec votre code.</p>
           </div>

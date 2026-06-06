@@ -48,9 +48,9 @@ export default function AdminReviewsPage() {
   }
 
   const STATUS_LABELS: Record<string, string> = {
-    PENDING: '⏳ En attente',
-    APPROVED: '✓ Publié',
-    REJECTED: '✗ Rejeté',
+    PENDING: 'En attente',
+    APPROVED: 'Publié',
+    REJECTED: 'Rejeté',
   }
 
   return (
@@ -63,7 +63,7 @@ export default function AdminReviewsPage() {
       <div>
         {/* Filters */}
         <div className="flex gap-2 mb-6">
-          {([['pending', '⏳ En attente'], ['all', 'Tous les avis']] as const).map(([val, label]) => (
+          {([['pending', 'En attente'], ['all', 'Tous les avis']] as const).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setFilter(val)}

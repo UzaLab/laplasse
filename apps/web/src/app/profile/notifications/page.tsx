@@ -6,7 +6,9 @@ import Link from 'next/link'
 import { Bell, ArrowLeft, Loader2, CheckCheck } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { NotificationIcon } from '@/lib/icons'
 
 interface Notif {
   id: string
@@ -17,20 +19,9 @@ interface Notif {
   created_at: string
 }
 
-const TYPE_ICONS: Record<string, string> = {
-  review_approved: '⭐',
-  review_rejected: '❌',
-  merchant_verified: '✅',
-  merchant_pending: '⏳',
-  loyalty_level_up: '🏆',
-  referral_reward: '🎁',
-  welcome: '👋',
-  default: '🔔',
-}
-
 export default function NotificationsPage() {
   const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const [mounted, setMounted] = useState(false)
   const qc = useQueryClient()
 
@@ -42,31 +33,23 @@ export default function NotificationsPage() {
   const { data: notifications = [], isLoading } = useQuery<Notif[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await authApiFetch('/notifications')
       if (!res.ok) return []
       return res.json()
     },
-    enabled: !!(isAuthenticated && mounted && access_token),
+    enabled: !!(isAuthenticated && mounted),
   })
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/read-all`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      await authApiFetch('/notifications/read-all', { method: 'PATCH' })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   })
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      await authApiFetch(`/notifications/${id}/read`, { method: 'PATCH' })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   })
@@ -126,8 +109,8 @@ export default function NotificationsPage() {
                 className={`w-full flex items-start gap-4 px-6 py-4 text-left transition-colors hover:bg-slate-50 ${!n.read ? 'bg-amber-50/50' : ''}`}
                 onClick={() => !n.read && markRead.mutate(n.id)}
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0">
-                  {TYPE_ICONS[n.type] ?? TYPE_ICONS.default}
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                  <NotificationIcon type={n.type} size={18} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-bold ${n.read ? 'text-slate-700' : 'text-slate-900'}`}>{n.title}</p>

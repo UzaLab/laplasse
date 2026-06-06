@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Heart, BadgeCheck, Star, MessageCircle } from 'lucide-react'
-import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { BadgeCheck, Star, MessageCircle } from 'lucide-react'
 import { Merchant } from '@/types/merchant'
+import { FavoriteButton } from './FavoriteButton'
 
 interface MerchantCardProps {
   merchant: Merchant
@@ -12,8 +11,6 @@ interface MerchantCardProps {
 }
 
 export function MerchantCard({ merchant, compact = false }: MerchantCardProps) {
-  const [isFav, setIsFav] = useState(false)
-
   const imageHeight = compact ? '140px' : '180px'
 
   return (
@@ -67,24 +64,12 @@ export function MerchantCard({ merchant, compact = false }: MerchantCardProps) {
             </span>
           )}
 
-          {/* Bouton favori */}
-          <button
-            onClick={(e) => {
-              e.preventDefault()
-              setIsFav(!isFav)
-            }}
-            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 transition-transform hover:scale-110"
-            style={{ boxShadow: 'var(--shadow-sm)' }}
-            aria-label="Ajouter aux favoris"
-          >
-            <Heart
-              size={16}
-              className={cn(
-                'transition-colors',
-                isFav ? 'fill-[#FF5A5F] text-[#FF5A5F]' : 'text-[#717171]',
-              )}
-            />
-          </button>
+          <FavoriteButton
+            merchantId={merchant.id}
+            merchantSlug={merchant.slug}
+            size={16}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm hover:scale-110 transition-transform"
+          />
         </div>
 
         {/* Infos */}
@@ -99,7 +84,7 @@ export function MerchantCard({ merchant, compact = false }: MerchantCardProps) {
               {merchant.verification_status === 'VERIFIED' && (
                 <BadgeCheck
                   size={compact ? 14 : 16}
-                  className="shrink-0 text-blue-500"
+                  className="shrink-0 text-slate-600"
                   aria-label="Vérifié"
                 />
               )}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Clock, Loader2, CheckCircle2, Save } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
 interface HourEntry {
@@ -33,7 +34,7 @@ const DEFAULT_HOURS: HourEntry[] = DAYS.map(d => ({
 
 export default function MerchantHoursPage() {
   const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated, activeMerchantId } = useAuthStore()
   const [hours, setHours] = useState<HourEntry[]>(DEFAULT_HOURS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,13 +45,11 @@ export default function MerchantHoursPage() {
     if (!isAuthenticated) { router.push('/login?redirect=/merchant/hours'); return }
     fetchHours()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [isAuthenticated, activeMerchantId])
 
   const fetchHours = async () => {
     setLoading(true)
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/hours`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const res = await merchantApiFetch('/merchants/me/hours', activeMerchantId)
     if (res.ok) {
       const data = await res.json()
       if (data.length > 0) {
@@ -75,12 +74,8 @@ export default function MerchantHoursPage() {
     setSaving(true)
     setError('')
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/hours`, {
+    const res = await merchantApiFetch('/merchants/me/hours', activeMerchantId, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${access_token}`,
-      },
       body: JSON.stringify({ hours }),
     })
 

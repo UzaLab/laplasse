@@ -2,10 +2,11 @@
 
 import { useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { BadgeCheck, SlidersHorizontal, X, TrendingUp, MapPin, Star } from 'lucide-react'
+import { BadgeCheck, SlidersHorizontal, X, TrendingUp, MapPin, Star, Search } from 'lucide-react'
 import Link from 'next/link'
 
 import { Navbar } from '@/components/layout/Navbar'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { SearchBar } from '@/features/discovery/components/SearchBar'
 import { SearchResultCard, type SearchHit } from '@/features/discovery/components/SearchResultCard'
 import { useCategories, useSearch } from '@/features/discovery/hooks/useDiscovery'
@@ -235,8 +236,8 @@ function SearchContent() {
         {noResults && (
           <div>
             <div className="flex flex-col items-center py-12 text-center mb-10">
-              <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mb-4 text-3xl">
-                🔍
+              <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mb-4">
+                <Search size={28} className="text-slate-400" strokeWidth={1.75} />
               </div>
               <h3 className="text-lg font-extrabold text-slate-900 mb-1">Aucun résultat</h3>
               <p className="text-slate-500 text-sm max-w-xs">
@@ -271,25 +272,7 @@ function SearchContent() {
         )}
       </div>
 
-      {/* ── BOTTOM NAV MOBILE ─────────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40 safe-area-bottom">
-        {[
-          { href: '/',        label: 'Découvrir', emoji: '🏠' },
-          { href: '/search',  label: 'Recherche',  emoji: '🔍', active: true },
-          { href: '/favoris', label: 'Favoris',    emoji: '❤️' },
-          { href: '/profile', label: 'Profil',     emoji: '👤' },
-        ].map(({ href, label, emoji, active }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex flex-col items-center gap-0.5 transition-colors ${active ? 'text-brand-600' : 'text-slate-400 hover:text-slate-900'}`}
-            style={{ textDecoration: 'none' }}
-          >
-            <span className="text-xl">{emoji}</span>
-            <span className="text-[10px] font-semibold">{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <MobileBottomNav />
     </div>
   )
 }

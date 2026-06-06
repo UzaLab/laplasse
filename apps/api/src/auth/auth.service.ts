@@ -80,7 +80,15 @@ export class AuthService {
       select: {
         id: true, email: true, full_name: true, avatar: true,
         role: true, password_hash: true, created_at: true,
-        merchant: { select: { id: true, business_name: true, slug: true, verification_status: true } },
+        merchants: {
+          select: {
+            id: true, business_name: true, slug: true,
+            verification_status: true, subscription_plan: true, organization_id: true,
+          },
+        },
+        organization: {
+          select: { id: true, name: true, type: true, logo: true },
+        },
       },
     })
 
@@ -127,7 +135,15 @@ export class AuthService {
       select: {
         id: true, email: true, full_name: true, avatar: true,
         phone: true, role: true, created_at: true,
-        merchant: { select: { id: true, business_name: true, slug: true, verification_status: true } },
+        merchants: {
+          select: {
+            id: true, business_name: true, slug: true,
+            verification_status: true, subscription_plan: true, organization_id: true,
+          },
+        },
+        organization: {
+          select: { id: true, name: true, type: true, logo: true },
+        },
       },
     })
   }

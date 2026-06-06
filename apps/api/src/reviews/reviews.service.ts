@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
+import { FraudService } from '../fraud/fraud.service'
 import { CreateReviewDto } from './dto/create-review.dto'
 
 @Injectable()
@@ -8,11 +9,17 @@ export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly loyalty: LoyaltyService,
+    private readonly fraud: FraudService,
   ) {}
 
   async create(dto: CreateReviewDto, userId: string) {
     if (dto.rating < 1 || dto.rating > 5) {
       throw new BadRequestException('Rating must be between 1 and 5')
+    }
+
+    const spam = await this.fraud.checkReviewSpam(userId)
+    if (spam.flagged) {
+      throw new ForbiddenException('Activité suspecte détectée. Réessayez demain.')
     }
 
     const merchant = await this.prisma.merchant.findUnique({ where: { id: dto.merchant_id } })

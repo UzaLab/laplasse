@@ -9,6 +9,7 @@ import { SpotCard } from '@/features/discovery/components/SpotCard'
 import { NearbyCard } from '@/features/discovery/components/NearbyCard'
 import { MarketplaceSection } from '@/features/discovery/components/MarketplaceSection'
 import { B2BSection } from '@/features/discovery/components/B2BSection'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
 
 // Adapte ApiMerchant → shape SpotCard (qui inclut sub_category & featured_product)
@@ -119,25 +120,7 @@ export default async function HomePage() {
 
       <Footer />
 
-      {/* ══ BOTTOM NAV MOBILE ══════════════════════════════════════════════════ */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40">
-        {[
-          { href: '/',        label: 'Découvrir', emoji: '🏠', active: true },
-          { href: '/search',  label: 'Recherche',  emoji: '🔍' },
-          { href: '/favoris', label: 'Favoris',    emoji: '❤️' },
-          { href: '/profile', label: 'Profil',     emoji: '👤' },
-        ].map(({ href, label, emoji, active }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex flex-col items-center gap-0.5 transition-colors ${active ? 'text-brand-600' : 'text-slate-400 hover:text-slate-900'}`}
-            style={{ textDecoration: 'none' }}
-          >
-            <span className="text-xl">{emoji}</span>
-            <span className="text-[10px] font-semibold">{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <MobileBottomNav />
     </div>
   )
 }

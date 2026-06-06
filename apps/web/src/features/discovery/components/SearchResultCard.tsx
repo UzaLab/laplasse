@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { BadgeCheck, Heart, MapPin, MessageCircle, Star, Store } from 'lucide-react'
-import { useState } from 'react'
+import { BadgeCheck, MapPin, MessageCircle, Star, Store } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
+import { FavoriteButton } from './FavoriteButton'
+import { CategoryIcon } from '@/lib/icons'
 
 // Les résultats Meilisearch sont plats — on normalise les deux formats ici
 interface MeiliFlat {
@@ -38,25 +39,20 @@ function getLocation(m: SearchHit): string {
   return district ?? city ?? ''
 }
 
-function getCategoryIcon(m: SearchHit): string {
+function getCategoryIconName(m: SearchHit): string {
   return m.category?.icon ?? m.category_icon ?? ''
 }
 
-const ICON_EMOJI: Record<string, string> = {
-  UtensilsCrossed: '🍽️',
-  Wine: '🍷',
-  Gem: '💎',
-  Scissors: '✂️',
-  Dumbbell: '💪',
+function getCategorySlug(m: SearchHit): string | undefined {
+  return m.category?.slug ?? m.category_slug
 }
 
 export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
-  const [isFav, setIsFav] = useState(false)
-
   const formattedName = m._formatted?.business_name
   const categoryName = getCategoryName(m)
   const location = getLocation(m)
-  const icon = getCategoryIcon(m)
+  const iconName = getCategoryIconName(m)
+  const categorySlug = getCategorySlug(m)
 
   return (
     <article className="bg-white rounded-3xl p-3 shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex flex-col">
@@ -71,28 +67,24 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
           />
         ) : (
-          <div className="w-full h-full bg-slate-100 flex items-center justify-center text-5xl">
-            {ICON_EMOJI[icon] ?? '🏪'}
+          <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+            <CategoryIcon name={iconName} slug={categorySlug} size={40} className="text-slate-300" />
           </div>
         )}
 
         {/* Rating badge */}
         {m.review_count > 0 && (
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-bold text-slate-900 flex items-center gap-1">
-            <Star size={11} className="fill-brand-500 text-brand-500" />
+            <Star size={11} className="fill-slate-700 text-slate-700" />
             {m.review_count}
           </div>
         )}
 
-        {/* Favorite */}
-        <button
-          onClick={(e) => { e.preventDefault(); setIsFav(!isFav) }}
-          className={`absolute top-3 left-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ${
-            isFav ? 'text-red-500' : 'text-slate-400 hover:text-red-500'
-          }`}
-        >
-          <Heart size={15} className={isFav ? 'fill-red-500' : ''} />
-        </button>
+        <FavoriteButton
+          merchantId={m.id}
+          merchantSlug={m.slug}
+          className="absolute top-3 left-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center"
+        />
 
         {/* Verified */}
         {m.verification_status === 'VERIFIED' && (
@@ -117,7 +109,7 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
                 : m.business_name}
             </span>
             {m.verification_status === 'VERIFIED' && (
-              <BadgeCheck size={14} className="text-blue-500 shrink-0" />
+              <BadgeCheck size={14} className="text-slate-600 shrink-0" />
             )}
           </h3>
           {location && (
@@ -151,7 +143,7 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
         {/* "En vitrine" placeholder — activé quand marketplace disponible */}
         <div className="mt-auto bg-slate-50 p-2.5 rounded-xl border border-slate-100 group-hover:border-brand-200 transition-colors mb-3">
           <div className="flex items-center gap-1 mb-1">
-            <Store size={11} className="text-brand-500" />
+            <Store size={11} className="text-slate-500" />
             <span className="text-[9px] font-bold text-slate-400 uppercase">En vitrine</span>
           </div>
           <p className="text-xs text-slate-400 italic">Marketplace bientôt disponible</p>

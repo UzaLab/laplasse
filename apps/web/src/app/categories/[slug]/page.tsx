@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, BadgeCheck, MapPin, MessageCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BadgeCheck, MapPin, MessageCircle, Search } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { api, ApiCategory, ApiMerchant } from '@/lib/api'
+import { CategoryIcon } from '@/lib/icons'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -22,7 +23,9 @@ function MerchantCard({ merchant }: { merchant: ApiMerchant }) {
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-5xl">🏪</div>
+            <div className="w-full h-full flex items-center justify-center">
+              <CategoryIcon name={merchant.category.icon} slug={merchant.category.slug} size={40} className="text-slate-300" />
+            </div>
           )}
           {merchant.verification_status === 'VERIFIED' && (
             <div className="absolute top-3 left-3 bg-blue-500/90 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -35,7 +38,7 @@ function MerchantCard({ merchant }: { merchant: ApiMerchant }) {
           <h3 className="font-bold text-slate-900 text-lg mb-1 flex items-center gap-1.5">
             {merchant.business_name}
             {merchant.verification_status === 'VERIFIED' && (
-              <BadgeCheck size={14} className="text-blue-500 shrink-0" />
+              <BadgeCheck size={14} className="text-slate-600 shrink-0" />
             )}
           </h3>
 
@@ -94,12 +97,8 @@ export default async function CategoryPage({ params }: Props) {
             <ArrowLeft size={16} /> Retour
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-brand-500/20 rounded-2xl flex items-center justify-center text-3xl">
-              {category.icon === 'UtensilsCrossed' ? '🍽️' :
-               category.icon === 'Wine' ? '🍷' :
-               category.icon === 'Gem' ? '💎' :
-               category.icon === 'Scissors' ? '✂️' :
-               category.icon === 'Dumbbell' ? '💪' : '🏪'}
+            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center">
+              <CategoryIcon name={category.icon} slug={category.slug} size={28} className="text-white" />
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
@@ -143,7 +142,9 @@ export default async function CategoryPage({ params }: Props) {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="text-6xl mb-4">🔍</div>
+            <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mb-4">
+              <Search size={28} className="text-slate-400" strokeWidth={1.75} />
+            </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Aucun établissement</h3>
             <p className="text-slate-500 mb-6">Aucun établissement dans cette catégorie pour le moment.</p>
             <Link

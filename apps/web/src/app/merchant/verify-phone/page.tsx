@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Smartphone, Loader2, CheckCircle2, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 
 export default function VerifyPhonePage() {
   const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated, activeMerchantId } = useAuthStore()
   const [step, setStep] = useState<'send' | 'verify' | 'done'>('send')
   const [code, setCode] = useState('')
   const [phoneMasked, setPhoneMasked] = useState('')
@@ -23,9 +24,7 @@ export default function VerifyPhonePage() {
   }, [isAuthenticated])
 
   const checkStatus = async () => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/verify-phone/status`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const res = await merchantApiFetch('/merchants/me/verify-phone/status', activeMerchantId)
     if (res.ok) {
       const data = await res.json()
       if (data.phone_verified) {
@@ -37,10 +36,7 @@ export default function VerifyPhonePage() {
   const sendOtp = async () => {
     setLoading(true)
     setError('')
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/verify-phone/send`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const res = await merchantApiFetch('/merchants/me/verify-phone/send', activeMerchantId, { method: 'POST' })
     const data = await res.json()
     if (res.ok) {
       setPhoneMasked(data.phone_masked ?? '')
@@ -58,12 +54,8 @@ export default function VerifyPhonePage() {
     setLoading(true)
     setError('')
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/verify-phone/confirm`, {
+    const res = await merchantApiFetch('/merchants/me/verify-phone/confirm', activeMerchantId, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${access_token}`,
-      },
       body: JSON.stringify({ code }),
     })
     const data = await res.json()

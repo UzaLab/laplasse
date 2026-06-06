@@ -1,25 +1,6 @@
 import Link from 'next/link'
-import {
-  Utensils,
-  Scissors,
-  ShoppingBag,
-  BedDouble,
-  Pill,
-  Coffee,
-  Wrench,
-  LucideIcon,
-} from 'lucide-react'
 import { Category } from '@/types/merchant'
-
-const ICON_MAP: Record<string, LucideIcon> = {
-  Utensils,
-  Scissors,
-  ShoppingBag,
-  BedDouble,
-  Pill,
-  Coffee,
-  Wrench,
-}
+import { getCategoryIcon } from '@/lib/icons'
 
 interface CategoryBarProps {
   categories: Category[]
@@ -34,7 +15,7 @@ export function CategoryBar({ categories, activeSlug }: CategoryBarProps) {
         style={{ margin: '0 -24px', paddingLeft: '24px', paddingRight: '24px' }}
       >
         {categories.map((cat) => {
-          const Icon = ICON_MAP[cat.icon] ?? Utensils
+          const Icon = getCategoryIcon(cat.icon, cat.slug)
           const isActive = cat.slug === activeSlug
 
           return (
@@ -48,11 +29,11 @@ export function CategoryBar({ categories, activeSlug }: CategoryBarProps) {
                 style={{
                   borderRadius: '16px',
                   background: isActive ? 'var(--primary)' : 'var(--surface)',
-                  color: isActive ? 'white' : 'var(--primary)',
+                  color: isActive ? 'white' : 'var(--text-main)',
                   boxShadow: isActive ? 'var(--shadow-md)' : 'var(--shadow-sm)',
                 }}
               >
-                <Icon size={28} />
+                <Icon size={28} strokeWidth={2} />
               </div>
               <span
                 className="text-center text-xs font-medium leading-tight"

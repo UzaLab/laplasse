@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, CheckCircle2, SaveIcon } from 'lucide-react'
+import { Loader2, CheckCircle2, SaveIcon, Clock, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
 interface MerchantProfile {
@@ -34,7 +35,7 @@ const FIELDS: Field[] = [
 
 export default function EditMerchantProfilePage() {
   const router = useRouter()
-  const { isAuthenticated, user, access_token } = useAuthStore()
+  const { isAuthenticated, user, activeMerchantId } = useAuthStore()
 
   const [profile, setProfile] = useState<MerchantProfile | null>(null)
   const [form, setForm] = useState<FormData>({
@@ -51,13 +52,11 @@ export default function EditMerchantProfilePage() {
     if (user?.role === 'USER') { router.push('/'); return }
     fetchProfile()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [isAuthenticated, activeMerchantId])
 
   const fetchProfile = async () => {
     setLoading(true)
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/profile`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const res = await merchantApiFetch('/merchants/me/profile', activeMerchantId)
     if (res.ok) {
       const data: MerchantProfile = await res.json()
       setProfile(data)
@@ -84,12 +83,8 @@ export default function EditMerchantProfilePage() {
       Object.entries(form).map(([k, v]) => [k, v.trim() || undefined])
     )
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/profile`, {
+    const res = await merchantApiFetch('/merchants/me/profile', activeMerchantId, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${access_token}`,
-      },
       body: JSON.stringify(payload),
     })
 
@@ -161,8 +156,12 @@ export default function EditMerchantProfilePage() {
             ? 'bg-amber-50 border-amber-200 text-amber-800'
             : 'bg-slate-50 border-slate-200 text-slate-700'
         }`}>
-          <span className="text-2xl">
-            {profile.verification_status === 'VERIFIED' ? '✅' : profile.verification_status === 'PENDING' ? '⏳' : '⚠️'}
+          <span className="shrink-0">
+            {profile.verification_status === 'VERIFIED'
+              ? <CheckCircle2 size={24} className="text-slate-600" />
+              : profile.verification_status === 'PENDING'
+              ? <Clock size={24} className="text-slate-600" />
+              : <AlertTriangle size={24} className="text-slate-600" />}
           </span>
           <div>
             <p className="font-bold text-sm">
@@ -216,7 +215,7 @@ export default function EditMerchantProfilePage() {
               disabled={saving}
               className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {saving ? <><Loader2 size={18} className="animate-spin" /> Sauvegarde…</> : '💾 Sauvegarder les modifications'}
+              {saving ? <><Loader2 size={18} className="animate-spin" /> Sauvegarde…</> : <><SaveIcon size={18} /> Sauvegarder les modifications</>}
             </button>
           </div>
         </form>

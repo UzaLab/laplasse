@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Image as ImageIcon, Loader2, Plus, Trash2, Star } from 'lucide-react'
+import { Image as ImageIcon, Loader2, Plus, Trash2, Star, Crown } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
 interface MediaItem {
@@ -19,11 +20,17 @@ interface MediaData {
   logo: string | null
   cover_image: string | null
   gallery: MediaItem[]
+  limits?: {
+    max_photos: number
+    current_photos: number
+    can_add: boolean
+    plan: string
+  }
 }
 
 export default function MerchantMediaPage() {
   const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated, activeMerchantId } = useAuthStore()
   const [data, setData] = useState<MediaData | null>(null)
   const [newUrl, setNewUrl] = useState('')
   const [loading, setLoading] = useState(true)
@@ -36,20 +43,18 @@ export default function MerchantMediaPage() {
     if (!isAuthenticated) { router.push('/login?redirect=/merchant/media'); return }
     fetchMedia()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated])
+  }, [isAuthenticated, activeMerchantId])
 
   const fetchMedia = async () => {
     setLoading(true)
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/media`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    const res = await merchantApiFetch('/merchants/me/media', activeMerchantId)
     if (res.ok) setData(await res.json())
     setLoading(false)
   }
 
   const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !access_token) return
+    if (!file) return
     setUploading(true)
     setError('')
 
@@ -57,9 +62,8 @@ export default function MerchantMediaPage() {
     form.append('file', file)
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/media/upload`, {
+      const res = await merchantApiFetch('/merchants/me/media/upload', activeMerchantId, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${access_token}` },
         body: form,
       })
       if (res.ok) {
@@ -81,12 +85,8 @@ export default function MerchantMediaPage() {
     setAdding(true)
     setError('')
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/media`, {
+    const res = await merchantApiFetch('/merchants/me/media', activeMerchantId, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${access_token}`,
-      },
       body: JSON.stringify({ url: newUrl.trim() }),
     })
 
@@ -102,22 +102,15 @@ export default function MerchantMediaPage() {
 
   const deleteMedia = async (id: string) => {
     setProcessing(id)
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/media/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    await merchantApiFetch(`/merchants/me/media/${id}`, activeMerchantId, { method: 'DELETE' })
     await fetchMedia()
     setProcessing(null)
   }
 
   const setAs = async (url: string, field: 'logo' | 'cover_image') => {
     setProcessing(url)
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/media/cover`, {
+    await merchantApiFetch('/merchants/me/media/cover', activeMerchantId, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${access_token}`,
-      },
       body: JSON.stringify({ url, field }),
     })
     await fetchMedia()
@@ -142,6 +135,32 @@ export default function MerchantMediaPage() {
           </div>
         ) : data && (
           <>
+            {data.limits && (
+              <div className={`rounded-2xl border p-4 flex items-start gap-3 ${
+                data.limits.can_add
+                  ? 'bg-slate-50 border-slate-100'
+                  : 'bg-amber-50 border-amber-200'
+              }`}>
+                <ImageIcon size={18} className={data.limits.can_add ? 'text-slate-400' : 'text-amber-600'} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-900">
+                    {data.limits.max_photos < 0
+                      ? `${data.limits.current_photos} photo${data.limits.current_photos > 1 ? 's' : ''} — illimitées (plan ${data.limits.plan})`
+                      : `${data.limits.current_photos}/${data.limits.max_photos} photos utilisées (plan ${data.limits.plan})`
+                    }
+                  </p>
+                  {!data.limits.can_add && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Limite atteinte.{' '}
+                      <Link href="/merchant/plans" className="font-bold underline inline-flex items-center gap-1">
+                        <Crown size={12} /> Passer au plan Starter
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Logo & Cover */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {([
@@ -169,8 +188,10 @@ export default function MerchantMediaPage() {
             <div className="bg-white border border-slate-100 rounded-2xl p-5">
               <h3 className="font-bold text-slate-900 mb-3">Uploader une photo</h3>
               <p className="text-xs text-slate-500 mb-4">JPEG, PNG ou WebP — max 5 Mo</p>
-              <label className={`flex items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${
-                uploading ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:border-brand-400 hover:bg-slate-50'
+              <label className={`flex items-center justify-center gap-2 w-full py-8 border-2 border-dashed rounded-2xl transition-colors ${
+                data.limits && !data.limits.can_add
+                  ? 'border-slate-200 bg-slate-50 cursor-not-allowed opacity-60'
+                  : uploading ? 'border-brand-300 bg-brand-50 cursor-pointer' : 'border-slate-200 hover:border-brand-400 hover:bg-slate-50 cursor-pointer'
               }`}>
                 {uploading
                   ? <><Loader2 size={18} className="animate-spin text-brand-600" /><span className="text-sm font-bold text-brand-700">Envoi en cours…</span></>
@@ -180,7 +201,7 @@ export default function MerchantMediaPage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="hidden"
-                  disabled={uploading}
+                  disabled={uploading || (data.limits ? !data.limits.can_add : false)}
                   onChange={uploadFile}
                 />
               </label>

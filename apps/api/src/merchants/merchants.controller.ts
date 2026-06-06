@@ -49,9 +49,18 @@ export class MerchantsController {
   // ── Routes authentifiées avec préfixe fixe (AVANT :slug) ────────────────────
 
   @UseGuards(JwtAuthGuard)
+  @Get('my/all')
+  getMyMerchants(@CurrentUser() user: { id: string }) {
+    return this.merchantsService.findAllMine(user.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me/profile')
-  getMyMerchant(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.findMine(user.id)
+  getMyMerchant(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.findMine(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -63,14 +72,18 @@ export class MerchantsController {
       district?: string; address?: string; logo?: string; cover_image?: string;
     },
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.updateMine(body, user.id)
+    return this.merchantsService.updateMine(body, user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/hours')
-  getMyHours(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.getMyHours(user.id)
+  getMyHours(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getMyHours(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -78,14 +91,18 @@ export class MerchantsController {
   updateMyHours(
     @Body() body: { hours: Array<{ day: number; open_time?: string; close_time?: string; is_closed?: boolean }> },
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.updateMyHours(body.hours, user.id)
+    return this.merchantsService.updateMyHours(body.hours, user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/media')
-  getMyMedia(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.getMyMedia(user.id)
+  getMyMedia(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getMyMedia(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -104,8 +121,9 @@ export class MerchantsController {
   uploadMyMedia(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.uploadMyMediaFile(user.id, file)
+    return this.merchantsService.uploadMyMediaFile(user.id, file, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -113,8 +131,9 @@ export class MerchantsController {
   addMyMedia(
     @Body() body: { url: string; type?: string; order?: number },
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.addMyMedia(body, user.id)
+    return this.merchantsService.addMyMedia(body, user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -122,8 +141,9 @@ export class MerchantsController {
   deleteMyMedia(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.deleteMyMedia(id, user.id)
+    return this.merchantsService.deleteMyMedia(id, user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -131,14 +151,18 @@ export class MerchantsController {
   setCoverImage(
     @Body() body: { url: string; field: 'logo' | 'cover_image' },
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.setMyCoverImage(body.url, user.id, body.field)
+    return this.merchantsService.setMyCoverImage(body.url, user.id, body.field, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/analytics')
-  getMyAnalytics(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.getMyAnalytics(user.id)
+  getMyAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getMyAnalytics(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -146,20 +170,27 @@ export class MerchantsController {
   getMyAnalyticsChart(
     @CurrentUser() user: { id: string },
     @Query('days') days?: string,
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.getMyAnalyticsChart(user.id, days ? Number(days) : 30)
+    return this.merchantsService.getMyAnalyticsChart(user.id, days ? Number(days) : 30, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/crm')
-  getMyCRM(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.getMyCRM(user.id)
+  getMyCRM(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getMyCRM(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('me/verify-phone/send')
-  sendPhoneVerification(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.sendPhoneVerification(user.id)
+  sendPhoneVerification(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.sendPhoneVerification(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -167,14 +198,18 @@ export class MerchantsController {
   confirmPhoneVerification(
     @Body() body: { code: string },
     @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.confirmPhoneVerification(user.id, body.code)
+    return this.merchantsService.confirmPhoneVerification(user.id, body.code, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/verify-phone/status')
-  phoneVerificationStatus(@CurrentUser() user: { id: string }) {
-    return this.merchantsService.getPhoneVerificationStatus(user.id)
+  phoneVerificationStatus(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getPhoneVerificationStatus(user.id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -183,6 +218,8 @@ export class MerchantsController {
     @Body() body: {
       business_name: string; category_slug: string; description?: string;
       phone?: string; whatsapp?: string; address?: string; district?: string; city?: string;
+      organization_id?: string;
+      create_organization?: { name: string; type: 'CHAIN' | 'GROUP' | 'MULTI_SITE' };
     },
     @CurrentUser() user: { id: string },
   ) {

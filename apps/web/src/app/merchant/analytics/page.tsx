@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { TrendingUp, Eye, MessageCircle, Phone, Heart, Star, Loader2 } from 'lucide-react'
+import { TrendingUp, Eye, MessageCircle, Phone, Heart, Star, Loader2, Network } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
+import { authApiFetch } from '@/lib/authFetch'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { AnalyticsChart } from '@/features/merchant/components/AnalyticsChart'
 
@@ -14,7 +16,20 @@ interface Analytics {
   call_clicks: number
   favorites: number
   reviews: { count: number; avg_rating: number | null }
-  interactions: Array<{ event_type: string; count: number }>
+  interactions?: Array<{ event_type: string; count: number }>
+}
+
+interface OrgAnalytics {
+  organization: { id: string; name: string; type: string }
+  totals: Analytics
+  by_merchant: Array<{
+    merchant_id: string
+    business_name: string
+    slug: string
+    views: number
+    whatsapp_clicks: number
+    call_clicks: number
+  }>
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -30,25 +45,38 @@ const EVENT_LABELS: Record<string, string> = {
 
 export default function MerchantAnalyticsPage() {
   const router = useRouter()
-  const { isAuthenticated, access_token } = useAuthStore()
+  const searchParams = useSearchParams()
+  const isOrgScope = searchParams.get('scope') === 'organization'
+  const { isAuthenticated, activeMerchantId, user } = useAuthStore()
   const [stats, setStats] = useState<Analytics | null>(null)
+  const [orgStats, setOrgStats] = useState<OrgAnalytics | null>(null)
   const [chart, setChart] = useState<{ days: { date: string; count: number }[]; total: number } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isAuthenticated) { router.push('/login?redirect=/merchant/analytics'); return }
+
+    if (isOrgScope && user?.organization?.id) {
+      authApiFetch(`/organizations/${user.organization.id}/analytics`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          setOrgStats(data)
+          if (data?.totals) setStats(data.totals)
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false))
+      return
+    }
+
     Promise.all([
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/analytics`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }).then(r => r.ok ? r.json() : null),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/analytics/chart?days=30`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      }).then(r => r.ok ? r.json() : null),
+      merchantApiFetch('/merchants/me/analytics', activeMerchantId).then(r => r.ok ? r.json() : null),
+      merchantApiFetch('/merchants/me/analytics/chart?days=30', activeMerchantId).then(r => r.ok ? r.json() : null),
     ]).then(([analytics, chartData]) => {
       setStats(analytics)
       setChart(chartData)
+      setOrgStats(null)
     }).catch(() => {}).finally(() => setLoading(false))
-  }, [isAuthenticated, access_token, router])
+  }, [isAuthenticated, activeMerchantId, router, isOrgScope, user?.organization?.id])
 
   if (!isAuthenticated) return null
 
@@ -64,10 +92,39 @@ export default function MerchantAnalyticsPage() {
   return (
     <MerchantShell>
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-          <TrendingUp size={22} className="text-amber-500" /> Statistiques
-        </h1>
-        <p className="text-slate-400 mt-1 text-sm">Performance de votre établissement.</p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
+              <TrendingUp size={22} className="text-amber-500" /> Statistiques
+              {isOrgScope && orgStats && (
+                <span className="text-sm font-bold text-slate-500 flex items-center gap-1">
+                  <Network size={16} /> {orgStats.organization.name}
+                </span>
+              )}
+            </h1>
+            <p className="text-slate-400 mt-1 text-sm">
+              {isOrgScope ? 'Performance agrégée de votre organisation.' : 'Performance de votre établissement.'}
+            </p>
+          </div>
+          {user?.organization && (
+            <div className="flex gap-2">
+              <Link
+                href="/merchant/analytics"
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${!isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                style={{ textDecoration: 'none' }}
+              >
+                Établissement
+              </Link>
+              <Link
+                href="/merchant/analytics?scope=organization"
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                style={{ textDecoration: 'none' }}
+              >
+                Organisation
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -110,7 +167,7 @@ export default function MerchantAnalyticsPage() {
               </div>
             )}
 
-            {stats.interactions.length > 0 && (
+            {stats.interactions && stats.interactions.length > 0 && (
               <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100">
                   <h3 className="font-extrabold text-slate-900">Détail des interactions</h3>
@@ -128,6 +185,26 @@ export default function MerchantAnalyticsPage() {
               </div>
             )}
           </div>
+
+          {isOrgScope && orgStats && orgStats.by_merchant.length > 0 && (
+            <div className="mt-6 bg-white border border-slate-100 rounded-[28px] overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="font-extrabold text-slate-900">Par établissement</h3>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {orgStats.by_merchant.map(m => (
+                  <div key={m.merchant_id} className="flex items-center justify-between px-6 py-4 gap-4">
+                    <span className="text-sm font-bold text-slate-900 truncate">{m.business_name}</span>
+                    <div className="flex gap-4 text-xs text-slate-500 shrink-0">
+                      <span>{m.views} vues</span>
+                      <span>{m.whatsapp_clicks} WA</span>
+                      <span>{m.call_clicks} appels</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {stats.views === 0 && stats.reviews.count === 0 && (
             <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100">

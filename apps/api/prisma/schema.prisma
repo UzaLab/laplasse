@@ -85,6 +85,12 @@ enum NotificationStatus {
   FAILED
 }
 
+enum OrganizationType {
+  CHAIN
+  GROUP
+  MULTI_SITE
+}
+
 // ─── USERS ─────────────────────────────────────────────────────────────────────
 
 model User {
@@ -106,12 +112,17 @@ model User {
   favorites        Favorite[]
   searches         SearchHistory[]
   interactions     MerchantInteraction[]
-  merchant         Merchant?
+  merchants        Merchant[]
   notifications    Notification[]
   analytics_events AnalyticsEvent[]
   loyalty_account  LoyaltyAccount?
   referral_code    ReferralCode?
   referral_invite  Referral?           @relation("ReferralInvitee")
+  organization     MerchantOrganization?
+  bookings         Booking[]
+  payments         PaymentTransaction[]
+  device_tokens    DeviceToken[]
+  audit_logs       AuditLog[]
 
   @@index([email])
   @@index([phone])
@@ -137,7 +148,7 @@ model Merchant {
   slug                String             @unique
   description         String?
   category_id         String
-  owner_id            String             @unique
+  owner_id            String
   logo                String?
   cover_image         String?
   phone               String?
@@ -147,12 +158,14 @@ model Merchant {
   verification_status VerificationStatus @default(UNVERIFIED)
   trust_score         Int                @default(0)
   subscription_plan   SubscriptionPlan   @default(FREE)
+  organization_id     String?
   is_active           Boolean            @default(true)
   is_sponsored        Boolean            @default(false)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
   owner         User                  @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  organization  MerchantOrganization? @relation(fields: [organization_id], references: [id], onDelete: SetNull)
   category      Category              @relation(fields: [category_id], references: [id])
   location      MerchantLocation?
   media         MerchantMedia[]
@@ -165,12 +178,34 @@ model Merchant {
   hours         BusinessHour[]
   tags          MerchantTag[]
   promotions    Promotion[]
+  bookings         Booking[]
+  payments         PaymentTransaction[]
+  booking_settings MerchantBookingSettings?
+  services         MerchantService[]
+  staff            MerchantStaff[]
+  ad_campaigns     AdCampaign[]
 
   @@index([slug])
   @@index([category_id])
   @@index([verification_status])
   @@index([trust_score])
   @@index([is_active])
+  @@index([organization_id])
+}
+
+model MerchantOrganization {
+  id         String           @id @default(cuid())
+  name       String
+  type       OrganizationType
+  owner_id   String           @unique
+  logo       String?
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  owner     User       @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  merchants Merchant[]
+
+  @@index([owner_id])
 }
 
 model MerchantLocation {
@@ -519,4 +554,227 @@ model Promotion {
   @@index([merchant_id])
   @@index([is_active])
   @@index([ends_at])
+}
+
+// ─── PAYMENTS (simulateur V1) ──────────────────────────────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  SIMULATOR
+}
+
+enum PaymentPurpose {
+  SUBSCRIPTION
+  AD_CAMPAIGN
+}
+
+model PaymentTransaction {
+  id          String             @id @default(cuid())
+  user_id     String
+  merchant_id String
+  purpose     PaymentPurpose     @default(SUBSCRIPTION)
+  provider    PaymentProvider    @default(SIMULATOR)
+  plan        SubscriptionPlan?
+  amount      Int
+  currency    String             @default("XOF")
+  status      PaymentStatus      @default(PENDING)
+  reference   String             @unique
+  metadata    Json?
+  created_at  DateTime           @default(now())
+  paid_at     DateTime?
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([merchant_id])
+  @@index([status])
+  @@index([reference])
+}
+
+// ─── BOOKINGS ──────────────────────────────────────────────────────────────────
+
+enum BookingType {
+  TABLE
+  APPOINTMENT
+  ROOM
+  CONSULTATION
+  VENUE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model MerchantBookingSettings {
+  merchant_id         String  @id
+  max_capacity        Int     @default(20)
+  slot_duration_min   Int     @default(60)
+  buffer_min          Int     @default(15)
+  booking_window_days Int     @default(30)
+  auto_confirm        Boolean @default(false)
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+}
+
+model MerchantService {
+  id           String  @id @default(cuid())
+  merchant_id  String
+  name         String
+  duration_min Int     @default(60)
+  price        Int?
+  is_active    Boolean @default(true)
+  created_at   DateTime @default(now())
+
+  merchant Merchant  @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([merchant_id])
+}
+
+model MerchantStaff {
+  id          String  @id @default(cuid())
+  merchant_id String
+  name        String
+  role        String?
+  is_active   Boolean @default(true)
+  created_at  DateTime @default(now())
+
+  merchant Merchant  @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([merchant_id])
+}
+
+model Booking {
+  id               String        @id @default(cuid())
+  merchant_id      String
+  user_id          String?
+  booking_type     BookingType   @default(TABLE)
+  guest_name       String
+  guest_phone      String
+  guest_email      String?
+  booked_at        DateTime
+  check_out_at     DateTime?
+  party_size       Int           @default(1)
+  service_id       String?
+  staff_id         String?
+  room_type        String?
+  notes            String?
+  metadata         Json?
+  status           BookingStatus @default(PENDING)
+  reminder_sent_at DateTime?
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  merchant Merchant         @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  user     User?            @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  service  MerchantService? @relation(fields: [service_id], references: [id], onDelete: SetNull)
+  staff    MerchantStaff?   @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+
+  @@index([merchant_id])
+  @@index([user_id])
+  @@index([booked_at])
+  @@index([status])
+  @@index([booking_type])
+}
+
+// ─── ADS SELF-SERVICE ──────────────────────────────────────────────────────────
+
+enum AdCampaignStatus {
+  DRAFT
+  PENDING_PAYMENT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum AdPlacement {
+  SEARCH
+  FEATURED
+  CATEGORY
+}
+
+model AdCampaign {
+  id          String           @id @default(cuid())
+  merchant_id String
+  placement   AdPlacement      @default(SEARCH)
+  status      AdCampaignStatus @default(DRAFT)
+  amount      Int
+  starts_at   DateTime
+  ends_at     DateTime
+  impressions Int              @default(0)
+  clicks      Int              @default(0)
+  payment_id  String?
+  created_at  DateTime         @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([status])
+  @@index([ends_at])
+}
+
+// ─── AUDIT & FRAUD ─────────────────────────────────────────────────────────────
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  PAYMENT
+  MODERATION
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  user_id     String?
+  action      AuditAction
+  entity_type String
+  entity_id   String?
+  payload     Json?
+  ip          String?
+  created_at  DateTime    @default(now())
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([entity_type, entity_id])
+  @@index([created_at])
+}
+
+model FraudSignal {
+  id          String   @id @default(cuid())
+  signal_type String
+  severity    String   @default("medium")
+  entity_type String
+  entity_id   String?
+  details     Json?
+  resolved    Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  @@index([resolved])
+  @@index([created_at])
+}
+
+model DeviceToken {
+  id         String   @id @default(cuid())
+  user_id    String
+  token      String   @unique
+  platform   String   @default("web")
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
 }

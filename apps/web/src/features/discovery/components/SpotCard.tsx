@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Star, Heart, MapPin, Store, BadgeCheck, Plus, MessageCircle, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { Star, MapPin, Store, BadgeCheck, Plus, MessageCircle, Zap } from 'lucide-react'
 import { ApiMerchant } from '@/lib/api'
+import { FavoriteButton } from './FavoriteButton'
 
 export interface SpotMerchantProps extends ApiMerchant {
   sub_category?: string
@@ -13,8 +13,6 @@ export interface SpotMerchantProps extends ApiMerchant {
 }
 
 export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
-  const [isFav, setIsFav] = useState(false)
-
   return (
     <article className="bg-white rounded-[32px] p-4 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 hover:-translate-y-1 transition-transform duration-300 group">
 
@@ -30,7 +28,7 @@ export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
         {/* Rating badge */}
         {merchant.review_count > 0 && (
           <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-bold text-slate-900 flex items-center gap-1 shadow-sm">
-            <Star size={13} className="fill-brand-500 text-brand-500" />
+            <Star size={13} className="text-slate-700" />
             {merchant.review_count}
           </div>
         )}
@@ -65,18 +63,17 @@ export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
             <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-1.5">
               {merchant.business_name}
               {merchant.verification_status === 'VERIFIED' && (
-                <BadgeCheck size={16} className="text-blue-500 shrink-0" />
+                <BadgeCheck size={16} className="text-slate-600 shrink-0" />
               )}
             </h3>
           </div>
-          <button
-            onClick={() => setIsFav(!isFav)}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              isFav ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500'
-            }`}
-          >
-            <Heart size={18} className={isFav ? 'fill-red-500' : ''} />
-          </button>
+          <FavoriteButton
+            merchantId={merchant.id}
+            merchantSlug={merchant.slug}
+            size={18}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 hover:bg-red-50 shrink-0"
+            favoritedClassName="bg-red-50 text-red-500"
+          />
         </div>
 
         {/* Localisation + WhatsApp */}

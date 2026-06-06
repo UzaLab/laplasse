@@ -3,17 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Trophy, Star, Zap, ArrowLeft, Loader2, ChevronUp } from 'lucide-react'
+import { Trophy, Star, Zap, ArrowLeft, Loader2, ChevronUp, Heart, Share2, Gift, Store, ArrowUp, ArrowDown, Check } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { LOYALTY_TIER_ICONS } from '@/lib/icons'
+import type { LucideIcon } from 'lucide-react'
 
-const TIER_CONFIG = {
-  EXPLORER:  { label: 'Explorateur', color: 'from-slate-400 to-slate-600',  ring: 'ring-slate-200', emoji: '🌍' },
-  LOCAL:     { label: 'Local',       color: 'from-emerald-400 to-teal-600', ring: 'ring-emerald-200', emoji: '📍' },
-  INSIDER:   { label: 'Insider',     color: 'from-amber-400 to-orange-600', ring: 'ring-amber-200', emoji: '⭐' },
-  AMBASSADOR:{ label: 'Ambassadeur', color: 'from-violet-500 to-purple-700',ring: 'ring-violet-200', emoji: '🏆' },
-} as const
+const TIER_CONFIG: Record<string, { label: string; color: string; ring: string; Icon: LucideIcon }> = {
+  EXPLORER:  { label: 'Explorateur', color: 'from-slate-400 to-slate-600',  ring: 'ring-slate-200', Icon: LOYALTY_TIER_ICONS.EXPLORER },
+  LOCAL:     { label: 'Local',       color: 'from-emerald-400 to-teal-600', ring: 'ring-emerald-200', Icon: LOYALTY_TIER_ICONS.LOCAL },
+  INSIDER:   { label: 'Insider',     color: 'from-amber-400 to-orange-600', ring: 'ring-amber-200', Icon: LOYALTY_TIER_ICONS.INSIDER },
+  AMBASSADOR:{ label: 'Ambassadeur', color: 'from-violet-500 to-purple-700',ring: 'ring-violet-200', Icon: LOYALTY_TIER_ICONS.AMBASSADOR },
+}
 
 const REASON_LABELS: Record<string, string> = {
   review: 'Avis déposé',
@@ -94,7 +96,7 @@ export default function LoyaltyPage() {
         <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-[60px] -translate-y-1/3 translate-x-1/3 pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-end gap-6">
           <div className="flex-1">
-            <div className="text-4xl mb-2">{cfg.emoji}</div>
+            <div className="mb-2"><cfg.Icon size={36} strokeWidth={1.75} className="text-white/90" /></div>
             <div className="text-sm font-bold opacity-80 uppercase tracking-widest mb-1">Niveau actuel</div>
             <div className="text-4xl font-black mb-3">{cfg.label}</div>
             <div className="flex items-end gap-3">
@@ -130,7 +132,7 @@ export default function LoyaltyPage() {
         <div className="space-y-6">
           <div className="bg-white rounded-[28px] border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 flex items-center gap-2"><Trophy size={16} className="text-amber-500" /> Niveaux</h3>
+              <h3 className="font-extrabold text-slate-900 flex items-center gap-2"><Trophy size={16} className="text-slate-600" /> Niveaux</h3>
             </div>
             <div className="divide-y divide-slate-50">
               {Object.entries(TIER_CONFIG).map(([key, t]) => {
@@ -139,13 +141,15 @@ export default function LoyaltyPage() {
                 const isReached = tierData && points >= tierData.min
                 return (
                   <div key={key} className={`flex items-center gap-4 px-6 py-4 ${isAct ? 'bg-slate-50' : ''}`}>
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center text-lg shrink-0 ${isAct ? `ring-2 ${t.ring}` : ''}`}>{t.emoji}</div>
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${t.color} flex items-center justify-center shrink-0 ${isAct ? `ring-2 ${t.ring}` : ''}`}>
+                      <t.Icon size={18} strokeWidth={2} className="text-white" />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm font-extrabold ${isAct ? 'text-slate-900' : isReached ? 'text-slate-700' : 'text-slate-400'}`}>{t.label}</p>
                       <p className="text-xs text-slate-400">{tierData?.min ?? 0} points minimum</p>
                     </div>
                     {isAct && <span className="text-[10px] font-black bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">Actuel</span>}
-                    {!isAct && isReached && <span className="text-[10px] font-bold text-emerald-600">✓ Atteint</span>}
+                    {!isAct && isReached && <span className="text-[10px] font-bold text-slate-600 flex items-center gap-0.5"><Check size={10} /> Atteint</span>}
                   </div>
                 )
               })}
@@ -154,18 +158,18 @@ export default function LoyaltyPage() {
 
           <div className="bg-white rounded-[28px] border border-slate-100 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900 flex items-center gap-2"><Zap size={16} className="text-amber-500" /> Comment gagner des points</h3>
+              <h3 className="font-extrabold text-slate-900 flex items-center gap-2"><Zap size={16} className="text-slate-600" /> Comment gagner des points</h3>
             </div>
             <div className="divide-y divide-slate-50">
               {[
-                { action: 'Déposer un avis', pts: 20, icon: <Star size={14} className="text-amber-500" /> },
-                { action: 'Ajouter en favori', pts: 5, icon: '❤️' },
-                { action: 'Partager un établissement', pts: 10, icon: '🔗' },
-                { action: 'Parrainer un ami', pts: 30, icon: '🎁' },
-                { action: 'Inscrire votre commerce', pts: 50, icon: '🏪' },
+                { action: 'Déposer un avis', pts: 20, icon: <Star size={14} className="text-slate-600" /> },
+                { action: 'Ajouter en favori', pts: 5, icon: <Heart size={14} className="text-slate-600" /> },
+                { action: 'Partager un établissement', pts: 10, icon: <Share2 size={14} className="text-slate-600" /> },
+                { action: 'Parrainer un ami', pts: 30, icon: <Gift size={14} className="text-slate-600" /> },
+                { action: 'Inscrire votre commerce', pts: 50, icon: <Store size={14} className="text-slate-600" /> },
               ].map(item => (
                 <div key={item.action} className="flex items-center gap-4 px-6 py-3.5">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 text-sm">{item.icon}</div>
+                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">{item.icon}</div>
                   <span className="flex-1 text-sm font-semibold text-slate-700">{item.action}</span>
                   <span className="text-sm font-black text-amber-600">+{item.pts} pts</span>
                 </div>
@@ -187,7 +191,11 @@ export default function LoyaltyPage() {
               <div className="divide-y divide-slate-50">
                 {data.transactions.map(tx => (
                   <div key={tx.id} className="flex items-center gap-4 px-6 py-3.5">
-                    <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-sm shrink-0">{tx.points > 0 ? '⬆️' : '⬇️'}</div>
+                    <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
+                      {tx.points > 0
+                        ? <ArrowUp size={14} className="text-slate-600" />
+                        : <ArrowDown size={14} className="text-slate-600" />}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800">{REASON_LABELS[tx.reason] ?? tx.reason}</p>
                       <p className="text-xs text-slate-400">{new Date(tx.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</p>

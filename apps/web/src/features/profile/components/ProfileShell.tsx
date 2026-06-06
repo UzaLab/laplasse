@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck,
-  LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift,
+  LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar,
 } from 'lucide-react'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 
 interface ProfileShellProps {
@@ -40,6 +42,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
 
   const mainNav: NavItem[] = [
     { href: '/profile',               label: "Vue d'ensemble",  icon: <LayoutDashboard size={17} /> },
+    { href: '/profile/bookings',      label: 'Mes réservations', icon: <Calendar size={17} /> },
     { href: '/favoris',               label: 'Mes favoris',     icon: <Heart size={17} /> },
     { href: '/profile/reviews',       label: 'Mes avis',        icon: <Star size={17} /> },
     { href: '/profile/loyalty',       label: 'Mes points',      icon: <Trophy size={17} /> },
@@ -48,7 +51,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
     { href: '/profile/settings',      label: 'Paramètres',      icon: <Settings size={17} /> },
   ]
 
-  const isMerchant = user?.role === 'MERCHANT' || !!user?.merchant
+  const isMerchant = user?.role === 'MERCHANT' || (user?.merchants?.length ?? 0) > 0
 
   const extraNav: NavItem[] = [
     ...(isMerchant
@@ -151,7 +154,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
+        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-30 relative overflow-visible">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"
@@ -176,13 +179,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
               <Compass size={15} /> Explorer
             </Link>
             <div className="w-px h-5 bg-slate-200 hidden sm:block" />
-            <Link
-              href="/profile/notifications"
-              className="text-slate-400 hover:text-slate-700 transition-colors"
-              style={{ textDecoration: 'none' }}
-            >
-              <Bell size={18} />
-            </Link>
+            <NotificationBell />
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">
@@ -205,25 +202,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
         </div>
       </main>
 
-      {/* Bottom nav mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40">
-        {[
-          { href: '/',        label: 'Découvrir', icon: '🏠' },
-          { href: '/search',  label: 'Recherche', icon: '🔍' },
-          { href: '/favoris', label: 'Favoris',   icon: '❤️' },
-          { href: '/profile', label: 'Profil',    icon: '👤' },
-        ].map(({ href, label, icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex flex-col items-center gap-0.5 transition-colors ${isActive(href) ? 'text-amber-600' : 'text-slate-400'}`}
-            style={{ textDecoration: 'none' }}
-          >
-            <span className="text-xl">{icon}</span>
-            <span className="text-[10px] font-semibold">{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <MobileBottomNav />
     </div>
   )
 }

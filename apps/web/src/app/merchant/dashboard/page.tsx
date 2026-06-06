@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { useMerchant } from '@/features/discovery/hooks/useDiscovery'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { AnalyticsChart } from '@/features/merchant/components/AnalyticsChart'
@@ -42,7 +43,7 @@ function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isNew = searchParams.get('new') === 'true'
-  const { isAuthenticated, user, access_token } = useAuthStore()
+  const { isAuthenticated, user, activeMerchantId } = useAuthStore()
   const [phoneVerified, setPhoneVerified] = useState<boolean | null>(null)
 
   useEffect(() => {
@@ -52,59 +53,51 @@ function DashboardContent() {
   const { data: myProfile, isLoading: loadingProfile } = useQuery<{
     id: string; slug: string; business_name: string; subscription_plan: string
   } | null>({
-    queryKey: ['my-merchant-profile', user?.id],
+    queryKey: ['my-merchant-profile', user?.id, activeMerchantId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/profile`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await merchantApiFetch('/merchants/me/profile', activeMerchantId)
       if (res.status === 404 || res.status === 403) return null
       return res.ok ? res.json() : null
     },
-    enabled: !!(isAuthenticated && access_token),
+    enabled: isAuthenticated,
   })
 
-  const slug = myProfile?.slug ?? user?.merchant?.slug
+  const slug = myProfile?.slug ?? user?.merchants?.[0]?.slug
   const { data: merchant, isLoading: loadingMerchant } = useMerchant(slug ?? '')
   const isLoading = loadingProfile || loadingMerchant
 
   useEffect(() => {
-    if (!access_token) return
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/verify-phone/status`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    if (!isAuthenticated) return
+    merchantApiFetch('/merchants/me/verify-phone/status', activeMerchantId)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setPhoneVerified(d.phone_verified) })
       .catch(() => {})
-  }, [access_token])
+  }, [isAuthenticated, activeMerchantId])
 
   const { data: analytics } = useQuery<{
     views: number; whatsapp_clicks: number; call_clicks: number;
     favorites: number; reviews: { count: number; avg_rating: number | null }
   }>({
-    queryKey: ['merchant-analytics', user?.id],
+    queryKey: ['merchant-analytics', user?.id, activeMerchantId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/analytics`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await merchantApiFetch('/merchants/me/analytics', activeMerchantId)
       return res.ok ? res.json() : null
     },
-    enabled: !!(isAuthenticated && access_token),
+    enabled: isAuthenticated,
   })
 
   const { data: chartData } = useQuery<{ days: { date: string; count: number }[]; total: number }>({
-    queryKey: ['merchant-analytics-chart', user?.id],
+    queryKey: ['merchant-analytics-chart', user?.id, activeMerchantId],
     queryFn: async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/analytics/chart?days=30`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const res = await merchantApiFetch('/merchants/me/analytics/chart?days=30', activeMerchantId)
       return res.ok ? res.json() : null
     },
-    enabled: !!(isAuthenticated && access_token),
+    enabled: isAuthenticated,
   })
 
   if (!isAuthenticated || !user) return null
 
-  const hasNoMerchant = !myProfile && !user?.merchant && !isLoading
+  const hasNoMerchant = !myProfile && !(user?.merchants?.length) && !isLoading
 
   if (hasNoMerchant) {
     return (
@@ -186,7 +179,7 @@ function DashboardContent() {
                   {merchant.cover_image
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={merchant.cover_image} alt="" className="w-full h-full object-cover" />
-                    : '🏪'
+                    : <Store size={24} className="text-slate-500" strokeWidth={1.5} />
                   }
                 </div>
                 <div className="flex-1 min-w-0">
@@ -199,8 +192,8 @@ function DashboardContent() {
                         ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                         : 'bg-slate-700 text-slate-400 border-slate-600'
                     }`}>
-                      {merchant.verification_status === 'VERIFIED' ? '✓ Vérifié' :
-                       merchant.verification_status === 'PENDING' ? '⏳ En attente' : 'Non vérifié'}
+                      {merchant.verification_status === 'VERIFIED' ? 'Vérifié' :
+                       merchant.verification_status === 'PENDING' ? 'En attente' : 'Non vérifié'}
                     </span>
                     <span className="text-xs text-slate-500">{merchant.category.name}</span>
                   </div>

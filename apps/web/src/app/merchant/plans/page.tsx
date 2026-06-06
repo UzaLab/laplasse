@@ -5,7 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Check, Zap, Crown, Star, Loader2, BadgeCheck } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
+import { PaymentSimulator } from '@/features/merchant/components/PaymentSimulator'
+import type { SubscriptionPlan } from '@/lib/planLimits'
 
 interface Plan {
   id: 'FREE' | 'STARTER' | 'GROWTH' | 'PREMIUM'
@@ -32,9 +35,10 @@ const PLANS: Plan[] = [
     features: [
       'Fiche marchand basique',
       '3 photos max',
-      'Horaires',
-      'Coordonnées de contact',
+      '1 établissement',
+      'Horaires & coordonnées',
       'Présence dans les résultats',
+      'Analytics basiques',
     ],
     cta: 'Votre plan actuel',
   },
@@ -49,8 +53,8 @@ const PLANS: Plan[] = [
     features: [
       'Tout du plan Gratuit',
       '10 photos dans la galerie',
-      'Badge "Partenaire"',
-      'Priorité dans les recherches',
+      '1 établissement',
+      'Promotions & CRM basique',
       'Statistiques de base (vues, clics)',
       'Support email',
     ],
@@ -68,10 +72,10 @@ const PLANS: Plan[] = [
     features: [
       'Tout du plan Starter',
       'Photos illimitées',
-      'Mise en avant sur la homepage',
-      'Analytics avancés (graphes, export)',
-      'Badge "Établissement vérifié"',
-      'Boost dans la recherche (×2)',
+      'Jusqu\'à 3 établissements',
+      'Organisation (chaîne/groupe/multi-sites)',
+      'Analytics avancés & export',
+      'Boost recherche ×2',
       'Support prioritaire',
     ],
     cta: 'Choisir Growth',
@@ -86,9 +90,10 @@ const PLANS: Plan[] = [
     color: 'purple',
     features: [
       'Tout du plan Growth',
+      'Établissements illimités',
+      'Organisation avancée',
       'Annonce sponsorisée (top résultats)',
-      'Page dédiée avec URL personnalisée',
-      'Accès API marchand',
+      'Boost recherche ×3',
       'Account manager dédié',
       'Rapport mensuel personnalisé',
     ],
@@ -98,10 +103,10 @@ const PLANS: Plan[] = [
 
 export default function MerchantPlansPage() {
   const router = useRouter()
-  const { isAuthenticated, user, access_token } = useAuthStore()
+  const { isAuthenticated, user, activeMerchantId } = useAuthStore()
   const [mounted, setMounted] = useState(false)
   const [currentPlan, setCurrentPlan] = useState<string | null>(null)
-  const [requesting, setRequesting] = useState<string | null>(null)
+  const [simulatorPlan, setSimulatorPlan] = useState<{ id: SubscriptionPlan; name: string } | null>(null)
 
   useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
@@ -109,24 +114,16 @@ export default function MerchantPlansPage() {
   }, [mounted, isAuthenticated, router])
 
   useEffect(() => {
-    if (!access_token) return
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/profile`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    })
+    if (!isAuthenticated) return
+    merchantApiFetch('/merchants/me/profile', activeMerchantId)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.subscription_plan) setCurrentPlan(d.subscription_plan) })
       .catch(() => {})
-  }, [access_token])
+  }, [isAuthenticated, activeMerchantId])
 
-  const handleSelectPlan = async (planId: string) => {
+  const handleSelectPlan = (planId: SubscriptionPlan, planName: string) => {
     if (planId === 'FREE') return
-    setRequesting(planId)
-    // Formulaire de contact WhatsApp pour l'upgrade (simple pour MVP)
-    const msg = encodeURIComponent(
-      `Bonjour LaPlasse, je suis ${user?.full_name ?? user?.email} et je souhaite passer au plan ${planId} pour mon établissement.`
-    )
-    window.open(`https://wa.me/2250700000000?text=${msg}`, '_blank')
-    setRequesting(null)
+    setSimulatorPlan({ id: planId, name: planName })
   }
 
   if (!mounted) {
@@ -210,8 +207,8 @@ export default function MerchantPlansPage() {
                 </ul>
 
                 <button
-                  onClick={() => handleSelectPlan(plan.id)}
-                  disabled={isCurrent || plan.id === 'FREE' || requesting === plan.id}
+                  onClick={() => handleSelectPlan(plan.id, plan.name)}
+                  disabled={isCurrent || plan.id === 'FREE'}
                   className={`w-full py-3 rounded-2xl text-sm font-extrabold transition-all ${
                     isCurrent
                       ? 'bg-emerald-500 text-white cursor-default'
@@ -222,8 +219,7 @@ export default function MerchantPlansPage() {
                       : 'bg-slate-900 text-white hover:bg-slate-800'
                   }`}
                 >
-                  {requesting === plan.id ? <Loader2 size={14} className="animate-spin inline" /> :
-                   isCurrent ? '✓ Plan actuel' : plan.cta}
+                  {isCurrent ? '✓ Plan actuel' : plan.cta}
                 </button>
               </div>
             )
@@ -231,8 +227,18 @@ export default function MerchantPlansPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-10">
-          Paiement par virement ou Mobile Money · Facturation mensuelle · Annulation à tout moment
+          Paiement simulé V1 (Orange Money / Wave en production) · Facturation mensuelle · Annulation à tout moment
         </p>
+
+        {simulatorPlan && (
+          <PaymentSimulator
+            planId={simulatorPlan.id}
+            planName={simulatorPlan.name}
+            activeMerchantId={activeMerchantId}
+            onSuccess={plan => setCurrentPlan(plan)}
+            onClose={() => setSimulatorPlan(null)}
+          />
+        )}
       </div>
     </MerchantShell>
   )

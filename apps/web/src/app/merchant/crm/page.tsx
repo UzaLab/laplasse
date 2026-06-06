@@ -8,6 +8,7 @@ import {
   UserX, Search, Loader2, Star,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 
 type Segment = 'all' | 'recent' | 'regular' | 'inactive' | 'lost'
@@ -43,20 +44,18 @@ const SEGMENT_CONFIG: Record<string, { label: string; color: string; bg: string;
 }
 
 export default function MerchantCRMPage() {
-  const { access_token, isAuthenticated } = useAuthStore()
+  const { isAuthenticated, activeMerchantId } = useAuthStore()
   const [segment, setSegment] = useState<Segment>('all')
   const [search, setSearch] = useState('')
 
   const { data, isLoading } = useQuery<CRMData>({
-    queryKey: ['merchant-crm'],
+    queryKey: ['merchant-crm', activeMerchantId],
     queryFn: async () => {
-      const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/crm`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      })
+      const r = await merchantApiFetch('/merchants/me/crm', activeMerchantId)
       if (!r.ok) throw new Error('Unauthorized')
       return r.json()
     },
-    enabled: !!access_token && isAuthenticated,
+    enabled: isAuthenticated,
   })
 
   if (isLoading) {

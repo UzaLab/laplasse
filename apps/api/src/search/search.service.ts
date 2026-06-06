@@ -204,7 +204,7 @@ export class SearchService implements OnModuleInit {
       // Sponsored merchants bubble up (max 2 slots), only when relevant (verified)
       const sponsored = result.hits.filter(h => h['is_sponsored'] && h['verification_status'] === 'VERIFIED')
       const regular   = result.hits.filter(h => !h['is_sponsored'] || h['verification_status'] !== 'VERIFIED')
-      const sorted    = [...sponsored.slice(0, 2), ...regular]
+      const sorted    = [...sponsored.slice(0, 3), ...regular]
 
       return {
         data: sorted,

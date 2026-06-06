@@ -7,6 +7,7 @@ import { ComplaintsService } from '../complaints/complaints.service'
 import { SearchService } from '../search/search.service'
 import { MerchantsService } from '../merchants/merchants.service'
 import { NotificationsService } from '../notifications/notifications.service'
+import { AuditService } from '../audit/audit.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -18,6 +19,7 @@ export class AdminController {
     private readonly searchService: SearchService,
     private readonly merchantsService: MerchantsService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
@@ -265,5 +267,10 @@ export class AdminController {
         daily_searches: dailySearches.map(r => ({ day: r.day, count: Number(r.count) })),
       },
     }
+  }
+
+  @Get('audit')
+  getAuditLogs(@Query('limit') limit?: string) {
+    return this.audit.listRecent(limit ? Number(limit) : 50)
   }
 }

@@ -49,34 +49,65 @@ function redirectToLogin() {
   window.location.href = `/login?redirect=${redirect}`
 }
 
+function buildHeaders(accessToken: string, options?: RequestInit): HeadersInit {
+  const base: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+  }
+  if (options?.body && !(options.headers as Record<string, string>)?.['Content-Type']) {
+    base['Content-Type'] = 'application/json'
+  }
+  return { ...base, ...(options?.headers as Record<string, string> | undefined) }
+}
+
+/** Fetch authentifié avec refresh auto sur 401. Retourne la Response brute. */
+export async function authApiFetch(
+  path: string,
+  options?: RequestInit,
+  retried = false,
+): Promise<Response> {
+  const token = useAuthStore.getState().access_token
+  if (!token) {
+    redirectToLogin()
+    return new Response(null, { status: 401 })
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: buildHeaders(token, options),
+  })
+
+  if (res.status === 401 && !retried) {
+    const newToken = await getValidAccessToken()
+    if (newToken) {
+      return authApiFetch(path, options, true)
+    }
+    redirectToLogin()
+  }
+
+  return res
+}
+
+/** Fetch authentifié — retourne JSON ou null (utilise le token passé, refresh auto sur 401). */
 export async function authFetch<T>(
   path: string,
   accessToken: string,
   options?: RequestInit,
   retried = false,
 ): Promise<T | null> {
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-        ...options?.headers,
-      },
-    })
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: buildHeaders(accessToken, options),
+  })
 
-    if (res.status === 401 && !retried) {
-      const newToken = await getValidAccessToken()
-      if (newToken) {
-        return authFetch<T>(path, newToken, options, true)
-      }
-      redirectToLogin()
-      return null
+  if (res.status === 401 && !retried) {
+    const newToken = await getValidAccessToken()
+    if (newToken) {
+      return authFetch<T>(path, newToken, options, true)
     }
-
-    if (!res.ok) return null
-    return res.json() as Promise<T>
-  } catch {
+    redirectToLogin()
     return null
   }
+
+  if (!res.ok) return null
+  return res.json() as Promise<T>
 }

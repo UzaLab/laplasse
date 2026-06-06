@@ -10,6 +10,10 @@ export type NotificationType =
   | 'referral_reward'
   | 'promotion_created'
   | 'welcome'
+  | 'subscription_upgraded'
+  | 'booking_created'
+  | 'booking_confirmed'
+  | 'booking_status'
 
 @Injectable()
 export class NotificationsService {

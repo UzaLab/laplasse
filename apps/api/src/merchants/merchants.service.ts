@@ -1,9 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { OtpService } from '../otp/otp.service'
 import { StorageService } from '../storage/storage.service'
 import { QueryMerchantsDto } from './dto/query-merchants.dto'
+import {
+  getHighestPlan,
+  getPlanLimits,
+  isWithinLimit,
+  planLimitMessage,
+} from '../common/plan-limits'
+import { OrganizationType } from '../../generated/prisma/client'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -22,6 +29,7 @@ const MERCHANT_PUBLIC_SELECT = {
   verification_status: true,
   trust_score: true,
   is_sponsored: true,
+  subscription_plan: true,
   created_at: true,
   category: {
     select: { id: true, name: true, slug: true, icon: true },
@@ -44,6 +52,18 @@ const MERCHANT_PUBLIC_SELECT = {
   },
 } as const
 
+const MERCHANT_MINI_SELECT = {
+  id: true,
+  business_name: true,
+  slug: true,
+  verification_status: true,
+  subscription_plan: true,
+  organization_id: true,
+  cover_image: true,
+  is_active: true,
+  category: { select: { name: true, slug: true, icon: true } },
+} as const
+
 @Injectable()
 export class MerchantsService {
   constructor(
@@ -52,6 +72,18 @@ export class MerchantsService {
     private readonly config: ConfigService,
     private readonly storage: StorageService,
   ) {}
+
+  // ── Helper : résoudre l'établissement actif d'un utilisateur ────────────────
+  private async resolveMyMerchant(userId: string, merchantId?: string) {
+    const where = merchantId
+      ? { id: merchantId, owner_id: userId }
+      : { owner_id: userId }
+    const m = await this.prisma.merchant.findFirst({ where })
+    if (!m) throw new NotFoundException('Merchant not found')
+    return m
+  }
+
+  // ── Liste publique ──────────────────────────────────────────────────────────
 
   async findAll(query: QueryMerchantsDto) {
     const where = {
@@ -204,16 +236,67 @@ export class MerchantsService {
     })
   }
 
+  // ── Mes établissements ──────────────────────────────────────────────────────
+
+  async findAllMine(userId: string) {
+    const merchants = await this.prisma.merchant.findMany({
+      where: { owner_id: userId },
+      select: MERCHANT_MINI_SELECT,
+      orderBy: { created_at: 'asc' },
+    })
+    return merchants
+  }
+
   async registerMerchant(
     data: {
       business_name: string; category_slug: string; description?: string;
       phone?: string; whatsapp?: string; address?: string; district?: string; city?: string;
+      organization_id?: string;
+      create_organization?: { name: string; type: OrganizationType };
     },
     userId: string,
   ) {
-    const existing = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (existing) {
-      throw new ConflictException('Vous avez déjà un établissement enregistré. Accédez à votre dashboard marchand.')
+    const existingMerchants = await this.prisma.merchant.findMany({
+      where: { owner_id: userId },
+      select: { subscription_plan: true },
+    })
+
+    const effectivePlan = getHighestPlan(existingMerchants)
+    const limits = getPlanLimits(effectivePlan)
+
+    if (!isWithinLimit(existingMerchants.length, limits.maxEstablishments)) {
+      throw new ForbiddenException(planLimitMessage('establishments', effectivePlan))
+    }
+
+    let organizationId: string | null = data.organization_id ?? null
+
+    if (data.create_organization) {
+      if (!limits.orgAllowed) {
+        throw new ForbiddenException(planLimitMessage('organization', effectivePlan))
+      }
+      const existingOrg = await this.prisma.merchantOrganization.findUnique({
+        where: { owner_id: userId },
+      })
+      if (existingOrg) {
+        organizationId = existingOrg.id
+      } else {
+        const org = await this.prisma.merchantOrganization.create({
+          data: {
+            name: data.create_organization.name,
+            type: data.create_organization.type,
+            owner_id: userId,
+          },
+        })
+        organizationId = org.id
+      }
+    } else if (organizationId) {
+      if (!limits.orgAllowed) {
+        throw new ForbiddenException(planLimitMessage('organization', effectivePlan))
+      }
+      const org = await this.prisma.merchantOrganization.findFirst({
+        where: { id: organizationId, owner_id: userId },
+      })
+      if (!org) throw new BadRequestException('Organisation introuvable')
     }
 
     const category = await this.prisma.category.findUnique({ where: { slug: data.category_slug } })
@@ -235,6 +318,7 @@ export class MerchantsService {
         whatsapp: data.whatsapp ?? null,
         category_id: category.id,
         owner_id: userId,
+        organization_id: organizationId,
         verification_status: 'PENDING',
         is_active: false,
         location: data.district ? {
@@ -248,11 +332,11 @@ export class MerchantsService {
       },
       select: {
         id: true, business_name: true, slug: true,
-        verification_status: true, is_active: true, created_at: true,
+        verification_status: true, is_active: true, organization_id: true, created_at: true,
       },
     })
 
-    // Met à jour le rôle user → MERCHANT
+    // Met à jour le rôle user → MERCHANT (idempotent)
     await this.prisma.user.update({
       where: { id: userId },
       data: { role: 'MERCHANT' },
@@ -261,9 +345,9 @@ export class MerchantsService {
     return merchant
   }
 
-  async findMine(userId: string) {
+  async findMine(userId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
-      where: { owner_id: userId },
+      where: merchantId ? { id: merchantId, owner_id: userId } : { owner_id: userId },
       select: {
         ...MERCHANT_PUBLIC_SELECT,
         email: true,
@@ -274,9 +358,8 @@ export class MerchantsService {
     return this.formatMerchant(merchant)
   }
 
-  async getMyHours(userId: string) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async getMyHours(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const hours = await this.prisma.businessHour.findMany({
       where: { merchant_id: merchant.id },
@@ -289,9 +372,9 @@ export class MerchantsService {
   async updateMyHours(
     hours: Array<{ day: number; open_time?: string; close_time?: string; is_closed?: boolean }>,
     userId: string,
+    merchantId?: string,
   ) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     await this.prisma.$transaction([
       this.prisma.businessHour.deleteMany({ where: { merchant_id: merchant.id } }),
@@ -306,15 +389,11 @@ export class MerchantsService {
       }),
     ])
 
-    return this.getMyHours(userId)
+    return this.getMyHours(userId, merchantId)
   }
 
-  async getMyMedia(userId: string) {
-    const merchant = await this.prisma.merchant.findFirst({
-      where: { owner_id: userId },
-      select: { id: true, logo: true, cover_image: true },
-    })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async getMyMedia(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const media = await this.prisma.merchantMedia.findMany({
       where: { merchant_id: merchant.id },
@@ -322,10 +401,23 @@ export class MerchantsService {
       select: { id: true, type: true, url: true, thumbnail: true, order: true, created_at: true },
     })
 
-    return { logo: merchant.logo, cover_image: merchant.cover_image, gallery: media }
+    const limits = getPlanLimits(merchant.subscription_plan)
+    const photoCount = media.filter(m => m.type === 'IMAGE').length
+
+    return {
+      logo: merchant.logo,
+      cover_image: merchant.cover_image,
+      gallery: media,
+      limits: {
+        max_photos: limits.maxPhotos,
+        current_photos: photoCount,
+        can_add: isWithinLimit(photoCount, limits.maxPhotos),
+        plan: merchant.subscription_plan,
+      },
+    }
   }
 
-  async uploadMyMediaFile(userId: string, file: Express.Multer.File) {
+  async uploadMyMediaFile(userId: string, file: Express.Multer.File, merchantId?: string) {
     if (!file?.buffer?.length) {
       throw new BadRequestException('Fichier requis')
     }
@@ -336,19 +428,28 @@ export class MerchantsService {
       throw new BadRequestException('Taille maximale : 5 Mo')
     }
 
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
-
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
     const url = await this.storage.upload(file.buffer, file.mimetype, `merchants/${merchant.id}`)
-    return this.addMyMedia({ url, type: 'IMAGE' }, userId)
+    return this.addMyMedia({ url, type: 'IMAGE' }, userId, merchantId)
   }
 
   async addMyMedia(
     data: { url: string; type?: string; order?: number },
     userId: string,
+    merchantId?: string,
   ) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    const mediaType = data.type ?? 'IMAGE'
+
+    if (mediaType === 'IMAGE') {
+      const photoCount = await this.prisma.merchantMedia.count({
+        where: { merchant_id: merchant.id, type: 'IMAGE' },
+      })
+      const limits = getPlanLimits(merchant.subscription_plan)
+      if (!isWithinLimit(photoCount, limits.maxPhotos)) {
+        throw new ForbiddenException(planLimitMessage('photos', merchant.subscription_plan))
+      }
+    }
 
     const count = await this.prisma.merchantMedia.count({ where: { merchant_id: merchant.id } })
 
@@ -356,7 +457,7 @@ export class MerchantsService {
       data: {
         merchant_id: merchant.id,
         url: data.url,
-        type: (data.type ?? 'IMAGE') as never,
+        type: mediaType as never,
         order: data.order ?? count,
         uploaded_by: userId,
       },
@@ -364,9 +465,8 @@ export class MerchantsService {
     })
   }
 
-  async deleteMyMedia(mediaId: string, userId: string) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async deleteMyMedia(mediaId: string, userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const media = await this.prisma.merchantMedia.findFirst({
       where: { id: mediaId, merchant_id: merchant.id },
@@ -377,9 +477,8 @@ export class MerchantsService {
     return { deleted: true }
   }
 
-  async setMyCoverImage(url: string, userId: string, field: 'logo' | 'cover_image') {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async setMyCoverImage(url: string, userId: string, field: 'logo' | 'cover_image', merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     return this.prisma.merchant.update({
       where: { id: merchant.id },
@@ -388,9 +487,9 @@ export class MerchantsService {
     })
   }
 
-  async sendPhoneVerification(userId: string) {
+  async sendPhoneVerification(userId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
-      where: { owner_id: userId },
+      where: merchantId ? { id: merchantId, owner_id: userId } : { owner_id: userId },
       select: { id: true, phone: true, whatsapp: true },
     })
     if (!merchant) throw new NotFoundException('Merchant not found')
@@ -402,9 +501,9 @@ export class MerchantsService {
     return { ...result, phone_masked: phone.replace(/(\d{2})\d+(\d{2})/, '$1****$2') }
   }
 
-  async confirmPhoneVerification(userId: string, code: string) {
+  async confirmPhoneVerification(userId: string, code: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
-      where: { owner_id: userId },
+      where: merchantId ? { id: merchantId, owner_id: userId } : { owner_id: userId },
       select: { id: true, phone: true, whatsapp: true },
     })
     if (!merchant) throw new NotFoundException('Merchant not found')
@@ -433,9 +532,9 @@ export class MerchantsService {
     return { verified: true, message: 'Téléphone vérifié avec succès' }
   }
 
-  async getPhoneVerificationStatus(userId: string) {
+  async getPhoneVerificationStatus(userId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
-      where: { owner_id: userId },
+      where: merchantId ? { id: merchantId, owner_id: userId } : { owner_id: userId },
       select: {
         id: true,
         verifications: {
@@ -453,9 +552,8 @@ export class MerchantsService {
     }
   }
 
-  async getMyAnalytics(userId: string) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async getMyAnalytics(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const [interactions, reviewStats, favoritesCount] = await Promise.all([
       this.prisma.merchantInteraction.groupBy({
@@ -493,9 +591,8 @@ export class MerchantsService {
     }
   }
 
-  async getMyAnalyticsChart(userId: string, days = 30) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async getMyAnalyticsChart(userId: string, days = 30, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const since = new Date()
     since.setDate(since.getDate() - days + 1)
@@ -510,7 +607,6 @@ export class MerchantsService {
       select: { created_at: true },
     })
 
-    // Group by day
     const byDay: Record<string, number> = {}
     for (let d = 0; d < days; d++) {
       const dt = new Date(since)
@@ -537,10 +633,9 @@ export class MerchantsService {
       logo?: string; cover_image?: string;
     },
     userId: string,
+    merchantId?: string,
   ) {
-    const merchant = await this.prisma.merchant.findFirst({ where: { owner_id: userId } })
-    if (!merchant) throw new NotFoundException('Merchant not found')
-
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
     const { district, address, ...merchantData } = data
 
     const updated = await this.prisma.merchant.update({
@@ -617,10 +712,8 @@ export class MerchantsService {
 
     let score = 0
 
-    // Signal 1 : phone OTP verified (+20)
     if (m.owner?.is_verified) score += 20
 
-    // Signal 2 : profile completeness (up to +25)
     const completenessPoints = [
       m.description && m.description.length > 50 ? 8 : m.description ? 4 : 0,
       m.logo ? 6 : 0,
@@ -630,22 +723,18 @@ export class MerchantsService {
     ]
     score += completenessPoints.reduce((a, b) => a + b, 0)
 
-    // Signal 3 : approved reviews quantity (up to +30)
     const reviewCount = m._count.reviews
     const reviewPoints = Math.min(30, reviewCount * 3)
     score += reviewPoints
 
-    // Signal 4 : avg rating (up to +15)
     if (m.reviews.length > 0) {
       const avg = m.reviews.reduce((s, r) => s + r.rating, 0) / m.reviews.length
       score += Math.round((avg / 5) * 15)
     }
 
-    // Signal 5 : active complaints (−10 each, min 0)
     const penaltyPoints = m.complaints.length * 10
     score = Math.max(0, score - penaltyPoints)
 
-    // Signal 6 : favorites bonus (+5)
     if (m._count.favorites >= 5) score += 5
 
     const finalScore = Math.min(100, score)
@@ -672,47 +761,144 @@ export class MerchantsService {
     return { updated }
   }
 
-  async getMyCRM(userId: string) {
-    const merchant = await this.prisma.merchant.findUnique({
-      where: { owner_id: userId },
-      select: { id: true },
-    })
-    if (!merchant) throw new NotFoundException('Merchant not found')
+  async getMyCRM(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+
+    const limits = getPlanLimits(merchant.subscription_plan)
+    if (!limits.crm) {
+      throw new ForbiddenException('Le CRM nécessite le plan Starter ou supérieur.')
+    }
 
     const now = new Date()
     const days30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const days90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     const days180 = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000)
 
-    // All reviewers of this merchant
     const allReviews = await this.prisma.review.findMany({
       where: { merchant_id: merchant.id, status: 'APPROVED' },
       select: {
         user_id: true,
         rating: true,
         created_at: true,
-        user: { select: { id: true, full_name: true, email: true, created_at: true } },
+        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
       },
       orderBy: { created_at: 'desc' },
     })
 
-    // Group reviews by user
-    const byUser = new Map<string, { user: typeof allReviews[0]['user']; reviews: typeof allReviews }>()
-    for (const r of allReviews) {
-      if (!byUser.has(r.user_id)) byUser.set(r.user_id, { user: r.user, reviews: [] })
-      byUser.get(r.user_id)!.reviews.push(r)
+    const bookingClients = await this.prisma.booking.findMany({
+      where: { merchant_id: merchant.id },
+      select: {
+        user_id: true,
+        guest_name: true,
+        guest_phone: true,
+        guest_email: true,
+        booked_at: true,
+        status: true,
+        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
+      },
+      orderBy: { booked_at: 'desc' },
+    })
+
+    const favoriteUsers = await this.prisma.favorite.findMany({
+      where: { merchant_id: merchant.id },
+      select: {
+        user_id: true,
+        created_at: true,
+        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
+      },
+    })
+
+    type CustomerRow = {
+      id: string
+      full_name: string | null
+      email: string | null
+      phone: string | null
+      created_at: Date
+      reviewCount: number
+      avgRating: number
+      lastReviewAt: Date | null
+      lastBookingAt: Date | null
+      bookingCount: number
+      isFavorite: boolean
+      sources: string[]
+      segment: 'recent' | 'inactive' | 'lost' | 'regular'
     }
 
-    const customers = Array.from(byUser.values()).map(({ user, reviews }) => {
-      const lastReviewAt = reviews[0]?.created_at ?? null
+    const customerMap = new Map<string, CustomerRow>()
+
+    const upsertCustomer = (
+      key: string,
+      user: { id: string; full_name: string | null; email: string | null; phone: string | null; created_at: Date },
+      patch: Partial<CustomerRow>,
+    ) => {
+      const existing = customerMap.get(key) ?? {
+        ...user,
+        reviewCount: 0,
+        avgRating: 0,
+        lastReviewAt: null,
+        lastBookingAt: null,
+        bookingCount: 0,
+        isFavorite: false,
+        sources: [],
+        segment: 'regular' as const,
+      }
+      customerMap.set(key, {
+        ...existing,
+        ...patch,
+        sources: [...new Set([...existing.sources, ...(patch.sources ?? [])])],
+      })
+    }
+
+    for (const r of allReviews) {
+      upsertCustomer(r.user_id, r.user, {
+        sources: ['review'],
+        reviewCount: (customerMap.get(r.user_id)?.reviewCount ?? 0) + 1,
+      })
+    }
+
+    for (const b of bookingClients) {
+      const key = b.user_id ?? `phone:${b.guest_phone}`
+      const user = b.user ?? {
+        id: key,
+        full_name: b.guest_name,
+        email: b.guest_email,
+        phone: b.guest_phone,
+        created_at: b.booked_at,
+      }
+      const prev = customerMap.get(key)
+      upsertCustomer(key, user, {
+        sources: ['booking'],
+        bookingCount: (prev?.bookingCount ?? 0) + 1,
+        lastBookingAt: !prev?.lastBookingAt || b.booked_at > prev.lastBookingAt ? b.booked_at : prev.lastBookingAt,
+      })
+    }
+
+    for (const f of favoriteUsers) {
+      upsertCustomer(f.user_id, f.user, { sources: ['favorite'], isFavorite: true })
+    }
+
+    const byUser = new Map<string, typeof allReviews>()
+    for (const r of allReviews) {
+      if (!byUser.has(r.user_id)) byUser.set(r.user_id, [])
+      byUser.get(r.user_id)!.push(r)
+    }
+
+    const customers = Array.from(customerMap.values()).map(c => {
+      const reviews = byUser.get(c.id) ?? []
       const reviewCount = reviews.length
-      const avgRating = reviews.reduce((s, r) => s + r.rating, 0) / reviewCount
-      const isRecent = lastReviewAt && lastReviewAt >= days30
-      const isInactive = lastReviewAt && lastReviewAt < days90 && lastReviewAt >= days180
-      const isLost = lastReviewAt && lastReviewAt < days180
+      const avgRating = reviewCount
+        ? Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviewCount * 10) / 10
+        : c.avgRating
+      const lastReviewAt = reviews[0]?.created_at ?? c.lastReviewAt
+      const lastActivity = lastReviewAt && c.lastBookingAt
+        ? (lastReviewAt > c.lastBookingAt ? lastReviewAt : c.lastBookingAt)
+        : (lastReviewAt ?? c.lastBookingAt)
+      const isRecent = lastActivity && lastActivity >= days30
+      const isInactive = lastActivity && lastActivity < days90 && lastActivity >= days180
+      const isLost = lastActivity && lastActivity < days180
       const segment: 'recent' | 'inactive' | 'lost' | 'regular' =
         isLost ? 'lost' : isInactive ? 'inactive' : isRecent ? 'recent' : 'regular'
-      return { ...user, reviewCount, avgRating: Math.round(avgRating * 10) / 10, lastReviewAt, segment }
+      return { ...c, reviewCount, avgRating, lastReviewAt, segment }
     })
 
     const recent = customers.filter(c => c.segment === 'recent')
@@ -720,7 +906,6 @@ export class MerchantsService {
     const lost = customers.filter(c => c.segment === 'lost')
     const regular = customers.filter(c => c.segment === 'regular')
 
-    // Recent reviewers this month (unique users)
     const recentReviewers = new Set(
       allReviews.filter(r => r.created_at >= days30).map(r => r.user_id),
     ).size

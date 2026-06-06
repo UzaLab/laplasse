@@ -18,6 +18,14 @@ import { NotificationsModule } from './notifications/notifications.module'
 import { LoyaltyModule } from './loyalty/loyalty.module'
 import { ReferralModule } from './referral/referral.module'
 import { PromotionsModule } from './promotions/promotions.module'
+import { OrganizationsModule } from './organizations/organizations.module'
+import { PaymentsModule } from './payments/payments.module'
+import { BookingsModule } from './bookings/bookings.module'
+import { QueueModule } from './queue/queue.module'
+import { AuditModule } from './audit/audit.module'
+import { FraudModule } from './fraud/fraud.module'
+import { StaffModule } from './staff/staff.module'
+import { AdsModule } from './ads/ads.module'
 
 @Module({
   imports: [
@@ -25,6 +33,7 @@ import { PromotionsModule } from './promotions/promotions.module'
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     OtpModule,
     PrismaModule,
+    AuditModule,
     HealthModule,
     AuthModule,
     CategoriesModule,
@@ -38,6 +47,13 @@ import { PromotionsModule } from './promotions/promotions.module'
     LoyaltyModule,
     ReferralModule,
     PromotionsModule,
+    OrganizationsModule,
+    PaymentsModule,
+    BookingsModule,
+    QueueModule,
+    FraudModule,
+    StaffModule,
+    AdsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

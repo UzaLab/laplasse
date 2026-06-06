@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Star, X, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
+import { authApiFetch } from '@/lib/authFetch'
+
 interface ReviewModalProps {
   merchantId: string
   merchantName: string
@@ -11,7 +13,7 @@ interface ReviewModalProps {
 }
 
 export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalProps) {
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const [rating, setRating] = useState(0)
   const [hovered, setHovered] = useState(0)
   const [title, setTitle] = useState('')
@@ -29,12 +31,8 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
     setError('')
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/reviews`, {
+      const res = await authApiFetch('/reviews', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${access_token}`,
-        },
         body: JSON.stringify({
           merchant_id: merchantId,
           rating,
@@ -44,8 +42,12 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        setError(data.message ?? 'Erreur lors de l\'envoi')
+        const data = await res.json().catch(() => ({}))
+        setError(
+          res.status === 401
+            ? 'Session expirée — reconnectez-vous pour laisser un avis'
+            : (data.message ?? 'Erreur lors de l\'envoi'),
+        )
         return
       }
 

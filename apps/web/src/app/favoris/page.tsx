@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Heart, BadgeCheck, MapPin, MessageCircle, Loader2 } from 'lucide-react'
+import { Heart, BadgeCheck, MapPin, MessageCircle, Loader2, Store } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
@@ -51,7 +51,7 @@ export default function FavorisPage() {
     <ProfileShell>
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-          <Heart size={24} className="text-red-500 fill-red-500" /> Mes favoris
+          <Heart size={24} className="text-slate-700" strokeWidth={2} /> Mes favoris
         </h1>
         <p className="text-slate-400 mt-1 text-sm">
           {isLoading ? 'Chargement…'
@@ -68,7 +68,7 @@ export default function FavorisPage() {
       ) : favorites.length === 0 ? (
         <div className="bg-white rounded-[28px] border border-slate-100 p-12 text-center">
           <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Heart size={28} className="text-red-200" />
+            <Heart size={28} className="text-slate-300" strokeWidth={1.5} />
           </div>
           <p className="text-slate-500 font-medium mb-4">Aucun favori pour le moment.</p>
           <Link
@@ -92,10 +92,10 @@ export default function FavorisPage() {
                 {m.cover_image
                   // eslint-disable-next-line @next/next/no-img-element
                   ? <img src={m.cover_image} alt={m.business_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  : <div className="w-full h-full flex items-center justify-center text-4xl">🏪</div>
+                  : <div className="w-full h-full flex items-center justify-center"><Store size={32} className="text-slate-300" strokeWidth={1.5} /></div>
                 }
                 <div className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center">
-                  <Heart size={14} className="fill-red-500 text-red-500" />
+                  <Heart size={14} className="text-slate-600" />
                 </div>
                 {m.verification_status === 'VERIFIED' && (
                   <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-blue-500/90 text-white text-[10px] font-bold px-2 py-1 rounded-full">

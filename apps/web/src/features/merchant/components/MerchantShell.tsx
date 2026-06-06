@@ -1,13 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
-  Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users,
+  Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users, UserCircle2,
+  ChevronDown, Plus, Building2, Network, Calendar, Tag, Megaphone, Scissors,
 } from 'lucide-react'
+import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
 import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
+import { authApiFetch } from '@/lib/authFetch'
 
 interface MerchantShellProps {
   children: React.ReactNode
@@ -18,8 +22,60 @@ interface MerchantShellProps {
 export function MerchantShell({ children, merchantSlug, merchantName }: MerchantShellProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user, logout, activeMerchantId, setActiveMerchant, updateUser } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+
+  const merchants = user?.merchants ?? []
+  const organization = user?.organization
+  const activeMerchant = merchants.find(m => m.id === activeMerchantId) ?? merchants[0] ?? null
+  const orgMerchants = organization
+    ? merchants.filter(m => m.organization_id === organization.id)
+    : []
+  const independentMerchants = organization
+    ? merchants.filter(m => m.organization_id !== organization.id)
+    : merchants
+
+  // Synchronise la liste d'établissements et l'organisation depuis l'API
+  useEffect(() => {
+    if (!user) return
+    Promise.all([
+      merchantApiFetch('/merchants/my/all'),
+      authApiFetch('/auth/me'),
+    ])
+      .then(async ([merchantsRes, meRes]) => {
+        if (merchantsRes.ok) {
+          const list = await merchantsRes.json() as Array<{
+            id: string; business_name: string; slug: string;
+            verification_status: string; subscription_plan?: string; organization_id?: string | null
+          }>
+          if (list.length) {
+            updateUser({
+              merchants: list.map(m => ({
+                id: m.id,
+                business_name: m.business_name,
+                slug: m.slug,
+                verification_status: m.verification_status,
+                subscription_plan: m.subscription_plan,
+                organization_id: m.organization_id,
+              })),
+            })
+            const currentValid = list.some(m => m.id === activeMerchantId)
+            if (!activeMerchantId || !currentValid) {
+              setActiveMerchant(list[0].id)
+            }
+          }
+        }
+        if (meRes.ok) {
+          const me = await meRes.json()
+          if (me.organization) {
+            updateUser({ organization: me.organization })
+          }
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const handleLogout = () => { logout(); router.push('/') }
 
@@ -33,12 +89,19 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     { href: '/merchant/dashboard',    label: "Vue d'ensemble",   icon: <LayoutDashboard size={17} /> },
     { href: '/merchant/analytics',    label: 'Statistiques',     icon: <TrendingUp size={17} /> },
     { href: '/merchant/crm',          label: 'Clients CRM',      icon: <Users size={17} /> },
+    { href: '/merchant/bookings',     label: 'Réservations',     icon: <Calendar size={17} /> },
   ]
 
   const editNav: NavItem[] = [
     { href: '/merchant/profile/edit', label: 'Modifier le profil', icon: <Edit size={17} /> },
     { href: '/merchant/hours',        label: 'Horaires',            icon: <Clock size={17} /> },
     { href: '/merchant/media',        label: 'Photos & médias',     icon: <Image size={17} /> },
+    { href: '/merchant/staff',        label: 'Prestations & équipe', icon: <Scissors size={17} /> },
+  ]
+
+  const growthNav: NavItem[] = [
+    { href: '/merchant/promotions',   label: 'Promotions',          icon: <Tag size={17} /> },
+    { href: '/merchant/ads',        label: 'Visibilité',          icon: <Megaphone size={17} /> },
   ]
 
   const billingNav: NavItem[] = [
@@ -68,7 +131,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   )
 
   const pageName = [
-    ...mainNav, ...editNav, ...billingNav,
+    ...mainNav, ...editNav, ...growthNav, ...billingNav,
   ].find(n => isActive(n.href))?.label ?? 'Dashboard'
 
   const SidebarInner = (
@@ -96,23 +159,120 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </button>
       </div>
 
-      {/* Merchant identity */}
-      {merchantName && (
-        <div className="mx-3 mt-4 px-3 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
-          <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mb-0.5">Établissement</p>
-          <p className="text-sm font-extrabold text-slate-900 truncate">{merchantName}</p>
-          {merchantSlug && (
+      {/* Merchant switcher */}
+      <div className="mx-3 mt-4 relative">
+        {organization && (
+          <div className="mb-2 px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl">
+            <div className="flex items-center gap-2">
+              <Network size={12} className="text-slate-400 shrink-0" />
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Organisation</p>
+            </div>
+            <p className="text-xs font-extrabold text-slate-900 truncate mt-0.5">{organization.name}</p>
             <Link
-              href={`/m/${merchantSlug}`}
-              target="_blank"
+              href={`/merchant/analytics?scope=organization`}
+              onClick={() => setSwitcherOpen(false)}
               className="inline-flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-bold mt-1 transition-colors"
               style={{ textDecoration: 'none' }}
             >
-              Voir la fiche publique <ExternalLink size={9} />
+              Analytics agrégés <ExternalLink size={9} />
             </Link>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+        {merchants.length > 1 ? (
+          <div>
+            <button
+              onClick={() => setSwitcherOpen(v => !v)}
+              className="w-full flex items-center gap-2 px-3 py-3 bg-amber-50 border border-amber-100 rounded-2xl hover:border-amber-300 transition-colors"
+            >
+              <Building2 size={14} className="text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider leading-none mb-0.5">Établissement actif</p>
+                <p className="text-sm font-extrabold text-slate-900 truncate">
+                  {activeMerchant?.business_name ?? merchantName ?? '—'}
+                </p>
+              </div>
+              <ChevronDown size={14} className={`text-amber-500 shrink-0 transition-transform ${switcherOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {switcherOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto">
+                {organization && orgMerchants.length > 0 && (
+                  <>
+                    <p className="px-4 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {organization.name}
+                    </p>
+                    {orgMerchants.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false) }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                          m.id === activeMerchantId
+                            ? 'bg-amber-50 text-slate-900 font-bold'
+                            : 'text-slate-600 hover:bg-slate-50 font-semibold'
+                        }`}
+                      >
+                        <Building2 size={13} className={m.id === activeMerchantId ? 'text-amber-500' : 'text-slate-400'} />
+                        <span className="truncate">{m.business_name}</span>
+                      </button>
+                    ))}
+                    {independentMerchants.length > 0 && (
+                      <div className="h-px bg-slate-100 mx-2" />
+                    )}
+                  </>
+                )}
+                {independentMerchants.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false) }}
+                    className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                      m.id === activeMerchantId
+                        ? 'bg-amber-50 text-slate-900 font-bold'
+                        : 'text-slate-600 hover:bg-slate-50 font-semibold'
+                    }`}
+                  >
+                    <Building2 size={13} className={m.id === activeMerchantId ? 'text-amber-500' : 'text-slate-400'} />
+                    <span className="truncate">{m.business_name}</span>
+                  </button>
+                ))}
+                <div className="h-px bg-slate-100" />
+                <Link
+                  href="/merchant/signup"
+                  onClick={() => setSwitcherOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 font-bold transition-colors"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Plus size={13} /> Ajouter un établissement
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-3 py-3 bg-amber-50 border border-amber-100 rounded-2xl">
+            <p className="text-xs text-amber-600 font-bold uppercase tracking-wider mb-0.5">Établissement</p>
+            <p className="text-sm font-extrabold text-slate-900 truncate">
+              {activeMerchant?.business_name ?? merchantName ?? '—'}
+            </p>
+            {(activeMerchant?.slug ?? merchantSlug) && (
+              <Link
+                href={`/m/${activeMerchant?.slug ?? merchantSlug}`}
+                target="_blank"
+                className="inline-flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-bold mt-1 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                Voir la fiche publique <ExternalLink size={9} />
+              </Link>
+            )}
+            <Link
+              href="/merchant/signup"
+              className="block mt-1.5 text-[10px] text-slate-400 hover:text-amber-600 font-bold transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              + Ajouter un établissement
+            </Link>
+          </div>
+        )}
+      </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
@@ -130,6 +290,12 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </div>
         <div>
           <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+            Croissance
+          </p>
+          <div className="space-y-0.5">{growthNav.map(navLink)}</div>
+        </div>
+        <div>
+          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
             Abonnement
           </p>
           <div className="space-y-0.5">{billingNav.map(navLink)}</div>
@@ -142,7 +308,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
             className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all"
             style={{ textDecoration: 'none' }}
           >
-            <span className="text-[16px]">👤</span> Mon profil client
+            <UserCircle2 size={16} /> Mon profil client
           </Link>
           <Link
             href="/search"
@@ -231,25 +397,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </div>
       </main>
 
-      {/* Bottom nav mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40">
-        {[
-          { href: '/merchant/dashboard', label: 'Dashboard', icon: '📊' },
-          { href: '/merchant/crm',       label: 'Clients',   icon: '👥' },
-          { href: '/merchant/analytics', label: 'Stats',     icon: '📈' },
-          { href: '/merchant/media',     label: 'Médias',    icon: '📷' },
-        ].map(({ href, label, icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex flex-col items-center gap-0.5 transition-colors ${isActive(href) ? 'text-amber-600' : 'text-slate-400'}`}
-            style={{ textDecoration: 'none' }}
-          >
-            <span className="text-xl">{icon}</span>
-            <span className="text-[10px] font-semibold">{label}</span>
-          </Link>
-        ))}
-      </nav>
+      <MerchantMobileNav />
     </div>
   )
 }

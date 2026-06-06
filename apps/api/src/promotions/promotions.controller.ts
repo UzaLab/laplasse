@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Patch, Delete, Body, Param, UseGuards,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
@@ -24,20 +24,41 @@ export class PromotionsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('mine')
+  getMine(
+    @CurrentUser('id') userId: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.getMerchantPromotionsForOwner(userId, merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post()
-  create(@CurrentUser('id') userId: string, @Body() dto: CreatePromotionDto) {
-    return this.svc.create(userId, dto)
+  create(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreatePromotionDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.create(userId, dto, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/toggle')
-  toggle(@CurrentUser('id') userId: string, @Param('id') id: string) {
-    return this.svc.toggle(userId, id)
+  toggle(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.toggle(userId, id, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
-  delete(@CurrentUser('id') userId: string, @Param('id') id: string) {
-    return this.svc.delete(userId, id)
+  delete(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.delete(userId, id, merchantId)
   }
 }

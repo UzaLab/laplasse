@@ -3,7 +3,7 @@
 > Synthèse opérationnelle extraite de `Implementation Blueprint.md`, `cibooks_master_report.md` et Tomes 0–24.
 > Document de référence pour toute contribution au code.
 
-**Version :** 1.4 — Juin 2026 (V0.8 clôturée + CRM lite + R2 Storage)
+**Version :** 1.8 — Juin 2026 (Booking vertical + P1 ops)
 
 ---
 
@@ -479,6 +479,153 @@ NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 
 ---
 
+## 13c. Multi-établissements (livré V0.9)
+
+Un compte marchand peut désormais posséder **plusieurs établissements** (`1:N User → Merchant`).
+
+### Règles métier
+
+- La contrainte `@unique` sur `Merchant.owner_id` a été supprimée (migration `allow_multi_merchant`).
+- Lors de la connexion / `getMe`, l'API renvoie un tableau `merchants[]` (id, business_name, slug, verification_status).
+- Le frontend stocke `activeMerchantId` dans le store Zustand (`laplasse-auth`, persisté).
+- Toutes les routes `/merchants/me/*` acceptent un query param optionnel `?merchantId=` ; sans ce paramètre, la route résout le premier établissement de l'utilisateur.
+
+### Nouvelles routes API
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/merchants/my/all` | Liste tous les établissements de l'utilisateur connecté |
+| `GET` | `/merchants/me/profile?merchantId=` | Profil de l'établissement actif |
+| `PATCH` | `/merchants/me/profile?merchantId=` | Modifier l'établissement actif |
+| `GET/PATCH` | `/merchants/me/hours?merchantId=` | Horaires de l'établissement actif |
+| `GET/POST/DELETE` | `/merchants/me/media?merchantId=` | Médias de l'établissement actif |
+| `PATCH` | `/merchants/me/media/cover?merchantId=` | Logo/cover de l'établissement actif |
+| `GET` | `/merchants/me/analytics?merchantId=` | Analytics de l'établissement actif |
+| `GET` | `/merchants/me/analytics/chart?merchantId=` | Graphe analytics |
+| `GET` | `/merchants/me/crm?merchantId=` | CRM de l'établissement actif |
+| `POST` | `/merchants/me/verify-phone/send?merchantId=` | Envoi OTP téléphone |
+| `POST` | `/merchants/me/verify-phone/confirm?merchantId=` | Confirmation OTP |
+| `GET` | `/merchants/me/verify-phone/status?merchantId=` | Statut vérification |
+
+### Switcher d'établissement (frontend)
+
+`MerchantShell.tsx` affiche :
+- Si `merchants.length > 1` : un dropdown permettant de basculer d'un établissement à l'autre (appelle `setActiveMerchant(id)`).
+- Si `merchants.length === 1` : affichage simple du nom + lien vers la fiche publique.
+- Toujours : lien « + Ajouter un établissement » → `/merchant/signup`.
+
+### Pattern uniforme dans les pages dashboard
+
+```typescript
+const { activeMerchantId } = useAuthStore()
+const qs = activeMerchantId ? `?merchantId=${activeMerchantId}` : ''
+fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/profile${qs}`, ...)
+```
+
+---
+
+## 13d. Organisations & Feature Gating (livré V1.0)
+
+### Modèle Organisation
+
+Un marchand avec plan **GROWTH** ou **PREMIUM** peut créer une `MerchantOrganization` pour regrouper ses établissements.
+
+| Type | Description |
+|------|-------------|
+| `CHAIN` | Même marque, plusieurs sites |
+| `GROUP` | Holding avec marques différentes |
+| `MULTI_SITE` | Indépendant avec annexes |
+
+Relations : `User 1:0..1 MerchantOrganization`, `MerchantOrganization 1:N Merchant`.
+
+### Limites par plan (`apps/api/src/common/plan-limits.ts`)
+
+| Plan | Photos | Établissements | Org | Promotions | CRM |
+|------|--------|----------------|-----|------------|-----|
+| FREE | 3 | 1 | ❌ | ❌ | ❌ |
+| STARTER | 10 | 1 | ❌ | ✅ | ✅ |
+| GROWTH | ∞ | 3 | ✅ lite | ✅ | ✅ |
+| PREMIUM | ∞ | ∞ | ✅ advanced | ✅ | ✅ |
+
+Enforcement : `addMyMedia`, `registerMerchant`, `promotions.create`, `bookings.create` (STARTER+), CRM (STARTER+), ads (GROWTH+), staff (GROWTH+).
+
+### Booking vertical (P0 — livré)
+
+Architecture unifiée (Tome 03 §10) : `BookingType` par catégorie marchand.
+
+| Catégorie | Type | UI |
+|-----------|------|-----|
+| restaurants, cafés, bars | `TABLE` | Créneaux + invités |
+| beaute, fitness | `APPOINTMENT` | Prestation + créneau |
+| hotels | `ROOM` | Check-in/out + type chambre |
+| boutiques | — | Widget masqué |
+
+- Moteur disponibilité : horaires, capacité, fenêtre 30j, anti double-booking
+- `GET /bookings/merchant/:id/config|availability`
+- Rappels J-1 via BullMQ (Redis requis)
+- FCM si `FCM_SERVER_KEY` + `DeviceToken`
+- Page client `/profile/bookings`
+
+### P1 ops (livré)
+
+| Feature | Route / page |
+|---------|----------------|
+| Ads self-service | `POST /ads/campaigns`, `/merchant/ads` |
+| Staff + prestations | `/merchants/me/staff|services`, `/merchant/staff` |
+| Promotions UI | `/merchant/promotions`, `GET /promotions/mine` |
+| CRM avancé | Bookings + favoris + avis dans `/merchants/me/crm` |
+| Audit log | `GET /admin/audit`, table `AuditLog` |
+| Fraude basique | `GET /admin/fraud`, spam booking/reviews |
+| searchBoost | Jusqu'à 3 slots sponsorisés en recherche |
+
+### Marketplace — quand la mettre en place ?
+
+Prévue dans les Tomes (Tome 11 §18.4, Sprint 5) : produits, panier, checkout, commandes.
+
+| Phase | Statut |
+|-------|--------|
+| V0.5 MVP discovery | ✅ Livré sans marketplace |
+| V1.0 booking + monétisation SaaS | ✅ En cours |
+| **V1.5 — Marketplace transactions** | ❌ **Prochaine grosse slice** |
+| V2.0 Merchant OS + app native | Futur |
+
+Recommandation : lancer la marketplace **après** stabilisation du booking vertical et densité marchands Abidjan — slice `Product` + `Order` + checkout simulé, ciblant d'abord **boutiques** (pas restaurants).
+
+### Simulateur de paiement (V1)
+
+Remplace Mobile Money en développement. Flux :
+
+1. `POST /payments/subscribe/init` — crée une `PaymentTransaction` PENDING
+2. `POST /payments/subscribe/confirm` — `{ paymentId, simulateResult: success|failure }`
+3. Succès → met à jour `Merchant.subscription_plan` + `Subscription` + notification push
+
+### Booking engine (V1)
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/bookings/merchant/:id/enabled` | Vérifie si réservations actives (plan STARTER+) |
+| `POST` | `/bookings/merchant/:id` | Créer une réservation (public, auth optionnelle) |
+| `GET` | `/bookings/merchant?merchantId=` | Liste marchand |
+| `PATCH` | `/bookings/:id/status` | Confirmer / annuler |
+
+### Push notifications (BullMQ)
+
+`NotificationQueueService` — file Redis `notifications`, channel `push` simulé (FCM en production).
+
+---
+
+### Routes API Organisations
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `POST` | `/organizations` | Créer (GROWTH+) |
+| `GET` | `/organizations/mine` | Mon organisation |
+| `PATCH` | `/organizations/:id` | Modifier |
+| `POST/DELETE` | `/organizations/:id/merchants/:merchantId` | Rattacher / détacher |
+| `GET` | `/organizations/:id/analytics` | Analytics agrégés |
+
+---
+
 ## 14. Références
 
 | Document | Contenu |
@@ -511,14 +658,42 @@ Concept validé terrain à Cocody. Déploiement Coolify opérationnel (prod + pr
 | Sidebar profil + navbar user link + layout pleine largeur | ✅ |
 | Push notifications (BullMQ + FCM) | ❌ → V1.0 |
 
-### V1.0 — Objectifs
-- Expansion géographique (Yopougon, Marcory, Plateau)
-- Push notifications (BullMQ + FCM)
-- Booking engine (réservations en ligne)
-- Mobile Money (Orange Money, Wave)
-- Domaine `laplasse.ci` (remplace sslip.io)
-- Config prod R2 : activer les env vars R2_* dans Coolify
-- UptimeRobot : pointer sur https://api.*.sslip.io/api/health
+### V0.9 — LIVRÉE (juin 2026)
+Multi-établissements marchand + unification icônes Lucide + navigation mobile off-canvas.
+
+| Feature clé | Statut |
+|-------------|--------|
+| Multi-établissements : 1 compte → N établissements | ✅ |
+| Switcher d'établissement dans la sidebar marchand | ✅ |
+| `GET /merchants/my/all` + `?merchantId=` sur toutes les routes `/me/*` | ✅ |
+| `authStore` : `merchants[]`, `activeMerchantId`, `setActiveMerchant()` | ✅ |
+| Icônes unifiées Lucide (suppression emojis & icônes colorées) | ✅ |
+| `FavoriteButton` (cœurs fonctionnels sur toutes les cartes) | ✅ |
+| Menu mobile off-canvas (`MobileNav.tsx`) | ✅ |
+| Catégories homepage en carousel avec navigation | ✅ |
+
+### V1.0 — LIVRÉE (juin 2026)
+
+| Feature clé | Statut |
+|-------------|--------|
+| Organisations (chaîne/groupe/multi-sites) | ✅ |
+| Feature gating par plan (photos, établissements, promotions) | ✅ |
+| Analytics agrégés par organisation | ✅ |
+| Simulateur de paiement abonnements (`POST /payments/subscribe/*`) | ✅ |
+| Booking engine vertical (TABLE/APPOINTMENT/ROOM) | ✅ |
+| Availability engine + créneaux | ✅ |
+| `/profile/bookings` | ✅ |
+| Rappels booking BullMQ | ✅ |
+| Ads self-service marchand | ✅ |
+| Staff + prestations | ✅ |
+| Promotions UI marchand | ✅ |
+| CRM avancé (bookings/favoris) | ✅ |
+| Audit log + fraude basique | ✅ |
+| Push FCM (si FCM_SERVER_KEY) | ✅ |
+| Marketplace ecommerce | ❌ → V1.5 |
+| Push notifications BullMQ (push simulé → channel `push`) | ✅ |
+| Expansion géographique (Yopougon, Marcory, Plateau dans seed) | ✅ |
+| Domaine `laplasse.ci` | ❌ (infra) |
 
 ---
 

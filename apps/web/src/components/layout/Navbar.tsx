@@ -1,15 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2 } from 'lucide-react'
+import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2, Heart } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { MobileNav } from './MobileNav'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const { user, isAuthenticated, logout } = useAuthStore()
@@ -112,7 +114,7 @@ export function Navbar() {
                   >
                     <UserCircle2 size={15} /> Mon profil
                   </Link>
-                  {(user.role === 'MERCHANT' || user.merchant) && (
+                  {(user.role === 'MERCHANT' || (user.merchants?.length ?? 0) > 0) && (
                     <Link
                       href="/merchant/dashboard"
                       onClick={() => setDropdownOpen(false)}
@@ -138,7 +140,7 @@ export function Navbar() {
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
-                    ❤️ Mes favoris
+                    <Heart size={15} /> Mes favoris
                   </Link>
                   <button
                     onClick={handleLogout}
@@ -160,11 +162,25 @@ export function Navbar() {
             </Link>
           )}
 
-          <button className="md:hidden text-slate-900" aria-label="Menu">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden text-slate-900 p-1 -mr-1"
+            aria-label="Ouvrir le menu"
+            aria-expanded={mobileOpen}
+          >
             <Menu size={24} />
           </button>
         </div>
       </div>
+
+      <MobileNav
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        isAuthenticated={isAuthenticated}
+        user={user}
+        onLogout={handleLogout}
+      />
     </nav>
   )
 }

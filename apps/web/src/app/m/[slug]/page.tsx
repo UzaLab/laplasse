@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Star, MapPin,
-  BadgeCheck, Clock, Share2, Heart, Store, Image as ImageIcon,
+  BadgeCheck, Clock, Store, Image as ImageIcon,
   Wifi, Car, Music, Wind, Utensils, Wine
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
@@ -13,6 +13,7 @@ import { ReviewTrigger } from '@/features/merchant/components/ReviewTrigger'
 import { ReportTrigger } from '@/features/merchant/components/ReportTrigger'
 import { MerchantViewTracker, MerchantContactButtons } from '@/features/merchant/components/MerchantTracker'
 import { SimilarMerchants } from '@/features/merchant/components/SimilarMerchants'
+import { BookingForm } from '@/features/merchant/components/BookingForm'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -387,6 +388,8 @@ export default async function MerchantPage({ params }: Props) {
               />
             </div>
 
+            <BookingForm merchantId={merchant.id} merchantName={merchant.business_name} />
+
             {/* Trust score */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">
               <h4 className="font-bold text-slate-900 mb-3 text-sm uppercase tracking-wider text-slate-400">
@@ -424,14 +427,12 @@ export default async function MerchantPage({ params }: Props) {
             </div>
 
             {/* Share / Favorite */}
-            <div className="flex gap-3">
-              <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-2xl font-semibold text-slate-700 hover:border-slate-400 transition-colors text-sm shadow-sm">
-                <Share2 size={16} /> Partager
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-2xl font-semibold text-slate-700 hover:border-red-300 hover:text-red-500 transition-colors text-sm shadow-sm">
-                <Heart size={16} /> Sauvegarder
-              </button>
-            </div>
+            <MerchantActions
+              merchantId={merchant.id}
+              merchantName={merchant.business_name}
+              merchantSlug={merchant.slug}
+              variant="sidebar"
+            />
           </div>
         </div>
       </main>

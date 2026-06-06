@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Star, BadgeCheck, Zap } from 'lucide-react'
+import { MapPin, Star, BadgeCheck, Zap, Store } from 'lucide-react'
 import { ApiMerchant } from '@/lib/api'
+import { CategoryIcon } from '@/lib/icons'
 
 interface Props {
   merchants: ApiMerchant[]
@@ -32,7 +33,7 @@ export function SimilarMerchants({ merchants }: Props) {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-300">
-                  <span className="text-4xl">{m.category.icon ?? '🏪'}</span>
+                  <CategoryIcon name={m.category.icon} slug={m.category.slug} size={36} />
                 </div>
               )}
 
@@ -50,7 +51,7 @@ export function SimilarMerchants({ merchants }: Props) {
                   {m.business_name}
                 </h3>
                 {m.verification_status === 'VERIFIED' && (
-                  <BadgeCheck size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                  <BadgeCheck size={14} className="text-slate-600 shrink-0 mt-0.5" />
                 )}
               </div>
 
@@ -61,7 +62,7 @@ export function SimilarMerchants({ merchants }: Props) {
 
               {m.review_count > 0 && (
                 <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
-                  <Star size={11} className="fill-amber-400 text-amber-400" />
+                  <Star size={11} className="text-slate-600" />
                   {m.review_count} avis
                 </div>
               )}

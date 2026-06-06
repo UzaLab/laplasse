@@ -26,10 +26,10 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  OPEN: '🔴 Ouvert',
-  UNDER_REVIEW: '⏳ En cours',
-  RESOLVED: '✅ Résolu',
-  DISMISSED: '✗ Rejeté',
+  OPEN: 'Ouvert',
+  UNDER_REVIEW: 'En cours',
+  RESOLVED: 'Résolu',
+  DISMISSED: 'Rejeté',
 }
 
 export default function AdminComplaintsPage() {
@@ -74,7 +74,7 @@ export default function AdminComplaintsPage() {
 
       <div>
         <div className="flex gap-2 mb-6">
-          {([['open', '🔴 Ouverts'], ['all', 'Tous']] as const).map(([val, label]) => (
+          {([['open', 'Ouverts'], ['all', 'Tous']] as const).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setFilter(val)}

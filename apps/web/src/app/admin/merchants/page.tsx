@@ -85,7 +85,7 @@ function AdminMerchantsContent() {
       <div>
         {/* Filters */}
         <div className="flex gap-2 mb-6">
-          {([['pending', '⏳ En attente'], ['all', 'Tous']] as const).map(([val, label]) => (
+          {([['pending', 'En attente'], ['all', 'Tous']] as const).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setFilter(val)}
@@ -122,8 +122,8 @@ function AdminMerchantsContent() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-extrabold text-slate-900">{m.business_name}</h3>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_COLORS[m.verification_status] ?? STATUS_COLORS.UNVERIFIED}`}>
-                          {m.verification_status === 'VERIFIED' ? '✓ Vérifié' :
-                           m.verification_status === 'PENDING' ? '⏳ En attente' :
+                          {m.verification_status === 'VERIFIED' ? 'Vérifié' :
+                           m.verification_status === 'PENDING' ? 'En attente' :
                            m.verification_status === 'REJECTED' ? '✗ Rejeté' : 'Non vérifié'}
                         </span>
                         {m.is_sponsored && (
