@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Eye, MessageCircle, Phone, Heart, Star, Loader2, Network } from 'lucide-react'
@@ -43,7 +43,7 @@ const EVENT_LABELS: Record<string, string> = {
   SHARE: 'Partages',
 }
 
-export default function MerchantAnalyticsPage() {
+function MerchantAnalyticsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isOrgScope = searchParams.get('scope') === 'organization'
@@ -218,5 +218,19 @@ export default function MerchantAnalyticsPage() {
         <p className="text-center text-slate-500 py-24">Impossible de charger les statistiques.</p>
       )}
     </MerchantShell>
+  )
+}
+
+export default function MerchantAnalyticsPage() {
+  return (
+    <Suspense fallback={
+      <MerchantShell>
+        <div className="flex items-center justify-center py-24">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      </MerchantShell>
+    }>
+      <MerchantAnalyticsContent />
+    </Suspense>
   )
 }
