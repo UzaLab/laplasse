@@ -60,3 +60,48 @@ export class CancelBookingDto {
   @IsString()
   reason?: string
 }
+
+export class UpdateMyBookingDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  guest_name?: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  guest_phone?: string
+
+  @IsOptional()
+  @IsEmail()
+  guest_email?: string
+
+  @IsOptional()
+  @IsDateString()
+  booked_at?: string
+
+  @IsOptional()
+  @IsDateString()
+  check_out_at?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  party_size?: number
+
+  @IsOptional()
+  @IsString()
+  service_id?: string
+
+  @IsOptional()
+  @IsString()
+  staff_id?: string
+
+  @IsOptional()
+  @IsString()
+  room_type?: string
+
+  @IsOptional()
+  @IsString()
+  notes?: string
+}

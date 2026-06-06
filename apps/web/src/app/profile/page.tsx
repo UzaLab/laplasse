@@ -87,9 +87,10 @@ export default function ProfilePage() {
   const { data: bookings = [] } = useQuery<BookingRow[]>({
     queryKey: ['my-bookings-dashboard'],
     queryFn: async () => {
-      const res = await authApiFetch('/bookings/mine')
+      const res = await authApiFetch('/bookings/mine?tab=upcoming&limit=20')
       if (!res.ok) return []
-      return res.json()
+      const data = await res.json()
+      return Array.isArray(data) ? data : (data.items ?? [])
     },
     enabled: !!(isAuthenticated && mounted),
   })

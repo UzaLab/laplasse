@@ -41,7 +41,7 @@ export class AvailabilityService {
   async getAvailableSlots(
     merchantId: string,
     dateStr: string,
-    opts?: { serviceId?: string; staffId?: string; bookingType?: BookingType },
+    opts?: { serviceId?: string; staffId?: string; bookingType?: BookingType; excludeBookingId?: string },
   ): Promise<AvailabilityResponse> {
     const merchant = await this.prisma.merchant.findUnique({
       where: { id: merchantId },
@@ -104,6 +104,7 @@ export class AvailabilityService {
         status: { in: ['PENDING', 'CONFIRMED'] },
         booked_at: { gte: dayStart, lt: dayEnd },
         ...(opts?.staffId ? { staff_id: opts.staffId } : {}),
+        ...(opts?.excludeBookingId ? { id: { not: opts.excludeBookingId } } : {}),
       },
       select: { booked_at: true, check_out_at: true, party_size: true, booking_type: true, staff_id: true },
     })
@@ -161,6 +162,7 @@ export class AvailabilityService {
       checkOutAt?: Date
       serviceId?: string
       staffId?: string
+      excludeBookingId?: string
     },
   ) {
     const dateStr = bookedAt.toISOString().slice(0, 10)
@@ -169,6 +171,7 @@ export class AvailabilityService {
       serviceId: opts.serviceId,
       staffId: opts.staffId,
       bookingType: opts.bookingType,
+      excludeBookingId: opts.excludeBookingId,
     })
 
     if (closed) {
@@ -189,6 +192,7 @@ export class AvailabilityService {
           merchant_id: merchantId,
           booking_type: 'ROOM',
           status: { in: ['PENDING', 'CONFIRMED'] },
+          ...(opts.excludeBookingId ? { id: { not: opts.excludeBookingId } } : {}),
           booked_at: { lt: opts.checkOutAt },
           OR: [
             { check_out_at: { gt: bookedAt } },

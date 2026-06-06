@@ -14,7 +14,7 @@ import { Public } from '../auth/decorators/public.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { BookingsService } from './bookings.service'
-import { CreateBookingDto, UpdateBookingStatusDto } from './dto/booking.dto'
+import { CreateBookingDto, UpdateBookingStatusDto, UpdateMyBookingDto } from './dto/booking.dto'
 import { BookingStatus } from '../../generated/prisma/client'
 
 @Controller('bookings')
@@ -43,8 +43,9 @@ export class BookingsController {
     @Query('date') date: string,
     @Query('serviceId') serviceId?: string,
     @Query('staffId') staffId?: string,
+    @Query('excludeBookingId') excludeBookingId?: string,
   ) {
-    return this.bookingsService.getAvailability(merchantId, date, serviceId, staffId)
+    return this.bookingsService.getAvailability(merchantId, date, serviceId, staffId, excludeBookingId)
   }
 
   @Public()
@@ -68,14 +69,33 @@ export class BookingsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('mine')
-  myBookings(@CurrentUser('id') userId: string) {
-    return this.bookingsService.listMyBookings(userId)
+  myBookings(
+    @CurrentUser('id') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('tab') tab?: 'upcoming' | 'history',
+  ) {
+    return this.bookingsService.listMyBookings(userId, {
+      page: Math.max(1, parseInt(page ?? '1', 10) || 1),
+      limit: Math.min(20, Math.max(1, parseInt(limit ?? '5', 10) || 5)),
+      tab: tab === 'history' ? 'history' : 'upcoming',
+    })
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch('mine/:id/cancel')
   cancelMine(@CurrentUser('id') userId: string, @Param('id') bookingId: string) {
     return this.bookingsService.cancelMyBooking(userId, bookingId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('mine/:id')
+  updateMine(
+    @CurrentUser('id') userId: string,
+    @Param('id') bookingId: string,
+    @Body() dto: UpdateMyBookingDto,
+  ) {
+    return this.bookingsService.updateMyBooking(userId, bookingId, dto)
   }
 
   @UseGuards(JwtAuthGuard)
