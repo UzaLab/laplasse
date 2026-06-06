@@ -53,7 +53,10 @@ function buildHeaders(accessToken: string, options?: RequestInit): HeadersInit {
   const base: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
   }
-  if (options?.body && !(options.headers as Record<string, string>)?.['Content-Type']) {
+  const isFormData =
+    typeof FormData !== 'undefined' && options?.body instanceof FormData
+  const existingContentType = (options?.headers as Record<string, string> | undefined)?.['Content-Type']
+  if (options?.body && !isFormData && !existingContentType) {
     base['Content-Type'] = 'application/json'
   }
   return { ...base, ...(options?.headers as Record<string, string> | undefined) }
@@ -71,20 +74,27 @@ export async function authApiFetch(
     return new Response(null, { status: 401 })
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: buildHeaders(token, options),
-  })
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: buildHeaders(token, options),
+    })
 
-  if (res.status === 401 && !retried) {
-    const newToken = await getValidAccessToken()
-    if (newToken) {
-      return authApiFetch(path, options, true)
+    if (res.status === 401 && !retried) {
+      const newToken = await getValidAccessToken()
+      if (newToken) {
+        return authApiFetch(path, options, true)
+      }
+      redirectToLogin()
     }
-    redirectToLogin()
-  }
 
-  return res
+    return res
+  } catch {
+    return new Response(
+      JSON.stringify({ message: 'Impossible de contacter le serveur' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
 }
 
 /** Fetch authentifié — retourne JSON ou null (utilise le token passé, refresh auto sur 401). */
@@ -94,20 +104,24 @@ export async function authFetch<T>(
   options?: RequestInit,
   retried = false,
 ): Promise<T | null> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: buildHeaders(accessToken, options),
-  })
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: buildHeaders(accessToken, options),
+    })
 
-  if (res.status === 401 && !retried) {
-    const newToken = await getValidAccessToken()
-    if (newToken) {
-      return authFetch<T>(path, newToken, options, true)
+    if (res.status === 401 && !retried) {
+      const newToken = await getValidAccessToken()
+      if (newToken) {
+        return authFetch<T>(path, newToken, options, true)
+      }
+      redirectToLogin()
+      return null
     }
-    redirectToLogin()
+
+    if (!res.ok) return null
+    return res.json() as Promise<T>
+  } catch {
     return null
   }
-
-  if (!res.ok) return null
-  return res.json() as Promise<T>
 }

@@ -47,8 +47,16 @@ export default function MerchantMediaPage() {
 
   const fetchMedia = async () => {
     setLoading(true)
+    setError('')
     const res = await merchantApiFetch('/merchants/me/media', activeMerchantId)
-    if (res.ok) setData(await res.json())
+    if (res.ok) {
+      setData(await res.json())
+    } else if (res.status === 503) {
+      setError('Impossible de contacter l\'API. Vérifiez que le serveur est démarré.')
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setError((d as { message?: string }).message ?? 'Erreur lors du chargement des médias')
+    }
     setLoading(false)
   }
 
@@ -132,6 +140,17 @@ export default function MerchantMediaPage() {
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 size={28} className="animate-spin text-slate-300" />
+          </div>
+        ) : error && !data ? (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-6 text-center">
+            <p className="text-sm text-red-700 font-medium">{error}</p>
+            <button
+              type="button"
+              onClick={fetchMedia}
+              className="mt-4 text-sm font-bold text-slate-700 border border-slate-200 px-4 py-2 rounded-xl hover:bg-white transition-colors"
+            >
+              Réessayer
+            </button>
           </div>
         ) : data && (
           <>

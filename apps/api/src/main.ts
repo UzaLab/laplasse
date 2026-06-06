@@ -42,6 +42,7 @@ async function bootstrap() {
   const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
   const corsOrigins = [
     'http://localhost:3000',
+    'http://127.0.0.1:3000',
     appUrl,
     appUrl.replace(/^http:/, 'https:'),
     appUrl.replace(/^https:/, 'http:'),

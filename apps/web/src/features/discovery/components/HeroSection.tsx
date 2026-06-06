@@ -1,11 +1,10 @@
 'use client'
 
-import { Star } from 'lucide-react'
 import { SearchAutocomplete } from './SearchAutocomplete'
 
 export function HeroSection() {
   return (
-    <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-x-hidden overflow-y-visible">
+    <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32">
       {/* Blob amber */}
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-brand-100 rounded-full blur-[100px] -z-10 opacity-60 translate-x-1/3 -translate-y-1/3" />
       {/* Blob blue */}
@@ -15,12 +14,6 @@ export function HeroSection() {
 
         {/* Texte gauche */}
         <div className="flex-1 text-center lg:text-left">
-
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-bold uppercase tracking-widest mb-6 shadow-sm">
-            <Star size={13} className="fill-brand-500 text-brand-500" />
-            Abidjan Premium Lifestyle
-          </div>
 
           {/* Titre */}
           <h1 className="text-5xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight mb-6">

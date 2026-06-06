@@ -43,7 +43,7 @@ export default async function HomePage() {
   const nearby     = nearbyRaw.status === 'fulfilled'     ? nearbyRaw.value : []
 
   return (
-    <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900">
+    <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
       <Navbar />
 
       {/* Hero */}
