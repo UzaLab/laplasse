@@ -43,7 +43,7 @@ const SEGMENT_CONFIG: Record<string, { label: string; color: string; bg: string;
 }
 
 export default function MerchantCRMPage() {
-  const { token, isAuthenticated } = useAuthStore()
+  const { access_token, isAuthenticated } = useAuthStore()
   const [segment, setSegment] = useState<Segment>('all')
   const [search, setSearch] = useState('')
 
@@ -51,12 +51,12 @@ export default function MerchantCRMPage() {
     queryKey: ['merchant-crm'],
     queryFn: async () => {
       const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/me/crm`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${access_token}` },
       })
       if (!r.ok) throw new Error('Unauthorized')
       return r.json()
     },
-    enabled: !!token && isAuthenticated,
+    enabled: !!access_token && isAuthenticated,
   })
 
   if (isLoading) {
