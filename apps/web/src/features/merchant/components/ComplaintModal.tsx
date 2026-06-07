@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Loader2, CheckCircle2, Flag } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
-import { useRouter } from 'next/navigation'
+import { authApiFetch } from '@/lib/authFetch'
 
 const REASONS = [
   'Informations incorrectes',
@@ -21,7 +22,7 @@ interface ComplaintModalProps {
 }
 
 export function ComplaintModal({ merchantId, merchantName, onClose }: ComplaintModalProps) {
-  const { isAuthenticated, access_token } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const [reason, setReason] = useState('')
   const [description, setDescription] = useState('')
@@ -38,12 +39,8 @@ export function ComplaintModal({ merchantId, merchantName, onClose }: ComplaintM
     setError('')
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/complaints`, {
+      const res = await authApiFetch('/complaints', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${access_token}`,
-        },
         body: JSON.stringify({ merchant_id: merchantId, reason, description: description || undefined }),
       })
 

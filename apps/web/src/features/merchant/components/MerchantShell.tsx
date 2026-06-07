@@ -23,7 +23,7 @@ interface MerchantShellProps {
 export function MerchantShell({ children, merchantSlug, merchantName }: MerchantShellProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout, activeMerchantId, setActiveMerchant, updateUser } = useAuthStore()
+  const { user, logoutRemote, activeMerchantId, setActiveMerchant, updateUser } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
 
@@ -78,7 +78,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
-  const handleLogout = () => { logout(); router.push('/') }
+  const handleLogout = async () => { await logoutRemote(); router.push('/') }
 
   const initials = (user?.full_name ?? user?.email ?? '?')
     .split(/[\s@]/).filter(Boolean).slice(0, 2)

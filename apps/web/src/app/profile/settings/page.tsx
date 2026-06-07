@@ -10,7 +10,7 @@ import { ProfileShell } from '@/features/profile/components/ProfileShell'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
-  const { hydrated, isAuthenticated, user, logout } = useRequireAuth('/profile/settings')
+  const { hydrated, isAuthenticated, user, logout: logoutRemote } = useRequireAuth('/profile/settings')
   const [editing, setEditing]   = useState(false)
   const [name, setName]         = useState('')
   const [saving, setSaving]     = useState(false)
@@ -133,7 +133,7 @@ export default function ProfileSettingsPage() {
         </div>
         <div className="px-6 py-5">
           <button
-            onClick={() => { logout(); router.push('/') }}
+            onClick={async () => { await logoutRemote(); router.push('/') }}
             className="flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700 transition-colors"
           >
             <LogOut size={16} /> Se déconnecter

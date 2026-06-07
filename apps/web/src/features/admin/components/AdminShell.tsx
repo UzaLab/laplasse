@@ -32,16 +32,16 @@ interface AdminShellProps {
 
 export function AdminShell({ pageTitle, children }: AdminShellProps) {
   const pathname = usePathname()
-  const { ready, user, access_token } = useAdminSession()
+  const { ready, user } = useAdminSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [stats, setStats] = useState<AdminStats | null>(null)
 
   useEffect(() => {
-    if (!ready || !access_token) return
-    adminFetch<AdminStats>('/admin/stats', access_token).then(data => {
+    if (!ready) return
+    adminFetch<AdminStats>('/admin/stats').then(data => {
       if (data) setStats(data)
     })
-  }, [ready, access_token])
+  }, [ready])
 
   if (!ready || !user) return null
 

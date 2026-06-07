@@ -1,8 +1,7 @@
 import { useAuthStore } from '@/stores/authStore'
+import { authUrl, AUTH_FETCH_INIT } from '@/lib/authClient'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
-
-let refreshPromise: Promise<string | null> | null = null
+let refreshPromise: Promise<boolean> | null = null
 let hydrationPromise: Promise<void> | null = null
 
 function waitForAuthHydration(): Promise<void> {
@@ -19,36 +18,29 @@ function waitForAuthHydration(): Promise<void> {
   return hydrationPromise
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const { refresh_token, setAuth, user, logout } = useAuthStore.getState()
-  if (!refresh_token) return null
-
+async function refreshSession(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
+    const res = await fetch(authUrl('/auth/refresh'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token }),
+      credentials: 'include',
+      headers: AUTH_FETCH_INIT.headers,
+      body: '{}',
     })
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) logout()
-      return null
+      if (res.status === 401 || res.status === 403) {
+        useAuthStore.getState().logout()
+      }
+      return false
     }
-    const data = await res.json()
-    if (user && data.access_token && data.refresh_token) {
-      setAuth(user, data.access_token, data.refresh_token)
-      return data.access_token as string
-    }
-    logout()
-    return null
+    return true
   } catch {
-    // Erreur réseau — conserver la session, ne pas déconnecter
-    return null
+    return false
   }
 }
 
-async function getValidAccessToken(): Promise<string | null> {
+async function ensureValidSession(): Promise<boolean> {
   if (!refreshPromise) {
-    refreshPromise = refreshAccessToken().finally(() => {
+    refreshPromise = refreshSession().finally(() => {
       refreshPromise = null
     })
   }
@@ -61,10 +53,8 @@ function redirectToLogin() {
   window.location.href = `/login?redirect=${redirect}`
 }
 
-function buildHeaders(accessToken: string, options?: RequestInit): HeadersInit {
-  const base: Record<string, string> = {
-    Authorization: `Bearer ${accessToken}`,
-  }
+function buildHeaders(options?: RequestInit): HeadersInit {
+  const base: Record<string, string> = {}
   const isFormData =
     typeof FormData !== 'undefined' && options?.body instanceof FormData
   const existingContentType = (options?.headers as Record<string, string> | undefined)?.['Content-Type']
@@ -74,7 +64,7 @@ function buildHeaders(accessToken: string, options?: RequestInit): HeadersInit {
   return { ...base, ...(options?.headers as Record<string, string> | undefined) }
 }
 
-/** Fetch authentifié avec refresh auto sur 401. Retourne la Response brute. */
+/** Fetch authentifié via cookies httpOnly, refresh auto sur 401. */
 export async function authApiFetch(
   path: string,
   options?: RequestInit,
@@ -82,8 +72,7 @@ export async function authApiFetch(
 ): Promise<Response> {
   await waitForAuthHydration()
 
-  const token = useAuthStore.getState().access_token
-  if (!token) {
+  if (!useAuthStore.getState().isAuthenticated) {
     return new Response(
       JSON.stringify({ message: 'Non authentifié' }),
       { status: 401, headers: { 'Content-Type': 'application/json' } },
@@ -91,14 +80,15 @@ export async function authApiFetch(
   }
 
   try {
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(authUrl(path), {
       ...options,
-      headers: buildHeaders(token, options),
+      credentials: 'include',
+      headers: buildHeaders(options),
     })
 
     if (res.status === 401 && !retried) {
-      const newToken = await getValidAccessToken()
-      if (newToken) {
+      const ok = await ensureValidSession()
+      if (ok) {
         return authApiFetch(path, options, true)
       }
       redirectToLogin()
@@ -113,33 +103,13 @@ export async function authApiFetch(
   }
 }
 
-/** Fetch authentifié — retourne JSON ou null (utilise le token passé, refresh auto sur 401). */
+/** Fetch authentifié — retourne JSON ou null. */
 export async function authFetch<T>(
   path: string,
-  accessToken: string,
   options?: RequestInit,
   retried = false,
 ): Promise<T | null> {
-  await waitForAuthHydration()
-
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...options,
-      headers: buildHeaders(accessToken, options),
-    })
-
-    if (res.status === 401 && !retried) {
-      const newToken = await getValidAccessToken()
-      if (newToken) {
-        return authFetch<T>(path, newToken, options, true)
-      }
-      redirectToLogin()
-      return null
-    }
-
-    if (!res.ok) return null
-    return res.json() as Promise<T>
-  } catch {
-    return null
-  }
+  const res = await authApiFetch(path, options, retried)
+  if (!res.ok) return null
+  return res.json() as Promise<T>
 }

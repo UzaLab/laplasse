@@ -21,6 +21,12 @@ describe('AuthService', () => {
       create: jest.Mock
       update: jest.Mock
     }
+    authToken: {
+      create: jest.Mock
+      findFirst: jest.Mock
+      delete: jest.Mock
+      deleteMany: jest.Mock
+    }
   }
   let jwt: { signAsync: jest.Mock }
   let config: { get: jest.Mock }
@@ -34,8 +40,14 @@ describe('AuthService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      authToken: {
+        create: jest.fn().mockResolvedValue({ id: 't1' }),
+        findFirst: jest.fn(),
+        delete: jest.fn(),
+        deleteMany: jest.fn(),
+      },
     }
-    jwt = { signAsync: jest.fn().mockResolvedValue('token') }
+    jwt = { signAsync: jest.fn().mockResolvedValue('access-jwt') }
     config = {
       get: jest.fn((key: string) => {
         if (key === 'JWT_SECRET') return 'test-secret'
@@ -55,6 +67,8 @@ describe('AuthService', () => {
       jwt as unknown as JwtService,
       config as unknown as ConfigService,
       otp as unknown as OtpService,
+      { sendWelcome: jest.fn() } as never,
+      { getOrCreateAccount: jest.fn() } as never,
     )
     jest.clearAllMocks()
   })
@@ -89,9 +103,10 @@ describe('AuthService', () => {
       })
 
       expect(hash).toHaveBeenCalledWith('Password1!', 12)
+      expect(prisma.authToken.create).toHaveBeenCalled()
       expect(result.user.email).toBe('new@laplasse.ci')
-      expect(result.access_token).toBe('token')
-      expect(result.refresh_token).toBe('token')
+      expect(result.access_token).toBe('access-jwt')
+      expect(result.refresh_token).toEqual(expect.any(String))
     })
   })
 
@@ -123,7 +138,8 @@ describe('AuthService', () => {
 
       expect(result.user.email).toBe('admin@laplasse.ci')
       expect(result.user).not.toHaveProperty('password_hash')
-      expect(result.access_token).toBe('token')
+      expect(result.access_token).toBe('access-jwt')
+      expect(prisma.authToken.create).toHaveBeenCalled()
     })
   })
 })

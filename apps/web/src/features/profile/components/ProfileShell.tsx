@@ -18,10 +18,10 @@ interface ProfileShellProps {
 export function ProfileShell({ children }: ProfileShellProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user, logoutRemote } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const handleLogout = () => { logout(); router.push('/') }
+  const handleLogout = async () => { await logoutRemote(); router.push('/') }
 
   const initials = (user?.full_name ?? user?.email ?? '?')
     .split(/[\s@]/).filter(Boolean).slice(0, 2)

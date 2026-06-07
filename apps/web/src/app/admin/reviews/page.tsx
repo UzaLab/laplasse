@@ -15,31 +15,31 @@ interface AdminReview {
 }
 
 export default function AdminReviewsPage() {
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [reviews, setReviews] = useState<AdminReview[]>([])
   const [filter, setFilter] = useState<'all' | 'pending'>('pending')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ready || !access_token) return
+    if (!ready) return
     fetchReviews()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, ready, access_token])
+  }, [filter, ready])
 
   const fetchReviews = async () => {
-    if (!access_token) return
+    if (!ready) return
     setLoading(true)
     const qs = filter === 'pending' ? '?filter=pending' : ''
-    const data = await adminFetch<AdminReview[]>(`/admin/reviews${qs}`, access_token)
+    const data = await adminFetch<AdminReview[]>(`/admin/reviews${qs}`)
     if (data) setReviews(data)
     setLoading(false)
   }
 
   const moderate = async (id: string, action: 'approve' | 'reject' | 'delete') => {
-    if (!access_token) return
+    if (!ready) return
     setProcessing(id)
-    await adminFetch(`/admin/reviews/${id}/moderate`, access_token, {
+    await adminFetch(`/admin/reviews/${id}/moderate`, {
       method: 'PATCH',
       body: JSON.stringify({ action }),
     })

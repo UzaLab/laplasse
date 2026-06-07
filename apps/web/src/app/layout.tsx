@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Outfit } from 'next/font/google'
 import { QueryProvider } from '@/providers/QueryProvider'
 import { PostHogProvider } from '@/providers/PostHogProvider'
+import { AuthBootstrap } from '@/components/AuthBootstrap'
 import './globals.css'
 
 const outfit = Outfit({
@@ -52,7 +53,10 @@ export default function RootLayout({
     <html lang="fr" className={outfit.variable}>
       <body>
         <PostHogProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <AuthBootstrap />
+            {children}
+          </QueryProvider>
         </PostHogProvider>
       </body>
     </html>

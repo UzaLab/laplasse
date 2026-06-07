@@ -42,7 +42,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
 }
 
 export default function AdminDashboard() {
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [stats, setStats]                     = useState<AdminStats | null>(null)
   const [pendingMerchants, setPendingMerchants] = useState<PendingMerchant[]>([])
   const [recentReviews, setRecentReviews]       = useState<PendingReview[]>([])
@@ -50,12 +50,12 @@ export default function AdminDashboard() {
   const [processing, setProcessing]             = useState<string | null>(null)
 
   const load = async () => {
-    if (!access_token) return
+    if (!ready) return
     setLoading(true)
     const [statsData, merchantsData, reviewsData] = await Promise.all([
-      adminFetch<AdminStats>('/admin/stats', access_token),
-      adminFetch<PendingMerchant[]>('/admin/merchants?filter=pending&limit=5', access_token),
-      adminFetch<PendingReview[]>('/admin/reviews?filter=pending', access_token),
+      adminFetch<AdminStats>('/admin/stats'),
+      adminFetch<PendingMerchant[]>('/admin/merchants?filter=pending&limit=5'),
+      adminFetch<PendingReview[]>('/admin/reviews?filter=pending'),
     ])
     if (statsData)    setStats(statsData)
     if (merchantsData) setPendingMerchants(merchantsData)
@@ -64,15 +64,15 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
-    if (!ready || !access_token) return
+    if (!ready) return
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, access_token])
+  }, [ready])
 
   const verifyMerchant = async (id: string) => {
-    if (!access_token) return
+    if (!ready) return
     setProcessing(id)
-    await adminFetch(`/admin/merchants/${id}/verify`, access_token, {
+    await adminFetch(`/admin/merchants/${id}/verify`, {
       method: 'PATCH',
       body: JSON.stringify({ status: 'VERIFIED', trust_score: 70 }),
     })

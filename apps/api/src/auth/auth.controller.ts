@@ -1,27 +1,58 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common'
+import type { Request, Response } from 'express'
 import { Throttle } from '@nestjs/throttler'
+import { ConfigService } from '@nestjs/config'
 import { AuthService } from './auth.service'
 import { RegisterDto, LoginDto, RefreshTokenDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
+import {
+  clearAuthCookies,
+  getRefreshTokenFromRequest,
+  setAuthCookies,
+} from './auth-cookies'
 
 @Controller('auth')
 @Throttle({ default: { limit: 10, ttl: 60_000 } })
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @Public()
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto)
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { user, access_token, refresh_token } = await this.authService.register(dto)
+    setAuthCookies(res, this.config, access_token, refresh_token)
+    return { user }
   }
 
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto)
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { user, access_token, refresh_token } = await this.authService.login(dto)
+    setAuthCookies(res, this.config, access_token, refresh_token)
+    return { user }
   }
 
   @Public()
@@ -36,15 +67,35 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('otp/verify')
   @HttpCode(HttpStatus.OK)
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.authService.loginWithPhoneOtp(dto.phone, dto.code)
+  async verifyOtp(
+    @Body() dto: VerifyOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { user, access_token, refresh_token } = await this.authService.loginWithPhoneOtp(
+      dto.phone,
+      dto.code,
+    )
+    setAuthCookies(res, this.config, access_token, refresh_token)
+    return { user }
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshFromToken(dto.refresh_token)
+  async refresh(
+    @Req() req: Request,
+    @Body() dto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = getRefreshTokenFromRequest(req) ?? dto.refresh_token
+    if (!refreshToken) {
+      clearAuthCookies(res, this.config)
+      throw new UnauthorizedException('Session expirée, reconnectez-vous')
+    }
+
+    const { access_token, refresh_token } = await this.authService.refreshFromToken(refreshToken)
+    setAuthCookies(res, this.config, access_token, refresh_token)
+    return { success: true }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -56,7 +107,14 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout() {
-    return { success: true, message: 'Logged out' }
+  async logout(
+    @Req() req: Request,
+    @CurrentUser() user: { id: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = getRefreshTokenFromRequest(req)
+    const result = await this.authService.logout(refreshToken)
+    clearAuthCookies(res, this.config)
+    return result
   }
 }

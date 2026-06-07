@@ -34,6 +34,7 @@ function RegisterContent() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           email: form.email,
           password: form.password,
@@ -54,13 +55,13 @@ function RegisterContent() {
         return
       }
 
-      setAuth(data.user, data.access_token, data.refresh_token)
+      setAuth(data.user)
 
-      // Appliquer le code de parrainage si présent
-      if (refCode && data.access_token) {
+      if (refCode) {
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/referral/apply`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.access_token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ code: refCode }),
         }).catch(() => {})
       }

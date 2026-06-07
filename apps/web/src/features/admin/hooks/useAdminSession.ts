@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
-import { authFetch } from '@/lib/authFetch'
+import { authApiFetch } from '@/lib/authFetch'
 
 export function useAdminSession() {
   const router = useRouter()
-  const { isAuthenticated, user, access_token, logout } = useAuthStore()
+  const { isAuthenticated, user, logoutRemote } = useAuthStore()
   const [hydrated, setHydrated] = useState(false)
   const [sessionValid, setSessionValid] = useState(false)
 
@@ -22,7 +22,7 @@ export function useAdminSession() {
   useEffect(() => {
     if (!hydrated) return
 
-    if (!isAuthenticated || !access_token) {
+    if (!isAuthenticated) {
       router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
       return
     }
@@ -33,10 +33,10 @@ export function useAdminSession() {
     }
 
     let cancelled = false
-    authFetch('/auth/me', access_token).then(me => {
+    authApiFetch('/auth/me').then(async res => {
       if (cancelled) return
-      if (!me) {
-        logout()
+      if (!res.ok) {
+        await logoutRemote()
         router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
         return
       }
@@ -44,10 +44,10 @@ export function useAdminSession() {
     })
 
     return () => { cancelled = true }
-  }, [hydrated, isAuthenticated, access_token, user, router, logout])
+  }, [hydrated, isAuthenticated, user, router, logoutRemote])
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
-  const ready = hydrated && isAuthenticated && !!access_token && isAdmin && sessionValid
+  const ready = hydrated && isAuthenticated && isAdmin && sessionValid
 
-  return { ready, access_token, user }
+  return { ready, user }
 }

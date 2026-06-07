@@ -14,7 +14,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const { user, isAuthenticated, logout } = useAuthStore()
+  const { user, isAuthenticated, logoutRemote } = useAuthStore()
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20)
@@ -32,8 +32,8 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logoutRemote()
     setDropdownOpen(false)
     router.push('/')
   }

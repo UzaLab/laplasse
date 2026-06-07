@@ -44,6 +44,7 @@ function LoginForm() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(form),
       })
 
@@ -54,7 +55,7 @@ function LoginForm() {
         return
       }
 
-      setAuth(data.user, data.access_token, data.refresh_token)
+      setAuth(data.user)
       redirectAfterLogin(data.user)
     } catch {
       setError('Erreur de connexion. Vérifiez votre réseau.')
@@ -92,11 +93,12 @@ function LoginForm() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ phone, code: otpCode }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.message ?? 'Code invalide'); return }
-      setAuth(data.user, data.access_token, data.refresh_token)
+      setAuth(data.user)
       redirectAfterLogin(data.user)
     } catch {
       setError('Erreur réseau')

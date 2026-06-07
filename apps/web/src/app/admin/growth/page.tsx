@@ -66,30 +66,30 @@ const KPI_CARDS = [
 ] as const
 
 export default function AdminGrowthPage() {
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [data, setData] = useState<GrowthKpis | null>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
   const [recalculating, setRecalculating] = useState(false)
 
   useEffect(() => {
-    if (!ready || !access_token) return
+    if (!ready) return
     fetchGrowth()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, ready, access_token])
+  }, [days, ready])
 
   const fetchGrowth = async () => {
-    if (!access_token) return
+    if (!ready) return
     setLoading(true)
-    const result = await adminFetch<GrowthKpis>(`/admin/growth?days=${days}`, access_token)
+    const result = await adminFetch<GrowthKpis>(`/admin/growth?days=${days}`)
     if (result) setData(result)
     setLoading(false)
   }
 
   const handleRecalculateTrust = async () => {
-    if (!access_token) return
+    if (!ready) return
     setRecalculating(true)
-    await adminFetch('/admin/trust-score/recalculate-all', access_token, { method: 'POST' })
+    await adminFetch('/admin/trust-score/recalculate-all', { method: 'POST' })
     setRecalculating(false)
   }
 

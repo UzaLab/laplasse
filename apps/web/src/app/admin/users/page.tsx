@@ -25,16 +25,16 @@ const ROLE_STYLES: Record<string, string> = {
 }
 
 export default function AdminUsersPage() {
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!ready || !access_token) return
-    adminFetch<AdminUser[]>('/admin/users', access_token)
+    if (!ready) return
+    adminFetch<AdminUser[]>('/admin/users')
       .then(data => setUsers(data ?? []))
       .finally(() => setLoading(false))
-  }, [ready, access_token])
+  }, [ready])
 
   return (
     <AdminShell pageTitle="Utilisateurs">

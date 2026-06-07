@@ -9,6 +9,17 @@ import { OtpService } from '../otp/otp.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { RegisterDto, LoginDto } from './dto/auth.dto'
+import {
+  createRefreshTokenValue,
+  hashToken,
+  refreshExpiresAt,
+} from './auth-token.util'
+
+export interface AuthSessionResult {
+  user: Record<string, unknown>
+  access_token: string
+  refresh_token: string
+}
 
 @Injectable()
 export class AuthService {
@@ -23,9 +34,7 @@ export class AuthService {
     private readonly loyalty: LoyaltyService,
   ) {}
 
-  // ─── Register ─────────────────────────────────────────────────────────────
-
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto): Promise<AuthSessionResult> {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
     if (existing) throw new ConflictException('Cet email est déjà utilisé')
 
@@ -60,10 +69,9 @@ export class AuthService {
       throw err
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role)
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role)
     this.logger.log(`New user registered: ${user.email}`)
 
-    // Init loyalty + notification de bienvenue (non-bloquant)
     Promise.all([
       this.loyalty.getOrCreateAccount(user.id),
       this.notifications.sendWelcome(user.id, user.full_name ?? undefined),
@@ -72,9 +80,7 @@ export class AuthService {
     return { user, ...tokens }
   }
 
-  // ─── Login ────────────────────────────────────────────────────────────────
-
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto): Promise<AuthSessionResult> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email, is_active: true },
       select: {
@@ -98,12 +104,10 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Invalid credentials')
 
     const { password_hash: _, ...safeUser } = user
-    const tokens = await this.generateTokens(user.id, user.email, user.role)
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role)
 
     return { user: safeUser, ...tokens }
   }
-
-  // ─── Refresh ──────────────────────────────────────────────────────────────
 
   async refresh(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -112,22 +116,18 @@ export class AuthService {
     })
     if (!user) throw new UnauthorizedException()
 
-    return this.generateTokens(user.id, user.email, user.role)
+    return this.issueTokenPair(user.id, user.email, user.role)
   }
 
   async refreshFromToken(refreshToken: string) {
-    try {
-      const payload = await this.jwt.verifyAsync<{ sub: string; email: string; role: string }>(
-        refreshToken,
-        { secret: this.config.get('JWT_SECRET') },
-      )
-      return this.refresh(payload.sub)
-    } catch {
+    const stored = await this.findValidRefreshToken(refreshToken)
+    if (!stored) {
       throw new UnauthorizedException('Session expirée, reconnectez-vous')
     }
-  }
 
-  // ─── Me ───────────────────────────────────────────────────────────────────
+    await this.prisma.authToken.delete({ where: { id: stored.id } })
+    return this.refresh(stored.user_id)
+  }
 
   async getMe(userId: string) {
     return this.prisma.user.findUnique({
@@ -148,13 +148,11 @@ export class AuthService {
     })
   }
 
-  // ─── OTP téléphone ─────────────────────────────────────────────────────────
-
   async sendPhoneOtp(phone: string) {
     return this.otp.send(phone, 'login')
   }
 
-  async loginWithPhoneOtp(phone: string, code: string) {
+  async loginWithPhoneOtp(phone: string, code: string): Promise<AuthSessionResult> {
     const valid = await this.otp.verify(phone, 'login', code)
     if (!valid) throw new BadRequestException('Code OTP invalide ou expiré')
 
@@ -180,11 +178,55 @@ export class AuthService {
       data: { is_verified: true },
     })
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role)
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role)
     return { user: { ...user, is_verified: true }, ...tokens }
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
+  async logout(refreshToken: string | null) {
+    if (refreshToken) {
+      await this.prisma.authToken.deleteMany({
+        where: { token: hashToken(refreshToken), type: 'refresh' },
+      })
+    }
+    return { success: true, message: 'Logged out' }
+  }
+
+  async revokeAllSessions(userId: string) {
+    await this.prisma.authToken.deleteMany({
+      where: { user_id: userId, type: 'refresh' },
+    })
+  }
+
+  private async findValidRefreshToken(refreshToken: string) {
+    return this.prisma.authToken.findFirst({
+      where: {
+        token: hashToken(refreshToken),
+        type: 'refresh',
+        expires_at: { gt: new Date() },
+      },
+    })
+  }
+
+  private async issueTokenPair(userId: string, email: string, role: string) {
+    const payload = { sub: userId, email, role }
+    const refresh_token = createRefreshTokenValue()
+
+    const access_token = await this.jwt.signAsync(payload, {
+      secret: this.config.get('JWT_SECRET'),
+      expiresIn: this.config.get('JWT_ACCESS_EXPIRES') ?? '15m',
+    })
+
+    await this.prisma.authToken.create({
+      data: {
+        user_id: userId,
+        token: hashToken(refresh_token),
+        type: 'refresh',
+        expires_at: refreshExpiresAt(this.config),
+      },
+    })
+
+    return { access_token, refresh_token }
+  }
 
   private isUniqueConstraint(err: unknown, field: string): boolean {
     return (
@@ -194,22 +236,5 @@ export class AuthService {
       && Array.isArray((err as { meta: { target?: string[] } }).meta?.target)
       && (err as { meta: { target: string[] } }).meta.target.includes(field)
     )
-  }
-
-  private async generateTokens(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role }
-
-    const [access_token, refresh_token] = await Promise.all([
-      this.jwt.signAsync(payload, {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_ACCESS_EXPIRES') ?? '15m',
-      }),
-      this.jwt.signAsync(payload, {
-        secret: this.config.get('JWT_SECRET'),
-        expiresIn: this.config.get('JWT_REFRESH_EXPIRES') ?? '30d',
-      }),
-    ])
-
-    return { access_token, refresh_token }
   }
 }

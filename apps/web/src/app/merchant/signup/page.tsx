@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MapPin, Store, ArrowRight, ArrowLeft, CheckCircle2, Loader2, Building2, Network } from 'lucide-react'
+import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon } from '@/lib/icons'
 import { getHighestPlan, ORG_TYPE_LABELS, type OrganizationType } from '@/lib/planLimits'
@@ -27,7 +28,7 @@ type StructureMode = 'independent' | 'attach_org' | 'create_org'
 
 export default function MerchantSignupPage() {
   const router = useRouter()
-  const { isAuthenticated, access_token, user, setActiveMerchant, updateUser } = useAuthStore()
+  const { isAuthenticated, user, setActiveMerchant, updateUser } = useAuthStore()
 
   const existingMerchants = user?.merchants ?? []
   const highestPlan = getHighestPlan(existingMerchants)
@@ -80,12 +81,8 @@ export default function MerchantSignupPage() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/merchants/register`, {
+      const res = await authApiFetch('/merchants/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${access_token}`,
-        },
         body: JSON.stringify(payload),
       })
 

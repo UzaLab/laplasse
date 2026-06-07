@@ -33,31 +33,31 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function AdminComplaintsPage() {
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [filter, setFilter] = useState<'open' | 'all'>('open')
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ready || !access_token) return
+    if (!ready) return
     fetchComplaints()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, ready, access_token])
+  }, [filter, ready])
 
   const fetchComplaints = async () => {
-    if (!access_token) return
+    if (!ready) return
     setLoading(true)
     const qs = filter === 'open' ? '?filter=open' : ''
-    const data = await adminFetch<Complaint[]>(`/admin/complaints${qs}`, access_token)
+    const data = await adminFetch<Complaint[]>(`/admin/complaints${qs}`)
     if (data) setComplaints(data)
     setLoading(false)
   }
 
   const moderate = async (id: string, action: 'review' | 'resolve' | 'dismiss') => {
-    if (!access_token) return
+    if (!ready) return
     setProcessing(id)
-    await adminFetch(`/admin/complaints/${id}`, access_token, {
+    await adminFetch(`/admin/complaints/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ action }),
     })

@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import { join } from 'path'
 import express from 'express'
+import cookieParser from 'cookie-parser'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { winstonLogger } from './common/logger/logger.config'
@@ -27,6 +28,7 @@ async function bootstrap() {
   })
 
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')))
+  app.use(cookieParser())
 
   app.use(
     helmet({

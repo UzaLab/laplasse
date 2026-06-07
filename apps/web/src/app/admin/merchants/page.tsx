@@ -26,7 +26,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 function AdminMerchantsContent() {
   const searchParams = useSearchParams()
-  const { ready, access_token } = useAdminSession()
+  const { ready } = useAdminSession()
   const [merchants, setMerchants] = useState<AdminMerchant[]>([])
   const [filter, setFilter] = useState<'all' | 'pending'>('pending')
 
@@ -37,24 +37,23 @@ function AdminMerchantsContent() {
   const [processing, setProcessing] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!ready || !access_token) return
+    if (!ready) return
     fetchMerchants()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, ready, access_token])
+  }, [filter, ready])
 
   const fetchMerchants = async () => {
-    if (!access_token) return
+    if (!ready) return
     setLoading(true)
     const qs = filter === 'pending' ? '?filter=pending' : ''
-    const data = await adminFetch<AdminMerchant[]>(`/admin/merchants${qs}`, access_token)
+    const data = await adminFetch<AdminMerchant[]>(`/admin/merchants${qs}`)
     if (data) setMerchants(data)
     setLoading(false)
   }
 
   const handleVerify = async (id: string, status: 'VERIFIED' | 'REJECTED', score?: number) => {
     setProcessing(id)
-    if (!access_token) return
-    await adminFetch(`/admin/merchants/${id}/verify`, access_token, {
+    await adminFetch(`/admin/merchants/${id}/verify`, {
       method: 'PATCH',
       body: JSON.stringify({ status, trust_score: score }),
     })
@@ -64,8 +63,7 @@ function AdminMerchantsContent() {
 
   const handleToggleSponsored = async (id: string, current: boolean) => {
     setProcessing(id)
-    if (!access_token) return
-    await adminFetch(`/admin/merchants/${id}/sponsor`, access_token, {
+    await adminFetch(`/admin/merchants/${id}/sponsor`, {
       method: 'PATCH',
       body: JSON.stringify({ is_sponsored: !current }),
     })

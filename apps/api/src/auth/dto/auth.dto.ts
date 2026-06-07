@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsOptional, MaxLength } from 'class-validator'
+import { IsEmail, IsString, MinLength, IsOptional, MaxLength, ValidateIf } from 'class-validator'
 
 export class RegisterDto {
   @IsEmail()
@@ -26,8 +26,9 @@ export class LoginDto {
 }
 
 export class RefreshTokenDto {
+  @ValidateIf((o: RefreshTokenDto) => o.refresh_token !== undefined && o.refresh_token !== '')
   @IsString()
-  refresh_token: string
+  refresh_token?: string
 }
 
 export class SendOtpDto {

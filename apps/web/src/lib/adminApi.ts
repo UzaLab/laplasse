@@ -1,9 +1,10 @@
-import { authFetch } from './authFetch'
+import { authApiFetch } from './authFetch'
 
 export async function adminFetch<T>(
   path: string,
-  accessToken: string,
   options?: RequestInit,
 ): Promise<T | null> {
-  return authFetch<T>(path, accessToken, options)
+  const res = await authApiFetch(path, options)
+  if (!res.ok) return null
+  return res.json() as Promise<T>
 }
