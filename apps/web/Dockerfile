@@ -41,6 +41,9 @@ RUN pnpm build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# wget requis par le healthcheck Coolify (Alpine n'inclut pas curl)
+RUN apk add --no-cache wget
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -59,5 +62,8 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
 
 CMD ["node", "server.js"]
