@@ -24,6 +24,9 @@ RUN pnpm build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# wget requis par le healthcheck Coolify (Alpine n'inclut pas curl)
+RUN apk add --no-cache wget
+
 ENV NODE_ENV=production
 
 COPY --from=builder /app/apps/api/dist ./dist
@@ -34,4 +37,8 @@ COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node dist/prisma/seed.js || echo '[warn] migrate/seed failed'; exec node dist/src/main.js"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=120s --retries=5 \
+  CMD wget -qO- http://localhost:3001/api/health || exit 1
+
+# Seed uniquement si RUN_SEED=true (évite ~15s au démarrage en prod)
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && ( [ \"$RUN_SEED\" = \"true\" ] && node dist/prisma/seed.js || true ) || echo '[warn] migrate failed'; exec node dist/src/main.js"]
