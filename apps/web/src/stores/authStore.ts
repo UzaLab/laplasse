@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { authUrl, AUTH_FETCH_INIT } from '@/lib/authClient'
+import { authUrl } from '@/lib/authClient'
+import { invalidateAuthSession, type SessionStatus } from '@/lib/authSession'
 
 export interface MerchantSummary {
   id: string
@@ -32,8 +33,10 @@ interface AuthState {
   user: AuthUser | null
   isAuthenticated: boolean
   activeMerchantId: string | null
+  sessionStatus: SessionStatus
 
   setAuth: (user: AuthUser) => void
+  setSessionStatus: (status: SessionStatus) => void
   logout: () => void
   logoutRemote: () => Promise<void>
   updateUser: (user: Partial<AuthUser>) => void
@@ -46,21 +49,28 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       activeMerchantId: null,
+      sessionStatus: 'idle',
 
       setAuth: (user) =>
         set((state) => ({
           user,
           isAuthenticated: true,
+          sessionStatus: 'authenticated',
           activeMerchantId:
             user.merchants?.[0]?.id ?? state.activeMerchantId ?? null,
         })),
 
-      logout: () =>
+      setSessionStatus: (sessionStatus) => set({ sessionStatus }),
+
+      logout: () => {
+        invalidateAuthSession()
         set({
           user: null,
           isAuthenticated: false,
           activeMerchantId: null,
-        }),
+          sessionStatus: 'anonymous',
+        })
+      },
 
       logoutRemote: async () => {
         try {
@@ -71,10 +81,12 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // Réseau indisponible — on efface quand même l'état local
         }
+        invalidateAuthSession()
         set({
           user: null,
           isAuthenticated: false,
           activeMerchantId: null,
+          sessionStatus: 'anonymous',
         })
       },
 
@@ -92,42 +104,17 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
         activeMerchantId: state.activeMerchantId,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        if (state.isAuthenticated && state.user) {
+          state.sessionStatus = 'idle'
+        } else {
+          state.sessionStatus = 'anonymous'
+        }
+      },
     },
   ),
 )
 
-/** Valide la session cookie auprès de l'API (refresh auto si access expiré). */
-export async function bootstrapAuthSession(): Promise<AuthUser | null> {
-  try {
-    const res = await fetch(authUrl('/auth/me'), {
-      credentials: 'include',
-    })
-    if (res.ok) {
-      const user = (await res.json()) as AuthUser
-      useAuthStore.getState().setAuth(user)
-      return user
-    }
-    if (res.status === 401) {
-      const refreshed = await fetch(authUrl('/auth/refresh'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: AUTH_FETCH_INIT.headers,
-        body: '{}',
-      })
-      if (refreshed.ok) {
-        const meRes = await fetch(authUrl('/auth/me'), { credentials: 'include' })
-        if (meRes.ok) {
-          const user = (await meRes.json()) as AuthUser
-          useAuthStore.getState().setAuth(user)
-          return user
-        }
-      }
-    }
-  } catch {
-    // Conserver l'état local en cas d'erreur réseau transitoire
-    return useAuthStore.getState().user
-  }
-
-  useAuthStore.getState().logout()
-  return null
-}
+/** @deprecated Utiliser ensureAuthSession depuis @/lib/authSession */
+export { ensureAuthSession as bootstrapAuthSession } from '@/lib/authSession'

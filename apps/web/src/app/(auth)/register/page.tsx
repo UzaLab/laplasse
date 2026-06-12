@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { invalidateAuthSession } from '@/lib/authSession'
 
 function RegisterContent() {
   const router = useRouter()
@@ -55,6 +56,7 @@ function RegisterContent() {
         return
       }
 
+      invalidateAuthSession()
       setAuth(data.user)
 
       if (refCode) {

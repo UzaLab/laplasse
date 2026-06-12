@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, Smartphone } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { invalidateAuthSession } from '@/lib/authSession'
 import { Suspense } from 'react'
 
 type LoginMode = 'email' | 'otp'
@@ -55,6 +56,7 @@ function LoginForm() {
         return
       }
 
+      invalidateAuthSession()
       setAuth(data.user)
       redirectAfterLogin(data.user)
     } catch {
@@ -98,6 +100,7 @@ function LoginForm() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.message ?? 'Code invalide'); return }
+      invalidateAuthSession()
       setAuth(data.user)
       redirectAfterLogin(data.user)
     } catch {

@@ -3,51 +3,47 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
-import { authApiFetch } from '@/lib/authFetch'
+import { ensureAuthSession } from '@/lib/authSession'
 
 export function useAdminSession() {
   const router = useRouter()
-  const { isAuthenticated, user, logoutRemote } = useAuthStore()
-  const [hydrated, setHydrated] = useState(false)
+  const user = useAuthStore(s => s.user)
+  const [persistHydrated, setPersistHydrated] = useState(false)
   const [sessionValid, setSessionValid] = useState(false)
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
+      setPersistHydrated(true)
       return
     }
-    return useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    return useAuthStore.persist.onFinishHydration(() => setPersistHydrated(true))
   }, [])
 
   useEffect(() => {
-    if (!hydrated) return
-
-    if (!isAuthenticated) {
-      router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
-      return
-    }
-
-    if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-      router.push('/')
-      return
-    }
+    if (!persistHydrated) return
 
     let cancelled = false
-    authApiFetch('/auth/me').then(async res => {
+    ensureAuthSession().then(validatedUser => {
       if (cancelled) return
-      if (!res.ok) {
-        await logoutRemote()
+
+      if (!validatedUser) {
         router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
         return
       }
+
+      if (validatedUser.role !== 'ADMIN' && validatedUser.role !== 'SUPER_ADMIN') {
+        router.push('/')
+        return
+      }
+
       setSessionValid(true)
     })
 
     return () => { cancelled = true }
-  }, [hydrated, isAuthenticated, user, router, logoutRemote])
+  }, [persistHydrated, router])
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
-  const ready = hydrated && isAuthenticated && isAdmin && sessionValid
+  const ready = persistHydrated && sessionValid && isAdmin
 
   return { ready, user }
 }

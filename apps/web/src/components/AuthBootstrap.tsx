@@ -1,12 +1,24 @@
 'use client'
 
 import { useEffect } from 'react'
-import { bootstrapAuthSession } from '@/stores/authStore'
+import { ensureAuthSession, isSessionResolved } from '@/lib/authSession'
+import { useAuthStore } from '@/stores/authStore'
 
-/** Valide la session cookie au chargement de l'application. */
+/** Lance la validation session une fois le store réhydraté (mutex — sans doublon). */
 export function AuthBootstrap() {
   useEffect(() => {
-    bootstrapAuthSession()
+    const kick = () => {
+      const { sessionStatus } = useAuthStore.getState()
+      if (!isSessionResolved(sessionStatus)) {
+        ensureAuthSession()
+      }
+    }
+
+    if (useAuthStore.persist.hasHydrated()) {
+      kick()
+      return
+    }
+    return useAuthStore.persist.onFinishHydration(kick)
   }, [])
   return null
 }

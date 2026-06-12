@@ -1,44 +1,43 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuthStore, bootstrapAuthSession } from '@/stores/authStore'
+import { useAuthStore } from '@/stores/authStore'
+import { ensureAuthSession, isSessionResolved } from '@/lib/authSession'
 
-function getInitialHydrated() {
+function getInitialPersistHydrated() {
   return typeof window !== 'undefined' && useAuthStore.persist.hasHydrated()
 }
 
-/** Auth prêt — réhydrate le store puis valide la session cookie auprès de l'API. */
+/** Auth prêt — attend la réhydratation puis une validation session unique (mutex global). */
 export function useAuthReady() {
-  const { isAuthenticated, user, logoutRemote } = useAuthStore()
-  const [hydrated, setHydrated] = useState(getInitialHydrated)
-  const [sessionChecked, setSessionChecked] = useState(false)
+  const { isAuthenticated, user, logoutRemote, sessionStatus } = useAuthStore()
+  const [persistHydrated, setPersistHydrated] = useState(getInitialPersistHydrated)
 
   useEffect(() => {
     if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true)
+      setPersistHydrated(true)
       return
     }
-    return useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    return useAuthStore.persist.onFinishHydration(() => setPersistHydrated(true))
   }, [])
 
   useEffect(() => {
-    if (!hydrated || sessionChecked) return
-    let cancelled = false
-    bootstrapAuthSession().finally(() => {
-      if (!cancelled) setSessionChecked(true)
-    })
-    return () => { cancelled = true }
-  }, [hydrated, sessionChecked])
+    if (!persistHydrated) return
+    if (isSessionResolved(sessionStatus)) return
+    ensureAuthSession()
+  }, [persistHydrated, sessionStatus])
 
-  const ready = hydrated && sessionChecked && isAuthenticated && !!user
-  const { logout, activeMerchantId } = useAuthStore()
+  const sessionChecked = isSessionResolved(sessionStatus)
+  const ready = persistHydrated && sessionChecked && isAuthenticated && !!user
 
   return {
     ready,
-    hydrated: hydrated && sessionChecked,
+    hydrated: persistHydrated && sessionChecked,
+    sessionChecked,
+    sessionStatus,
     isAuthenticated,
     user,
     logout: logoutRemote,
-    activeMerchantId,
+    activeMerchantId: useAuthStore(s => s.activeMerchantId),
   }
 }
