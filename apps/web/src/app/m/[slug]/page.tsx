@@ -14,6 +14,7 @@ import { ReportTrigger } from '@/features/merchant/components/ReportTrigger'
 import { MerchantViewTracker, MerchantContactButtons } from '@/features/merchant/components/MerchantTracker'
 import { SimilarMerchants } from '@/features/merchant/components/SimilarMerchants'
 import { BookingForm } from '@/features/merchant/components/BookingForm'
+import { MerchantProductsSection } from '@/features/marketplace/components/MerchantProductsSection'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -202,6 +203,16 @@ export default async function MerchantPage({ params }: Props) {
               <section>
                 <h2 className="text-2xl font-bold text-slate-900 mb-4">À propos</h2>
                 <p className="text-slate-600 leading-relaxed text-lg">{merchant.description}</p>
+              </section>
+            )}
+
+            {/* Boutique marketplace */}
+            {merchant.category.slug === 'boutiques' && (
+              <section id="boutique">
+                <MerchantProductsSection
+                  merchantSlug={merchant.slug}
+                  merchantName={merchant.business_name}
+                />
               </section>
             )}
 

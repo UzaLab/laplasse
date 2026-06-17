@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck,
-  LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar,
+  LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar, ShoppingBag,
 } from 'lucide-react'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
@@ -43,6 +43,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
   const mainNav: NavItem[] = [
     { href: '/profile',               label: "Vue d'ensemble",  icon: <LayoutDashboard size={17} /> },
     { href: '/profile/bookings',      label: 'Mes réservations', icon: <Calendar size={17} /> },
+    { href: '/profile/orders',        label: 'Mes commandes',   icon: <ShoppingBag size={17} /> },
     { href: '/favoris',               label: 'Mes favoris',     icon: <Heart size={17} /> },
     { href: '/profile/reviews',       label: 'Mes avis',        icon: <Star size={17} /> },
     { href: '/profile/loyalty',       label: 'Mes points',      icon: <Trophy size={17} /> },

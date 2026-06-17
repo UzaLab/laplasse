@@ -7,6 +7,7 @@ import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
   Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users, UserCircle2,
   ChevronDown, Plus, Building2, Network, Calendar, Tag, Megaphone, Scissors,
+  ShoppingBag, Package,
 } from 'lucide-react'
 import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
@@ -86,11 +87,17 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
 
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 
+  const marketplaceNav: NavItem[] = [
+    { href: '/merchant/products', label: 'Produits',   icon: <Package size={17} /> },
+    { href: '/merchant/orders',   label: 'Commandes',  icon: <ShoppingBag size={17} /> },
+  ]
+
   const mainNav: NavItem[] = [
     { href: '/merchant/dashboard',    label: "Vue d'ensemble",   icon: <LayoutDashboard size={17} /> },
     { href: '/merchant/analytics',    label: 'Statistiques',     icon: <TrendingUp size={17} /> },
     { href: '/merchant/crm',          label: 'Clients CRM',      icon: <Users size={17} /> },
     { href: '/merchant/bookings',     label: 'Réservations',     icon: <Calendar size={17} /> },
+    ...marketplaceNav,
   ]
 
   const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)

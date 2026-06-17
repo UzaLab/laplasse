@@ -235,6 +235,42 @@ async function main() {
 
   console.log('✅ Vérifications créées')
 
+  // ─── MARKETPLACE PRODUCTS (boutiques) ────────────────────────────────────────
+
+  const boutiqueProducts: Array<{ merchantSlug: string; products: Array<{ name: string; slug: string; price: number; stock: number; image: string; desc: string }> }> = [
+    {
+      merchantSlug: 'yale-design',
+      products: [
+        { name: 'Robe Wax Élégance', slug: 'robe-wax-elegance', price: 45000, stock: 12, image: 'https://images.unsplash.com/photo-1594633312681-425a7b9569e2?auto=format&fit=crop&q=80&w=800', desc: 'Robe en wax premium, coupe moderne.' },
+        { name: 'Sac Tissé Main', slug: 'sac-tisse-main', price: 28000, stock: 8, image: 'https://images.unsplash.com/photo-1590875127128-5de792a5c2a8?auto=format&fit=crop&q=80&w=800', desc: 'Sac artisanal tissé à la main.' },
+        { name: 'Boubou Homme Premium', slug: 'boubou-homme-premium', price: 65000, stock: 5, image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=800', desc: 'Boubou brodé, finitions soignées.' },
+      ],
+    },
+    {
+      merchantSlug: 'galerie-korhogo',
+      products: [
+        { name: 'Masque Senoufo', slug: 'masque-senoufo', price: 85000, stock: 3, image: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=800', desc: 'Masque traditionnel authentique.' },
+        { name: 'Tissu Kita', slug: 'tissu-kita', price: 35000, stock: 15, image: 'https://images.unsplash.com/photo-1558171818-61854a5d1d4f?auto=format&fit=crop&q=80&w=800', desc: 'Tissu Kita 6 yards, motifs géométriques.' },
+        { name: 'Bronze Baoulé', slug: 'bronze-baoule', price: 120000, stock: 2, image: 'https://images.unsplash.com/photo-1578749556568-bc2c40f68d55?auto=format&fit=crop&q=80&w=800', desc: 'Sculpture bronze signée artiste local.' },
+      ],
+    },
+  ]
+
+  let productCount = 0
+  for (const group of boutiqueProducts) {
+    const mId = merchantMap[group.merchantSlug]
+    if (!mId) continue
+    for (const p of group.products) {
+      await prisma.product.upsert({
+        where: { merchant_id_slug: { merchant_id: mId, slug: p.slug } },
+        update: { name: p.name, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
+        create: { merchant_id: mId, name: p.name, slug: p.slug, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
+      })
+      productCount++
+    }
+  }
+  console.log(`✅ ${productCount} produits marketplace créés`)
+
   console.log('\n🎉 Base de données LaPlasse initialisée avec succès !')
   console.log(`   → ${categories.length} catégories`)
   console.log('   → Utilisateurs : admin@laplasse.ci / Admin2026!')
