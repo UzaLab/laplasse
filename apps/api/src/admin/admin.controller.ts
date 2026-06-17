@@ -8,6 +8,7 @@ import { SearchService } from '../search/search.service'
 import { MerchantsService } from '../merchants/merchants.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { AuditService } from '../audit/audit.service'
+import { MarketplaceService } from '../marketplace/marketplace.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,6 +21,7 @@ export class AdminController {
     private readonly merchantsService: MerchantsService,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly marketplace: MarketplaceService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
@@ -200,6 +202,12 @@ export class AdminController {
   async syncSearch() {
     await this.searchService.syncAllMerchants()
     return { ok: true, message: 'Meilisearch re-indexé avec succès' }
+  }
+
+  @Post('seed-marketplace')
+  async seedMarketplace() {
+    const result = await this.marketplace.seedDemoProducts()
+    return { ok: true, ...result }
   }
 
   // ── Trust Score ──────────────────────────────────────────────────────────────
