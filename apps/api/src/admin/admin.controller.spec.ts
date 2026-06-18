@@ -2,6 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { AdminController } from './admin.controller'
 import { PrismaService } from '../prisma/prisma.service'
 import { ComplaintsService } from '../complaints/complaints.service'
+import { SearchService } from '../search/search.service'
+import { MerchantsService } from '../merchants/merchants.service'
+import { NotificationsService } from '../notifications/notifications.service'
+import { AuditService } from '../audit/audit.service'
+import { MarketplaceService } from '../marketplace/marketplace.service'
 
 describe('AdminController — modération', () => {
   let controller: AdminController
@@ -36,6 +41,11 @@ describe('AdminController — modération', () => {
           provide: ComplaintsService,
           useValue: { findAll: jest.fn(), moderate: jest.fn() },
         },
+        { provide: SearchService, useValue: { syncAllMerchants: jest.fn() } },
+        { provide: MerchantsService, useValue: { recalculateTrustScore: jest.fn(), recalculateAllTrustScores: jest.fn() } },
+        { provide: NotificationsService, useValue: { sendToUser: jest.fn() } },
+        { provide: AuditService, useValue: { log: jest.fn() } },
+        { provide: MarketplaceService, useValue: { seedDemoProducts: jest.fn() } },
       ],
     }).compile()
 

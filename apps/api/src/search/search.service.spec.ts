@@ -6,6 +6,7 @@ describe('SearchService', () => {
   let service: SearchService
   let prisma: {
     merchant: { findMany: jest.Mock; findUnique: jest.Mock }
+    shop: { findMany: jest.Mock }
     searchHistory: { create: jest.Mock }
   }
   const originalFetch = global.fetch
@@ -13,6 +14,7 @@ describe('SearchService', () => {
   beforeEach(() => {
     prisma = {
       merchant: { findMany: jest.fn(), findUnique: jest.fn() },
+      shop: { findMany: jest.fn().mockResolvedValue([]) },
       searchHistory: { create: jest.fn() },
     }
 

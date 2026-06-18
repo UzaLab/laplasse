@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common'
 import { ReviewsService } from './reviews.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
+import { FraudService } from '../fraud/fraud.service'
 
 describe('ReviewsService', () => {
   let service: ReviewsService
@@ -26,7 +28,11 @@ describe('ReviewsService', () => {
         create: jest.fn(),
       },
     }
-    service = new ReviewsService(prisma as unknown as PrismaService)
+    service = new ReviewsService(
+      prisma as unknown as PrismaService,
+      { earnPoints: jest.fn().mockResolvedValue(undefined) } as unknown as LoyaltyService,
+      { checkReviewSpam: jest.fn().mockResolvedValue(false) } as unknown as FraudService,
+    )
   })
 
   describe('create', () => {
