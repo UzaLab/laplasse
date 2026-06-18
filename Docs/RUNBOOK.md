@@ -240,8 +240,25 @@ Les builds Docker sont optimisés pour un VPS modeste (`.dockerignore`, cache pn
 
 **Règle d'or : ne jamais lancer 4 builds en parallèle.** Sur Coolify → Settings → désactiver le déploiement auto simultané si possible, ou utiliser le script séquentiel :
 
+**504 Gateway Timeout pendant un déploiement :** normal sur ce VPS — le build Docker (surtout Next.js) consomme toute la RAM et les conteneurs en ligne ne répondent plus temporairement. **Ne pas relancer** un autre build tant que le précédent n'est pas terminé.
+
+**Remettre le site en ligne sans rebuild** (après redémarrage Coolify) :
+
 ```bash
 export COOLIFY_TOKEN="votre-token"
+./scripts/coolify-deploy.sh recover-prod
+```
+
+**Déployer du nouveau code — une seule app à la fois :**
+
+```bash
+export COOLIFY_TOKEN="votre-token"
+./scripts/coolify-deploy.sh api-prod          # ~6 min, peu d'impact
+# Attendre ✓ finished + site OK, puis :
+FORCE=true ./scripts/coolify-deploy.sh web-prod   # ~30-45 min, 504 attendus
+```
+
+```bash
 # Préprod (develop) puis prod (main), une app à la fois
 ./scripts/coolify-deploy.sh preprod
 ./scripts/coolify-deploy.sh prod
