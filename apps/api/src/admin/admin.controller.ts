@@ -1,4 +1,5 @@
-import { Controller, Get, Patch, Post, Param, Body, UseGuards, Query } from '@nestjs/common'
+import { Controller, Get, Patch, Post, Param, Body, UseGuards, Query, NotFoundException, BadRequestException } from '@nestjs/common'
+import { hash } from 'bcryptjs'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
 import { Roles } from '../auth/decorators/roles.decorator'
@@ -196,6 +197,22 @@ export class AdminController {
       orderBy: { created_at: 'desc' },
       take: Number(limit ?? 50),
     })
+  }
+
+  @Post('users/set-password')
+  async setUserPassword(@Body() body: { email: string; password: string }) {
+    const email = body.email?.trim().toLowerCase()
+    if (!email || !body.password?.trim()) {
+      throw new BadRequestException('Email et mot de passe requis')
+    }
+    const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true, email: true } })
+    if (!user) throw new NotFoundException('Utilisateur introuvable')
+    const password_hash = await hash(body.password, 12)
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password_hash, is_verified: true, is_active: true },
+    })
+    return { ok: true, email: user.email }
   }
 
   @Post('sync-search')

@@ -251,6 +251,7 @@ Variables critiques : `DATABASE_URL`, `JWT_SECRET`, `REDIS_URL`, `MEILI_HOST`, `
 |------|-------|--------------|-----|
 | **Admin** | `admin@laplasse.ci` | `Admin2026!` | http://localhost:3000/login → `/admin` |
 | **Marchand** | `bushman@laplasse.ci` | `Bushman2026!` | `/merchant/dashboard` — Le Bushman Café |
+| **Marchand boutique** | `owner3@laplasse.ci` | `Yale2026!` | `/merchant/shop` — Yalé Design |
 | **User** | `ksouary@gmail.com` | `Ksoary2026!` | `/profile` |
 | User test | `user@test.ci` | *(pas de mot de passe seed)* | — |
 

@@ -41,6 +41,7 @@ async function main() {
   const userPwd     = await hash('User2026!', 12)
   const ksoaryPwd   = await hash('Ksoary2026!', 12)
   const bushmanPwd  = await hash('Bushman2026!', 12)
+  const yalePwd     = await hash('Yale2026!', 12)
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@laplasse.ci' },
@@ -72,8 +73,19 @@ async function main() {
     Array.from({ length: 25 }, (_, i) => i + 1).map(i =>
       prisma.user.upsert({
         where: { email: `owner${i}@laplasse.ci` },
-        update: {},
-        create: { email: `owner${i}@laplasse.ci`, phone: `+2250800${String(i).padStart(4,'0')}`, full_name: `Marchand ${i}`, role: 'MERCHANT', is_verified: true, city: 'Abidjan', country: 'CI' },
+        update: i === 3
+          ? { password_hash: yalePwd, role: 'MERCHANT', is_verified: true, is_active: true }
+          : {},
+        create: {
+          email: `owner${i}@laplasse.ci`,
+          phone: `+2250800${String(i).padStart(4,'0')}`,
+          full_name: `Marchand ${i}`,
+          role: 'MERCHANT',
+          is_verified: true,
+          city: 'Abidjan',
+          country: 'CI',
+          ...(i === 3 ? { password_hash: yalePwd } : {}),
+        },
       })
     )
   )
