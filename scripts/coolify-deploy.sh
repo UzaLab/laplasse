@@ -21,17 +21,30 @@ CURL_MAX="${CURL_MAX:-60}"
 
 curl_json() {
   local url="$1"
-  local tmp
+  shift
+  local tmp code attempt
   tmp=$(mktemp)
-  local code
-  code=$(curl -sS --max-time "$CURL_MAX" -o "$tmp" -w "%{http_code}" "$@")
-  if [[ "$code" != "200" ]] || [[ ! -s "$tmp" ]]; then
-    rm -f "$tmp"
-    echo "curl_fail:$code" >&2
-    return 1
-  fi
-  cat "$tmp"
+  for attempt in 1 2 3 4 5; do
+    code=$(curl -sS --max-time "$CURL_MAX" -o "$tmp" -w "%{http_code}" "$@" "$url")
+    if [[ "$code" == "200" ]] && [[ -s "$tmp" ]]; then
+      cat "$tmp"
+      rm -f "$tmp"
+      return 0
+    fi
+    echo "  retry curl ($attempt/5) http=$code" >&2
+    sleep 15
+  done
   rm -f "$tmp"
+  return 1
+}
+
+post_deploy() {
+  local uuid="$1"
+  curl_json "$COOLIFY_HOST/api/v1/deploy" \
+    -X POST \
+    -H "Authorization: Bearer $COOLIFY_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"uuid\":\"$uuid\",\"force\":${FORCE:-false}}"
 }
 
 deploy_status() {
@@ -47,10 +60,7 @@ deploy_one() {
   echo ""
   echo "▶ Déploiement: $name"
   local resp dep st
-  resp=$(curl -sf --max-time "$CURL_MAX" -X POST "$COOLIFY_HOST/api/v1/deploy" \
-    -H "Authorization: Bearer $COOLIFY_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{\"uuid\":\"$uuid\",\"force\":${FORCE:-false}}") || { echo "✗ $name (échec POST deploy)"; return 1; }
+  resp=$(post_deploy "$uuid") || { echo "✗ $name (échec POST deploy)"; return 1; }
   dep=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['deployments'][0]['deployment_uuid'])")
   echo "  uuid=$dep"
 
