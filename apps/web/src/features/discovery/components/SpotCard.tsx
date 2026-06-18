@@ -1,15 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { Star, MapPin, Store, BadgeCheck, Plus, MessageCircle, Zap } from 'lucide-react'
+import { Star, MapPin, BadgeCheck, Zap } from 'lucide-react'
 import { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from './FavoriteButton'
+import { ShopPreviewSnippet } from './ShopPreviewSnippet'
+import { WhatsAppLink } from './WhatsAppLink'
 
 export interface SpotMerchantProps extends ApiMerchant {
   sub_category?: string
   has_reservation?: boolean
   has_marketplace?: boolean
-  featured_product?: { name: string; price: string; image: string }
+  featured_product?: ApiMerchant['featured_product']
 }
 
 export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
@@ -83,47 +85,21 @@ export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
             {merchant.location?.district}, {merchant.location?.city}
           </p>
           {merchant.whatsapp && (
-            <a
-              href={`https://wa.me/${merchant.whatsapp.replace(/\s+/g, '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <WhatsAppLink
+              phone={merchant.whatsapp}
+              merchantId={merchant.id}
               className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-            >
-              <MessageCircle size={12} />
-              WhatsApp
-            </a>
+            />
           )}
         </div>
 
         {/* Micro-Marketplace */}
         {merchant.has_marketplace && merchant.featured_product && (
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center gap-4 group-hover:border-brand-200 transition-colors cursor-pointer mb-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <div className="w-14 h-14 rounded-xl overflow-hidden bg-white shrink-0">
-              <img
-                src={merchant.featured_product.image}
-                alt={merchant.featured_product.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Store size={12} className="text-brand-600" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  La Boutique
-                </span>
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 truncate">
-                {merchant.featured_product.name}
-              </h4>
-              <p className="text-xs font-bold text-brand-600 mt-0.5">
-                {merchant.featured_product.price}
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-900 group-hover:bg-brand-500 group-hover:text-white transition-colors">
-              <Plus size={16} />
-            </div>
-          </div>
+          <ShopPreviewSnippet
+            product={merchant.featured_product}
+            merchantSlug={merchant.slug}
+            className="mb-4"
+          />
         )}
 
         {/* CTA Buttons */}

@@ -16,6 +16,7 @@ import { MarketplaceService } from './marketplace.service'
 import {
   AddCartItemDto,
   CheckoutDto,
+  ConfirmBatchOrderPaymentDto,
   ConfirmOrderPaymentDto,
   CreateProductDto,
   UpdateCartItemDto,
@@ -35,6 +36,43 @@ export class MarketplaceController {
   }
 
   @Public()
+  @Get('marketplace/products')
+  listCatalog(
+    @Query('q') q?: string,
+    @Query('merchant') merchant?: string,
+    @Query('sort') sort?: string,
+    @Query('maxPrice') maxPrice?: string,
+  ) {
+    return this.svc.listMarketplaceProducts({
+      q,
+      merchant,
+      sort,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+    })
+  }
+
+  @Public()
+  @Get('marketplace/merchants')
+  listMerchants(@Query('limit') limit?: string) {
+    return this.svc.listMarketplaceMerchants(limit ? Number(limit) : 20)
+  }
+
+  @Public()
+  @Get('shops/:slug/products')
+  listPublicShop(@Param('slug') slug: string) {
+    return this.svc.listPublicProducts(slug)
+  }
+
+  @Public()
+  @Get('shops/:slug/products/:productSlug')
+  getPublicShop(
+    @Param('slug') slug: string,
+    @Param('productSlug') productSlug: string,
+  ) {
+    return this.svc.getPublicProduct(slug, productSlug)
+  }
+
+  @Public()
   @Get('merchants/:slug/products')
   listPublic(@Param('slug') slug: string) {
     return this.svc.listPublicProducts(slug)
@@ -50,9 +88,10 @@ export class MarketplaceController {
   @Get('products/mine')
   listMine(
     @CurrentUser('id') userId: string,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.listMyProducts(userId, merchantId)
+    return this.svc.listMyProducts(userId, shopId ?? merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -60,9 +99,10 @@ export class MarketplaceController {
   create(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateProductDto,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.createProduct(userId, dto, merchantId)
+    return this.svc.createProduct(userId, dto, shopId ?? merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -71,9 +111,10 @@ export class MarketplaceController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.updateProduct(userId, id, dto, merchantId)
+    return this.svc.updateProduct(userId, id, dto, shopId ?? merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -81,9 +122,10 @@ export class MarketplaceController {
   remove(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.deleteProduct(userId, id, merchantId)
+    return this.svc.deleteProduct(userId, id, shopId ?? merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -99,13 +141,13 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Patch('cart/items/:productId')
+  @Patch('cart/items/:itemId')
   updateCartItem(
     @CurrentUser('id') userId: string,
-    @Param('productId') productId: string,
+    @Param('itemId') itemId: string,
     @Body() dto: UpdateCartItemDto,
   ) {
-    return this.svc.updateCartItem(userId, productId, dto.quantity)
+    return this.svc.updateCartItem(userId, itemId, dto.quantity)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -127,6 +169,12 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('orders/pay/confirm-batch')
+  confirmBatchPayment(@CurrentUser('id') userId: string, @Body() dto: ConfirmBatchOrderPaymentDto) {
+    return this.svc.confirmBatchOrderPayments(userId, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/mine')
   myOrders(@CurrentUser('id') userId: string) {
     return this.svc.listMyOrders(userId)
@@ -136,10 +184,11 @@ export class MarketplaceController {
   @Get('orders/merchant/mine')
   merchantOrders(
     @CurrentUser('id') userId: string,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
     @Query('status') status?: OrderStatus,
   ) {
-    return this.svc.listMerchantOrders(userId, merchantId, status)
+    return this.svc.listMerchantOrders(userId, shopId ?? merchantId, status)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -154,8 +203,9 @@ export class MarketplaceController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
+    @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.updateOrderStatus(userId, id, dto, merchantId)
+    return this.svc.updateOrderStatus(userId, id, dto, shopId ?? merchantId)
   }
 }

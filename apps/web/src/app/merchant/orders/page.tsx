@@ -23,19 +23,19 @@ const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: str
 }
 
 export default function MerchantOrdersPage() {
-  const { activeMerchantId } = useAuthStore()
+  const { activeShopId } = useAuthStore()
   const { hydrated, isAuthenticated, ready } = useRequireAuth('/merchant/orders')
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    if (!activeMerchantId) return
+    if (!activeShopId) return
     setLoading(true)
-    const list = await fetchMerchantOrders(activeMerchantId)
+    const list = await fetchMerchantOrders(activeShopId)
     setOrders(list)
     setLoading(false)
-  }, [activeMerchantId])
+  }, [activeShopId])
 
   useEffect(() => {
     if (!ready) return
@@ -44,7 +44,7 @@ export default function MerchantOrdersPage() {
 
   const handleStatus = async (orderId: string, status: OrderStatus) => {
     setProcessingId(orderId)
-    await updateOrderStatus(orderId, status, activeMerchantId)
+    await updateOrderStatus(orderId, status, activeShopId)
     await load()
     setProcessingId(null)
   }

@@ -1,6 +1,6 @@
 import { authApiFetch } from './authFetch'
 import { authUrl } from './authClient'
-import { merchantApiFetch } from './merchantApi'
+import { shopApiFetch } from './shopApi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,16 +15,29 @@ export type OrderStatus =
   | 'REFUNDED'
 export type DeliveryType = 'PICKUP' | 'DELIVERY'
 
+export interface ProductVariant {
+  id: string
+  name: string
+  price: number
+  stock_quantity: number
+  sku?: string | null
+}
+
 export interface MarketplaceProduct {
   id: string
   name: string
   slug: string
   description?: string | null
+  composition?: string | null
   price: number
   currency: string
   stock_quantity: number
   image_url?: string | null
   status: ProductStatus
+  allow_pickup?: boolean
+  allow_delivery?: boolean
+  has_variants?: boolean
+  variants?: ProductVariant[]
   merchant?: {
     id: string
     business_name: string
@@ -43,10 +56,33 @@ export interface FeaturedProduct {
   merchant: { business_name: string; slug: string }
 }
 
+export interface MarketplaceCatalogProduct extends FeaturedProduct {
+  created_at?: string
+  merchant: { business_name: string; slug: string; logo?: string | null }
+}
+
+export interface MarketplaceBoutique {
+  id: string
+  business_name: string
+  slug: string
+  logo: string | null
+}
+
+export interface CartMerchantGroup {
+  id: string
+  business_name: string
+  slug: string
+  subtotal: number
+  item_count: number
+}
+
 export interface CartItem {
   id: string
   quantity: number
+  unit_price: number
   line_total: number
+  variant_id?: string | null
+  variant?: ProductVariant | null
   product: MarketplaceProduct & {
     merchant: {
       id: string
@@ -54,6 +90,7 @@ export interface CartItem {
       slug: string
       category?: { slug: string }
     }
+    has_variants?: boolean
   }
 }
 
@@ -64,13 +101,21 @@ export interface Cart {
   subtotal: number
   currency: string
   merchant: { id: string; business_name: string; slug: string } | null
+  merchants: CartMerchantGroup[]
+  merchant_count: number
   item_count: number
+  delivery_options?: {
+    allow_pickup: boolean
+    allow_delivery: boolean
+  }
 }
 
 export interface OrderItem {
   id: string
   product_id?: string | null
+  variant_id?: string | null
   product_name: string
+  variant_name?: string | null
   unit_price: number
   quantity: number
   line_total: number
@@ -106,38 +151,64 @@ export interface Order {
   } | null
 }
 
-export interface CheckoutResult {
+export interface CheckoutOrderResult {
   orderId: string
   paymentId: string
   reference: string
   amount: number
+  merchant: { id: string; business_name: string; slug: string }
+}
+
+export interface CheckoutResult {
+  orders: CheckoutOrderResult[]
+  total: number
   currency: string
   provider: string
   instructions: string
+  orderId: string
+  paymentId: string
+  reference: string
+  amount: number
 }
 
 export interface ConfirmPaymentResult {
   status: 'SUCCESS' | 'FAILED'
   orderId?: string
+  orderIds?: string[]
   message: string
+}
+
+export interface ProductVariantInput {
+  name: string
+  price: number
+  stock_quantity?: number
+  sku?: string
 }
 
 export interface CreateProductInput {
   name: string
   description?: string
+  composition?: string
   price: number
   stock_quantity?: number
   image_url?: string
   status?: ProductStatus
+  allow_pickup?: boolean
+  allow_delivery?: boolean
+  variants?: ProductVariantInput[]
 }
 
 export interface UpdateProductInput {
   name?: string
   description?: string
+  composition?: string
   price?: number
   stock_quantity?: number
   image_url?: string
   status?: ProductStatus
+  allow_pickup?: boolean
+  allow_delivery?: boolean
+  variants?: ProductVariantInput[]
 }
 
 export interface CheckoutInput {
@@ -186,12 +257,33 @@ export function fetchFeaturedProducts() {
   return publicFetch<FeaturedProduct[]>('/marketplace/featured')
 }
 
-export function fetchMerchantProducts(merchantSlug: string) {
-  return publicFetch<MarketplaceProduct[]>(`/merchants/${merchantSlug}/products`)
+export function fetchMarketplaceProducts(params?: {
+  q?: string
+  merchant?: string
+  sort?: string
+  maxPrice?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params?.q) qs.set('q', params.q)
+  if (params?.merchant) qs.set('merchant', params.merchant)
+  if (params?.sort) qs.set('sort', params.sort)
+  if (params?.maxPrice != null) qs.set('maxPrice', String(params.maxPrice))
+  const query = qs.toString()
+  return publicFetch<MarketplaceCatalogProduct[]>(
+    `/marketplace/products${query ? `?${query}` : ''}`,
+  )
 }
 
-export function fetchProductDetail(merchantSlug: string, productSlug: string) {
-  return publicFetch<MarketplaceProduct>(`/merchants/${merchantSlug}/products/${productSlug}`)
+export function fetchMarketplaceMerchants(limit = 20) {
+  return publicFetch<MarketplaceBoutique[]>(`/marketplace/merchants?limit=${limit}`)
+}
+
+export function fetchMerchantProducts(shopSlug: string) {
+  return publicFetch<MarketplaceProduct[]>(`/shops/${shopSlug}/products`)
+}
+
+export function fetchProductDetail(shopSlug: string, productSlug: string) {
+  return publicFetch<MarketplaceProduct>(`/shops/${shopSlug}/products/${productSlug}`)
 }
 
 // ─── Cart (auth) ──────────────────────────────────────────────────────────────
@@ -204,10 +296,11 @@ export async function fetchCart(): Promise<Cart | null> {
 export async function addCartItem(
   productId: string,
   quantity: number,
+  variantId?: string,
 ): Promise<{ cart: Cart | null; error?: string }> {
   const res = await authApiFetch('/cart/items', {
     method: 'POST',
-    body: JSON.stringify({ productId, quantity }),
+    body: JSON.stringify({ productId, quantity, ...(variantId ? { variantId } : {}) }),
   })
   if (!res.ok) return { cart: null, error: await parseError(res) }
   const cart = await res.json() as Cart
@@ -215,10 +308,10 @@ export async function addCartItem(
 }
 
 export async function updateCartItemQuantity(
-  productId: string,
+  itemId: string,
   quantity: number,
 ): Promise<{ cart: Cart | null; error?: string }> {
-  const res = await authApiFetch(`/cart/items/${productId}`, {
+  const res = await authApiFetch(`/cart/items/${itemId}`, {
     method: 'PATCH',
     body: JSON.stringify({ quantity }),
   })
@@ -259,6 +352,19 @@ export async function confirmOrderPayment(
   return { result }
 }
 
+export async function confirmBatchOrderPayments(
+  paymentIds: string[],
+  simulateResult: 'success' | 'failure',
+): Promise<{ result: ConfirmPaymentResult | null; error?: string }> {
+  const res = await authApiFetch('/orders/pay/confirm-batch', {
+    method: 'POST',
+    body: JSON.stringify({ paymentIds, simulateResult }),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as ConfirmPaymentResult
+  return { result }
+}
+
 export async function fetchMyOrders(): Promise<Order[]> {
   const res = await authApiFetch('/orders/mine')
   const data = await parseJson<Order[]>(res)
@@ -271,13 +377,13 @@ export async function fetchOrder(orderId: string): Promise<Order | null> {
 }
 
 export async function fetchMerchantOrders(
-  merchantId: string | null | undefined,
+  shopId: string | null | undefined,
   status?: OrderStatus,
 ): Promise<Order[]> {
   const path = status
     ? `/orders/merchant/mine?status=${status}`
     : '/orders/merchant/mine'
-  const res = await merchantApiFetch(path, merchantId)
+  const res = await shopApiFetch(path, shopId)
   const data = await parseJson<Order[]>(res)
   return data ?? []
 }
@@ -285,9 +391,9 @@ export async function fetchMerchantOrders(
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  merchantId: string | null | undefined,
+  shopId: string | null | undefined,
 ): Promise<{ order: Order | null; error?: string }> {
-  const res = await merchantApiFetch(`/orders/${orderId}/status`, merchantId, {
+  const res = await shopApiFetch(`/orders/${orderId}/status`, shopId, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   })
@@ -298,17 +404,17 @@ export async function updateOrderStatus(
 
 // ─── Merchant products (auth) ─────────────────────────────────────────────────
 
-export async function fetchMyProducts(merchantId: string | null | undefined): Promise<MarketplaceProduct[]> {
-  const res = await merchantApiFetch('/products/mine', merchantId)
+export async function fetchMyProducts(shopId: string | null | undefined): Promise<MarketplaceProduct[]> {
+  const res = await shopApiFetch('/products/mine', shopId)
   const data = await parseJson<MarketplaceProduct[]>(res)
   return data ?? []
 }
 
 export async function createProduct(
   input: CreateProductInput,
-  merchantId: string | null | undefined,
+  shopId: string | null | undefined,
 ): Promise<{ product: MarketplaceProduct | null; error?: string }> {
-  const res = await merchantApiFetch('/products', merchantId, {
+  const res = await shopApiFetch('/products', shopId, {
     method: 'POST',
     body: JSON.stringify(input),
   })
@@ -320,9 +426,9 @@ export async function createProduct(
 export async function updateProduct(
   productId: string,
   input: UpdateProductInput,
-  merchantId: string | null | undefined,
+  shopId: string | null | undefined,
 ): Promise<{ product: MarketplaceProduct | null; error?: string }> {
-  const res = await merchantApiFetch(`/products/${productId}`, merchantId, {
+  const res = await shopApiFetch(`/products/${productId}`, shopId, {
     method: 'PATCH',
     body: JSON.stringify(input),
   })
@@ -333,9 +439,9 @@ export async function updateProduct(
 
 export async function deleteProduct(
   productId: string,
-  merchantId: string | null | undefined,
+  shopId: string | null | undefined,
 ): Promise<{ success: boolean; error?: string }> {
-  const res = await merchantApiFetch(`/products/${productId}`, merchantId, {
+  const res = await shopApiFetch(`/products/${productId}`, shopId, {
     method: 'DELETE',
   })
   if (!res.ok) return { success: false, error: await parseError(res) }

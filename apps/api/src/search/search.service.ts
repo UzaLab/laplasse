@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
+import { attachShopPreviewsToMerchants } from '../marketplace/shop-preview'
 
 export interface SearchFilters {
   q?: string
@@ -206,8 +207,13 @@ export class SearchService implements OnModuleInit {
       const regular   = result.hits.filter(h => !h['is_sponsored'] || h['verification_status'] !== 'VERIFIED')
       const sorted    = [...sponsored.slice(0, 3), ...regular]
 
+      const enriched = await attachShopPreviewsToMerchants(
+        this.prisma,
+        sorted as Array<{ id: string } & Record<string, unknown>>,
+      )
+
       return {
-        data: sorted,
+        data: enriched,
         meta: {
           total: result.estimatedTotalHits ?? result.hits.length,
           query: q,
@@ -256,8 +262,28 @@ export class SearchService implements OnModuleInit {
       skip: offset,
     })
 
+    const formatted = merchants.map(m => ({
+      id: m.id,
+      business_name: m.business_name,
+      slug: m.slug,
+      description: m.description,
+      cover_image: m.cover_image,
+      whatsapp: m.whatsapp,
+      verification_status: m.verification_status,
+      trust_score: m.trust_score,
+      is_sponsored: m.is_sponsored,
+      category: m.category,
+      category_name: m.category.name,
+      category_slug: m.category.slug,
+      category_icon: m.category.icon,
+      location: m.location,
+      city: m.location?.city ?? null,
+      district: m.location?.district ?? null,
+      review_count: m._count.reviews,
+    }))
+
     return {
-      data: merchants,
+      data: await attachShopPreviewsToMerchants(this.prisma, formatted),
       meta: { total: merchants.length, query: q ?? '', limit, offset, processing_time_ms: 0 },
     }
   }

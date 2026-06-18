@@ -21,8 +21,7 @@ function toSpotMerchant(m: ApiMerchant) {
       icon: m.category.icon ?? 'UtensilsCrossed',
     },
     sub_category: m.category.name,
-    has_reservation: false, // activé plus tard avec module booking
-    has_marketplace: false, // activé plus tard avec module marketplace
+    has_reservation: false,
   }
 }
 

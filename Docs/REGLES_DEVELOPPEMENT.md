@@ -3,7 +3,7 @@
 > Synthèse opérationnelle extraite de `Implementation Blueprint.md`, `cibooks_master_report.md` et Tomes 0–24.
 > Document de référence pour toute contribution au code.
 
-**Version :** 1.8 — Juin 2026 (Booking vertical + P1 ops)
+**Version :** 1.9 — Juin 2026 (Marketplace V1.5 clôturée)
 
 ---
 
@@ -578,18 +578,52 @@ Architecture unifiée (Tome 03 §10) : `BookingType` par catégorie marchand.
 | Fraude basique | `GET /admin/fraud`, spam booking/reviews |
 | searchBoost | Jusqu'à 3 slots sponsorisés en recherche |
 
-### Marketplace — quand la mettre en place ?
+### Marketplace — V1.5 LIVRÉE (juin 2026)
 
-Prévue dans les Tomes (Tome 11 §18.4, Sprint 5) : produits, panier, checkout, commandes.
+Slice ecommerce **boutiques uniquement** (`category_slug = boutiques`). Mobile Money **réel exclu** — simulateur uniquement.
+
+| Feature | Statut | Notes |
+|---------|--------|-------|
+| Modèles Prisma `Product`, `ProductVariant`, `Cart`, `Order` | ✅ | Migration `20260608000000` + `20260609000000` |
+| CRUD produits marchand (`/merchant/products`) | ✅ | Variantes optionnelles à la création/édition |
+| Catalogue public + fiche produit + boutique | ✅ | Maquettes `marketplace.md`, `fiche_produit.md`, `boutique.md` |
+| Panier multi-boutiques | ✅ | Articles de N marchands dans un seul panier |
+| Variantes produit (taille, format…) | ✅ | Sélecteur fiche produit + ligne panier |
+| Checkout + commandes split par marchand | ✅ | 1 commande + 1 paiement simulateur par boutique |
+| Paiement commandes (simulateur) | ✅ | `POST /orders/checkout` → `POST /orders/pay/confirm` ou `confirm-batch` |
+| Mobile Money réel (Wave/Orange/MTN) | ❌ | **Volontairement hors scope V1.5** → V2+ |
+| Pages client panier + checkout | ✅ | Maquette `cart.md` |
+| Commandes client + marchand | ✅ | `/profile/orders`, `/merchant/orders` |
+| Seed démo boutiques | ✅ | `POST /api/admin/seed-marketplace` |
+
+#### Routes API Marketplace (extrait)
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `GET` | `/marketplace/products` | Catalogue global |
+| `GET` | `/merchants/:slug/products/:productSlug` | Fiche produit (+ variantes) |
+| `POST` | `/cart/items` | `{ productId, variantId?, quantity }` — multi-boutiques OK |
+| `PATCH` | `/cart/items/:itemId` | Mise à jour quantité par ligne |
+| `POST` | `/orders/checkout` | Crée N commandes (1 par marchand) + paiements PENDING |
+| `POST` | `/orders/pay/confirm` | Simulateur : success \| failure (1 paiement) |
+| `POST` | `/orders/pay/confirm-batch` | Simulateur batch (panier multi-boutiques) |
+
+#### Simulateur paiement commandes
+
+1. `POST /orders/checkout` — crée les commandes PENDING + `PaymentTransaction` ORDER par marchand
+2. `POST /orders/pay/confirm-batch` — `{ paymentIds[], simulateResult: success|failure }`
+3. Succès → commande CONFIRMED, décrément stock (produit ou variante), retrait lignes panier, notification marchand
+
+> **Abonnements SaaS** : simulateur séparé via `POST /payments/subscribe/*` (inchangé).
+
+### Marketplace — historique roadmap
 
 | Phase | Statut |
 |-------|--------|
 | V0.5 MVP discovery | ✅ Livré sans marketplace |
-| V1.0 booking + monétisation SaaS | ✅ En cours |
-| **V1.5 — Marketplace transactions** | ❌ **Prochaine grosse slice** |
-| V2.0 Merchant OS + app native | Futur |
-
-Recommandation : lancer la marketplace **après** stabilisation du booking vertical et densité marchands Abidjan — slice `Product` + `Order` + checkout simulé, ciblant d'abord **boutiques** (pas restaurants).
+| V1.0 booking + monétisation SaaS | ✅ Livré |
+| **V1.5 — Marketplace transactions** | ✅ **Livré** (simulateur, sans MM réel) |
+| V2.0 Merchant OS + app native + MM réel | Futur |
 
 ### Simulateur de paiement (V1)
 
@@ -690,10 +724,19 @@ Multi-établissements marchand + unification icônes Lucide + navigation mobile 
 | CRM avancé (bookings/favoris) | ✅ |
 | Audit log + fraude basique | ✅ |
 | Push FCM (si FCM_SERVER_KEY) | ✅ |
-| Marketplace ecommerce | ❌ → V1.5 |
+| Marketplace ecommerce | ✅ → V1.5 |
 | Push notifications BullMQ (push simulé → channel `push`) | ✅ |
 | Expansion géographique (Yopougon, Marcory, Plateau dans seed) | ✅ |
 | Domaine `laplasse.ci` | ❌ (infra) |
+
+### V1.5 — LIVRÉE (juin 2026)
+
+| Feature clé | Statut |
+|-------------|--------|
+| Marketplace boutiques (produits, variantes, panier multi-marchands) | ✅ |
+| Checkout simulé + commandes split par boutique | ✅ |
+| UI maquettes marketplace / panier / fiche produit / boutique | ✅ |
+| Mobile Money réel | ❌ → V2+ |
 
 ---
 

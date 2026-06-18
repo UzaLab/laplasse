@@ -53,25 +53,26 @@ export function MerchantProductsSection({ merchantSlug, merchantName }: Merchant
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-        {products.slice(0, 6).map(product => (
+        {products.slice(0, 6).map((product, index) => (
           <ProductCard
             key={product.id}
             product={product}
             merchantSlug={merchantSlug}
             merchantName={merchantName}
-            compact
+            variant="boutique"
+            showBestSeller={index === 0}
           />
         ))}
       </div>
 
-      {products.length > 6 && (
+      {products.length > 0 && (
         <div className="mt-6 text-center">
           <Link
-            href={`/m/${merchantSlug}#boutique`}
-            className="inline-flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-700 transition-colors"
+            href={`/m/${merchantSlug}/boutique`}
+            className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors"
             style={{ textDecoration: 'none' }}
           >
-            Voir tous les produits
+            Voir la boutique complète
           </Link>
         </div>
       )}

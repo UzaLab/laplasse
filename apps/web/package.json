@@ -10,6 +10,9 @@
   "dependencies": {
     "@sentry/nextjs": "^10.56.0",
     "@tanstack/react-query": "^5.101.0",
+    "@tiptap/pm": "^3.27.0",
+    "@tiptap/react": "^3.27.0",
+    "@tiptap/starter-kit": "^3.27.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
@@ -17,6 +20,7 @@
     "posthog-node": "^5.36.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.14"
   },

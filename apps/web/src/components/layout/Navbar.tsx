@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2, Heart } from 'lucide-react'
+import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2, Heart, ShoppingBag } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useCartStore, useCartItemCount } from '@/stores/cartStore'
 import { MobileNav } from './MobileNav'
+import { CartDrawer } from './CartDrawer'
+import { CartSync } from './CartSync'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -15,6 +18,8 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const { user, isAuthenticated, logoutRemote } = useAuthStore()
+  const openDrawer = useCartStore(s => s.openDrawer)
+  const itemCount = useCartItemCount()
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20)
@@ -38,7 +43,13 @@ export function Navbar() {
     router.push('/')
   }
 
+  const handleCartClick = () => {
+    openDrawer()
+  }
+
   return (
+    <>
+      <CartSync />
     <nav
       className={cn(
         'fixed top-0 left-0 right-0 z-50 glass-panel border-b border-slate-200/50 transition-all duration-300',
@@ -59,6 +70,9 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-8 font-semibold text-sm text-slate-500">
           <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
             Découvrir
+          </Link>
+          <Link href="/marketplace" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
+            Marketplace
           </Link>
           <Link href="/search" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
             Recherche
@@ -81,6 +95,20 @@ export function Navbar() {
           >
             <Search size={20} />
           </Link>
+
+          <button
+            type="button"
+            onClick={handleCartClick}
+            className="relative text-slate-600 hover:text-brand-600 transition-colors p-1"
+            aria-label="Ouvrir le panier"
+          >
+            <ShoppingBag size={20} />
+            {itemCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                {itemCount > 9 ? '9+' : itemCount}
+              </span>
+            )}
+          </button>
 
           <div className="w-px h-6 bg-slate-200 hidden md:block" />
 
@@ -173,6 +201,7 @@ export function Navbar() {
           </button>
         </div>
       </div>
+    </nav>
 
       <MobileNav
         open={mobileOpen}
@@ -180,7 +209,11 @@ export function Navbar() {
         isAuthenticated={isAuthenticated}
         user={user}
         onLogout={handleLogout}
+        cartCount={itemCount}
+        onCartClick={handleCartClick}
       />
-    </nav>
+
+      <CartDrawer />
+    </>
   )
 }

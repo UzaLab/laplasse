@@ -16,6 +16,7 @@ export interface PlanLimits {
   adsSelfService: boolean
   staffManagement: boolean
   maxProducts: number
+  maxShops: number
   marketplace: boolean
 }
 
@@ -41,6 +42,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     adsSelfService: false,
     staffManagement: false,
     maxProducts: 5,
+    maxShops: 1,
     marketplace: true,
   },
   STARTER: {
@@ -57,6 +59,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     adsSelfService: false,
     staffManagement: false,
     maxProducts: 25,
+    maxShops: 1,
     marketplace: true,
   },
   GROWTH: {
@@ -73,6 +76,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     adsSelfService: true,
     staffManagement: true,
     maxProducts: -1,
+    maxShops: 3,
     marketplace: true,
   },
   PREMIUM: {
@@ -89,6 +93,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
     adsSelfService: true,
     staffManagement: true,
     maxProducts: -1,
+    maxShops: -1,
     marketplace: true,
   },
 }

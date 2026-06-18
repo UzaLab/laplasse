@@ -79,6 +79,9 @@ export class PaymentsService {
     if (payment.status !== 'PENDING') {
       throw new BadRequestException('Ce paiement a déjà été traité')
     }
+    if (!payment.merchant_id) {
+      throw new BadRequestException('Paiement abonnement invalide')
+    }
 
     if (simulateResult === 'failure') {
       const failed = await this.prisma.paymentTransaction.update({

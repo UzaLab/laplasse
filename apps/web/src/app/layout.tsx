@@ -3,6 +3,7 @@ import { Outfit } from 'next/font/google'
 import { QueryProvider } from '@/providers/QueryProvider'
 import { PostHogProvider } from '@/providers/PostHogProvider'
 import { AuthBootstrap } from '@/components/AuthBootstrap'
+import { AppToaster } from '@/components/ui/AppToaster'
 import './globals.css'
 
 const outfit = Outfit({
@@ -55,6 +56,7 @@ export default function RootLayout({
         <PostHogProvider>
           <QueryProvider>
             <AuthBootstrap />
+            <AppToaster />
             {children}
           </QueryProvider>
         </PostHogProvider>

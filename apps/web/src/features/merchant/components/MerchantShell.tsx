@@ -24,13 +24,15 @@ interface MerchantShellProps {
 export function MerchantShell({ children, merchantSlug, merchantName }: MerchantShellProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logoutRemote, activeMerchantId, setActiveMerchant, updateUser } = useAuthStore()
+  const { user, logoutRemote, activeMerchantId, activeShopId, setActiveMerchant, setActiveShop, updateUser } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
 
   const merchants = user?.merchants ?? []
+  const shops = user?.shops ?? []
   const organization = user?.organization
   const activeMerchant = merchants.find(m => m.id === activeMerchantId) ?? merchants[0] ?? null
+  const activeShop = shops.find(s => s.id === activeShopId) ?? shops[0] ?? null
   const orgMerchants = organization
     ? merchants.filter(m => m.organization_id === organization.id)
     : []
@@ -44,12 +46,14 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     Promise.all([
       merchantApiFetch('/merchants/my/all'),
       authApiFetch('/auth/me'),
+      authApiFetch('/shops/mine'),
     ])
-      .then(async ([merchantsRes, meRes]) => {
+      .then(async ([merchantsRes, meRes, shopsRes]) => {
         if (merchantsRes.ok) {
           const list = await merchantsRes.json() as Array<{
             id: string; business_name: string; slug: string;
             verification_status: string; subscription_plan?: string; organization_id?: string | null
+            category?: { slug: string }
           }>
           if (list.length) {
             updateUser({
@@ -60,11 +64,32 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
                 verification_status: m.verification_status,
                 subscription_plan: m.subscription_plan,
                 organization_id: m.organization_id,
+                category_slug: m.category?.slug,
               })),
             })
             const currentValid = list.some(m => m.id === activeMerchantId)
             if (!activeMerchantId || !currentValid) {
               setActiveMerchant(list[0].id)
+            }
+          }
+        }
+        if (shopsRes.ok) {
+          const shopList = await shopsRes.json() as Array<{
+            id: string; name: string; slug: string; status: string; merchant_id?: string | null
+          }>
+          if (shopList.length) {
+            updateUser({
+              shops: shopList.map(s => ({
+                id: s.id,
+                name: s.name,
+                slug: s.slug,
+                status: s.status as 'DRAFT' | 'ACTIVE' | 'SUSPENDED',
+                merchant_id: s.merchant_id,
+              })),
+            })
+            const shopValid = shopList.some(s => s.id === activeShopId)
+            if (!activeShopId || !shopValid) {
+              setActiveShop(shopList[0].id)
             }
           }
         }
@@ -87,21 +112,24 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
 
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 
-  const marketplaceNav: NavItem[] = [
-    { href: '/merchant/products', label: 'Produits',   icon: <Package size={17} /> },
-    { href: '/merchant/orders',   label: 'Commandes',  icon: <ShoppingBag size={17} /> },
-  ]
-
-  const mainNav: NavItem[] = [
-    { href: '/merchant/dashboard',    label: "Vue d'ensemble",   icon: <LayoutDashboard size={17} /> },
-    { href: '/merchant/analytics',    label: 'Statistiques',     icon: <TrendingUp size={17} /> },
-    { href: '/merchant/crm',          label: 'Clients CRM',      icon: <Users size={17} /> },
-    { href: '/merchant/bookings',     label: 'Réservations',     icon: <Calendar size={17} /> },
-    ...marketplaceNav,
-  ]
-
   const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)
   const canOfferings = PLAN_LIMITS[activeMerchantPlan]?.offeringsManagement ?? false
+  const hasShop = shops.length > 0
+
+  const marketplaceNav: NavItem[] = hasShop
+    ? [
+        { href: '/merchant/products', label: 'Produits', icon: <Package size={17} /> },
+        { href: '/merchant/orders', label: 'Commandes boutique', icon: <ShoppingBag size={17} /> },
+      ]
+    : []
+
+  const mainNav: NavItem[] = [
+    { href: '/merchant/dashboard', label: "Vue d'ensemble", icon: <LayoutDashboard size={17} /> },
+    { href: '/merchant/analytics', label: 'Statistiques', icon: <TrendingUp size={17} /> },
+    { href: '/merchant/crm', label: 'Clients CRM', icon: <Users size={17} /> },
+    { href: '/merchant/bookings', label: 'Réservations', icon: <Calendar size={17} /> },
+    ...marketplaceNav,
+  ]
 
   const editNav: NavItem[] = [
     { href: '/merchant/profile/edit', label: 'Modifier le profil', icon: <Edit size={17} /> },
@@ -284,6 +312,46 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
               + Ajouter un établissement
             </Link>
           </div>
+        )}
+      </div>
+
+      {/* Boutique switcher */}
+      <div className="mx-3 mt-3">
+        {shops.length > 0 ? (
+          <div className="px-3 py-3 bg-brand-50 border border-brand-100 rounded-2xl">
+            <p className="text-xs text-brand-600 font-bold uppercase tracking-wider mb-0.5">Boutique en ligne</p>
+            {shops.length === 1 ? (
+              <p className="text-sm font-extrabold text-slate-900 truncate">{activeShop?.name ?? shops[0].name}</p>
+            ) : (
+              <select
+                value={activeShopId ?? ''}
+                onChange={e => setActiveShop(e.target.value)}
+                className="w-full mt-1 text-sm font-bold bg-white border border-brand-100 rounded-lg px-2 py-1.5"
+              >
+                {shops.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            )}
+            {activeShop?.slug && (
+              <Link
+                href={`/boutique/${activeShop.slug}`}
+                target="_blank"
+                className="inline-flex items-center gap-1 text-[10px] text-brand-600 hover:text-brand-700 font-bold mt-1 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                Voir la boutique <ExternalLink size={9} />
+              </Link>
+            )}
+          </div>
+        ) : (
+          <Link
+            href="/shop/create"
+            className="flex items-center gap-2 px-3 py-3 bg-brand-50 border border-brand-100 border-dashed rounded-2xl text-sm font-bold text-brand-700 hover:bg-brand-100/80 transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            <ShoppingBag size={16} /> Créer ma boutique
+          </Link>
         )}
       </div>
 

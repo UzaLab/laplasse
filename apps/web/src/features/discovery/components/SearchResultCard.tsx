@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { BadgeCheck, MapPin, MessageCircle, Star, Store } from 'lucide-react'
+import { BadgeCheck, MapPin, Star } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from './FavoriteButton'
 import { CategoryIcon } from '@/lib/icons'
+import { ShopPreviewSnippet } from './ShopPreviewSnippet'
+import { WhatsAppLink } from './WhatsAppLink'
 
 // Les résultats Meilisearch sont plats — on normalise les deux formats ici
 interface MeiliFlat {
@@ -26,6 +28,8 @@ export type SearchHit = Partial<ApiMerchant> & MeiliFlat & {
   cover_image?: string | null
   whatsapp?: string | null
   tags?: string[]
+  has_marketplace?: boolean
+  featured_product?: ApiMerchant['featured_product']
 }
 
 function getCategoryName(m: SearchHit): string {
@@ -123,9 +127,12 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
         {(m.tags?.length ?? 0) > 0 || m.whatsapp ? (
           <div className="flex items-center gap-1.5 flex-wrap mb-3">
             {m.whatsapp && (
-              <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <MessageCircle size={10} /> WhatsApp
-              </span>
+              <WhatsAppLink
+                phone={m.whatsapp}
+                merchantId={m.id}
+                iconSize={10}
+                className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-emerald-100 transition-colors"
+              />
             )}
             {m.trust_score >= 80 && (
               <span className="text-[10px] font-bold bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full">
@@ -140,14 +147,13 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
           </div>
         ) : null}
 
-        {/* "En vitrine" placeholder — activé quand marketplace disponible */}
-        <div className="mt-auto bg-slate-50 p-2.5 rounded-xl border border-slate-100 group-hover:border-brand-200 transition-colors mb-3">
-          <div className="flex items-center gap-1 mb-1">
-            <Store size={11} className="text-slate-500" />
-            <span className="text-[9px] font-bold text-slate-400 uppercase">En vitrine</span>
-          </div>
-          <p className="text-xs text-slate-400 italic">Marketplace bientôt disponible</p>
-        </div>
+        {m.has_marketplace && m.featured_product ? (
+          <ShopPreviewSnippet
+            product={m.featured_product}
+            merchantSlug={m.slug}
+            className="mt-auto mb-3"
+          />
+        ) : null}
 
         {/* CTA */}
         <Link

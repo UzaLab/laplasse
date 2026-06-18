@@ -260,11 +260,12 @@ async function main() {
   for (const group of boutiqueProducts) {
     const mId = merchantMap[group.merchantSlug]
     if (!mId) continue
+    const shopId = `shop_${mId}`
     for (const p of group.products) {
       await prisma.product.upsert({
-        where: { merchant_id_slug: { merchant_id: mId, slug: p.slug } },
+        where: { shop_id_slug: { shop_id: shopId, slug: p.slug } },
         update: { name: p.name, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
-        create: { merchant_id: mId, name: p.name, slug: p.slug, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
+        create: { shop_id: shopId, name: p.name, slug: p.slug, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
       })
       productCount++
     }

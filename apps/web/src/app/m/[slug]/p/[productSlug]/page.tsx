@@ -3,28 +3,75 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, Minus, Plus, ShoppingCart } from 'lucide-react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Heart,
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Sparkles,
+  Star,
+  Store,
+  Truck,
+} from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { useAuthReady } from '@/hooks/useAuthReady'
+import { useCartStore } from '@/stores/cartStore'
+import { api, type ApiMerchantDetail } from '@/lib/api'
+import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
-  addCartItem,
+  fetchMerchantProducts,
   fetchProductDetail,
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
   type MarketplaceProduct,
+  type ProductVariant,
 } from '@/lib/marketplaceApi'
+import { ProductCard } from '@/features/marketplace/components/ProductCard'
+import { ProductHtmlContent } from '@/components/ui/ProductHtmlContent'
+import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
+import { notify } from '@/lib/notify'
+
+type TabId = 'description' | 'composition' | 'reviews'
+
+function StarRating({ rating }: { rating: number }) {
+  const full = Math.floor(rating)
+  const hasHalf = rating - full >= 0.5
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => {
+        if (i < full) {
+          return <Star key={i} size={16} className="fill-brand-400 text-brand-400" />
+        }
+        if (i === full && hasHalf) {
+          return <Star key={i} size={16} className="fill-brand-400/50 text-brand-400" />
+        }
+        return <Star key={i} size={16} className="text-slate-200" />
+      })}
+    </div>
+  )
+}
 
 export default function ProductDetailPage() {
   const params = useParams<{ slug: string; productSlug: string }>()
   const router = useRouter()
-  const { ready, isAuthenticated } = useAuthReady()
+  const { isAuthenticated } = useAuthReady()
+  const addItem = useCartStore(s => s.addItem)
   const [product, setProduct] = useState<MarketplaceProduct | null>(null)
+  const [merchantDetail, setMerchantDetail] = useState<ApiMerchantDetail | null>(null)
+  const [relatedProducts, setRelatedProducts] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [adding, setAdding] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [buyingNow, setBuyingNow] = useState(false)
+  const [addingRelatedId, setAddingRelatedId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<TabId>('description')
+  const [selectedImage, setSelectedImage] = useState('')
 
   const slug = params.slug
   const productSlug = params.productSlug
@@ -33,39 +80,82 @@ export default function ProductDetailPage() {
     if (!slug || !productSlug) return
     let cancelled = false
     setLoading(true)
-    fetchProductDetail(slug, productSlug)
-      .then(data => {
-        if (!cancelled) setProduct(data)
+
+    Promise.all([
+      fetchProductDetail(slug, productSlug),
+      api.merchants.bySlug(slug).catch(() => null),
+      fetchMerchantProducts(slug).catch(() => [] as MarketplaceProduct[]),
+    ])
+      .then(([productData, merchantData, allProducts]) => {
+        if (cancelled) return
+        if (productData) {
+          setProduct(productData)
+          setSelectedImage(productData.image_url || PLACEHOLDER_PRODUCT_IMAGE)
+          const firstVariant = productData.variants?.find(v => v.stock_quantity > 0)
+          setSelectedVariantId(firstVariant?.id ?? productData.variants?.[0]?.id ?? null)
+        }
+        setMerchantDetail(merchantData)
+        setRelatedProducts(
+          (allProducts ?? []).filter(p => p.slug !== productSlug).slice(0, 4),
+        )
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
+
     return () => { cancelled = true }
   }, [slug, productSlug])
 
-  const handleAddToCart = async () => {
+  const addToCart = async (redirectToCheckout = false) => {
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}/p/${productSlug}`)}`)
+      return false
+    }
+    if (!product) return false
+
+    const variants = product.variants ?? []
+    const variant = variants.find(v => v.id === selectedVariantId) ?? null
+    if (variants.length > 0 && !variant) {
+      notify.error('Sélectionnez une variante')
+      setAdding(false)
+      setBuyingNow(false)
+      return false
+    }
+
+    if (redirectToCheckout) setBuyingNow(true)
+    else setAdding(true)
+
+    const { error: err } = await addItem(product.id, quantity, {
+      variantId: variant?.id,
+      openDrawer: !redirectToCheckout,
+    })
+    if (err) {
+      setAdding(false)
+      setBuyingNow(false)
+      return false
+    }
+
+    if (redirectToCheckout) {
+      router.push('/checkout')
+    }
+    setAdding(false)
+    setBuyingNow(false)
+    return true
+  }
+
+  const handleRelatedAdd = async (related: MarketplaceProduct) => {
     if (!isAuthenticated) {
       router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}/p/${productSlug}`)}`)
       return
     }
-
-    if (!product) return
-    setAdding(true)
-    setError('')
-    setSuccess(false)
-
-    const { error: err } = await addCartItem(product.id, quantity)
-    if (err) {
-      setError(err)
-    } else {
-      setSuccess(true)
-    }
-    setAdding(false)
+    setAddingRelatedId(related.id)
+    await addItem(related.id, 1)
+    setAddingRelatedId(null)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />
       </div>
     )
@@ -75,9 +165,9 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA]">
         <Navbar />
-        <main className="max-w-3xl mx-auto px-6 pt-28 pb-16 text-center">
+        <main className={`${PAGE_CONTAINER} pt-28 pb-16 text-center`}>
           <p className="text-slate-500 mb-4">Produit introuvable.</p>
-          <Link href={`/m/${slug}`} className="text-amber-600 font-bold" style={{ textDecoration: 'none' }}>
+          <Link href={`/m/${slug}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
             Retour à la fiche
           </Link>
         </main>
@@ -87,117 +177,447 @@ export default function ProductDetailPage() {
   }
 
   const merchant = product.merchant
-  const outOfStock = product.stock_quantity <= 0 || product.status === 'OUT_OF_STOCK'
-  const image = product.image_url || PLACEHOLDER_PRODUCT_IMAGE
+  const variants = product.variants ?? []
+  const hasVariants = variants.length > 0
+  const selectedVariant: ProductVariant | null =
+    variants.find(v => v.id === selectedVariantId) ?? null
+  const displayPrice = selectedVariant?.price ?? product.price
+  const displayStock = selectedVariant?.stock_quantity ?? product.stock_quantity
+  const outOfStock = displayStock <= 0 || product.status === 'OUT_OF_STOCK'
+  const allowPickup = product.allow_pickup !== false
+  const allowDelivery = product.allow_delivery !== false
+  const shortDescription = product.description
+    ? stripHtml(product.description).slice(0, 220)
+    : ''
+  const image = selectedImage || product.image_url || PLACEHOLDER_PRODUCT_IMAGE
+  const categoryName = merchant?.category?.name ?? merchantDetail?.category.name ?? 'Marketplace'
+  const categorySlug = merchant?.category?.slug ?? merchantDetail?.category.slug
+  const merchantLogo = merchantDetail?.logo
+  const avgRating = merchantDetail?.avg_rating
+  const reviewCount = merchantDetail?.review_count ?? 0
+  const locationLabel = merchantDetail?.location
+    ? [merchantDetail.location.district, merchantDetail.location.city].filter(Boolean).join(', ')
+    : ''
+
+  const thumbnails = [product.image_url || PLACEHOLDER_PRODUCT_IMAGE]
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
 
-      <main className="max-w-5xl mx-auto px-6 pt-28 pb-16">
-        <Link
-          href={`/m/${slug}`}
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 mb-8 transition-colors"
-          style={{ textDecoration: 'none' }}
-        >
-          <ArrowLeft size={16} />
-          {merchant?.business_name ?? 'Retour'}
-        </Link>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <div className="aspect-square bg-slate-100 rounded-3xl overflow-hidden border border-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image} alt={product.name} className="w-full h-full object-cover" />
-          </div>
-
-          <div>
-            {merchant && (
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-2">
-                {merchant.business_name}
-              </p>
-            )}
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-3">{product.name}</h1>
-            <p className="text-2xl font-extrabold text-amber-600 mb-6">
-              {formatPrice(product.price, product.currency)}
-            </p>
-
-            {product.description && (
-              <p className="text-slate-600 leading-relaxed mb-6">{product.description}</p>
-            )}
-
-            <p className="text-sm text-slate-400 mb-6">
-              {outOfStock ? (
-                <span className="text-red-500 font-semibold">Rupture de stock</span>
-              ) : (
-                <span>{product.stock_quantity} en stock</span>
-              )}
-            </p>
-
-            {!outOfStock && (
-              <div className="flex items-center gap-4 mb-6">
-                <span className="text-sm font-bold text-slate-700">Quantité</span>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                    className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span className="font-bold text-slate-900 w-8 text-center">{quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(q => Math.min(product.stock_quantity, q + 1))}
-                    className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
-                {error}
-              </p>
-            )}
-
-            {success && (
-              <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-4">
-                Ajouté au panier !{' '}
-                <Link href="/cart" className="font-bold underline" style={{ textDecoration: 'none' }}>
-                  Voir le panier
-                </Link>
-              </p>
-            )}
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={outOfStock || adding}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50"
-              >
-                {adding ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <ShoppingCart size={18} />
-                )}
-                {outOfStock ? 'Indisponible' : adding ? 'Ajout…' : 'Ajouter au panier'}
-              </button>
-              {ready && isAuthenticated && (
+      {/* Fil d'Ariane */}
+      <div className="pt-28 pb-4 bg-white">
+        <div className={PAGE_CONTAINER}>
+          <nav className="flex items-center gap-2 text-sm font-medium text-slate-500 flex-wrap">
+            <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
+              Accueil
+            </Link>
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+            <Link href="/marketplace" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
+              Marketplace
+            </Link>
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+            {slug && (
+              <>
                 <Link
-                  href="/cart"
-                  className="inline-flex items-center justify-center gap-2 border border-slate-200 text-slate-700 font-bold py-3.5 px-6 rounded-xl hover:bg-slate-50 transition-colors text-sm"
+                  href={`/m/${slug}/boutique`}
+                  className="hover:text-slate-900 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
-                  Panier
+                  {categoryName}
                 </Link>
+                <ChevronRight size={16} className="text-slate-300 shrink-0" />
+              </>
+            )}
+            <span className="text-slate-900 font-bold truncate">{product.name}</span>
+          </nav>
+        </div>
+      </div>
+
+      {/* Section produit principale */}
+      <main className="bg-white pb-16">
+        <div className={PAGE_CONTAINER}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+            {/* Galerie */}
+            <div className="lg:col-span-7">
+              <div className="aspect-[4/3] w-full bg-slate-50 rounded-[32px] overflow-hidden relative border border-slate-100 group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image}
+                  alt={product.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+                {!outOfStock && (
+                  <div className="absolute top-4 left-4 flex flex-col gap-2">
+                    <span className="bg-white/90 backdrop-blur-sm text-brand-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+                      <Sparkles size={12} /> Best-Seller
+                    </span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-white transition-all shadow-sm"
+                  aria-label="Favoris"
+                >
+                  <Heart size={24} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 mt-4">
+                {thumbnails.map((thumb, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setSelectedImage(thumb)}
+                    className={`aspect-square rounded-2xl overflow-hidden relative transition-colors ${
+                      selectedImage === thumb
+                        ? 'border-2 border-slate-900'
+                        : 'border border-slate-200 hover:border-brand-300 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={thumb} className="w-full h-full object-cover" alt="" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Infos produit */}
+            <div className="lg:col-span-5 flex flex-col h-full">
+              {merchant && (
+                <Link
+                  href={`/m/${slug}`}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-brand-600 transition-colors mb-4 w-max"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <div className="w-6 h-6 rounded-md bg-slate-100 overflow-hidden shrink-0">
+                    {merchantLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={merchantLogo} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Store size={14} className="text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                  {merchant.business_name}
+                  <ChevronRight size={16} />
+                </Link>
+              )}
+
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
+                {product.name}
+              </h1>
+
+              <div className="flex items-center gap-4 mb-6 flex-wrap">
+                {avgRating != null && reviewCount > 0 && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <StarRating rating={avgRating} />
+                      <span className="text-sm font-bold text-slate-900 ml-1">{avgRating}</span>
+                      <Link
+                        href={`/m/${slug}#avis`}
+                        className="text-sm text-slate-400 underline ml-1 hover:text-slate-600"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        ({reviewCount} avis)
+                      </Link>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-slate-300" />
+                  </>
+                )}
+                <span
+                  className={`text-sm font-bold flex items-center gap-1 ${
+                    outOfStock ? 'text-red-500' : 'text-green-600'
+                  }`}
+                >
+                  <CheckCircle2 size={16} />
+                  {outOfStock ? 'Rupture de stock' : `En stock (${displayStock})`}
+                </span>
+              </div>
+
+              <div className="mb-8">
+                <div className="flex items-end gap-3">
+                  <span className="text-4xl font-extrabold text-brand-600">
+                    {formatPrice(displayPrice, product.currency)}
+                  </span>
+                  {hasVariants && !selectedVariant && (
+                    <span className="text-sm text-slate-500">à partir de</span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Taxes incluses. Frais de livraison calculés à l&apos;étape suivante.
+                </p>
+              </div>
+
+              {hasHtmlContent(product.description) && (
+                <p className="text-slate-600 leading-relaxed text-base mb-8 line-clamp-3">
+                  {shortDescription}
+                  {(product.description && stripHtml(product.description).length > 220) ? '…' : ''}
+                </p>
+              )}
+
+              <div className="h-px w-full bg-slate-100 mb-8" />
+
+              {!outOfStock && (
+                <div className="space-y-6">
+                  {hasVariants && (
+                    <div>
+                      <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
+                        Variante
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {variants.map(variant => {
+                          const variantOut = variant.stock_quantity <= 0
+                          return (
+                            <button
+                              key={variant.id}
+                              type="button"
+                              disabled={variantOut}
+                              onClick={() => {
+                                setSelectedVariantId(variant.id)
+                                setQuantity(1)
+                              }}
+                              className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                                selectedVariantId === variant.id
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : variantOut
+                                    ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'
+                              }`}
+                            >
+                              {variant.name}
+                              <span className="block text-[10px] font-medium opacity-80 mt-0.5">
+                                {formatPrice(variant.price, product.currency)}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
+                      Quantité
+                    </label>
+                    <div className="inline-flex items-center p-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="w-12 text-center font-bold text-slate-900">{quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => Math.min(displayStock, q + 1))}
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => addToCart(false)}
+                      disabled={adding || buyingNow}
+                      className="flex-1 bg-slate-900 text-white h-14 rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 group disabled:opacity-50"
+                    >
+                      {adding ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <ShoppingBag size={20} className="group-hover:-translate-y-0.5 transition-transform" />
+                      )}
+                      {adding ? 'Ajout…' : 'Ajouter au panier'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addToCart(true)}
+                      disabled={adding || buyingNow}
+                      className="flex-1 bg-brand-50 border-2 border-brand-200 text-brand-700 h-14 rounded-2xl font-bold hover:bg-brand-100 hover:border-brand-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {buyingNow && <Loader2 size={20} className="animate-spin" />}
+                      Acheter maintenant
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(allowPickup || allowDelivery) && (
+                <div className={`grid grid-cols-1 gap-4 mt-8 ${allowPickup && allowDelivery ? 'sm:grid-cols-2' : ''}`}>
+                  {allowDelivery && (
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-700 shrink-0 shadow-sm">
+                        <Truck size={16} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">Livraison</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {locationLabel
+                            ? `Disponible à ${merchantDetail?.location?.city ?? 'Abidjan'}.`
+                            : 'Livraison disponible à la commande.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {allowPickup && (
+                    <div className="bg-brand-50 p-4 rounded-2xl border border-brand-100 flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-brand-600 shrink-0 shadow-sm">
+                        <Store size={16} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">Click & Collect</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Retrait gratuit chez {merchant?.business_name ?? 'le vendeur'}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
         </div>
       </main>
+
+      {/* Onglets description */}
+      <section className="border-t border-slate-100 bg-[#FAFAFA] py-16">
+        <div className={PAGE_CONTAINER}>
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center justify-center gap-4 sm:gap-8 border-b border-slate-200 mb-8 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setActiveTab('description')}
+                className={`pb-4 font-bold whitespace-nowrap transition-colors ${
+                  activeTab === 'description'
+                    ? 'text-brand-600 border-b-2 border-brand-500'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Description détaillée
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('composition')}
+                className={`pb-4 font-medium whitespace-nowrap transition-colors ${
+                  activeTab === 'composition'
+                    ? 'text-brand-600 border-b-2 border-brand-500 font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Composition & Origine
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reviews')}
+                className={`pb-4 font-medium whitespace-nowrap transition-colors ${
+                  activeTab === 'reviews'
+                    ? 'text-brand-600 border-b-2 border-brand-500 font-bold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Avis clients{reviewCount > 0 ? ` (${reviewCount})` : ''}
+              </button>
+            </div>
+
+            {activeTab === 'description' && (
+              <ProductHtmlContent
+                html={product.description}
+                className="text-lg"
+                emptyMessage="Aucune description détaillée disponible pour ce produit."
+              />
+            )}
+
+            {activeTab === 'composition' && (
+              <div className="text-slate-600 leading-relaxed text-lg">
+                {hasHtmlContent(product.composition) ? (
+                  <ProductHtmlContent html={product.composition} />
+                ) : (
+                  <>
+                    <p className="mb-6">
+                      Produit proposé par{' '}
+                      <Link href={`/m/${slug}`} className="font-bold text-brand-600" style={{ textDecoration: 'none' }}>
+                        {merchant?.business_name}
+                      </Link>
+                      {categorySlug && <> — catégorie {categoryName}.</>}
+                    </p>
+                    {hasHtmlContent(product.description) ? (
+                      <ProductHtmlContent html={product.description} />
+                    ) : (
+                      <p className="text-slate-500">Aucune information de composition renseignée.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="text-center py-8">
+                {reviewCount > 0 && avgRating != null ? (
+                  <>
+                    <div className="flex items-center justify-center gap-2 mb-4">
+                      <StarRating rating={avgRating} />
+                      <span className="text-2xl font-extrabold text-slate-900">{avgRating}</span>
+                      <span className="text-slate-500">({reviewCount} avis sur l&apos;établissement)</span>
+                    </div>
+                    <Link
+                      href={`/m/${slug}#avis`}
+                      className="inline-flex items-center gap-2 text-brand-600 font-bold hover:text-brand-700"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      Voir tous les avis <ArrowRight size={16} />
+                    </Link>
+                  </>
+                ) : (
+                  <p className="text-slate-500">
+                    Aucun avis pour le moment.{' '}
+                    <Link href={`/m/${slug}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
+                      Consulter la fiche établissement
+                    </Link>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Cross-sell */}
+      {relatedProducts.length > 0 && (
+        <section className="py-16 bg-white border-t border-slate-100">
+          <div className={PAGE_CONTAINER}>
+            <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
+              <h2 className="text-2xl font-extrabold text-slate-900">Dans la même boutique</h2>
+              <Link
+                href={`/m/${slug}/boutique`}
+                className="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                style={{ textDecoration: 'none' }}
+              >
+                Voir la boutique {merchant?.business_name} <ArrowRight size={16} />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {relatedProducts.map(related => (
+                <ProductCard
+                  key={related.id}
+                  product={related}
+                  merchantSlug={slug}
+                  merchantName={merchant?.business_name}
+                  variant="related"
+                  showAddButton
+                  onAdd={() => handleRelatedAdd(related)}
+                  adding={addingRelatedId === related.id}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <Footer />
     </div>

@@ -47,7 +47,7 @@ export function MarketplaceSection() {
 
         <div className="text-center mt-12">
           <Link
-            href="/search?category=boutiques"
+            href="/marketplace"
             className="inline-flex items-center gap-2 font-bold text-slate-900 border-b-2 border-slate-900 pb-1 hover:text-brand-600 hover:border-brand-600 transition-colors"
           >
             Explorer la Marketplace <ArrowRight size={16} />

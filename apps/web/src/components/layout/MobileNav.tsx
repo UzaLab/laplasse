@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect } from 'react'
 import {
-  X, User, LogOut, LayoutDashboard, UserCircle2, Heart, MapPin,
+  X, User, LogOut, LayoutDashboard, UserCircle2, Heart, MapPin, ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/stores/authStore'
@@ -14,16 +14,21 @@ interface MobileNavProps {
   isAuthenticated: boolean
   user: AuthUser | null
   onLogout: () => void
+  cartCount?: number
+  onCartClick?: () => void
 }
 
 const NAV_LINKS = [
   { href: '/', label: 'Découvrir' },
+  { href: '/marketplace', label: 'Marketplace' },
   { href: '/search', label: 'Recherche' },
   { href: '/categories', label: 'Catégories' },
   { href: '/merchant/signup', label: 'Mon établissement' },
 ]
 
-export function MobileNav({ open, onClose, isAuthenticated, user, onLogout }: MobileNavProps) {
+export function MobileNav({
+  open, onClose, isAuthenticated, user, onLogout, cartCount = 0, onCartClick,
+}: MobileNavProps) {
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
@@ -86,6 +91,23 @@ export function MobileNav({ open, onClose, isAuthenticated, user, onLogout }: Mo
 
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-4 py-6">
+          {onCartClick && (
+            <button
+              type="button"
+              onClick={() => { onCartClick(); onClose() }}
+              className="flex items-center justify-between w-full px-4 py-3.5 mb-4 rounded-xl bg-brand-50 border border-brand-100 text-brand-700 font-bold text-base"
+            >
+              <span className="flex items-center gap-3">
+                <ShoppingBag size={18} /> Mon panier
+              </span>
+              {cartCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <ul className="space-y-1">
             {NAV_LINKS.map(({ href, label }) => (
               <li key={href}>

@@ -88,6 +88,7 @@ export class AdsService {
     })
     if (!payment) throw new NotFoundException('Paiement introuvable')
     if (payment.status !== 'PENDING') throw new BadRequestException('Paiement déjà traité')
+    if (!payment.merchant_id) throw new BadRequestException('Paiement publicité invalide')
 
     const campaign = await this.prisma.adCampaign.findFirst({
       where: { payment_id: paymentId, merchant_id: payment.merchant_id },

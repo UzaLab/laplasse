@@ -11,6 +11,7 @@ import {
   planLimitMessage,
 } from '../common/plan-limits'
 import { OrganizationType } from '../../generated/prisma/client'
+import { attachShopPreviewsToMerchants } from '../marketplace/shop-preview'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -110,8 +111,10 @@ export class MerchantsService {
       this.prisma.merchant.count({ where }),
     ])
 
+    const formatted = merchants.map(m => this.formatMerchant(m))
+
     return {
-      data: merchants.map(this.formatMerchant),
+      data: await attachShopPreviewsToMerchants(this.prisma, formatted),
       meta: {
         total,
         limit: query.limit ?? 20,
@@ -131,7 +134,10 @@ export class MerchantsService {
       orderBy: [{ is_sponsored: 'desc' }, { trust_score: 'desc' }],
       take: limit,
     })
-    return merchants.map(this.formatMerchant)
+    return attachShopPreviewsToMerchants(
+      this.prisma,
+      merchants.map(m => this.formatMerchant(m)),
+    )
   }
 
   async findNearby(city = 'Abidjan', district?: string, lat?: number, lng?: number, radiusKm = 2, limit = 6) {
@@ -169,13 +175,19 @@ export class MerchantsService {
         .sort((a, b) => a._distance_km - b._distance_km)
         .slice(0, limit)
 
-      return withDistance.map(({ _distance_km, ...m }) => ({
-        ...this.formatMerchant(m),
-        distance_km: Math.round(_distance_km * 10) / 10,
-      }))
+      return attachShopPreviewsToMerchants(
+        this.prisma,
+        withDistance.map(({ _distance_km, ...m }) => {
+          const formatted = this.formatMerchant(m as Record<string, unknown> & { id: string })
+          return { ...formatted, distance_km: Math.round(_distance_km * 10) / 10 }
+        }),
+      )
     }
 
-    return merchants.map(this.formatMerchant)
+    return attachShopPreviewsToMerchants(
+      this.prisma,
+      merchants.map(m => this.formatMerchant(m)),
+    )
   }
 
   async findBySlug(slug: string) {
@@ -211,8 +223,10 @@ export class MerchantsService {
       ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
       : null
 
+    const formatted = this.formatMerchant(merchant as Record<string, unknown> & { id: string })
+
     return {
-      ...this.formatMerchant(merchant),
+      ...formatted,
       email: merchant.email,
       reviews: merchant.reviews,
       media: merchant.media,
@@ -692,7 +706,7 @@ export class MerchantsService {
       },
     })
 
-    return merchants.map(m => this.formatMerchant(m as Record<string, unknown>))
+    return merchants.map(m => this.formatMerchant(m))
   }
 
   // ── Trust Score ───────────────────────────────────────────────────────────────
@@ -926,7 +940,12 @@ export class MerchantsService {
     }
   }
 
-  private formatMerchant(m: Record<string, unknown>) {
+  private formatMerchant<T extends Record<string, unknown>>(m: T): T & {
+    tags: string[]
+    review_count: number
+    favorites_count: number
+    _count: undefined
+  } {
     const tags = (m.tags as Array<{ tag: { name: string } }> | undefined)?.map(t => t.tag.name) ?? []
     const count = m._count as { reviews?: number; favorites?: number } | undefined
     return {

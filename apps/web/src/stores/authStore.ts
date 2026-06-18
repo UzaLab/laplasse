@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authUrl } from '@/lib/authClient'
 import { invalidateAuthSession, type SessionStatus } from '@/lib/authSession'
+import type { ShopSummary } from '@/lib/shopApi'
 
 export interface MerchantSummary {
   id: string
@@ -10,6 +11,7 @@ export interface MerchantSummary {
   verification_status: string
   subscription_plan?: string
   organization_id?: string | null
+  category_slug?: string
 }
 
 export interface OrganizationSummary {
@@ -26,6 +28,7 @@ export interface AuthUser {
   avatar: string | null
   role: string
   merchants?: MerchantSummary[]
+  shops?: ShopSummary[]
   organization?: OrganizationSummary | null
 }
 
@@ -33,6 +36,7 @@ interface AuthState {
   user: AuthUser | null
   isAuthenticated: boolean
   activeMerchantId: string | null
+  activeShopId: string | null
   sessionStatus: SessionStatus
 
   setAuth: (user: AuthUser) => void
@@ -41,6 +45,7 @@ interface AuthState {
   logoutRemote: () => Promise<void>
   updateUser: (user: Partial<AuthUser>) => void
   setActiveMerchant: (id: string) => void
+  setActiveShop: (id: string) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -49,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       activeMerchantId: null,
+      activeShopId: null,
       sessionStatus: 'idle',
 
       setAuth: (user) =>
@@ -58,6 +64,8 @@ export const useAuthStore = create<AuthState>()(
           sessionStatus: 'authenticated',
           activeMerchantId:
             user.merchants?.[0]?.id ?? state.activeMerchantId ?? null,
+          activeShopId:
+            user.shops?.[0]?.id ?? state.activeShopId ?? null,
         })),
 
       setSessionStatus: (sessionStatus) => set({ sessionStatus }),
@@ -68,6 +76,7 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           isAuthenticated: false,
           activeMerchantId: null,
+          activeShopId: null,
           sessionStatus: 'anonymous',
         })
       },
@@ -86,6 +95,7 @@ export const useAuthStore = create<AuthState>()(
           user: null,
           isAuthenticated: false,
           activeMerchantId: null,
+          activeShopId: null,
           sessionStatus: 'anonymous',
         })
       },
@@ -96,6 +106,7 @@ export const useAuthStore = create<AuthState>()(
         })),
 
       setActiveMerchant: (id) => set({ activeMerchantId: id }),
+      setActiveShop: (id) => set({ activeShopId: id }),
     }),
     {
       name: 'laplasse-auth',
@@ -103,6 +114,7 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         activeMerchantId: state.activeMerchantId,
+        activeShopId: state.activeShopId,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

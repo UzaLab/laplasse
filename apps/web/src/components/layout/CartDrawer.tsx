@@ -1,0 +1,279 @@
+'use client'
+
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import {
+  Loader2,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+import { useCartStore } from '@/stores/cartStore'
+import {
+  formatPrice,
+  PLACEHOLDER_PRODUCT_IMAGE,
+} from '@/lib/marketplaceApi'
+
+export function CartDrawer() {
+  const router = useRouter()
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const drawerOpen = useCartStore(s => s.drawerOpen)
+  const closeDrawer = useCartStore(s => s.closeDrawer)
+  const cart = useCartStore(s => s.cart)
+  const loading = useCartStore(s => s.loading)
+  const updatingItemId = useCartStore(s => s.updatingItemId)
+  const updateQuantity = useCartStore(s => s.updateQuantity)
+  const removeItem = useCartStore(s => s.removeItem)
+  const loadCart = useCartStore(s => s.loadCart)
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [drawerOpen])
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDrawer() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawerOpen, closeDrawer])
+
+  useEffect(() => {
+    if (drawerOpen && isAuthenticated) {
+      void loadCart()
+    }
+  }, [drawerOpen, isAuthenticated, loadCart])
+
+  const items = cart?.items ?? []
+  const hasItems = items.length > 0
+
+  const goToLogin = () => {
+    closeDrawer()
+    router.push(`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`)
+  }
+
+  const goTo = (path: string) => {
+    closeDrawer()
+    router.push(path)
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          'fixed inset-0 z-[80] bg-slate-900/40 backdrop-blur-sm transition-opacity duration-300',
+          drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        onClick={closeDrawer}
+        aria-hidden={!drawerOpen}
+      />
+
+      <aside
+        className={cn(
+          'fixed top-0 right-0 z-[90] h-full w-[min(100%,420px)] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out',
+          drawerOpen ? 'translate-x-0' : 'translate-x-full',
+        )}
+        aria-hidden={!drawerOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Panier"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+              <ShoppingBag size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-900">Mon panier</h2>
+              {(cart?.merchant_count ?? 0) > 0 && (
+                <p className="text-xs text-slate-400 font-medium truncate max-w-[220px]">
+                  {(cart?.merchant_count ?? 0) > 1
+                    ? `${cart?.merchant_count} boutiques`
+                    : cart?.merchant?.business_name}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeDrawer}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+            aria-label="Fermer le panier"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {!isAuthenticated ? (
+            <div className="flex flex-col items-center justify-center text-center py-16 px-4">
+              <ShoppingBag size={40} className="text-slate-200 mb-4" />
+              <p className="font-bold text-slate-900 mb-2">Connectez-vous</p>
+              <p className="text-sm text-slate-500 mb-6">
+                Identifiez-vous pour voir votre panier et passer commande.
+              </p>
+              <button
+                type="button"
+                onClick={goToLogin}
+                className="bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors text-sm"
+              >
+                Se connecter
+              </button>
+            </div>
+          ) : loading && !cart ? (
+            <div className="flex justify-center py-24">
+              <Loader2 size={28} className="animate-spin text-slate-300" />
+            </div>
+          ) : !hasItems ? (
+            <div className="flex flex-col items-center justify-center text-center py-16 px-4">
+              <ShoppingBag size={40} className="text-slate-200 mb-4" />
+              <p className="font-bold text-slate-900 mb-2">Panier vide</p>
+              <p className="text-sm text-slate-500 mb-6">
+                Découvrez les boutiques et ajoutez vos coups de cœur.
+              </p>
+              <button
+                type="button"
+                onClick={() => goTo('/')}
+                className="bg-brand-50 border border-brand-200 text-brand-700 font-bold px-6 py-3 rounded-xl hover:bg-brand-100 transition-colors text-sm"
+              >
+                Explorer
+              </button>
+            </div>
+          ) : (
+            <ul className="space-y-4">
+              {items.map(item => {
+                const product = item.product
+                const merchantSlug = product.merchant?.slug
+                const href = merchantSlug
+                  ? `/m/${merchantSlug}/p/${product.slug}`
+                  : '#'
+                const isUpdating = updatingItemId === item.id
+
+                return (
+                  <li
+                    key={item.id}
+                    className="flex gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50/50"
+                  >
+                    <Link
+                      href={href}
+                      onClick={closeDrawer}
+                      className="w-20 h-20 rounded-xl overflow-hidden bg-white shrink-0 border border-slate-100"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={product.image_url || PLACEHOLDER_PRODUCT_IMAGE}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </Link>
+
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={href}
+                        onClick={closeDrawer}
+                        className="font-bold text-slate-900 text-sm leading-tight line-clamp-2 hover:text-brand-600 transition-colors block"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        {product.name}
+                      </Link>
+                      {item.variant && (
+                        <p className="text-xs text-slate-500 mt-0.5">{item.variant.name}</p>
+                      )}
+                      <p className="text-sm font-extrabold text-brand-600 mt-1">
+                        {formatPrice(item.unit_price, product.currency)}
+                      </p>
+
+                      <div className="flex items-center justify-between mt-2 gap-2">
+                        <div className="inline-flex items-center p-0.5 bg-white border border-slate-200 rounded-lg">
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                            aria-label="Diminuer la quantité"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="w-8 text-center text-sm font-bold text-slate-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                            aria-label="Augmenter la quantité"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => removeItem(item.id)}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          aria-label="Retirer du panier"
+                        >
+                          {isUpdating ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 pt-1">
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {formatPrice(item.line_total, cart?.currency)}
+                      </p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        {isAuthenticated && hasItems && (
+          <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm font-medium text-slate-500">Sous-total</span>
+              <span className="text-xl font-extrabold text-slate-900">
+                {formatPrice(cart?.subtotal ?? 0, cart?.currency)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => goTo('/cart')}
+                className="h-12 rounded-xl border-2 border-slate-200 text-slate-900 font-bold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Voir le panier
+              </button>
+              <button
+                type="button"
+                onClick={() => goTo('/checkout')}
+                className="h-12 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+              >
+                Commander
+              </button>
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
+  )
+}

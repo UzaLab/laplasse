@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { BadgeCheck, Star, MessageCircle } from 'lucide-react'
 import { Merchant } from '@/types/merchant'
 import { FavoriteButton } from './FavoriteButton'
+import { WhatsAppLink } from './WhatsAppLink'
 
 interface MerchantCardProps {
   merchant: Merchant
@@ -12,26 +13,27 @@ interface MerchantCardProps {
 
 export function MerchantCard({ merchant, compact = false }: MerchantCardProps) {
   const imageHeight = compact ? '140px' : '180px'
+  const hasWhatsAppTag = merchant.tags?.includes('WhatsApp') && merchant.whatsapp
 
   return (
-    <Link
-      href={`/m/${merchant.slug}`}
-      className="block no-underline"
-      style={{ color: 'inherit' }}
+    <article
+      className="relative overflow-hidden bg-white transition-transform hover:-translate-y-1 active:scale-[0.98]"
+      style={{
+        borderRadius: '24px',
+        boxShadow: 'var(--shadow-sm)',
+        transition: 'var(--transition)',
+      }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.boxShadow = 'var(--shadow-md)')
+      }
+      onMouseLeave={(e) =>
+        (e.currentTarget.style.boxShadow = 'var(--shadow-sm)')
+      }
     >
-      <article
-        className="relative overflow-hidden bg-white transition-transform hover:-translate-y-1 active:scale-[0.98]"
-        style={{
-          borderRadius: '24px',
-          boxShadow: 'var(--shadow-sm)',
-          transition: 'var(--transition)',
-        }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.boxShadow = 'var(--shadow-md)')
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.boxShadow = 'var(--shadow-sm)')
-        }
+      <Link
+        href={`/m/${merchant.slug}`}
+        className="block no-underline"
+        style={{ color: 'inherit' }}
       >
         {/* Image */}
         <div
@@ -123,33 +125,44 @@ export function MerchantCard({ merchant, compact = false }: MerchantCardProps) {
             {compact && merchant.distance_km && ` • ${merchant.distance_km}km`}
           </p>
 
-          {/* Tags */}
+          {/* Tags (hors WhatsApp cliquable) */}
           {merchant.tags && merchant.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {merchant.is_open !== undefined && (
-                <Tag
-                  variant={merchant.is_open ? 'open' : 'closed'}
-                >
+                <Tag variant={merchant.is_open ? 'open' : 'closed'}>
                   {merchant.is_open ? 'Ouvert' : 'Fermé'}
                 </Tag>
               )}
-              {merchant.tags.map((tag) => (
-                <Tag key={tag} variant={tag === 'Ferme bientôt' ? 'warning' : 'default'}>
-                  {tag === 'WhatsApp' ? (
-                    <span className="flex items-center gap-1">
-                      <MessageCircle size={12} />
-                      WhatsApp
-                    </span>
-                  ) : (
-                    tag
-                  )}
-                </Tag>
-              ))}
+              {merchant.tags
+                .filter(tag => !(tag === 'WhatsApp' && hasWhatsAppTag))
+                .map((tag) => (
+                  <Tag key={tag} variant={tag === 'Ferme bientôt' ? 'warning' : 'default'}>
+                    {tag === 'WhatsApp' ? (
+                      <span className="flex items-center gap-1">
+                        <MessageCircle size={12} />
+                        WhatsApp
+                      </span>
+                    ) : (
+                      tag
+                    )}
+                  </Tag>
+                ))}
             </div>
           )}
         </div>
-      </article>
-    </Link>
+      </Link>
+
+      {hasWhatsAppTag && (
+        <div style={{ padding: compact ? '0 12px 12px' : '0 16px 16px' }}>
+          <WhatsAppLink
+            phone={merchant.whatsapp!}
+            merchantId={merchant.id}
+            iconSize={12}
+            className="inline-flex items-center gap-1 font-medium px-2.5 py-1 rounded-lg text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+          />
+        </div>
+      )}
+    </article>
   )
 }
 

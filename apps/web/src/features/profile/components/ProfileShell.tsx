@@ -54,11 +54,15 @@ export function ProfileShell({ children }: ProfileShellProps) {
 
   const isMerchant = user?.role === 'MERCHANT' || (user?.merchants?.length ?? 0) > 0
 
+  const hasShop = (user?.shops?.length ?? 0) > 0
   const extraNav: NavItem[] = [
     ...(isMerchant
       ? [{ href: '/merchant/dashboard', label: 'Dashboard marchand', icon: <Store size={17} /> }]
       : [{ href: '/merchant/signup', label: 'Inscrire mon commerce', icon: <Store size={17} /> }]
     ),
+    ...(!hasShop
+      ? [{ href: '/shop/create', label: 'Créer ma boutique', icon: <ShoppingBag size={17} /> }]
+      : []),
     ...(isAdmin ? [{ href: '/admin', label: 'Administration', icon: <ShieldCheck size={17} /> }] : []),
     { href: '/search', label: 'Explorer Abidjan', icon: <Compass size={17} /> },
   ]

@@ -57,6 +57,14 @@ export interface ApiMerchantHour {
   is_closed: boolean
 }
 
+export interface ApiShopFeaturedProduct {
+  name: string
+  price: string
+  image: string
+  slug: string
+  shop_slug: string
+}
+
 export interface ApiMerchant {
   id: string
   business_name: string
@@ -76,6 +84,8 @@ export interface ApiMerchant {
   tags: string[]
   review_count: number
   favorites_count: number
+  has_marketplace?: boolean
+  featured_product?: ApiShopFeaturedProduct
 }
 
 export interface ApiMerchantDetail extends ApiMerchant {

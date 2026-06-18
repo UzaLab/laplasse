@@ -27,6 +27,7 @@ import { FraudModule } from './fraud/fraud.module'
 import { StaffModule } from './staff/staff.module'
 import { AdsModule } from './ads/ads.module'
 import { MarketplaceModule } from './marketplace/marketplace.module'
+import { ShopsModule } from './shops/shops.module'
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module'
     StaffModule,
     AdsModule,
     MarketplaceModule,
+    ShopsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

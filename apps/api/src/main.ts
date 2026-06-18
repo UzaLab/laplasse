@@ -1,3 +1,4 @@
+import 'reflect-metadata'
 import * as Sentry from '@sentry/node'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'

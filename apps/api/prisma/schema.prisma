@@ -125,6 +125,7 @@ model User {
   audit_logs       AuditLog[]
   cart             Cart?
   orders           Order[]
+  shops            Shop[]
 
   @@index([email])
   @@index([phone])
@@ -187,7 +188,7 @@ model Merchant {
   staff            MerchantStaff[]
   availability_blocks MerchantAvailabilityBlock[]
   ad_campaigns     AdCampaign[]
-  products         Product[]
+  shop             Shop?
   orders           Order[]
 
   @@index([slug])
@@ -583,7 +584,8 @@ enum PaymentPurpose {
 model PaymentTransaction {
   id          String             @id @default(cuid())
   user_id     String
-  merchant_id String
+  merchant_id String?
+  shop_id     String?
   purpose     PaymentPurpose     @default(SUBSCRIPTION)
   provider    PaymentProvider    @default(SIMULATOR)
   plan        SubscriptionPlan?
@@ -596,12 +598,14 @@ model PaymentTransaction {
   created_at  DateTime           @default(now())
   paid_at     DateTime?
 
-  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
-  order    Order?   @relation(fields: [order_id], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
+  shop     Shop?     @relation(fields: [shop_id], references: [id], onDelete: SetNull)
+  order    Order?    @relation(fields: [order_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
   @@index([merchant_id])
+  @@index([shop_id])
   @@index([status])
   @@index([reference])
 }
@@ -822,7 +826,47 @@ model DeviceToken {
   @@index([user_id])
 }
 
-// ─── MARKETPLACE V1.5 ──────────────────────────────────────────────────────────
+// ─── MARKETPLACE V1.6 — Boutique (Shop) modulaire ─────────────────────────────
+
+enum ShopStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+}
+
+model Shop {
+  id          String     @id @default(cuid())
+  owner_id    String
+  name        String
+  slug        String     @unique
+  description String?
+  logo        String?
+  cover_image String?
+  phone       String?
+  whatsapp    String?
+  email       String?
+  country     String     @default("CI")
+  city        String     @default("Abidjan")
+  district    String?
+  address     String?
+  merchant_id String?    @unique
+  status      ShopStatus @default(DRAFT)
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  owner    User                 @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  merchant Merchant?            @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
+  products Product[]
+  orders   Order[]
+  payments PaymentTransaction[]
+
+  @@index([owner_id])
+  @@index([slug])
+  @@index([merchant_id])
+  @@index([status])
+  @@index([is_active])
+}
 
 enum ProductStatus {
   DRAFT
@@ -848,33 +892,54 @@ enum DeliveryType {
 
 model Product {
   id             String        @id @default(cuid())
-  merchant_id    String
+  shop_id        String
   name           String
   slug           String
   description    String?
+  composition    String?
   price          Int
   currency       String        @default("XOF")
   stock_quantity Int           @default(0)
   image_url      String?
+  allow_pickup   Boolean       @default(true)
+  allow_delivery Boolean       @default(true)
   status         ProductStatus @default(DRAFT)
   sort_order     Int           @default(0)
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
 
-  merchant    Merchant    @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  shop        Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  variants    ProductVariant[]
   cart_items  CartItem[]
   order_items OrderItem[]
 
-  @@unique([merchant_id, slug])
-  @@index([merchant_id, status])
+  @@unique([shop_id, slug])
+  @@index([shop_id, status])
+}
+
+model ProductVariant {
+  id             String   @id @default(cuid())
+  product_id     String
+  name           String
+  price          Int
+  stock_quantity Int      @default(0)
+  sku            String?
+  sort_order     Int      @default(0)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  product     Product     @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  cart_items  CartItem[]
+  order_items OrderItem[]
+
+  @@index([product_id])
 }
 
 model Cart {
-  id          String   @id @default(cuid())
-  user_id     String   @unique
-  merchant_id String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id         String   @id @default(cuid())
+  user_id    String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   user  User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   items CartItem[]
@@ -886,21 +951,24 @@ model CartItem {
   id         String   @id @default(cuid())
   cart_id    String
   product_id String
+  variant_id String?
   quantity   Int      @default(1)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  cart    Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  cart    Cart            @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variant_id], references: [id], onDelete: SetNull)
 
-  @@unique([cart_id, product_id])
   @@index([cart_id])
+  @@index([cart_id, product_id, variant_id])
 }
 
 model Order {
   id               String       @id @default(cuid())
   user_id          String
-  merchant_id      String
+  shop_id          String
+  merchant_id      String?
   status           OrderStatus  @default(PENDING)
   delivery_type    DeliveryType @default(PICKUP)
   delivery_address String?
@@ -913,11 +981,13 @@ model Order {
   updated_at       DateTime     @updatedAt
 
   user     User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  merchant Merchant            @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  shop     Shop                @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  merchant Merchant?           @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
   items    OrderItem[]
   payment  PaymentTransaction?
 
   @@index([user_id])
+  @@index([shop_id, status])
   @@index([merchant_id, status])
   @@index([created_at])
 }
@@ -926,13 +996,16 @@ model OrderItem {
   id           String  @id @default(cuid())
   order_id     String
   product_id   String?
+  variant_id   String?
   product_name String
+  variant_name String?
   unit_price   Int
   quantity     Int
   line_total   Int
 
-  order   Order    @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+  order   Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [product_id], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variant_id], references: [id], onDelete: SetNull)
 
   @@index([order_id])
 }
