@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
-import { MerchantShell } from '@/features/merchant/components/MerchantShell'
+import { ShopSectionLayout } from '@/features/merchant/components/shop/ShopSectionLayout'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { hasHtmlContent } from '@/lib/htmlUtils'
@@ -108,7 +108,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
   const isEdit = Boolean(productId)
   const { activeShopId, activeMerchantId, user } = useAuthStore()
   const { ready, hydrated, isAuthenticated } = useRequireAuth(
-    isEdit ? `/merchant/products/${productId}/edit` : '/merchant/products/new',
+    isEdit ? `/merchant/shop/products/${productId}/edit` : '/merchant/shop/products/new',
   )
 
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM)
@@ -251,49 +251,49 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
     }
 
     notify.success(isEdit ? 'Produit mis à jour' : 'Produit créé')
-    router.push('/merchant/products')
+    router.push('/merchant/shop/products')
   }
 
   if (!hydrated || !isAuthenticated) return null
 
   if (loading) {
     return (
-      <MerchantShell>
+      <ShopSectionLayout hideTabs>
         <div className="flex justify-center py-24">
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
-      </MerchantShell>
+      </ShopSectionLayout>
     )
   }
 
   if (notFound) {
     return (
-      <MerchantShell>
-        <div className="max-w-5xl mx-auto text-center py-24">
+      <ShopSectionLayout hideTabs>
+        <div className="text-center py-24">
           <p className="font-bold text-slate-900 mb-4">Produit introuvable</p>
           <Link
-            href="/merchant/products"
+            href="/merchant/shop/products"
             className="text-brand-600 font-bold"
             style={{ textDecoration: 'none' }}
           >
             Retour au catalogue
           </Link>
         </div>
-      </MerchantShell>
+      </ShopSectionLayout>
     )
   }
 
   const previewImage = form.image_url || PLACEHOLDER_PRODUCT_IMAGE
 
   return (
-    <MerchantShell>
-      <div className="max-w-5xl mx-auto">
+    <ShopSectionLayout hideTabs>
+      <div>
         {/* En-tête sticky (maquette) */}
         <div className="sticky top-0 z-20 -mx-5 lg:-mx-8 px-5 lg:px-8 py-4 mb-6 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-slate-200/80">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <Link
-                href="/merchant/products"
+                href="/merchant/shop/products"
                 className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all shadow-sm shrink-0"
                 style={{ textDecoration: 'none' }}
               >
@@ -301,11 +301,11 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
               </Link>
               <div className="min-w-0">
                 <nav className="hidden sm:flex items-center text-sm font-medium text-slate-500 mb-1">
-                  <Link href="/merchant/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
+                  <Link href="/merchant/shop/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
                     Catalogue
                   </Link>
                   <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
-                  <Link href="/merchant/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
+                  <Link href="/merchant/shop/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
                     Produits
                   </Link>
                   <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
@@ -321,7 +321,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
 
             <div className="flex items-center gap-3 shrink-0">
               <Link
-                href="/merchant/products"
+                href="/merchant/shop/products"
                 className="text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm hidden sm:block"
                 style={{ textDecoration: 'none' }}
               >
@@ -734,6 +734,6 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
           </div>
         </div>
       </div>
-    </MerchantShell>
+    </ShopSectionLayout>
   )
 }

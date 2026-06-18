@@ -1,13 +1,10 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { use } from 'react'
-import { MerchantProductForm } from '@/features/merchant/components/MerchantProductForm'
-
-export default function EditMerchantProductPage({
+export default async function LegacyEditProductRedirect({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = use(params)
-  return <MerchantProductForm productId={id} />
+  const { id } = await params
+  redirect(`/merchant/shop/products/${id}/edit`)
 }

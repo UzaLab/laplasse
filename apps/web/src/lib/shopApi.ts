@@ -30,6 +30,25 @@ export interface ShopSummary {
   description?: string | null
 }
 
+export interface ShopDetails extends ShopSummary {
+  cover_image?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  email?: string | null
+  city?: string | null
+  district?: string | null
+  address?: string | null
+  is_active?: boolean
+}
+
+export function getShopsForMerchant(
+  shops: ShopSummary[] | undefined,
+  merchantId: string | null | undefined,
+): ShopSummary[] {
+  if (!merchantId) return []
+  return (shops ?? []).filter(s => s.merchant_id === merchantId)
+}
+
 export interface CreateShopInput {
   name: string
   description?: string
@@ -46,6 +65,12 @@ export async function fetchMyShops(): Promise<ShopSummary[]> {
   const res = await authApiFetch('/shops/mine')
   if (!res.ok) return []
   return res.json() as Promise<ShopSummary[]>
+}
+
+export async function fetchShopBySlug(slug: string): Promise<ShopDetails | null> {
+  const res = await authApiFetch(`/shops/${slug}`)
+  if (!res.ok) return null
+  return res.json() as Promise<ShopDetails>
 }
 
 export async function createShop(

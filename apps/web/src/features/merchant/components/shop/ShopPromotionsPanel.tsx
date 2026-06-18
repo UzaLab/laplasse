@@ -1,0 +1,174 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Loader2, Plus, Tag, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
+import { merchantApiFetch } from '@/lib/merchantApi'
+
+interface Promotion {
+  id: string
+  title: string
+  description: string | null
+  type: string
+  value: number
+  code: string | null
+  is_active: boolean
+  starts_at: string
+  ends_at: string
+}
+
+export function ShopPromotionsPanel() {
+  const { activeMerchantId } = useAuthStore()
+  const [promos, setPromos] = useState<Promotion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    type: 'PERCENTAGE',
+    value: '10',
+    starts_at: '',
+    ends_at: '',
+  })
+
+  const load = async () => {
+    setLoading(true)
+    const res = await merchantApiFetch('/promotions/mine', activeMerchantId)
+    if (res.ok) setPromos(await res.json())
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMerchantId])
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await merchantApiFetch('/promotions', activeMerchantId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: form.title,
+        description: form.description || undefined,
+        type: form.type,
+        value: Number(form.value),
+        starts_at: new Date(form.starts_at).toISOString(),
+        ends_at: new Date(form.ends_at).toISOString(),
+      }),
+    })
+    setForm({ title: '', description: '', type: 'PERCENTAGE', value: '10', starts_at: '', ends_at: '' })
+    load()
+  }
+
+  const toggle = async (id: string) => {
+    await merchantApiFetch(`/promotions/${id}/toggle`, activeMerchantId, { method: 'PATCH' })
+    load()
+  }
+
+  const remove = async (id: string) => {
+    await merchantApiFetch(`/promotions/${id}`, activeMerchantId, { method: 'DELETE' })
+    load()
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+          <Tag size={18} className="text-amber-500" /> Promotions boutique
+        </h2>
+        <p className="text-slate-400 text-sm mt-0.5">
+          Créez des offres et codes promo pour vos clients.
+        </p>
+      </div>
+
+      <form onSubmit={create} className="bg-white rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
+        <p className="text-sm font-bold text-slate-700">Nouvelle offre</p>
+        <input
+          required
+          placeholder="Titre *"
+          value={form.title}
+          onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-amber-400"
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={form.type}
+            onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+            className="border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+          >
+            <option value="PERCENTAGE">Pourcentage</option>
+            <option value="FIXED">Montant fixe</option>
+            <option value="FREE_ITEM">Article offert</option>
+          </select>
+          <input
+            required
+            type="number"
+            placeholder="Valeur"
+            value={form.value}
+            onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
+            className="border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            required
+            type="datetime-local"
+            value={form.starts_at}
+            onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
+            className="border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+          />
+          <input
+            required
+            type="datetime-local"
+            value={form.ends_at}
+            onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
+            className="border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          type="submit"
+          className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl"
+        >
+          <Plus size={14} /> Créer
+        </button>
+      </form>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="animate-spin text-slate-400" />
+        </div>
+      ) : promos.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-[28px] border border-slate-100">
+          <Tag size={28} className="text-slate-200 mx-auto mb-2" />
+          <p className="text-sm text-slate-500">Aucune promotion pour le moment.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {promos.map(p => (
+            <div
+              key={p.id}
+              className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center justify-between gap-4"
+            >
+              <div>
+                <p className="font-bold text-slate-900">{p.title}</p>
+                <p className="text-xs text-slate-400">
+                  {p.type} · {p.value}{p.type === 'PERCENTAGE' ? '%' : ' F'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => toggle(p.id)} className="text-slate-500">
+                  {p.is_active
+                    ? <ToggleRight size={22} className="text-emerald-500" />
+                    : <ToggleLeft size={22} />}
+                </button>
+                <button type="button" onClick={() => remove(p.id)} className="text-red-400">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

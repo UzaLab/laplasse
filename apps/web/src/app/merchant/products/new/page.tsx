@@ -1,7 +1,5 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-import { MerchantProductForm } from '@/features/merchant/components/MerchantProductForm'
-
-export default function NewMerchantProductPage() {
-  return <MerchantProductForm />
+export default function LegacyNewProductRedirect() {
+  redirect('/merchant/shop/products/new')
 }

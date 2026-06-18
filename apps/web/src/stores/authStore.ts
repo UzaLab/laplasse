@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authUrl } from '@/lib/authClient'
 import { invalidateAuthSession, type SessionStatus } from '@/lib/authSession'
-import type { ShopSummary } from '@/lib/shopApi'
+import { getShopsForMerchant, type ShopSummary } from '@/lib/shopApi'
 
 export interface MerchantSummary {
   id: string
@@ -45,7 +45,7 @@ interface AuthState {
   logoutRemote: () => Promise<void>
   updateUser: (user: Partial<AuthUser>) => void
   setActiveMerchant: (id: string) => void
-  setActiveShop: (id: string) => void
+  setActiveShop: (id: string | null) => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -58,15 +58,18 @@ export const useAuthStore = create<AuthState>()(
       sessionStatus: 'idle',
 
       setAuth: (user) =>
-        set((state) => ({
-          user,
-          isAuthenticated: true,
-          sessionStatus: 'authenticated',
-          activeMerchantId:
-            user.merchants?.[0]?.id ?? state.activeMerchantId ?? null,
-          activeShopId:
-            user.shops?.[0]?.id ?? state.activeShopId ?? null,
-        })),
+        set((state) => {
+          const activeMerchantId =
+            user.merchants?.[0]?.id ?? state.activeMerchantId ?? null
+          const linkedShops = getShopsForMerchant(user.shops, activeMerchantId)
+          return {
+            user,
+            isAuthenticated: true,
+            sessionStatus: 'authenticated',
+            activeMerchantId,
+            activeShopId: linkedShops[0]?.id ?? null,
+          }
+        }),
 
       setSessionStatus: (sessionStatus) => set({ sessionStatus }),
 
@@ -105,7 +108,14 @@ export const useAuthStore = create<AuthState>()(
           user: state.user ? { ...state.user, ...partial } : null,
         })),
 
-      setActiveMerchant: (id) => set({ activeMerchantId: id }),
+      setActiveMerchant: (id) =>
+        set((state) => {
+          const linkedShops = getShopsForMerchant(state.user?.shops, id)
+          return {
+            activeMerchantId: id,
+            activeShopId: linkedShops[0]?.id ?? null,
+          }
+        }),
       setActiveShop: (id) => set({ activeShopId: id }),
     }),
     {

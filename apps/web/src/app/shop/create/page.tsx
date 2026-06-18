@@ -61,7 +61,7 @@ export default function CreateShopPage() {
     updateUser({ shops: [...(user?.shops ?? []), shop] })
     setActiveShop(shop.id)
     notify.success('Boutique créée')
-    router.push('/merchant/products/new')
+    router.push('/merchant/shop/products/new')
   }
 
   if (!hydrated || !isAuthenticated) return null
