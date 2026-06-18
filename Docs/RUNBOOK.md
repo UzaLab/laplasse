@@ -234,4 +234,44 @@ grep 'suspicious\|ThrottlerException' apps/api/logs/app-$(date +%Y-%m-%d).log
 
 ---
 
+## 9. Déploiement Coolify (VPS limité)
+
+Les builds Docker sont optimisés pour un VPS modeste (`.dockerignore`, cache pnpm, RAM plafonnée à 768 Mo, deps prod seules en runtime).
+
+**Règle d'or : ne jamais lancer 4 builds en parallèle.** Sur Coolify → Settings → désactiver le déploiement auto simultané si possible, ou utiliser le script séquentiel :
+
+```bash
+export COOLIFY_TOKEN="votre-token"
+# Préprod (develop) puis prod (main), une app à la fois
+./scripts/coolify-deploy.sh preprod
+./scripts/coolify-deploy.sh prod
+
+# Rebuild complet (plus lent)
+FORCE=true ./scripts/coolify-deploy.sh api-preprod
+```
+
+**API alternative (curl) :**
+
+```bash
+curl -X POST "http://178.105.113.184:8000/api/v1/deploy" \
+  -H "Authorization: Bearer $COOLIFY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"uuid":"<APP_UUID>","force":false}'
+```
+
+UUIDs : `laplasse-api-preprod` → `z145ag9pnpqb0y864cwodsfk`, `laplasse-api-prod` → `iaai1jhevil8prxsusoptfin`, `laplasse-web-preprod` → `i5nviaj74152319gctpeyq27`, `laplasse-web-prod` → `pn73rp4w4dk0wyxfazyk0se0`.
+
+**Après déploiement API** (cookies httpOnly) :
+
+```bash
+jar=/tmp/laplasse.cookies
+curl -c "$jar" -X POST "https://api.../api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@laplasse.ci","password":"..."}'
+curl -b "$jar" -X POST "https://api.../api/admin/seed-marketplace"
+curl -b "$jar" -X POST "https://api.../api/admin/sync-search"
+```
+
+---
+
 *Document à maintenir à jour après chaque release majeure.*

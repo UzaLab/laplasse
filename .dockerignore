@@ -1,0 +1,35 @@
+# Git & IDE
+.git
+.github
+.cursor
+.claude
+**/.vscode
+
+# Dépendances & artefacts (reconstruits dans l'image)
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/generated
+
+# Env & secrets locaux
+**/.env
+**/.env.*
+!**/.env.example
+
+# Docs & maquettes (inutiles au build)
+Docs
+**/*.md
+!apps/**/README.md
+
+# Tests (allègent le contexte Docker)
+**/*.spec.ts
+**/*.test.ts
+**/__tests__
+**/test
+
+# Divers
+**/*.log
+**/.turbo
+scripts/load-test.mjs
+docker-compose*.yml
