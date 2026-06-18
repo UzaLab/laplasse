@@ -9,12 +9,12 @@ import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { api, ApiMerchant, ApiMerchantDetail } from '@/lib/api'
 import { MerchantActions } from '@/features/merchant/components/MerchantActions'
-import { ReviewTrigger } from '@/features/merchant/components/ReviewTrigger'
 import { ReportTrigger } from '@/features/merchant/components/ReportTrigger'
 import { MerchantViewTracker, MerchantContactButtons } from '@/features/merchant/components/MerchantTracker'
 import { SimilarMerchants } from '@/features/merchant/components/SimilarMerchants'
 import { BookingForm } from '@/features/merchant/components/BookingForm'
 import { MerchantProductsSection } from '@/features/marketplace/components/MerchantProductsSection'
+import { MerchantReviewsSection } from '@/features/discovery/components/MerchantReviewsSection'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -269,7 +269,7 @@ export default async function MerchantPage({ params }: Props) {
                   <Clock size={20} className="text-brand-500" /> Horaires
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {merchant.hours.map((h) => {
+                  {merchant.hours.map(h => {
                     const isToday = new Date().getDay() === h.day
                     return (
                       <div
@@ -318,60 +318,13 @@ export default async function MerchantPage({ params }: Props) {
             )}
 
             {/* Avis */}
-            <section>
-              <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <Star size={20} className="text-brand-500" />
-                  Avis clients
-                  {merchant.avg_rating && (
-                    <span className="ml-2 text-base font-extrabold text-brand-600 bg-brand-50 px-3 py-0.5 rounded-full border border-brand-200">
-                      {merchant.avg_rating} / 5
-                    </span>
-                  )}
-                </h3>
-                <ReviewTrigger merchantId={merchant.id} merchantName={merchant.business_name} />
-              </div>
-
-              {merchant.reviews.length === 0 && (
-                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-100">
-                  <p className="text-slate-500 font-medium mb-2">Aucun avis pour le moment</p>
-                  <p className="text-sm text-slate-400">Soyez le premier à donner votre avis !</p>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {merchant.reviews.map((review) => (
-                  <div key={review.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm">
-                          {(review.user.full_name ?? 'A')[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-sm text-slate-900">{review.user.full_name ?? 'Anonyme'}</p>
-                          <p className="text-xs text-slate-400">
-                            {new Date(review.created_at).toLocaleDateString('fr-FR', {
-                              year: 'numeric', month: 'long', day: 'numeric',
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            size={13}
-                            className={i < review.rating ? 'fill-brand-500 text-brand-500' : 'fill-slate-200 text-slate-200'}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    {review.title && <p className="font-semibold text-slate-900 mb-1 text-sm">{review.title}</p>}
-                    {review.content && <p className="text-slate-600 text-sm leading-relaxed">{review.content}</p>}
-                  </div>
-                ))}
-              </div>
-            </section>
+            <MerchantReviewsSection
+              merchantId={merchant.id}
+              merchantName={merchant.business_name}
+              avgRating={merchant.avg_rating}
+              totalCount={merchant.review_count}
+              initialReviews={merchant.reviews}
+            />
           </div>
 
           {/* ── RIGHT: Sticky Sidebar ─────────────────────────────────────── */}

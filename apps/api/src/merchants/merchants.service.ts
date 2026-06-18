@@ -207,7 +207,7 @@ export class MerchantsService {
             user: { select: { id: true, full_name: true, avatar: true } },
           },
           orderBy: { created_at: 'desc' },
-          take: 10,
+          take: 4,
         },
         media: {
           select: { id: true, type: true, url: true, thumbnail: true, order: true },
@@ -380,7 +380,7 @@ export class MerchantsService {
       orderBy: { day: 'asc' },
       select: { id: true, day: true, open_time: true, close_time: true, is_closed: true },
     })
-    return hours
+    return this.dedupeBusinessHours(hours)
   }
 
   async updateMyHours(
@@ -389,11 +389,12 @@ export class MerchantsService {
     merchantId?: string,
   ) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
+    const normalized = this.normalizeBusinessHoursInput(hours)
 
     await this.prisma.$transaction([
       this.prisma.businessHour.deleteMany({ where: { merchant_id: merchant.id } }),
       this.prisma.businessHour.createMany({
-        data: hours.map(h => ({
+        data: normalized.map(h => ({
           merchant_id: merchant.id,
           day: h.day,
           open_time: h.is_closed ? null : (h.open_time ?? null),
@@ -940,6 +941,27 @@ export class MerchantsService {
     }
   }
 
+  private dedupeBusinessHours<T extends { day: number }>(hours: T[]): T[] {
+    const byDay = new Map<number, T>()
+    for (const hour of hours) {
+      if (!byDay.has(hour.day)) byDay.set(hour.day, hour)
+    }
+    return Array.from(byDay.values()).sort((a, b) => a.day - b.day)
+  }
+
+  private normalizeBusinessHoursInput(
+    hours: Array<{ day: number; open_time?: string; close_time?: string; is_closed?: boolean }>,
+  ) {
+    const days = hours.map(h => h.day)
+    if (days.some(day => day < 0 || day > 6 || !Number.isInteger(day))) {
+      throw new BadRequestException('Chaque jour doit être un entier entre 0 (dimanche) et 6 (samedi)')
+    }
+    if (new Set(days).size !== days.length) {
+      throw new BadRequestException('Un seul horaire par jour est autorisé')
+    }
+    return this.dedupeBusinessHours(hours)
+  }
+
   private formatMerchant<T extends Record<string, unknown>>(m: T): T & {
     tags: string[]
     review_count: number
@@ -948,8 +970,10 @@ export class MerchantsService {
   } {
     const tags = (m.tags as Array<{ tag: { name: string } }> | undefined)?.map(t => t.tag.name) ?? []
     const count = m._count as { reviews?: number; favorites?: number } | undefined
+    const rawHours = m.hours as Array<{ day: number }> | undefined
     return {
       ...m,
+      ...(rawHours ? { hours: this.dedupeBusinessHours(rawHours) } : {}),
       tags,
       review_count: count?.reviews ?? 0,
       favorites_count: count?.favorites ?? 0,

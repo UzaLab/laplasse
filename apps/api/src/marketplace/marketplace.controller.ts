@@ -58,6 +58,12 @@ export class MarketplaceController {
   }
 
   @Public()
+  @Get('marketplace/spotlight')
+  listSpotlight(@Query('limit') limit?: string) {
+    return this.svc.listMarketplaceSpotlight(limit ? Number(limit) : undefined)
+  }
+
+  @Public()
   @Get('shops/:slug/products')
   listPublicShop(@Param('slug') slug: string) {
     return this.svc.listPublicProducts(slug)

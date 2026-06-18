@@ -49,7 +49,7 @@ export function ProductCard({
 
   if (variant === 'boutique') {
     return (
-      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-brand-200 transition-all group flex flex-col relative">
+      <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:border-brand-200 transition-all group flex flex-col h-full relative">
         {outOfStock && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl">
             <span className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold">
@@ -86,19 +86,48 @@ export function ProductCard({
           </div>
         </Link>
 
-        <div className={`px-1 flex-1 flex flex-col ${outOfStock ? 'opacity-50' : ''}`}>
+        <div className={`px-1 flex-1 flex flex-col min-h-0 ${outOfStock ? 'opacity-50' : ''}`}>
           {name && (
-            <p className="text-[10px] text-brand-600 font-bold uppercase tracking-wide mb-1 truncate">
+            <p className="hidden sm:block text-[10px] text-brand-600 font-bold uppercase tracking-wide mb-1 truncate">
               {name}
             </p>
           )}
-          <Link href={href} style={{ textDecoration: 'none' }}>
-            <h4 className="font-bold text-slate-900 text-sm mb-2 leading-tight flex-1 hover:text-brand-600 transition-colors line-clamp-2">
+          <Link href={href} className="block flex-1 min-h-0" style={{ textDecoration: 'none' }}>
+            <h4 className="font-bold text-slate-900 text-sm leading-[1.375rem] line-clamp-2 min-h-[2.75rem] hover:text-brand-600 transition-colors">
               {product.name}
             </h4>
           </Link>
-          <div className="flex items-center justify-between mt-auto">
-            <span className={`font-extrabold ${outOfStock ? 'text-slate-500' : 'text-slate-900'}`}>
+
+          {/* Mobile : prix + bouton ancrés en bas */}
+          <div className="flex flex-col gap-2 pt-2 mt-auto sm:hidden">
+            <span className={`font-extrabold text-base ${outOfStock ? 'text-slate-500' : 'text-brand-600'}`}>
+              {formatPrice(product.price, product.currency)}
+            </span>
+            {showAddButton && onAdd && !outOfStock ? (
+              <button
+                type="button"
+                onClick={onAdd}
+                disabled={adding}
+                className="w-full py-2.5 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-slate-900/20 hover:bg-brand-500 active:scale-[0.98] transition-all disabled:opacity-50"
+                aria-label="Ajouter au panier"
+              >
+                {adding ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <>
+                    <ShoppingBag size={14} />
+                    Ajouter
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="h-[38px]" aria-hidden />
+            )}
+          </div>
+
+          {/* Desktop : prix + icône */}
+          <div className="hidden sm:flex items-center justify-between mt-auto pt-1">
+            <span className={`font-extrabold ${outOfStock ? 'text-slate-500' : 'text-brand-600'}`}>
               {formatPrice(product.price, product.currency)}
             </span>
             {showAddButton && onAdd && !outOfStock && (

@@ -52,22 +52,39 @@ export class ReviewsService {
     return review
   }
 
-  async findByMerchant(merchantId: string) {
-    return this.prisma.review.findMany({
-      where: { merchant_id: merchantId, status: 'APPROVED' },
-      select: {
-        id: true, rating: true, title: true, content: true, created_at: true,
-        user: { select: { id: true, full_name: true, avatar: true } },
-      },
-      orderBy: { created_at: 'desc' },
-      take: 50,
-    })
+  async findByMerchant(merchantId: string, opts?: { limit?: number; offset?: number }) {
+    const limit = Math.min(Math.max(opts?.limit ?? 4, 1), 50)
+    const offset = Math.max(opts?.offset ?? 0, 0)
+    const where = { merchant_id: merchantId, status: 'APPROVED' as const }
+
+    const [data, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        select: {
+          id: true, rating: true, title: true, content: true, created_at: true,
+          user: { select: { id: true, full_name: true, avatar: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.review.count({ where }),
+    ])
+
+    return { data, meta: { total, limit, offset } }
   }
 
   async findMine(userId: string) {
     return this.prisma.review.findMany({
       where: { user_id: userId },
-      include: { merchant: { select: { id: true, business_name: true, slug: true } } },
+      include: {
+        merchant: {
+          select: {
+            id: true, business_name: true, slug: true, cover_image: true,
+            category: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { created_at: 'desc' },
     })
   }

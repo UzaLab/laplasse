@@ -1099,6 +1099,116 @@ export class MarketplaceService {
     return this.listMarketplaceShops(limit)
   }
 
+  async getMarketplaceSpotlightLimit(): Promise<number> {
+    const row = await this.prisma.platformSetting.findUnique({
+      where: { key: 'marketplace_spotlight_limit' },
+    })
+    const parsed = Number(row?.value ?? 8)
+    if (!Number.isFinite(parsed) || parsed < 1) return 8
+    return Math.min(Math.floor(parsed), 20)
+  }
+
+  async setMarketplaceSpotlightLimit(limit: number) {
+    const value = Math.min(Math.max(Math.floor(limit), 1), 20)
+    await this.prisma.platformSetting.upsert({
+      where: { key: 'marketplace_spotlight_limit' },
+      create: { key: 'marketplace_spotlight_limit', value: String(value) },
+      update: { value: String(value) },
+    })
+    return { marketplace_spotlight_limit: value }
+  }
+
+  async listMarketplaceSpotlight(requestedLimit?: number) {
+    const cap = requestedLimit
+      ? Math.min(Math.max(Math.floor(requestedLimit), 1), 20)
+      : await this.getMarketplaceSpotlightLimit()
+
+    const now = new Date()
+
+    const [shops, marketplaceCampaigns] = await Promise.all([
+      this.prisma.shop.findMany({
+        where: {
+          is_active: true,
+          status: 'ACTIVE',
+          products: { some: { status: 'ACTIVE', stock_quantity: { gt: 0 } } },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logo: true,
+          marketplace_featured: true,
+          merchant: {
+            select: { id: true, is_sponsored: true },
+          },
+        },
+      }),
+      this.prisma.adCampaign.findMany({
+        where: {
+          placement: 'MARKETPLACE',
+          status: 'ACTIVE',
+          starts_at: { lte: now },
+          ends_at: { gte: now },
+        },
+        select: { merchant_id: true },
+      }),
+    ])
+
+    const sponsoredMerchantIds = new Set(marketplaceCampaigns.map(c => c.merchant_id))
+
+    const ranked = shops
+      .map(shop => {
+        const merchantId = shop.merchant?.id
+        const hasMarketplaceAd = merchantId ? sponsoredMerchantIds.has(merchantId) : false
+        const isAdminFeatured = shop.marketplace_featured
+        const isMerchantSponsored = shop.merchant?.is_sponsored ?? false
+
+        if (!isAdminFeatured && !hasMarketplaceAd && !isMerchantSponsored) return null
+
+        const priority =
+          (isAdminFeatured ? 300 : 0) +
+          (hasMarketplaceAd ? 200 : 0) +
+          (isMerchantSponsored ? 100 : 0)
+
+        return {
+          id: shop.id,
+          business_name: shop.name,
+          slug: shop.slug,
+          logo: shop.logo,
+          is_sponsored: hasMarketplaceAd || isMerchantSponsored,
+          is_admin_featured: isAdminFeatured,
+          priority,
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .sort((a, b) => b.priority - a.priority || a.business_name.localeCompare(b.business_name, 'fr'))
+
+    return ranked.slice(0, cap)
+  }
+
+  async setShopMarketplaceFeatured(shopId: string, featured: boolean) {
+    const shop = await this.prisma.shop.findUnique({ where: { id: shopId } })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+
+    if (featured) {
+      const limit = await this.getMarketplaceSpotlightLimit()
+      const current = await this.prisma.shop.count({
+        where: { marketplace_featured: true, id: { not: shopId } },
+      })
+      if (current >= limit) {
+        throw new BadRequestException(
+          `Maximum ${limit} boutique(s) en avant sur la marketplace. Retirez une sélection admin ou augmentez la limite.`,
+        )
+      }
+    }
+
+    return this.prisma.shop.update({
+      where: { id: shopId },
+      data: { marketplace_featured: featured },
+      select: { id: true, name: true, slug: true, marketplace_featured: true },
+    })
+  }
+
   async listMarketplaceShops(limit = 20) {
     return this.prisma.shop.findMany({
       where: {

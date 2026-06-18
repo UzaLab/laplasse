@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Eye, MessageCircle, Star, Store, Edit, BadgeCheck,
-  TrendingUp, Users, Clock, ChevronRight, Loader2, Smartphone,
-  CheckCircle2, AlertCircle, PhoneCall,
+  TrendingUp, Users, Clock, Loader2, Smartphone,
+  CheckCircle2, AlertCircle, PhoneCall, ImageIcon, ShoppingBag,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
@@ -67,6 +67,8 @@ function DashboardContent() {
   const slug = myProfile?.slug ?? user?.merchants?.[0]?.slug
   const { data: merchant, isLoading: loadingMerchant } = useMerchant(slug ?? '')
   const isLoading = loadingProfile || loadingMerchant
+  const hasShop = (user?.shops?.length ?? 0) > 0
+  const firstName = user?.full_name?.split(' ')[0] ?? 'Marchand'
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) return
@@ -169,23 +171,35 @@ function DashboardContent() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : merchant ? (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Colonne gauche */}
-          <div className="xl:col-span-1 space-y-6">
+        <div className="w-full min-w-0 space-y-8">
+          {/* En-tête */}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Bonjour, {firstName}
+            </h1>
+            <p className="text-slate-500 mt-2 text-sm sm:text-base">
+              Voici un aperçu de la performance de{' '}
+              <span className="font-semibold text-slate-700">{merchant.business_name}</span>.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+            {/* Colonne établissement */}
+            <div className="xl:col-span-4 space-y-6">
           {/* Header carte établissement */}
           <div className="bg-slate-900 rounded-[28px] p-1 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-72 h-72 bg-amber-400/15 rounded-full blur-[90px] -translate-y-1/3 translate-x-1/4 pointer-events-none" />
             <div className="bg-slate-900 rounded-[24px] p-6 relative z-10">
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 bg-slate-800 border border-slate-700 rounded-2xl flex items-center justify-center text-2xl overflow-hidden shrink-0">
-                  {merchant.cover_image
+                  {merchant.logo || merchant.cover_image
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={merchant.cover_image} alt="" className="w-full h-full object-cover" />
+                    ? <img src={merchant.logo ?? merchant.cover_image ?? ''} alt="" className="w-full h-full object-cover" />
                     : <Store size={24} className="text-slate-500" strokeWidth={1.5} />
                   }
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-extrabold text-white truncate">{merchant.business_name}</h1>
+                  <h2 className="text-xl font-extrabold text-white truncate">{merchant.business_name}</h2>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                       merchant.verification_status === 'VERIFIED'
@@ -200,13 +214,25 @@ function DashboardContent() {
                     <span className="text-xs text-slate-500">{merchant.category.name}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mt-5">
                 <Link
                   href="/merchant/profile/edit"
-                  className="shrink-0 flex items-center gap-1.5 text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold bg-white text-slate-900 px-3.5 py-2 rounded-xl hover:bg-slate-100 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <Edit size={14} /> Modifier
                 </Link>
+                {slug && (
+                  <Link
+                    href={`/m/${slug}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Eye size={14} /> Voir la fiche
+                  </Link>
+                )}
               </div>
 
               {/* Stats rapides */}
@@ -245,7 +271,7 @@ function DashboardContent() {
             if (score === 100) return null
             const missing = items.filter(i => !i.done)
             return (
-              <div className="bg-white border border-slate-100 rounded-[28px] p-6">
+              <div className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <AlertCircle size={15} className="text-amber-500" />
@@ -261,15 +287,15 @@ function DashboardContent() {
                 </div>
                 <div className="space-y-1.5">
                   {missing.slice(0, 4).map(item => (
-                    <div key={item.label} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 size={13} className="text-slate-200" />
-                        <span className="text-xs text-slate-500">{item.label}</span>
+                    <div key={item.label} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 size={13} className="text-slate-200 shrink-0" />
+                        <span className="text-xs text-slate-500 truncate">{item.label}</span>
                       </div>
                       {item.href && (
                         <Link
                           href={item.href}
-                          className="text-xs font-bold text-amber-600 hover:text-amber-700"
+                          className="text-xs font-bold text-amber-600 hover:text-amber-700 shrink-0"
                           style={{ textDecoration: 'none' }}
                         >
                           Ajouter →
@@ -281,19 +307,19 @@ function DashboardContent() {
               </div>
             )
           })()}
-          </div>
+            </div>
 
-          {/* Colonne droite */}
-          <div className="xl:col-span-2 space-y-6">
+            {/* Colonne analytics */}
+            <div className="xl:col-span-8 space-y-6">
           {/* Stats grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { icon: <Star size={18} />,  label: 'Avis reçus',  value: analytics ? analytics.reviews.count  : merchant.review_count,    color: 'amber' },
               { icon: <Users size={18} />, label: 'Favoris',      value: analytics ? analytics.favorites      : merchant.favorites_count,  color: 'rose' },
-              ...(analytics?.call_clicks ? [{ icon: <PhoneCall size={18} />, label: 'Clics tél', value: analytics.call_clicks, color: 'violet' }] : []),
-              ...(analytics?.reviews.avg_rating ? [{ icon: <Star size={18} />, label: 'Note moy.', value: analytics.reviews.avg_rating, color: 'orange' }] : []),
+              { icon: <PhoneCall size={18} />, label: 'Clics tél', value: analytics?.call_clicks ?? 0, color: 'violet' },
+              { icon: <Star size={18} />, label: 'Note moy.', value: analytics?.reviews.avg_rating?.toFixed(1) ?? '—', color: 'orange' },
             ].map(stat => (
-              <div key={stat.label} className="bg-white border border-slate-100 rounded-[28px] p-5">
+              <div key={stat.label} className="bg-white border border-slate-100 rounded-[28px] p-5 shadow-sm">
                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-3 ${
                   stat.color === 'amber'  ? 'bg-amber-50 text-amber-600' :
                   stat.color === 'rose'   ? 'bg-rose-50 text-rose-600' :
@@ -307,57 +333,71 @@ function DashboardContent() {
           </div>
 
           {/* Chart */}
-          {chartData && chartData.days.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-[28px] p-6">
-              <div className="flex items-center justify-between mb-4">
+          {chartData && chartData.days.length > 0 ? (
+            <div className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">Vues — 30 derniers jours</h3>
+                  <h3 className="font-extrabold text-slate-900">Vues — 30 derniers jours</h3>
                   <p className="text-xs text-slate-400 mt-0.5">
                     <span className="font-bold text-slate-700">{chartData.total}</span> visites au total
                   </p>
                 </div>
                 <Link
                   href="/merchant/analytics"
-                  className="flex items-center gap-1.5 text-xs text-amber-600 font-bold bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-amber-600 font-bold bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
-                  <TrendingUp size={11} /> Détail
+                  <TrendingUp size={12} /> Voir tout
                 </Link>
               </div>
-              <AnalyticsChart data={chartData.days} height={72} color="#f59e0b" />
+              <AnalyticsChart data={chartData.days} height={88} color="#f59e0b" />
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-100 rounded-[28px] p-8 text-center shadow-sm">
+              <TrendingUp size={28} className="text-slate-200 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-slate-600">Pas encore de données analytics</p>
+              <p className="text-xs text-slate-400 mt-1">Les vues apparaîtront dès que les visiteurs consulteront votre fiche.</p>
             </div>
           )}
-
-          {/* Actions rapides */}
-          <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <h3 className="font-extrabold text-slate-900">Actions rapides</h3>
             </div>
-            {[
-              { href: '/merchant/profile/edit', icon: <Edit size={16} className="text-amber-500" />,    label: 'Modifier le profil',      desc: 'Nom, description, contact' },
-              { href: '/merchant/hours',        icon: <Clock size={16} className="text-blue-500" />,    label: 'Gérer les horaires',      desc: 'Définir vos heures d\'ouverture' },
-              { href: '/merchant/media',        icon: <Store size={16} className="text-emerald-500" />, label: 'Ajouter des photos',      desc: 'Logo, cover, galerie' },
-              { href: '/merchant/analytics',    icon: <TrendingUp size={16} className="text-violet-500" />, label: 'Voir les statistiques', desc: 'Vues, clics, avis' },
-              { href: '/merchant/crm',          icon: <Users size={16} className="text-teal-500" />,       label: 'Clients CRM',           desc: 'Clients récurrents et inactifs' },
-              { href: '/merchant/plans',        icon: <BadgeCheck size={16} className="text-rose-500" />, label: 'Plans & abonnements',   desc: 'Booster votre visibilité' },
-            ].map((action, i, arr) => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className={`flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors ${i < arr.length - 1 ? 'border-b border-slate-100' : ''}`}
-                style={{ textDecoration: 'none' }}
-              >
-                <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center shrink-0">
-                  {action.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900 text-sm">{action.label}</p>
-                  <p className="text-xs text-slate-400">{action.desc}</p>
-                </div>
-                <ChevronRight size={16} className="text-slate-300 shrink-0" />
-              </Link>
-            ))}
           </div>
+
+          {/* Actions rapides — pleine largeur */}
+          <div className="border-t border-slate-200 pt-8">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+              Actions rapides
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[
+                { href: '/merchant/profile/edit', Icon: Edit, title: 'Modifier le profil', sub: 'Nom, description, contact' },
+                { href: '/merchant/hours', Icon: Clock, title: 'Horaires', sub: 'Heures d\'ouverture' },
+                { href: '/merchant/media', Icon: ImageIcon, title: 'Photos & médias', sub: 'Logo, cover, galerie' },
+                { href: '/merchant/analytics', Icon: TrendingUp, title: 'Statistiques', sub: 'Vues, clics, avis' },
+                { href: '/merchant/crm', Icon: Users, title: 'Clients CRM', sub: 'Clients récurrents' },
+                { href: '/merchant/plans', Icon: BadgeCheck, title: 'Plans & visibilité', sub: 'Booster votre fiche' },
+                ...(hasShop
+                  ? [{ href: '/merchant/shop', Icon: ShoppingBag, title: 'Ma boutique', sub: 'Produits & commandes' }]
+                  : []),
+                ...(slug
+                  ? [{ href: `/m/${slug}`, Icon: Store, title: 'Fiche publique', sub: 'Voir comme un client' }]
+                  : []),
+              ].map(action => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="bg-white border border-slate-200 rounded-[20px] p-5 hover:border-amber-200 hover:shadow-md transition-all group"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <action.Icon
+                    size={22}
+                    strokeWidth={1.75}
+                    className="text-slate-600 group-hover:text-amber-600 mb-3 transition-colors"
+                  />
+                  <p className="font-extrabold text-slate-900 text-sm">{action.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{action.sub}</p>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}

@@ -16,6 +16,7 @@ describe('ReviewsService', () => {
       findFirst: jest.Mock
       findMany: jest.Mock
       create: jest.Mock
+      count: jest.Mock
     }
   }
 
@@ -26,6 +27,7 @@ describe('ReviewsService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
+        count: jest.fn(),
       },
     }
     service = new ReviewsService(
@@ -87,16 +89,20 @@ describe('ReviewsService', () => {
   })
 
   describe('findByMerchant', () => {
-    it('ne retourne que les avis APPROVED', async () => {
+    it('ne retourne que les avis APPROVED paginés', async () => {
       prisma.review.findMany.mockResolvedValue([])
+      prisma.review.count.mockResolvedValue(0)
 
-      await service.findByMerchant('m1')
+      const result = await service.findByMerchant('m1')
 
       expect(prisma.review.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { merchant_id: 'm1', status: 'APPROVED' },
+          take: 4,
+          skip: 0,
         }),
       )
+      expect(result).toEqual({ data: [], meta: { total: 0, limit: 4, offset: 0 } })
     })
   })
 })

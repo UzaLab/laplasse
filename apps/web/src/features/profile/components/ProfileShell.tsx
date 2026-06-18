@@ -202,7 +202,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
         </header>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8">
+        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
           {children}
         </div>
       </main>

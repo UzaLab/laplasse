@@ -298,4 +298,33 @@ export class AdminController {
   getAuditLogs(@Query('limit') limit?: string) {
     return this.audit.listRecent(limit ? Number(limit) : 50)
   }
+
+  // ── Marketplace spotlight ────────────────────────────────────────────────────
+
+  @Get('marketplace/spotlight')
+  async getMarketplaceSpotlightSettings() {
+    const limit = await this.marketplace.getMarketplaceSpotlightLimit()
+    const featured = await this.prisma.shop.findMany({
+      where: { marketplace_featured: true },
+      select: { id: true, name: true, slug: true, marketplace_featured: true },
+      orderBy: { name: 'asc' },
+    })
+    return { marketplace_spotlight_limit: limit, featured_shops: featured }
+  }
+
+  @Patch('marketplace/spotlight/limit')
+  async setMarketplaceSpotlightLimit(@Body() body: { limit: number }) {
+    if (body.limit == null || !Number.isFinite(body.limit)) {
+      throw new BadRequestException('Limite invalide')
+    }
+    return this.marketplace.setMarketplaceSpotlightLimit(body.limit)
+  }
+
+  @Patch('shops/:id/marketplace-featured')
+  async toggleShopMarketplaceFeatured(
+    @Param('id') id: string,
+    @Body() body: { featured: boolean },
+  ) {
+    return this.marketplace.setShopMarketplaceFeatured(id, Boolean(body.featured))
+  }
 }

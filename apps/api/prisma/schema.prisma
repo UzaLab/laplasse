@@ -242,6 +242,7 @@ model BusinessHour {
 
   merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
 
+  @@unique([merchant_id, day])
   @@index([merchant_id])
 }
 
@@ -750,6 +751,7 @@ enum AdPlacement {
   SEARCH
   FEATURED
   CATEGORY
+  MARKETPLACE
 }
 
 model AdCampaign {
@@ -770,6 +772,14 @@ model AdCampaign {
   @@index([merchant_id])
   @@index([status])
   @@index([ends_at])
+}
+
+// ─── PLATFORM SETTINGS ─────────────────────────────────────────────────────────
+
+model PlatformSetting {
+  key        String   @id
+  value      String
+  updated_at DateTime @updatedAt
 }
 
 // ─── AUDIT & FRAUD ─────────────────────────────────────────────────────────────
@@ -852,6 +862,7 @@ model Shop {
   merchant_id String?    @unique
   status      ShopStatus @default(DRAFT)
   is_active   Boolean    @default(true)
+  marketplace_featured Boolean @default(false)
   created_at  DateTime   @default(now())
   updated_at  DateTime   @updatedAt
 

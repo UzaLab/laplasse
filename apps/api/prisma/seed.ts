@@ -195,12 +195,18 @@ async function main() {
   for (const { slug, schedule } of hoursData) {
     const mId = merchantMap[slug]
     if (!mId) continue
+    await prisma.businessHour.deleteMany({ where: { merchant_id: mId } })
     for (let day = 0; day < 7; day++) {
       const match = schedule.find(s => s.days.includes(day))
-      await prisma.businessHour.upsert({
-        where: { id: `bh-${slug}-${day}` },
-        update: {},
-        create: { id: `bh-${slug}-${day}`, merchant_id: mId, day, open_time: match?.open ?? null, close_time: match?.close ?? null, is_closed: !match },
+      await prisma.businessHour.create({
+        data: {
+          id: `bh-${slug}-${day}`,
+          merchant_id: mId,
+          day,
+          open_time: match?.open ?? null,
+          close_time: match?.close ?? null,
+          is_closed: !match,
+        },
       })
     }
   }
@@ -283,6 +289,21 @@ async function main() {
     }
   }
   console.log(`✅ ${productCount} produits marketplace créés`)
+
+  await prisma.platformSetting.upsert({
+    where: { key: 'marketplace_spotlight_limit' },
+    create: { key: 'marketplace_spotlight_limit', value: '8' },
+    update: {},
+  })
+
+  for (const slug of ['yale-design', 'galerie-korhogo']) {
+    const mId = merchantMap[slug]
+    if (!mId) continue
+    await prisma.shop.updateMany({
+      where: { OR: [{ id: `shop_${mId}` }, { merchant_id: mId }] },
+      data: { marketplace_featured: true },
+    })
+  }
 
   console.log('\n🎉 Base de données LaPlasse initialisée avec succès !')
   console.log(`   → ${categories.length} catégories`)

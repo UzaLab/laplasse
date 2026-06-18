@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, UseGuards, Query } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { ReviewsService } from './reviews.service'
 import { CreateReviewDto } from './dto/create-review.dto'
@@ -13,8 +13,15 @@ export class ReviewsController {
 
   @Public()
   @Get('merchant/:merchantId')
-  findByMerchant(@Param('merchantId') merchantId: string) {
-    return this.reviewsService.findByMerchant(merchantId)
+  findByMerchant(
+    @Param('merchantId') merchantId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.reviewsService.findByMerchant(merchantId, {
+      limit: limit ? Number(limit) : 4,
+      offset: offset ? Number(offset) : 0,
+    })
   }
 
   @Get('mine')

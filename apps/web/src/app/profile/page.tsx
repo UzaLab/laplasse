@@ -143,7 +143,7 @@ export default function ProfilePage() {
 
   return (
     <ProfileShell>
-      <div className="max-w-6xl mx-auto min-w-0">
+      <div className="w-full min-w-0">
 
         {/* Welcome */}
         <div className="mb-8">

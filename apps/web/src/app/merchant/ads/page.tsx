@@ -106,6 +106,7 @@ export default function MerchantAdsPage() {
             <option value="SEARCH">Top recherche</option>
             <option value="FEATURED">Page d&apos;accueil</option>
             <option value="CATEGORY">Catégorie</option>
+            <option value="MARKETPLACE">Boutiques à la une (Marketplace)</option>
           </select>
           <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm">
             <option value={7}>7 jours</option>

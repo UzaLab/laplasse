@@ -68,6 +68,11 @@ export interface MarketplaceBoutique {
   logo: string | null
 }
 
+export interface MarketplaceSpotlightShop extends MarketplaceBoutique {
+  is_sponsored?: boolean
+  is_admin_featured?: boolean
+}
+
 export interface CartMerchantGroup {
   id: string
   business_name: string
@@ -276,6 +281,10 @@ export function fetchMarketplaceProducts(params?: {
 
 export function fetchMarketplaceMerchants(limit = 20) {
   return publicFetch<MarketplaceBoutique[]>(`/marketplace/merchants?limit=${limit}`)
+}
+
+export function fetchMarketplaceSpotlight() {
+  return publicFetch<MarketplaceSpotlightShop[]>('/marketplace/spotlight')
 }
 
 export function fetchMerchantProducts(shopSlug: string) {
