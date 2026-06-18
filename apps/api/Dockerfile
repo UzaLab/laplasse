@@ -12,6 +12,7 @@ RUN pnpm install --frozen-lockfile --filter api
 
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM base AS builder
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/api ./apps/api
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
