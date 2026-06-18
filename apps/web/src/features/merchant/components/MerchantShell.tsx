@@ -50,6 +50,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       authApiFetch('/shops/mine'),
     ])
       .then(async ([merchantsRes, meRes, shopsRes]) => {
+        let latestMerchantId = activeMerchantId ?? user?.merchants?.[0]?.id ?? null
         if (merchantsRes.ok) {
           const list = await merchantsRes.json() as Array<{
             id: string; business_name: string; slug: string;
@@ -57,6 +58,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
             category?: { slug: string }
           }>
           if (list.length) {
+            latestMerchantId = activeMerchantId ?? list[0]?.id ?? null
             updateUser({
               merchants: list.map(m => ({
                 id: m.id,
@@ -71,6 +73,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
             const currentValid = list.some(m => m.id === activeMerchantId)
             if (!activeMerchantId || !currentValid) {
               setActiveMerchant(list[0].id)
+              latestMerchantId = list[0].id
             }
           }
         }
@@ -88,7 +91,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
                 merchant_id: s.merchant_id,
               })),
             })
-            const merchantId = activeMerchantId ?? list[0]?.id
+            const merchantId = latestMerchantId
             const linked = shopList.filter(s => s.merchant_id === merchantId)
             const shopValid = linked.some(s => s.id === activeShopId)
             if (linked.length && (!activeShopId || !shopValid)) {

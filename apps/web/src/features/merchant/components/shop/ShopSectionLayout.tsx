@@ -99,8 +99,8 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
         {/* Sous-navigation */}
         {!hideTabs && activeShop && (
           <nav className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl">
-            {TABS.map(({ href, label, icon: Icon, exact }) => {
-              const active = isTabActive(href, exact)
+            {TABS.map(({ href, label, icon: Icon }) => {
+              const active = isTabActive(href, href === '/merchant/shop')
               return (
                 <Link
                   key={href}

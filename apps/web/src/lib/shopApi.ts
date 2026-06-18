@@ -95,7 +95,11 @@ export async function createShop(
 
 export async function updateShop(
   shopId: string,
-  input: Partial<CreateShopInput> & { status?: ShopStatus },
+  input: Partial<CreateShopInput> & {
+    status?: ShopStatus
+    logo?: string
+    cover_image?: string
+  },
 ): Promise<{ shop: ShopSummary | null; error?: string }> {
   const res = await shopApiFetch(`/shops/${shopId}`, shopId, {
     method: 'PATCH',
