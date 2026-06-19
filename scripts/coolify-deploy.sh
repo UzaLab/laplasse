@@ -197,6 +197,8 @@ case "$TARGET" in
     ;;
   web-prod)
     wait_for_coolify || exit 1
+    # Sans FORCE : réutilise le cache Docker (souvent ~1–3 min si preprod vient de builder).
+    # FORCE=true uniquement si le cache est corrompu (~30–45 min sur ce VPS).
     deploy_one "$WEB_PROD" "laplasse-web-prod" 80
     ;;
   prod-first)

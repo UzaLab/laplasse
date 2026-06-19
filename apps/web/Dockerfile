@@ -44,7 +44,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
 
 # Limite le parallélisme Next.js (moins de pics RAM)
 ENV NEXT_PRIVATE_WORKER_COUNT=1
-RUN pnpm build
+RUN --mount=type=cache,id=laplasse-next-web,target=/app/apps/web/.next/cache \
+    pnpm build
 
 # ── Runner (standalone = ~50 Mo vs image complète) ────────────────────────────
 FROM node:22-alpine AS runner
