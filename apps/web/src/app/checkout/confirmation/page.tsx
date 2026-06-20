@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
@@ -18,6 +18,20 @@ import {
 } from '@/lib/checkoutSession'
 
 export default function CheckoutConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      }
+    >
+      <CheckoutConfirmationContent />
+    </Suspense>
+  )
+}
+
+function CheckoutConfirmationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuthStore()
