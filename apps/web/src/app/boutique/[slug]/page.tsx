@@ -4,6 +4,8 @@ import { Footer } from '@/components/layout/Footer'
 import { authUrl } from '@/lib/authClient'
 import { BoutiquePageClient } from '@/features/marketplace/components/BoutiquePageClient'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ slug: string }>
 }

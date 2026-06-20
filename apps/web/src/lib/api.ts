@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
+
 function getApiUrl(): string {
   // SSR dans Docker : URL interne Coolify (évite le loopback Traefik/SSL)
   if (typeof window === 'undefined' && process.env.API_INTERNAL_URL) {
@@ -30,7 +32,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   for (const base of bases) {
     try {
-      const res = await fetch(`${base}${path}`, {
+      const res = await fetchWithTimeout(`${base}${path}`, {
         headers: { 'Content-Type': 'application/json' },
         ...options,
       })

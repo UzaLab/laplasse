@@ -42,8 +42,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST \
     NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 
-# Limite le parallélisme Next.js (moins de pics RAM)
-ENV NEXT_PRIVATE_WORKER_COUNT=1
+# Limite le parallélisme Next.js (VPS RAM limitée) — 2 workers suffisent sans prérendu API lourd
+ENV NEXT_PRIVATE_WORKER_COUNT=2
 RUN --mount=type=cache,id=laplasse-next-web,target=/app/apps/web/.next/cache \
     pnpm build
 

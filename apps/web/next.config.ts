@@ -36,6 +36,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  // Évite les builds Docker bloqués sur le VPS (pages lentes / API indisponible)
+  staticPageGenerationTimeout: 45,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

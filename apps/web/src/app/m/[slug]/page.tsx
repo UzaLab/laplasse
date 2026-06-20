@@ -16,6 +16,8 @@ import { BookingForm } from '@/features/merchant/components/BookingForm'
 import { MerchantProductsSection } from '@/features/marketplace/components/MerchantProductsSection'
 import { MerchantReviewsSection } from '@/features/discovery/components/MerchantReviewsSection'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ slug: string }>
 }

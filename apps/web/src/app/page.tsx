@@ -12,6 +12,8 @@ import { B2BSection } from '@/features/discovery/components/B2BSection'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
 
+export const dynamic = 'force-dynamic'
+
 // Adapte ApiMerchant → shape SpotCard (qui inclut sub_category & featured_product)
 function toSpotMerchant(m: ApiMerchant) {
   return {

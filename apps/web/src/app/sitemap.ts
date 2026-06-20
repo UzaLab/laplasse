@@ -1,12 +1,17 @@
 import type { MetadataRoute } from 'next'
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+const SITEMAP_MERCHANT_LIMIT = 200
 
 async function fetchJson<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(`${API_URL}${path}`, {
-      next: { revalidate: 3600 }, // revalidate toutes les heures
+    const res = await fetchWithTimeout(`${API_URL}${path}`, {
+      next: { revalidate: 3600 },
     })
     if (!res.ok) return null
     return res.json() as Promise<T>
@@ -39,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const merchantsRes = await fetchJson<{
     data: Array<{ slug: string; updated_at?: string }>
     meta: { total: number }
-  }>('/merchants?limit=1000&offset=0')
+  }>('/merchants?limit=' + SITEMAP_MERCHANT_LIMIT + '&offset=0')
 
   const merchantRoutes: MetadataRoute.Sitemap = (merchantsRes?.data ?? []).map(m => ({
     url: `${BASE_URL}/m/${m.slug}`,

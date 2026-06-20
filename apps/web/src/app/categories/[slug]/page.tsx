@@ -6,6 +6,8 @@ import { Footer } from '@/components/layout/Footer'
 import { api, ApiCategory, ApiMerchant } from '@/lib/api'
 import { CategoryIcon } from '@/lib/icons'
 
+export const dynamic = 'force-dynamic'
+
 interface Props {
   params: Promise<{ slug: string }>
 }
