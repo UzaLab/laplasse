@@ -33,6 +33,7 @@ export interface MarketplaceProduct {
   currency: string
   stock_quantity: number
   image_url?: string | null
+  images?: string[]
   status: ProductStatus
   allow_pickup?: boolean
   allow_delivery?: boolean
@@ -197,6 +198,7 @@ export interface CreateProductInput {
   price: number
   stock_quantity?: number
   image_url?: string
+  images?: string[]
   status?: ProductStatus
   allow_pickup?: boolean
   allow_delivery?: boolean
@@ -210,6 +212,7 @@ export interface UpdateProductInput {
   price?: number
   stock_quantity?: number
   image_url?: string
+  images?: string[]
   status?: ProductStatus
   allow_pickup?: boolean
   allow_delivery?: boolean

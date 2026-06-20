@@ -124,16 +124,33 @@ export class MerchantsService {
   }
 
   async findFeatured(city = 'Abidjan', limit = 6) {
-    const merchants = await this.prisma.merchant.findMany({
-      where: {
-        is_active: true,
-        verification_status: 'VERIFIED',
-        location: { city: { equals: city, mode: 'insensitive' } },
-      },
+    const baseWhere = {
+      is_active: true,
+      location: { city: { equals: city, mode: 'insensitive' as const } },
+    }
+
+    const verified = await this.prisma.merchant.findMany({
+      where: { ...baseWhere, verification_status: 'VERIFIED' },
       select: MERCHANT_PUBLIC_SELECT,
       orderBy: [{ is_sponsored: 'desc' }, { trust_score: 'desc' }],
       take: limit,
     })
+
+    let merchants = verified
+    if (verified.length < limit) {
+      const verifiedIds = new Set(verified.map(m => m.id))
+      const fallback = await this.prisma.merchant.findMany({
+        where: {
+          ...baseWhere,
+          id: verifiedIds.size ? { notIn: [...verifiedIds] } : undefined,
+        },
+        select: MERCHANT_PUBLIC_SELECT,
+        orderBy: [{ is_sponsored: 'desc' }, { trust_score: 'desc' }],
+        take: limit - verified.length,
+      })
+      merchants = [...verified, ...fallback]
+    }
+
     return attachShopPreviewsToMerchants(
       this.prisma,
       merchants.map(m => this.formatMerchant(m)),

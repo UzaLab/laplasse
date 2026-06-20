@@ -38,6 +38,13 @@ import { notify } from '@/lib/notify'
 
 type TabId = 'description' | 'composition' | 'reviews'
 
+function getProductGallery(product: MarketplaceProduct): string[] {
+  const fromList = product.images?.filter(Boolean) ?? []
+  if (fromList.length > 0) return fromList
+  if (product.image_url) return [product.image_url]
+  return [PLACEHOLDER_PRODUCT_IMAGE]
+}
+
 function StarRating({ rating }: { rating: number }) {
   const full = Math.floor(rating)
   const hasHalf = rating - full >= 0.5
@@ -90,7 +97,8 @@ export default function ProductDetailPage() {
         if (cancelled) return
         if (productData) {
           setProduct(productData)
-          setSelectedImage(productData.image_url || PLACEHOLDER_PRODUCT_IMAGE)
+          const gallery = getProductGallery(productData)
+          setSelectedImage(gallery[0])
           const firstVariant = productData.variants?.find(v => v.stock_quantity > 0)
           setSelectedVariantId(firstVariant?.id ?? productData.variants?.[0]?.id ?? null)
         }
@@ -189,7 +197,9 @@ export default function ProductDetailPage() {
   const shortDescription = product.description
     ? stripHtml(product.description).slice(0, 220)
     : ''
-  const image = selectedImage || product.image_url || PLACEHOLDER_PRODUCT_IMAGE
+  const galleryImages = getProductGallery(product)
+  const image = selectedImage || galleryImages[0]
+  const thumbnails = galleryImages
   const categoryName = merchant?.category?.name ?? merchantDetail?.category.name ?? 'Marketplace'
   const categorySlug = merchant?.category?.slug ?? merchantDetail?.category.slug
   const merchantLogo = merchantDetail?.logo
@@ -198,8 +208,6 @@ export default function ProductDetailPage() {
   const locationLabel = merchantDetail?.location
     ? [merchantDetail.location.district, merchantDetail.location.city].filter(Boolean).join(', ')
     : ''
-
-  const thumbnails = [product.image_url || PLACEHOLDER_PRODUCT_IMAGE]
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -263,23 +271,25 @@ export default function ProductDetailPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-4 gap-4 mt-4">
-                {thumbnails.map((thumb, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setSelectedImage(thumb)}
-                    className={`aspect-square rounded-2xl overflow-hidden relative transition-colors ${
-                      selectedImage === thumb
-                        ? 'border-2 border-slate-900'
-                        : 'border border-slate-200 hover:border-brand-300 opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={thumb} className="w-full h-full object-cover" alt="" />
-                  </button>
-                ))}
-              </div>
+              {thumbnails.length > 1 && (
+                <div className={`grid gap-3 mt-4 ${thumbnails.length <= 4 ? 'grid-cols-4' : 'grid-cols-4 sm:grid-cols-5'}`}>
+                  {thumbnails.map((thumb, i) => (
+                    <button
+                      key={`${thumb}-${i}`}
+                      type="button"
+                      onClick={() => setSelectedImage(thumb)}
+                      className={`aspect-square rounded-2xl overflow-hidden relative transition-colors ${
+                        selectedImage === thumb
+                          ? 'border-2 border-slate-900 ring-2 ring-slate-200'
+                          : 'border border-slate-200 hover:border-brand-300 opacity-80 hover:opacity-100'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={thumb} className="w-full h-full object-cover" alt="" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Infos produit */}
@@ -366,7 +376,7 @@ export default function ProductDetailPage() {
                       <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
                         Variante
                       </label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                         {variants.map(variant => {
                           const variantOut = variant.stock_quantity <= 0
                           return (
@@ -378,7 +388,7 @@ export default function ProductDetailPage() {
                                 setSelectedVariantId(variant.id)
                                 setQuantity(1)
                               }}
-                              className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                              className={`min-h-[48px] px-3 py-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all text-left sm:text-center ${
                                 selectedVariantId === variant.id
                                   ? 'bg-slate-900 text-white border-slate-900'
                                   : variantOut
@@ -398,51 +408,55 @@ export default function ProductDetailPage() {
                   )}
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
+                    <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider lg:sr-only">
                       Quantité
                     </label>
-                    <div className="inline-flex items-center p-1.5 bg-slate-50 border border-slate-200 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
-                      >
-                        <Minus size={16} />
-                      </button>
-                      <span className="w-12 text-center font-bold text-slate-900">{quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(q => Math.min(displayStock, q + 1))}
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
-                      >
-                        <Plus size={16} />
-                      </button>
-                    </div>
-                  </div>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
+                      <div className="inline-flex items-center p-1 bg-slate-50 border border-slate-200 rounded-full sm:rounded-xl shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full sm:rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                        >
+                          <Minus size={16} />
+                        </button>
+                        <span className="w-10 sm:w-12 text-center font-bold text-slate-900 text-sm sm:text-base">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => setQuantity(q => Math.min(displayStock, q + 1))}
+                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full sm:rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
 
-                  <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => addToCart(false)}
-                      disabled={adding || buyingNow}
-                      className="flex-1 bg-slate-900 text-white h-14 rounded-2xl font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 group disabled:opacity-50"
-                    >
-                      {adding ? (
-                        <Loader2 size={20} className="animate-spin" />
-                      ) : (
-                        <ShoppingBag size={20} className="group-hover:-translate-y-0.5 transition-transform" />
-                      )}
-                      {adding ? 'Ajout…' : 'Ajouter au panier'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => addToCart(true)}
-                      disabled={adding || buyingNow}
-                      className="flex-1 bg-brand-50 border-2 border-brand-200 text-brand-700 h-14 rounded-2xl font-bold hover:bg-brand-100 hover:border-brand-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {buyingNow && <Loader2 size={20} className="animate-spin" />}
-                      Acheter maintenant
-                    </button>
+                      <div className="flex flex-col sm:flex-row lg:flex-1 gap-3 lg:gap-2">
+                        <button
+                          type="button"
+                          onClick={() => addToCart(false)}
+                          disabled={adding || buyingNow}
+                          className="w-full lg:flex-1 bg-slate-900 text-white min-h-[48px] py-3.5 lg:py-0 lg:h-11 rounded-full lg:rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 group disabled:opacity-50"
+                        >
+                          {adding ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <ShoppingBag size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+                          )}
+                          <span className="lg:hidden">{adding ? 'Ajout…' : 'Ajouter au panier'}</span>
+                          <span className="hidden lg:inline">{adding ? 'Ajout…' : 'Ajouter'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => addToCart(true)}
+                          disabled={adding || buyingNow}
+                          className="w-full lg:flex-1 bg-brand-50 border-2 border-brand-200 text-brand-700 min-h-[48px] py-3.5 lg:py-0 lg:h-11 rounded-full lg:rounded-xl text-sm font-bold hover:bg-brand-100 hover:border-brand-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {buyingNow && <Loader2 size={18} className="animate-spin" />}
+                          <span className="lg:hidden">Acheter maintenant</span>
+                          <span className="hidden lg:inline">Acheter</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -488,11 +502,11 @@ export default function ProductDetailPage() {
       <section className="border-t border-slate-100 bg-[#FAFAFA] py-16">
         <div className={PAGE_CONTAINER}>
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center justify-center gap-4 sm:gap-8 border-b border-slate-200 mb-8 overflow-x-auto">
+            <div className="flex items-center justify-start sm:justify-center gap-5 sm:gap-8 border-b border-slate-200 mb-8 overflow-x-auto no-scrollbar px-1">
               <button
                 type="button"
                 onClick={() => setActiveTab('description')}
-                className={`pb-4 font-bold whitespace-nowrap transition-colors ${
+                className={`pb-3 sm:pb-4 text-sm sm:text-base font-bold whitespace-nowrap transition-colors shrink-0 ${
                   activeTab === 'description'
                     ? 'text-brand-600 border-b-2 border-brand-500'
                     : 'text-slate-500 hover:text-slate-800'
@@ -503,10 +517,10 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('composition')}
-                className={`pb-4 font-medium whitespace-nowrap transition-colors ${
+                className={`pb-3 sm:pb-4 text-sm sm:text-base whitespace-nowrap transition-colors shrink-0 ${
                   activeTab === 'composition'
                     ? 'text-brand-600 border-b-2 border-brand-500 font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
+                    : 'text-slate-500 hover:text-slate-800 font-medium'
                 }`}
               >
                 Composition & Origine
@@ -514,10 +528,10 @@ export default function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('reviews')}
-                className={`pb-4 font-medium whitespace-nowrap transition-colors ${
+                className={`pb-3 sm:pb-4 text-sm sm:text-base whitespace-nowrap transition-colors shrink-0 ${
                   activeTab === 'reviews'
                     ? 'text-brand-600 border-b-2 border-brand-500 font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
+                    : 'text-slate-500 hover:text-slate-800 font-medium'
                 }`}
               >
                 Avis clients{reviewCount > 0 ? ` (${reviewCount})` : ''}

@@ -1,13 +1,14 @@
 import { cn } from '@/lib/utils'
 
 interface CheckoutStepsProps {
-  current: 1 | 2 | 3
+  current: 1 | 2 | 3 | 4
 }
 
 const STEPS = [
   { n: 1, label: 'Panier' },
   { n: 2, label: 'Livraison' },
   { n: 3, label: 'Paiement' },
+  { n: 4, label: 'Confirmation' },
 ] as const
 
 export function CheckoutSteps({ current }: CheckoutStepsProps) {

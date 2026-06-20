@@ -62,6 +62,11 @@ export class CreateProductDto {
   image_url?: string
 
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[]
+
+  @IsOptional()
   @IsBoolean()
   allow_pickup?: boolean
 
@@ -111,6 +116,11 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   image_url?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[]
 
   @IsOptional()
   @IsBoolean()

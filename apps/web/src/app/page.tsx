@@ -30,16 +30,15 @@ function toCategory(c: ApiCategory) {
 }
 
 export default async function HomePage() {
-  // Server-side fetch (SSR) — données fraîches à chaque requête
-  const [categoriesRaw, featuredRaw, nearbyRaw] = await Promise.allSettled([
+  const [categoriesRaw, merchantsRaw] = await Promise.allSettled([
     api.categories.list(),
-    api.merchants.featured('Abidjan', 3),
-    api.merchants.nearby('Abidjan', undefined, 3),
+    api.merchants.list({ city: 'Abidjan', limit: 6, sort: 'trust_score' }),
   ])
 
   const categories = categoriesRaw.status === 'fulfilled' ? categoriesRaw.value.map(toCategory) : []
-  const featured   = featuredRaw.status === 'fulfilled'   ? featuredRaw.value.map(toSpotMerchant) : []
-  const nearby     = nearbyRaw.status === 'fulfilled'     ? nearbyRaw.value : []
+  const merchants  = merchantsRaw.status === 'fulfilled' ? merchantsRaw.value.data.map(toSpotMerchant) : []
+  const featured   = merchants.slice(0, 3)
+  const nearby     = merchants.slice(0, 3)
 
   return (
     <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">

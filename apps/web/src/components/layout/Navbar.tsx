@@ -77,9 +77,6 @@ export function Navbar() {
           <Link href="/search" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
             Recherche
           </Link>
-          <Link href="/categories" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            Catégories
-          </Link>
           <Link href="/merchant/signup" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
             Mon établissement
           </Link>

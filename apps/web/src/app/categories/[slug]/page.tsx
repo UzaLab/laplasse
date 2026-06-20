@@ -76,7 +76,7 @@ export default async function CategoryPage({ params }: Props) {
   try {
     [category, merchants] = await Promise.all([
       api.categories.bySlug(slug),
-      api.merchants.list({ category: slug, limit: 24 }),
+      api.merchants.list({ category: slug, city: 'Abidjan', limit: 24, sort: 'trust_score' }),
     ])
   } catch {
     notFound()

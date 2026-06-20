@@ -22,7 +22,6 @@ const NAV_LINKS = [
   { href: '/', label: 'Découvrir' },
   { href: '/marketplace', label: 'Marketplace' },
   { href: '/search', label: 'Recherche' },
-  { href: '/categories', label: 'Catégories' },
   { href: '/merchant/signup', label: 'Mon établissement' },
 ]
 

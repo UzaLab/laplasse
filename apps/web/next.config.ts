@@ -39,6 +39,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async redirects() {
+    return [{ source: "/categories", destination: "/search", permanent: true }];
+  },
 };
 
 // N'applique withSentryConfig que si un DSN est configuré

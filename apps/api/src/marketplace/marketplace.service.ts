@@ -41,6 +41,59 @@ export class MarketplaceService {
     merchant_id: true,
   } as const
 
+  private productImagesInclude = {
+    images: {
+      orderBy: { sort_order: 'asc' as const },
+      select: { id: true, url: true, sort_order: true },
+    },
+  } as const
+
+  private resolveImageUrls(dto: { images?: string[]; image_url?: string | null }) {
+    if (dto.images !== undefined) {
+      return [...new Set(dto.images.map(u => u.trim()).filter(Boolean))].slice(0, 10)
+    }
+    if (dto.image_url?.trim()) return [dto.image_url.trim()]
+    return []
+  }
+
+  private attachProductImages<T extends { image_url: string | null; images?: { url: string }[] }>(
+    product: T,
+  ): Omit<T, 'images'> & { images: string[]; image_url: string | null } {
+    const urls = product.images?.length
+      ? product.images.map(i => i.url)
+      : product.image_url
+        ? [product.image_url]
+        : []
+    const { images: _images, ...rest } = product
+    return {
+      ...rest,
+      images: urls,
+      image_url: urls[0] ?? null,
+    }
+  }
+
+  private async syncProductImages(productId: string, urls: string[]) {
+    const cleaned = [...new Set(urls.map(u => u.trim()).filter(Boolean))].slice(0, 10)
+    await this.prisma.$transaction([
+      this.prisma.productImage.deleteMany({ where: { product_id: productId } }),
+      ...(cleaned.length
+        ? [
+            this.prisma.productImage.createMany({
+              data: cleaned.map((url, index) => ({
+                product_id: productId,
+                url,
+                sort_order: index,
+              })),
+            }),
+          ]
+        : []),
+      this.prisma.product.update({
+        where: { id: productId },
+        data: { image_url: cleaned[0] ?? null },
+      }),
+    ])
+  }
+
   private async syncProductStockFromVariants(productId: string, tx: Prisma.TransactionClient | PrismaService = this.prisma) {
     const variants = await tx.productVariant.findMany({ where: { product_id: productId } })
     if (!variants.length) return
@@ -267,10 +320,11 @@ export class MarketplaceService {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
           select: { id: true, name: true, price: true, stock_quantity: true, sku: true },
         },
+        ...this.productImagesInclude,
       },
     })
     if (!product) throw new NotFoundException('Produit introuvable')
-    return {
+    return this.attachProductImages({
       ...product,
       has_variants: product.variants.length > 0,
       shop: {
@@ -290,7 +344,7 @@ export class MarketplaceService {
             business_name: shop.name,
             slug: shop.slug,
           },
-    }
+    })
   }
 
   // ─── Products (boutique) ─────────────────────────────────────────────────────
@@ -304,8 +358,9 @@ export class MarketplaceService {
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
         },
+        ...this.productImagesInclude,
       },
-    })
+    }).then(products => products.map(p => this.attachProductImages(p)))
   }
 
   async createProduct(userId: string, dto: CreateProductDto, shopId?: string) {
@@ -338,8 +393,9 @@ export class MarketplaceService {
       : dto.price
     const status = dto.status ?? (stock > 0 ? 'ACTIVE' : 'DRAFT')
     this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
+    const imageUrls = this.resolveImageUrls(dto)
 
-    return this.prisma.product.create({
+    const created = await this.prisma.product.create({
       data: {
         shop_id: shop.id,
         name: dto.name,
@@ -348,10 +404,15 @@ export class MarketplaceService {
         composition: dto.composition,
         price,
         stock_quantity: stock,
-        image_url: dto.image_url,
+        image_url: imageUrls[0] ?? null,
         allow_pickup: dto.allow_pickup ?? true,
         allow_delivery: dto.allow_delivery ?? true,
         status,
+        images: imageUrls.length
+          ? {
+              create: imageUrls.map((url, index) => ({ url, sort_order: index })),
+            }
+          : undefined,
         variants: hasVariants
           ? {
               create: dto.variants!.map((v, index) => ({
@@ -364,8 +425,12 @@ export class MarketplaceService {
             }
           : undefined,
       },
-      include: { variants: true },
+      include: {
+        variants: true,
+        ...this.productImagesInclude,
+      },
     })
+    return this.attachProductImages(created)
   }
 
   async updateProduct(userId: string, productId: string, dto: UpdateProductDto, shopId?: string) {
@@ -409,7 +474,13 @@ export class MarketplaceService {
     const allowDelivery = dto.allow_delivery ?? existing.allow_delivery
     this.assertDeliveryModes(allowPickup, allowDelivery)
 
-    return this.prisma.product.update({
+    const imageUrls = dto.images !== undefined
+      ? this.resolveImageUrls({ images: dto.images })
+      : dto.image_url !== undefined
+        ? this.resolveImageUrls({ image_url: dto.image_url })
+        : undefined
+
+    await this.prisma.product.update({
       where: { id: productId },
       data: {
         name: dto.name,
@@ -417,13 +488,25 @@ export class MarketplaceService {
         composition: dto.composition,
         price,
         stock_quantity: stock,
-        image_url: dto.image_url,
+        ...(imageUrls !== undefined ? { image_url: imageUrls[0] ?? null } : {}),
         allow_pickup: dto.allow_pickup,
         allow_delivery: dto.allow_delivery,
         status,
       },
-      include: { variants: { orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] } },
     })
+
+    if (imageUrls !== undefined) {
+      await this.syncProductImages(productId, imageUrls)
+    }
+
+    const withImages = await this.prisma.product.findUniqueOrThrow({
+      where: { id: productId },
+      include: {
+        variants: { orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }] },
+        ...this.productImagesInclude,
+      },
+    })
+    return this.attachProductImages(withImages)
   }
 
   async deleteProduct(userId: string, productId: string, shopId?: string) {

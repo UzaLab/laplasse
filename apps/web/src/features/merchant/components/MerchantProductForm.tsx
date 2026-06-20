@@ -37,6 +37,7 @@ import {
 import { notify } from '@/lib/notify'
 
 const EMPTY_VARIANT: ProductVariantInput = { name: '', price: 0, stock_quantity: 0 }
+const MAX_PRODUCT_IMAGES = 10
 
 const INPUT_CLASS =
   'w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 font-medium outline-none focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all'
@@ -51,7 +52,7 @@ interface ProductFormState {
   composition: string
   price: string
   stock_quantity: string
-  image_url: string
+  images: string[]
   status: ProductStatus
   allow_pickup: boolean
   allow_delivery: boolean
@@ -65,7 +66,7 @@ const EMPTY_FORM: ProductFormState = {
   composition: '',
   price: '',
   stock_quantity: '0',
-  image_url: '',
+  images: [],
   status: 'ACTIVE',
   allow_pickup: true,
   allow_delivery: true,
@@ -75,13 +76,18 @@ const EMPTY_FORM: ProductFormState = {
 
 function productToForm(product: MarketplaceProduct): ProductFormState {
   const variants = product.variants ?? []
+  const images = product.images?.length
+    ? product.images
+    : product.image_url
+      ? [product.image_url]
+      : []
   return {
     name: product.name,
     description: product.description ?? '',
     composition: product.composition ?? '',
     price: String(product.price),
     stock_quantity: String(product.stock_quantity),
-    image_url: product.image_url ?? '',
+    images,
     status: product.status === 'ARCHIVED' ? 'DRAFT' : product.status,
     allow_pickup: product.allow_pickup ?? true,
     allow_delivery: product.allow_delivery ?? true,
@@ -97,6 +103,16 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
 
 function normalizeHtmlField(value: string): string | undefined {
   return hasHtmlContent(value) ? value : undefined
+}
+
+function canAppendImage(url: string, images: string[]) {
+  const trimmed = url.trim()
+  if (!trimmed) return { ok: false as const, error: 'URL invalide' }
+  if (images.includes(trimmed)) return { ok: false as const, error: 'Cette image est déjà ajoutée' }
+  if (images.length >= MAX_PRODUCT_IMAGES) {
+    return { ok: false as const, error: `Maximum ${MAX_PRODUCT_IMAGES} images par produit` }
+  }
+  return { ok: true as const, trimmed }
 }
 
 interface MerchantProductFormProps {
@@ -117,6 +133,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
   const [uploading, setUploading] = useState(false)
   const [initialHadVariants, setInitialHadVariants] = useState(false)
   const [notFound, setNotFound] = useState(false)
+  const [imageUrlDraft, setImageUrlDraft] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadProduct = useCallback(async () => {
@@ -157,7 +174,14 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
       })
       if (res.ok) {
         const media = (await res.json()) as { url: string }
-        setForm(f => ({ ...f, image_url: media.url }))
+        setForm(f => {
+          const check = canAppendImage(media.url, f.images)
+          if (!check.ok) {
+            notify.error(check.error)
+            return f
+          }
+          return { ...f, images: [...f.images, check.trimmed] }
+        })
         notify.success('Image téléversée')
       } else {
         const d = await res.json().catch(() => ({}))
@@ -222,7 +246,8 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
       stock_quantity: form.useVariants
         ? variants.reduce((sum, v) => sum + (v.stock_quantity ?? 0), 0)
         : parseInt(form.stock_quantity, 10) || 0,
-      image_url: form.image_url.trim() || undefined,
+      image_url: form.images[0],
+      images: form.images,
       status: form.status,
       allow_pickup: form.allow_pickup,
       allow_delivery: form.allow_delivery,
@@ -283,7 +308,32 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
     )
   }
 
-  const previewImage = form.image_url || PLACEHOLDER_PRODUCT_IMAGE
+  const canAddMoreImages = form.images.length < MAX_PRODUCT_IMAGES
+
+  const removeImage = (index: number) => {
+    setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== index) }))
+  }
+
+  const setPrimaryImage = (index: number) => {
+    if (index === 0) return
+    setForm(f => {
+      const next = [...f.images]
+      const [picked] = next.splice(index, 1)
+      next.unshift(picked)
+      return { ...f, images: next }
+    })
+  }
+
+  const addImageFromUrl = () => {
+    const check = canAppendImage(imageUrlDraft, form.images)
+    if (!check.ok) {
+      notify.error(check.error)
+      return
+    }
+    setForm(f => ({ ...f, images: [...f.images, check.trimmed] }))
+    setImageUrlDraft('')
+    notify.success('Image ajoutée')
+  }
 
   return (
     <ShopSectionLayout hideTabs>
@@ -383,12 +433,15 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
 
             {/* Médias */}
             <section className={CARD_CLASS}>
-              <h2 className="text-lg font-extrabold text-slate-900 mb-6 flex items-center justify-between gap-2 flex-wrap">
-                Médias
+              <h2 className="text-lg font-extrabold text-slate-900 mb-2 flex items-center justify-between gap-2 flex-wrap">
+                Images du produit
                 <span className="text-xs font-medium text-slate-400 font-normal">
-                  JPG, PNG, WEBP — max 5 Mo
+                  {form.images.length}/{MAX_PRODUCT_IMAGES} — JPG, PNG, WEBP
                 </span>
               </h2>
+              <p className="text-xs text-slate-500 mb-6">
+                La première image est l&apos;image principale (vignette et fiche produit).
+              </p>
 
               <input
                 ref={fileInputRef}
@@ -398,67 +451,102 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
                 onChange={handleFileChange}
               />
 
-              <div
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => { if (e.key === 'Enter') fileInputRef.current?.click() }}
-                onClick={() => !uploading && fileInputRef.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-colors ${
-                  uploading
-                    ? 'border-brand-300 bg-brand-50 cursor-wait'
-                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-brand-300 cursor-pointer group'
-                }`}
-              >
-                {uploading ? (
-                  <Loader2 size={32} className="animate-spin text-brand-500 mb-4" />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-brand-500 mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                    <UploadCloud size={32} />
-                  </div>
-                )}
-                <h3 className="font-bold text-slate-900 mb-1">
-                  {uploading ? 'Envoi en cours…' : 'Glissez votre image ici'}
-                </h3>
-                <p className="text-sm text-slate-500 mb-4">ou cliquez pour parcourir</p>
-                <span className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm">
-                  Sélectionner un fichier
-                </span>
-              </div>
+              {canAddMoreImages && (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter') fileInputRef.current?.click() }}
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-colors ${
+                    uploading
+                      ? 'border-brand-300 bg-brand-50 cursor-wait'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-brand-300 cursor-pointer group'
+                  }`}
+                >
+                  {uploading ? (
+                    <Loader2 size={32} className="animate-spin text-brand-500 mb-4" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-brand-500 mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                      <UploadCloud size={32} />
+                    </div>
+                  )}
+                  <h3 className="font-bold text-slate-900 mb-1">
+                    {uploading ? 'Envoi en cours…' : 'Ajouter une image'}
+                  </h3>
+                  <p className="text-sm text-slate-500 mb-4">Glissez-déposez ou cliquez pour parcourir</p>
+                  <span className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm">
+                    Sélectionner un fichier
+                  </span>
+                </div>
+              )}
 
               <div className="mt-4">
                 <label className={LABEL_CLASS}>Ou URL de l&apos;image</label>
-                <input
-                  type="url"
-                  value={form.image_url}
-                  onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-                  placeholder="https://…"
-                  className={INPUT_CLASS}
-                />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="url"
+                    value={imageUrlDraft}
+                    onChange={e => setImageUrlDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageFromUrl() } }}
+                    placeholder="https://…"
+                    className={`${INPUT_CLASS} flex-1`}
+                    disabled={!canAddMoreImages}
+                  />
+                  <button
+                    type="button"
+                    onClick={addImageFromUrl}
+                    disabled={!canAddMoreImages || !imageUrlDraft.trim()}
+                    className="shrink-0 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Ajouter
+                  </button>
+                </div>
               </div>
 
-              <div className="flex gap-4 mt-6 overflow-x-auto pb-2">
-                <div className="relative w-24 h-24 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={previewImage} alt="" className="w-full h-full object-cover" />
-                  {form.image_url && (
-                    <button
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, image_url: '' }))}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
-                      aria-label="Retirer l'image"
+              {form.images.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
+                  {form.images.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className={`relative rounded-xl border overflow-hidden bg-slate-50 aspect-square ${
+                        index === 0 ? 'border-brand-400 ring-2 ring-brand-100' : 'border-slate-200'
+                      }`}
                     >
-                      <X size={14} />
-                    </button>
-                  )}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      {index === 0 && (
+                        <span className="absolute top-2 left-2 bg-brand-500 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                          Principale
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
+                        aria-label="Retirer l'image"
+                      >
+                        <X size={14} />
+                      </button>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPrimaryImage(index)}
+                          className="absolute bottom-2 left-2 right-2 py-1.5 rounded-lg bg-white/95 text-[10px] font-bold text-slate-700 hover:text-brand-600 shadow-sm"
+                        >
+                          Définir principale
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {!form.image_url && (
-                  <div className="w-24 h-24 rounded-xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-slate-300 shrink-0">
-                    <ImageIcon size={28} className="opacity-50" />
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="mt-6 w-full aspect-[2/1] max-h-40 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-300">
+                  <ImageIcon size={32} className="opacity-50 mb-2" />
+                  <span className="text-sm font-medium text-slate-400">Aucune image pour l&apos;instant</span>
+                </div>
+              )}
             </section>
 
             {/* Tarification & inventaire */}

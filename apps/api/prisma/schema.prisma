@@ -921,11 +921,24 @@ model Product {
 
   shop        Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   variants    ProductVariant[]
+  images      ProductImage[]
   cart_items  CartItem[]
   order_items OrderItem[]
 
   @@unique([shop_id, slug])
   @@index([shop_id, status])
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  product_id String
+  url        String
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@index([product_id, sort_order])
 }
 
 model ProductVariant {

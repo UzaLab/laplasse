@@ -6,6 +6,14 @@ function getApiUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
 }
 
+function getSsrApiUrls(): string[] {
+  const publicUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+  if (typeof window !== 'undefined') return [publicUrl]
+  const internal = process.env.API_INTERNAL_URL
+  if (internal && internal !== publicUrl) return [internal, publicUrl]
+  return [internal ?? publicUrl]
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -17,17 +25,28 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+  const bases = getSsrApiUrls()
+  let lastError: ApiError | Error | null = null
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }))
-    throw new ApiError(res.status, err.message ?? 'API error')
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+      })
+
+      if (res.ok) {
+        return res.json() as Promise<T>
+      }
+
+      const err = await res.json().catch(() => ({ message: res.statusText }))
+      lastError = new ApiError(res.status, err.message ?? 'API error')
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+    }
   }
 
-  return res.json() as Promise<T>
+  throw lastError ?? new ApiError(503, 'API indisponible')
 }
 
 // ─── Types réponses API ────────────────────────────────────────────────────────
