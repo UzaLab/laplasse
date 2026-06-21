@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
+  BarChart3,
   ChevronRight,
   Loader2,
   Package,
@@ -15,6 +16,13 @@ import { fetchMerchantOrders, fetchMyProducts } from '@/lib/marketplaceApi'
 import { merchantApiFetch } from '@/lib/merchantApi'
 
 const QUICK_LINKS = [
+  {
+    href: '/merchant/shop/analytics',
+    icon: BarChart3,
+    label: 'Statistiques ventes',
+    desc: 'CA, conversion, top produits et abandons',
+    color: 'bg-violet-50 text-violet-600',
+  },
   {
     href: '/merchant/shop/products',
     icon: Package,

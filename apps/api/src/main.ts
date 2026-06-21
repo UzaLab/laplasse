@@ -51,8 +51,24 @@ async function bootstrap() {
     appUrl.replace(/^https:/, 'http:'),
   ].filter((v, i, arr) => arr.indexOf(v) === i)
 
+  const isAllowedOrigin = (origin: string | undefined): boolean => {
+    if (!origin) return true
+    if (corsOrigins.includes(origin)) return true
+    try {
+      const { hostname } = new URL(origin)
+      const host = hostname.toLowerCase()
+      if (host === 'laplasse.tech' || host.endsWith('.laplasse.tech')) return true
+      if (host.endsWith('.sslip.io')) return true
+    } catch {
+      return false
+    }
+    return false
+  }
+
   app.enableCors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin))
+    },
     credentials: true,
   })
 

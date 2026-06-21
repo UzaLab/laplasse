@@ -213,9 +213,41 @@ export class AppliedPromotionDto {
   code!: string
 }
 
-export class CheckoutDto {
+export class ShopCheckoutDeliveryDto {
+  @IsString()
+  shop_id!: string
+
   @IsIn(['PICKUP', 'DELIVERY'])
   delivery_type!: 'PICKUP' | 'DELIVERY'
+
+  @IsOptional()
+  @IsString()
+  delivery_city_id?: string
+
+  @IsOptional()
+  @IsString()
+  delivery_commune_id?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  delivery_district?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  delivery_address_detail?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  delivery_address?: string
+}
+
+export class CheckoutDto {
+  @IsOptional()
+  @IsIn(['PICKUP', 'DELIVERY'])
+  delivery_type?: 'PICKUP' | 'DELIVERY'
 
   @IsOptional()
   @IsString()
@@ -255,6 +287,12 @@ export class CheckoutDto {
   @ValidateNested({ each: true })
   @Type(() => AppliedPromotionDto)
   applied_promotions?: AppliedPromotionDto[]
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ShopCheckoutDeliveryDto)
+  shop_deliveries?: ShopCheckoutDeliveryDto[]
 }
 
 export class ConfirmOrderPaymentDto {
@@ -280,4 +318,32 @@ export class UpdateOrderStatusDto {
     'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED',
   ])
   status!: OrderStatus
+}
+
+export const ORDER_RETURN_REASONS = [
+  'DEFECTIVE',
+  'WRONG_ITEM',
+  'NOT_RECEIVED',
+  'CHANGED_MIND',
+  'OTHER',
+] as const
+
+export class CreateOrderReturnDto {
+  @IsIn([...ORDER_RETURN_REASONS])
+  reason!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string
+}
+
+export class UpdateOrderReturnDto {
+  @IsIn(['APPROVED', 'REJECTED', 'REFUNDED'])
+  status!: 'APPROVED' | 'REJECTED' | 'REFUNDED'
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  merchant_note?: string
 }

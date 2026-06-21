@@ -34,10 +34,12 @@ import {
 } from '../common/menu-modifiers'
 import { ShopsService } from '../shops/shops.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
+import type { DeliveryQuoteItem } from '../delivery-zones/delivery-zones.service'
 import { PromotionsService } from '../promotions/promotions.service'
 import { SearchService } from '../search/search.service'
 import { ShopCollectionsService } from '../shop-collections/shop-collections.service'
 import { DeliveryService } from '../delivery/delivery.service'
+import { orderStatusLabelFr } from '../common/order-status-labels'
 
 @Injectable()
 export class MarketplaceService {
@@ -1289,41 +1291,136 @@ export class MarketplaceService {
     return this.checkoutMarketplaceOrder(userId, dto, rawCart, activeItems)
   }
 
+  private resolveShopDeliveries(
+    dto: CheckoutDto,
+    shopIds: string[],
+  ) {
+    const globalType = dto.delivery_type ?? 'PICKUP'
+    const byShop = new Map((dto.shop_deliveries ?? []).map(s => [s.shop_id, s]))
+    return new Map(
+      shopIds.map(shopId => {
+        const specific = byShop.get(shopId)
+        return [
+          shopId,
+          {
+            shop_id: shopId,
+            delivery_type: specific?.delivery_type ?? globalType,
+            delivery_city_id: specific?.delivery_city_id ?? dto.delivery_city_id,
+            delivery_commune_id: specific?.delivery_commune_id ?? dto.delivery_commune_id,
+            delivery_district: specific?.delivery_district ?? dto.delivery_district,
+            delivery_address_detail:
+              specific?.delivery_address_detail ?? dto.delivery_address_detail,
+            delivery_address: specific?.delivery_address ?? dto.delivery_address,
+            city_name: undefined as string | undefined,
+            commune_name: undefined as string | undefined,
+            formatted_address: undefined as string | undefined,
+          },
+        ] 
+      }),
+    )
+  }
+
+  private async enrichShopDeliveryPlans(
+    plans: ReturnType<MarketplaceService['resolveShopDeliveries']>,
+  ) {
+    for (const plan of plans.values()) {
+      if (plan.delivery_type !== 'DELIVERY') continue
+
+      const hasStructured =
+        plan.delivery_city_id?.trim() && plan.delivery_commune_id?.trim()
+      const hasLegacy = plan.delivery_address?.trim()
+      if (!hasStructured && !hasLegacy) {
+        throw new BadRequestException(
+          'Adresse de livraison requise pour chaque boutique en mode livraison',
+        )
+      }
+
+      if (plan.delivery_city_id && plan.delivery_commune_id) {
+        const [city, commune] = await Promise.all([
+          this.prisma.geoCity.findUnique({ where: { id: plan.delivery_city_id } }),
+          this.prisma.geoCommune.findUnique({ where: { id: plan.delivery_commune_id } }),
+        ])
+        plan.city_name = city?.name
+        plan.commune_name = commune?.name
+      }
+
+      plan.formatted_address =
+        plan.delivery_address?.trim()
+        || [plan.delivery_district, plan.commune_name, plan.city_name, plan.delivery_address_detail]
+          .filter(Boolean)
+          .join(', ')
+    }
+  }
+
+  async reorderFromOrder(userId: string, orderId: string) {
+    const reorderable = new Set([
+      'COMPLETED',
+      'DELIVERED',
+      'CONFIRMED',
+      'PREPARING',
+      'READY',
+      'OUT_FOR_DELIVERY',
+    ])
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, user_id: userId },
+      include: { items: true },
+    })
+    if (!order) throw new NotFoundException('Commande introuvable')
+    if (!reorderable.has(order.status)) {
+      throw new BadRequestException('Cette commande ne peut pas être recommandée')
+    }
+
+    await this.clearCart(userId)
+
+    const added: string[] = []
+    const skipped: Array<{ name: string; reason: string }> = []
+
+    for (const item of order.items) {
+      try {
+        if (item.menu_item_id) {
+          const optionIds = parseSelectedModifiers(item.modifiers).map(m => m.option_id)
+          await this.addMenuItemToCart(userId, item.menu_item_id, item.quantity, optionIds)
+          added.push(item.product_name)
+        } else if (item.product_id) {
+          await this.addToCart(userId, {
+            productId: item.product_id,
+            quantity: item.quantity,
+            variantId: item.variant_id ?? undefined,
+          })
+          added.push(item.product_name)
+        } else {
+          skipped.push({ name: item.product_name, reason: 'Article non disponible' })
+        }
+      } catch (err) {
+        skipped.push({
+          name: item.product_name,
+          reason:
+            err instanceof BadRequestException
+              ? String(err.message)
+              : 'Indisponible',
+        })
+      }
+    }
+
+    if (!added.length && skipped.length) {
+      throw new BadRequestException(
+        skipped.map(s => `${s.name} : ${s.reason}`).join(' · '),
+      )
+    }
+
+    const cart = await this.getCart(userId)
+    return { cart, added_count: added.length, added, skipped }
+  }
+
   private async checkoutMarketplaceOrder(
     userId: string,
     dto: CheckoutDto,
     rawCart: Awaited<ReturnType<MarketplaceService['getOrCreateCart']>>,
     activeItems: typeof rawCart.items,
   ) {
-    const isDelivery = dto.delivery_type === 'DELIVERY'
-
-    if (isDelivery) {
-      const hasStructured =
-        dto.delivery_city_id?.trim() && dto.delivery_commune_id?.trim()
-      const hasLegacy = dto.delivery_address?.trim()
-      if (!hasStructured && !hasLegacy) {
-        throw new BadRequestException('Adresse de livraison requise (ville, commune et quartier)')
-      }
-    }
-
-    if (isDelivery) {
-      const blocked = activeItems.filter(i => i.product && !i.product.allow_delivery)
-      if (blocked.length) {
-        const names = blocked.map(i => i.product!.name).join(', ')
-        throw new BadRequestException(
-          `Livraison indisponible pour : ${names}. Retirez ces articles ou choisissez le retrait sur place.`,
-        )
-      }
-    }
-
-    if (dto.delivery_type === 'PICKUP') {
-      const blocked = activeItems.filter(i => i.product && !i.product.allow_pickup)
-      if (blocked.length) {
-        const names = blocked.map(i => i.product!.name).join(', ')
-        throw new BadRequestException(
-          `Retrait sur place indisponible pour : ${names}.`,
-        )
-      }
+    if (!dto.shop_deliveries?.length && !dto.delivery_type) {
+      throw new BadRequestException('Mode de livraison requis')
     }
 
     const cart = this.buildCartResponse(rawCart, activeItems)
@@ -1353,45 +1450,57 @@ export class MarketplaceService {
       subtotals[sid] = (subtotals[sid] ?? 0) + item.line_total
     }
 
-    let deliveryQuotes: Awaited<ReturnType<DeliveryZonesService['quote']>> | null = null
-    let cityName: string | undefined
-    let communeName: string | undefined
+    const shopDeliveries = this.resolveShopDeliveries(dto, Array.from(groups.keys()))
 
-    if (isDelivery && dto.delivery_city_id && dto.delivery_commune_id) {
-      const [city, commune] = await Promise.all([
-        this.prisma.geoCity.findUnique({ where: { id: dto.delivery_city_id } }),
-        this.prisma.geoCommune.findUnique({ where: { id: dto.delivery_commune_id } }),
-      ])
-      cityName = city?.name
-      communeName = commune?.name
+    for (const [shopId, items] of groups) {
+      const plan = shopDeliveries.get(shopId)!
+      if (plan.delivery_type === 'DELIVERY') {
+        const blocked = items.filter(i => i.product && !i.product.allow_delivery)
+        if (blocked.length) {
+          const names = blocked.map(i => i.product!.name).join(', ')
+          throw new BadRequestException(
+            `Livraison indisponible pour : ${names}. Retirez ces articles ou choisissez le retrait sur place.`,
+          )
+        }
+      } else {
+        const blocked = items.filter(i => i.product && !i.product.allow_pickup)
+        if (blocked.length) {
+          const names = blocked.map(i => i.product!.name).join(', ')
+          throw new BadRequestException(
+            `Retrait sur place indisponible pour : ${names}.`,
+          )
+        }
+      }
+    }
 
-      deliveryQuotes = await this.deliveryZones.quote({
-        shop_ids: Array.from(groups.keys()),
-        city_id: dto.delivery_city_id,
-        commune_id: dto.delivery_commune_id,
-        subtotals,
+    await this.enrichShopDeliveryPlans(shopDeliveries)
+
+    const deliveryQuotes: DeliveryQuoteItem[] = []
+    for (const [shopId, plan] of shopDeliveries) {
+      if (plan.delivery_type !== 'DELIVERY') continue
+      if (!plan.delivery_city_id || !plan.delivery_commune_id) continue
+
+      const quoteResult = await this.deliveryZones.quote({
+        shop_ids: [shopId],
+        city_id: plan.delivery_city_id,
+        commune_id: plan.delivery_commune_id,
+        subtotals: { [shopId]: subtotals[shopId] ?? 0 },
         order_flow: 'marketplace',
       })
 
-      const unavailable = deliveryQuotes.quotes.filter(q => !q.available)
+      const unavailable = quoteResult.quotes.filter(q => !q.available)
       if (unavailable.length) {
         const names = unavailable.map(q => q.shop_name).join(', ')
         throw new BadRequestException(
           `Livraison indisponible pour : ${names}. ${unavailable[0].message ?? ''}`.trim(),
         )
       }
+      deliveryQuotes.push(...quoteResult.quotes)
     }
 
     const promoByShop = new Map(
       (dto.applied_promotions ?? []).map(p => [p.shop_id, p]),
     )
-
-    const deliveryAddress = isDelivery
-      ? dto.delivery_address?.trim()
-        || [dto.delivery_district, communeName, cityName, dto.delivery_address_detail]
-          .filter(Boolean)
-          .join(', ')
-      : undefined
 
     const checkoutOrders = await this.prisma.$transaction(async tx => {
       const results: Array<{
@@ -1414,10 +1523,12 @@ export class MarketplaceService {
           throw new BadRequestException('Boutique introuvable pour cette commande')
         }
         const linkedMerchantId = shopInfo.merchant_id ?? null
+        const plan = shopDeliveries.get(groupShopId)!
+        const isShopDelivery = plan.delivery_type === 'DELIVERY'
 
         let deliveryFee = 0
-        if (isDelivery && deliveryQuotes) {
-          const quote = deliveryQuotes.quotes.find(q => q.shop_id === groupShopId)
+        if (isShopDelivery) {
+          const quote = deliveryQuotes.find(q => q.shop_id === groupShopId)
           deliveryFee = quote?.fee ?? 0
         }
 
@@ -1458,11 +1569,11 @@ export class MarketplaceService {
             merchant_id: linkedMerchantId,
             promotion_id: promotionId,
             status: 'PENDING',
-            delivery_type: dto.delivery_type,
-            delivery_address: deliveryAddress,
-            delivery_city_id: dto.delivery_city_id,
-            delivery_commune_id: dto.delivery_commune_id,
-            delivery_district: dto.delivery_district,
+            delivery_type: plan.delivery_type,
+            delivery_address: isShopDelivery ? plan.formatted_address : undefined,
+            delivery_city_id: isShopDelivery ? plan.delivery_city_id : undefined,
+            delivery_commune_id: isShopDelivery ? plan.delivery_commune_id : undefined,
+            delivery_district: isShopDelivery ? plan.delivery_district : undefined,
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
             subtotal,
@@ -2121,6 +2232,7 @@ export class MarketplaceService {
             courier: { select: { full_name: true, phone: true, vehicle: true } },
           },
         },
+        return_request: true,
       },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
@@ -2202,6 +2314,219 @@ export class MarketplaceService {
     })
   }
 
+  async exportMerchantOrdersCsv(userId: string, shopId?: string, days = 90) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    const periodDays = Math.min(Math.max(days, 1), 365)
+    const since = new Date()
+    since.setDate(since.getDate() - periodDays)
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        ...this.merchantOrderScope(shop),
+        created_at: { gte: since },
+      },
+      orderBy: { created_at: 'desc' },
+      include: {
+        items: true,
+        user: { select: { full_name: true, email: true, phone: true } },
+        payment: { select: { status: true, reference: true } },
+      },
+    })
+
+    const escape = (value: string | number | null | undefined) => {
+      const str = value == null ? '' : String(value)
+      if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`
+      return str
+    }
+
+    const header = [
+      'reference',
+      'date',
+      'statut',
+      'client',
+      'telephone',
+      'email',
+      'mode',
+      'adresse_livraison',
+      'articles',
+      'total_fcfa',
+      'paiement',
+      'ref_paiement',
+    ].join(',')
+
+    const rows = orders.map(order => {
+      const itemsSummary = order.items
+        .map(i => `${i.quantity}x ${i.product_name}${i.variant_name ? ` (${i.variant_name})` : ''}`)
+        .join(' · ')
+      return [
+        order.id.slice(-8).toUpperCase(),
+        order.created_at.toISOString(),
+        orderStatusLabelFr(order.status),
+        order.user?.full_name ?? order.customer_phone ?? '',
+        order.customer_phone ?? order.user?.phone ?? '',
+        order.user?.email ?? '',
+        order.delivery_type === 'DELIVERY' ? 'Livraison' : 'Retrait',
+        order.delivery_address ?? '',
+        itemsSummary,
+        order.total,
+        order.payment?.status ?? '',
+        order.payment?.reference ?? '',
+      ].map(escape).join(',')
+    })
+
+    return [header, ...rows].join('\n')
+  }
+
+  async getMerchantShopAnalytics(userId: string, shopId?: string, days = 30) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    const periodDays = Math.min(Math.max(days, 7), 90)
+    const since = new Date()
+    since.setDate(since.getDate() - periodDays)
+    since.setHours(0, 0, 0, 0)
+
+    const scope = this.merchantOrderScope(shop)
+    const periodWhere = { ...scope, created_at: { gte: since } }
+
+    const completedStatuses = [
+      'COMPLETED',
+      'CONFIRMED',
+      'PREPARING',
+      'READY',
+      'OUT_FOR_DELIVERY',
+      'DELIVERED',
+    ] as const
+
+    const [
+      statusGroups,
+      completedAgg,
+      stalePendingCount,
+      periodOrders,
+      orderItems,
+    ] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: periodWhere,
+        _count: { status: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          ...periodWhere,
+          status: { in: [...completedStatuses] },
+        },
+        _sum: { total: true },
+        _count: true,
+        _avg: { total: true },
+      }),
+      this.prisma.order.count({
+        where: {
+          ...scope,
+          status: 'PENDING',
+          created_at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+      }),
+      this.prisma.order.findMany({
+        where: periodWhere,
+        select: { created_at: true, total: true, status: true },
+        orderBy: { created_at: 'asc' },
+      }),
+      this.prisma.orderItem.findMany({
+        where: {
+          order: {
+            ...periodWhere,
+            status: { in: [...completedStatuses] },
+          },
+        },
+        select: {
+          product_id: true,
+          menu_item_id: true,
+          product_name: true,
+          quantity: true,
+          line_total: true,
+        },
+      }),
+    ])
+
+    const ordersByStatus = statusGroups.map(g => ({
+      status: g.status,
+      count: g._count.status,
+    }))
+
+    const ordersTotal = statusGroups.reduce((sum, g) => sum + g._count.status, 0)
+    const ordersCompleted = completedAgg._count
+    const ordersPending = statusGroups.find(g => g.status === 'PENDING')?._count.status ?? 0
+    const ordersCancelled =
+      (statusGroups.find(g => g.status === 'CANCELLED')?._count.status ?? 0) +
+      (statusGroups.find(g => g.status === 'REFUNDED')?._count.status ?? 0)
+
+    const checkoutAttempts = ordersCompleted + ordersCancelled + ordersPending
+    const conversionRate =
+      checkoutAttempts > 0 ? Math.round((ordersCompleted / checkoutAttempts) * 1000) / 10 : 0
+
+    const topMap = new Map<
+      string,
+      { product_id: string | null; menu_item_id: string | null; name: string; quantity_sold: number; revenue: number }
+    >()
+    for (const item of orderItems) {
+      const key = item.product_id ?? item.menu_item_id ?? item.product_name
+      const existing = topMap.get(key)
+      if (existing) {
+        existing.quantity_sold += item.quantity
+        existing.revenue += item.line_total
+      } else {
+        topMap.set(key, {
+          product_id: item.product_id,
+          menu_item_id: item.menu_item_id,
+          name: item.product_name,
+          quantity_sold: item.quantity,
+          revenue: item.line_total,
+        })
+      }
+    }
+    const topProducts = [...topMap.values()]
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8)
+
+    const chartMap = new Map<string, { revenue: number; orders: number }>()
+    for (let i = 0; i < periodDays; i++) {
+      const d = new Date(since)
+      d.setDate(d.getDate() + i)
+      chartMap.set(d.toISOString().slice(0, 10), { revenue: 0, orders: 0 })
+    }
+    for (const order of periodOrders) {
+      const day = order.created_at.toISOString().slice(0, 10)
+      const entry = chartMap.get(day)
+      if (!entry) continue
+      entry.orders += 1
+      if (completedStatuses.includes(order.status as (typeof completedStatuses)[number])) {
+        entry.revenue += order.total
+      }
+    }
+    const revenueChart = [...chartMap.entries()].map(([date, v]) => ({
+      date,
+      revenue: v.revenue,
+      orders: v.orders,
+    }))
+
+    return {
+      period_days: periodDays,
+      summary: {
+        revenue: completedAgg._sum.total ?? 0,
+        orders_total: ordersTotal,
+        orders_completed: ordersCompleted,
+        orders_pending: ordersPending,
+        orders_cancelled: ordersCancelled,
+        avg_order_value: completedAgg._avg.total
+          ? Math.round(completedAgg._avg.total)
+          : 0,
+        conversion_rate: conversionRate,
+        abandoned_checkouts: stalePendingCount,
+      },
+      orders_by_status: ordersByStatus,
+      top_products: topProducts,
+      revenue_chart: revenueChart,
+    }
+  }
+
   async updateOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, shopId?: string) {
     const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
     const order = await this.prisma.order.findFirst({
@@ -2238,7 +2563,7 @@ export class MarketplaceService {
       userId: order.user.id,
       type: 'order_status',
       title: 'Mise à jour commande',
-      body: `Votre commande est maintenant : ${dto.status}`,
+      body: `Votre commande est maintenant : ${orderStatusLabelFr(dto.status)}.`,
       data: { order_id: order.id, status: dto.status },
     })
 
@@ -2622,5 +2947,121 @@ export class MarketplaceService {
       }
     }
     return { created_or_updated: count, skipped_merchants: skipped }
+  }
+
+  private static readonly RETURN_ELIGIBLE_STATUSES: OrderStatus[] = [
+    'DELIVERED',
+    'COMPLETED',
+    'READY',
+  ]
+
+  async createOrderReturn(
+    userId: string,
+    orderId: string,
+    dto: { reason: string; description?: string },
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, user_id: userId },
+    })
+    if (!order) throw new NotFoundException('Commande introuvable')
+    if (!MarketplaceService.RETURN_ELIGIBLE_STATUSES.includes(order.status)) {
+      throw new BadRequestException('Cette commande n\'est pas éligible à un retour')
+    }
+    if (order.order_source === 'FOOD') {
+      throw new BadRequestException('Les retours food se font directement auprès du restaurant')
+    }
+
+    const existing = await this.prisma.orderReturn.findUnique({ where: { order_id: orderId } })
+    if (existing) {
+      throw new BadRequestException('Une demande de retour existe déjà pour cette commande')
+    }
+
+    return this.prisma.orderReturn.create({
+      data: {
+        order_id: orderId,
+        user_id: userId,
+        shop_id: order.shop_id,
+        reason: dto.reason,
+        description: dto.description ?? null,
+      },
+    })
+  }
+
+  async listMerchantReturns(
+    userId: string,
+    shopId?: string,
+    status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REFUNDED',
+  ) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    return this.prisma.orderReturn.findMany({
+      where: {
+        shop_id: shop.id,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { created_at: 'desc' },
+      include: {
+        order: {
+          select: {
+            id: true,
+            total: true,
+            status: true,
+            created_at: true,
+            user: { select: { full_name: true, email: true, phone: true } },
+            items: { select: { product_name: true, quantity: true } },
+          },
+        },
+      },
+      take: 100,
+    })
+  }
+
+  async updateOrderReturn(
+    userId: string,
+    returnId: string,
+    dto: { status: 'APPROVED' | 'REJECTED' | 'REFUNDED'; merchant_note?: string },
+    shopId?: string,
+  ) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    const row = await this.prisma.orderReturn.findFirst({
+      where: { id: returnId, shop_id: shop.id },
+      include: { order: true },
+    })
+    if (!row) throw new NotFoundException('Demande de retour introuvable')
+    if (row.status !== 'PENDING' && dto.status !== row.status) {
+      throw new BadRequestException('Cette demande a déjà été traitée')
+    }
+
+    const now = new Date()
+    const updated = await this.prisma.orderReturn.update({
+      where: { id: returnId },
+      data: {
+        status: dto.status,
+        merchant_note: dto.merchant_note ?? row.merchant_note,
+        resolved_at: ['APPROVED', 'REJECTED', 'REFUNDED'].includes(dto.status) ? now : null,
+      },
+    })
+
+    if (dto.status === 'REFUNDED' && row.order.status !== 'REFUNDED') {
+      await this.prisma.order.update({
+        where: { id: row.order_id },
+        data: { status: 'REFUNDED' },
+      })
+    }
+
+    await this.notificationQueue.enqueuePush({
+      userId: row.user_id,
+      type: 'order_return',
+      title: 'Demande de retour',
+      body: dto.status === 'APPROVED'
+        ? 'Votre demande de retour a été acceptée.'
+        : dto.status === 'REFUNDED'
+          ? 'Votre remboursement a été enregistré.'
+          : dto.status === 'REJECTED'
+            ? 'Votre demande de retour a été refusée.'
+            : 'Mise à jour de votre demande de retour.',
+      data: { order_id: row.order_id, return_id: returnId, status: dto.status },
+    })
+
+    return updated
   }
 }

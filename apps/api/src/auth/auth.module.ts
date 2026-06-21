@@ -7,6 +7,7 @@ import { AuthService } from './auth.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { LoyaltyModule } from '../loyalty/loyalty.module'
+import { BookingsModule } from '../bookings/bookings.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module'
     }),
     NotificationsModule,
     LoyaltyModule,
+    BookingsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

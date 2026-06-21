@@ -43,19 +43,26 @@ import {
   toAppliedPromotionInputs,
 } from '@/lib/cartPromo'
 import { notify } from '@/lib/notify'
+import { captureCheckoutStep } from '@/lib/analytics'
 import {
   createUserAddress,
   fetchMyAddresses,
   type UserAddress,
 } from '@/lib/addressesApi'
 
-import { getDeliveryVehicleLabel } from '@/lib/deliveryVehicles'
+import {
+  getDeliveryVehicleLabel,
+} from '@/lib/deliveryVehicles'
 import {
   detectCartKind,
   getCartRoute,
   getPaymentRoute,
   type OrderFlow,
 } from '@/lib/orderFlow'
+import {
+  ShopSplitDeliveryForm,
+  type ShopDeliveryState,
+} from '@/features/checkout/components/ShopSplitDeliveryForm'
 
 export default function CheckoutPage() {
   return (
@@ -100,6 +107,8 @@ function CheckoutPageContent() {
   const [communes, setCommunes] = useState<GeoCommune[]>([])
   const [deliveryQuotes, setDeliveryQuotes] = useState<DeliveryQuoteItem[]>([])
   const [quoteLoading, setQuoteLoading] = useState(false)
+  const [shopDeliveries, setShopDeliveries] = useState<Record<string, ShopDeliveryState>>({})
+  const [communesByShop, setCommunesByShop] = useState<Record<string, GeoCommune[]>>({})
 
   const cartShopIds = useMemo(
     () => cart?.merchants.map(m => m.id) ?? [],
@@ -120,12 +129,31 @@ function CheckoutPageContent() {
     [deliveryQuotes, freeDeliveryShopIds],
   )
 
+  const cartKind = useMemo(
+    () => (cart ? detectCartKind(cart.items, cart.kind) : 'empty'),
+    [cart],
+  )
+
+  const isFoodFlow = useMemo(
+    () => routeFlow === 'food' || foodFlowParam || cartKind === 'food',
+    [routeFlow, foodFlowParam, cartKind],
+  )
+
+  const useSplitDelivery = !isFoodFlow && (cart?.merchant_count ?? 0) > 1
+
+  const hasAnyDelivery = useMemo(() => {
+    if (useSplitDelivery) {
+      return cart?.merchants.some(m => shopDeliveries[m.id]?.deliveryType === 'DELIVERY') ?? false
+    }
+    return deliveryType === 'DELIVERY'
+  }, [useSplitDelivery, cart?.merchants, shopDeliveries, deliveryType])
+
   const checkoutTotal = useMemo(() => {
     const subtotal = cart?.subtotal ?? 0
-    const fee = deliveryType === 'DELIVERY' ? deliveryFee : 0
+    const fee = hasAnyDelivery ? deliveryFee : 0
     const discount = routeFlow === 'food' ? 0 : promoDiscount
     return Math.max(0, subtotal - discount + fee)
-  }, [cart?.subtotal, promoDiscount, deliveryFee, deliveryType, routeFlow])
+  }, [cart?.subtotal, promoDiscount, deliveryFee, hasAnyDelivery, routeFlow])
 
   useEffect(() => {
     if (!ready) return
@@ -151,6 +179,15 @@ function CheckoutPageContent() {
       if (r.ok) setCities(r.data)
     })
   }, [ready, isAuthenticated, routeFlow, router])
+
+  useEffect(() => {
+    if (loading || !cart?.items.length || isFoodFlow) return
+    captureCheckoutStep('checkout_started', {
+      item_count: cart.item_count,
+      merchant_count: cart.merchant_count,
+      subtotal: cart.subtotal,
+    })
+  }, [loading, cart, isFoodFlow])
 
   useEffect(() => {
     const saved = getCheckoutFormState()
@@ -247,18 +284,35 @@ function CheckoutPageContent() {
     })
   }, [selectedCity?.slug])
 
-  const cartKind = useMemo(
-    () => (cart ? detectCartKind(cart.items, cart.kind) : 'empty'),
-    [cart],
-  )
-
-  const isFoodFlow = useMemo(
-    () => routeFlow === 'food' || foodFlowParam || cartKind === 'food',
-    [routeFlow, foodFlowParam, cartKind],
-  )
-
   const loadDeliveryQuote = useCallback(async () => {
-    if (!cart || deliveryType !== 'DELIVERY' || !deliveryCityId || !deliveryCommuneId) {
+    if (!cart) {
+      setDeliveryQuotes([])
+      return
+    }
+
+    if (useSplitDelivery) {
+      setQuoteLoading(true)
+      const quotes: DeliveryQuoteItem[] = []
+      for (const merchant of cart.merchants) {
+        const cfg = shopDeliveries[merchant.id]
+        if (!cfg || cfg.deliveryType !== 'DELIVERY') continue
+        if (!cfg.deliveryCityId || !cfg.deliveryCommuneId) continue
+
+        const result = await fetchDeliveryQuote({
+          shop_ids: [merchant.id],
+          city_id: cfg.deliveryCityId,
+          commune_id: cfg.deliveryCommuneId,
+          subtotals: { [merchant.id]: merchant.subtotal },
+          order_flow: 'marketplace',
+        })
+        if (result.ok) quotes.push(...result.data.quotes)
+      }
+      setQuoteLoading(false)
+      setDeliveryQuotes(quotes)
+      return
+    }
+
+    if (deliveryType !== 'DELIVERY' || !deliveryCityId || !deliveryCommuneId) {
       setDeliveryQuotes([])
       return
     }
@@ -290,7 +344,60 @@ function CheckoutPageContent() {
       setDeliveryQuotes([])
       notify.error(result.error)
     }
-  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, isFoodFlow])
+  }, [
+    cart,
+    deliveryType,
+    deliveryCityId,
+    deliveryCommuneId,
+    isFoodFlow,
+    useSplitDelivery,
+    shopDeliveries,
+  ])
+
+  useEffect(() => {
+    if (!cart?.merchants.length || isFoodFlow) return
+    setShopDeliveries(prev => {
+      const next = { ...prev }
+      for (const merchant of cart.merchants) {
+        if (!next[merchant.id]) {
+          next[merchant.id] = {
+            deliveryType: 'PICKUP',
+            deliveryCityId: deliveryCityId || '',
+            deliveryCommuneId: deliveryCommuneId || '',
+            deliveryDistrict: deliveryDistrict || '',
+            deliveryAddressDetail: deliveryAddressDetail || '',
+          }
+        }
+      }
+      return next
+    })
+  }, [cart?.merchants, isFoodFlow, deliveryCityId, deliveryCommuneId, deliveryDistrict, deliveryAddressDetail])
+
+  const updateShopDelivery = useCallback((shopId: string, patch: Partial<ShopDeliveryState>) => {
+    setShopDeliveries(prev => ({
+      ...prev,
+      [shopId]: { ...prev[shopId], ...patch },
+    }))
+  }, [])
+
+  const handleShopCityChange = useCallback(
+    async (shopId: string, cityId: string) => {
+      updateShopDelivery(shopId, {
+        deliveryCityId: cityId,
+        deliveryCommuneId: '',
+      })
+      const city = cities.find(c => c.id === cityId)
+      if (!city?.slug) {
+        setCommunesByShop(prev => ({ ...prev, [shopId]: [] }))
+        return
+      }
+      const result = await fetchGeoCommunes(city.slug)
+      if (result.ok) {
+        setCommunesByShop(prev => ({ ...prev, [shopId]: result.data.communes }))
+      }
+    },
+    [cities, updateShopDelivery],
+  )
 
   useEffect(() => {
     void loadDeliveryQuote()
@@ -342,7 +449,22 @@ function CheckoutPageContent() {
       return
     }
 
-    if (deliveryType === 'DELIVERY') {
+    if (useSplitDelivery) {
+      for (const merchant of cart.merchants) {
+        const cfg = shopDeliveries[merchant.id]
+        if (cfg?.deliveryType === 'DELIVERY') {
+          if (!cfg.deliveryCityId || !cfg.deliveryCommuneId || !cfg.deliveryDistrict.trim()) {
+            notify.error(`Adresse incomplète pour ${merchant.business_name}`)
+            return
+          }
+        }
+      }
+      const unavailable = deliveryQuotes.filter(q => !q.available)
+      if (unavailable.length) {
+        notify.error(`Livraison indisponible : ${unavailable.map(q => q.shop_name).join(', ')}`)
+        return
+      }
+    } else if (deliveryType === 'DELIVERY') {
       if (!deliveryCityId || !deliveryCommuneId || !deliveryDistrict.trim()) {
         notify.error('Ville, commune et quartier requis pour la livraison')
         return
@@ -372,17 +494,45 @@ function CheckoutPageContent() {
       }
     }
 
+    const splitPayload = useSplitDelivery
+      ? cart.merchants.map(m => {
+          const cfg = shopDeliveries[m.id]!
+          const cityName = cities.find(c => c.id === cfg.deliveryCityId)?.name
+          const communeName = (communesByShop[m.id] ?? []).find(c => c.id === cfg.deliveryCommuneId)?.name
+          const formatted =
+            cfg.deliveryType === 'DELIVERY'
+              ? [cfg.deliveryDistrict, communeName, cityName, cfg.deliveryAddressDetail]
+                  .filter(Boolean)
+                  .join(', ')
+              : undefined
+          return {
+            shop_id: m.id,
+            delivery_type: cfg.deliveryType,
+            delivery_city_id: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryCityId : undefined,
+            delivery_commune_id: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryCommuneId : undefined,
+            delivery_district: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryDistrict : undefined,
+            delivery_address_detail:
+              cfg.deliveryType === 'DELIVERY' ? cfg.deliveryAddressDetail : undefined,
+            delivery_address: formatted,
+          }
+        })
+      : undefined
+
     setSubmitting(true)
     const { result, error: err } = await checkout({
-      delivery_type: deliveryType,
-      delivery_city_id: deliveryType === 'DELIVERY' ? deliveryCityId : undefined,
-      delivery_commune_id: deliveryType === 'DELIVERY' ? deliveryCommuneId : undefined,
-      delivery_district: deliveryType === 'DELIVERY' ? deliveryDistrict : undefined,
-      delivery_address_detail: deliveryType === 'DELIVERY' ? deliveryAddressDetail : undefined,
-      delivery_address: deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
+      delivery_type: useSplitDelivery
+        ? (hasAnyDelivery ? 'DELIVERY' : 'PICKUP')
+        : deliveryType,
+      delivery_city_id: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryCityId : undefined,
+      delivery_commune_id: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryCommuneId : undefined,
+      delivery_district: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryDistrict : undefined,
+      delivery_address_detail:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryAddressDetail : undefined,
+      delivery_address: !useSplitDelivery && deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
       customer_note: customerNote || undefined,
       customer_phone: phone,
       applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
+      shop_deliveries: splitPayload,
     })
 
     if (!result) {
@@ -405,8 +555,8 @@ function CheckoutPageContent() {
         saveNewAddress: saveNewAddress || undefined,
         newAddressLabel: newAddressLabel || undefined,
         discountAmount: isFoodFlow ? 0 : promoDiscount,
-        deliveryFee: deliveryType === 'DELIVERY' ? deliveryFee : 0,
-        deliveryQuotes: deliveryType === 'DELIVERY' ? deliveryQuotes : undefined,
+        deliveryFee: hasAnyDelivery ? deliveryFee : 0,
+        deliveryQuotes: hasAnyDelivery ? deliveryQuotes : undefined,
       }),
     )
     saveCheckoutDraft({
@@ -421,6 +571,13 @@ function CheckoutPageContent() {
       selectedAddressId: selectedAddressId ?? undefined,
       saveNewAddress: saveNewAddress || undefined,
       newAddressLabel: newAddressLabel || undefined,
+    })
+
+    captureCheckoutStep('checkout_delivery_completed', {
+      delivery_type: deliveryType,
+      merchant_count: cart.merchant_count,
+      order_count: result.orders.length,
+      total: checkoutTotal,
     })
 
     router.push(paymentPath)
@@ -520,6 +677,19 @@ function CheckoutPageContent() {
               </div>
             ) : (
               <div className="space-y-6">
+                {useSplitDelivery && cart ? (
+                  <ShopSplitDeliveryForm
+                    cart={cart}
+                    cities={cities}
+                    communesByShop={communesByShop}
+                    shopDeliveries={shopDeliveries}
+                    deliveryQuotes={deliveryQuotes}
+                    quoteLoading={quoteLoading}
+                    onChange={updateShopDelivery}
+                    onCityChange={handleShopCityChange}
+                  />
+                ) : (
+                <>
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <p className="text-sm font-bold text-slate-900 mb-3">Mode de retrait</p>
                   {!allowPickup && !allowDelivery ? (
@@ -745,6 +915,8 @@ function CheckoutPageContent() {
                     ) : null}
                   </>
                 )}
+                </>
+                )}
 
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">
@@ -790,13 +962,13 @@ function CheckoutPageContent() {
             <CheckoutOrderSummary
               cart={cart}
               total={checkoutTotal}
-              deliveryType={deliveryType}
+              deliveryType={hasAnyDelivery ? 'DELIVERY' : deliveryType}
               deliveryAddress={formattedDeliveryAddress}
               customerPhone={customerPhone || undefined}
               customerNote={customerNote || undefined}
               discountAmount={isFoodFlow ? 0 : promoDiscount}
-              deliveryFee={deliveryType === 'DELIVERY' ? deliveryFee : 0}
-              deliveryQuotes={deliveryType === 'DELIVERY' ? deliveryQuotes : undefined}
+              deliveryFee={hasAnyDelivery ? deliveryFee : 0}
+              deliveryQuotes={hasAnyDelivery ? deliveryQuotes : undefined}
               freeDeliveryShopIds={isFoodFlow ? [] : [...freeDeliveryShopIds]}
               className="lg:sticky lg:top-28"
             />

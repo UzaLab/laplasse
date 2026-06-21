@@ -86,7 +86,7 @@ Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 
 **Parcours marchand :** `/merchant/bookings` — filtres statut/type/recherche, vue liste + agenda, fiche détail, actions (confirmer, refuser, terminer, absent, annuler), contact client, tarifs hôtel estimés.
 
-**Limites restantes :** pas de paiement à la réservation, réservations invité (`user_id` null) invisibles côté profil, enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
+**Limites restantes :** pas de paiement à la réservation ; rappels SMS/WhatsApp simulés (logs + wa.me) en attendant provider ; enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
 
 ---
 
@@ -1555,14 +1555,14 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 
 | Domaine | Slices |
 |---------|--------|
-| **Marketplace** | ~~Alertes stock marchand~~ ✅ · Analytics e-commerce (conversion, abandon) · Order again · Split livraison multi-boutiques (mode/adresse par vendeur) |
+| **Marketplace** | ~~Analytics e-commerce~~ ✅ · ~~Order again~~ ✅ · ~~Split livraison multi-boutiques~~ ✅ |
 | **Restaurant** | ~~Modificateurs menu (suppléments)~~ ✅ · ~~ETA préparation checkout~~ ✅ |
 | **Hôtel** | ~~Tarification dynamique~~ ✅ · Fiche chambre riche · Notifications rappel séjour |
-| **Booking** | Rappels SMS/WhatsApp auto · Politique no-show · Réservations invité rattachables au compte |
-| **Delivery V3** | Notifications temps réel · GPS livreur · Partenaires logistiques |
-| **Multi-pays** | Autocomplete merchants par pays · Critères §11.12 « Burkina ready » · Seed BF opérationnel |
-| **Retail** | Retours SAV structuré · SEO produit avancé |
-| **UX transverse** | Funnels PostHog checkout · Onboarding marchand vertical |
+| **Booking** | ~~Rappels SMS/WhatsApp auto~~ ✅ · ~~Politique no-show~~ ✅ · ~~Réservations invité rattachables~~ ✅ |
+| **Delivery V3** | ~~Notifications temps réel~~ ✅ (push) · GPS livreur · Partenaires logistiques |
+| **Multi-pays** | Autocomplete merchants par pays · ~~Critères §11.12 « Burkina ready » (geo + smoke)~~ ✅ · Seed BF opérationnel prod |
+| **Retail** | Retours SAV structuré · SEO produit avancé · ~~Export CSV commandes~~ ✅ |
+| **UX transverse** | ~~Funnels PostHog checkout~~ ✅ · ~~Wizard marchand `/merchant/signup`~~ ✅ · Onboarding marchand vertical |
 
 ### 🟡 P2 — Scale & différenciation
 
@@ -1571,7 +1571,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | **Paiement** | Remboursement automatique MM (après P0 #1) |
 | **Delivery** | GPS livreur temps réel · Partenaires logistiques |
 | **Discovery** | Recommandations · Recently viewed · Fidélité achats |
-| **Ops** | Export CSV commandes · Multi-langue FR/EN · PWA offline-lite |
+| **Ops** | ~~Export CSV commandes~~ ✅ · Multi-langue FR/EN · PWA offline-lite |
 | **Pharmacie** | Upload ordonnance · Catalogue OTC |
 | **Admin** | `/admin/delivery` stats zones · `/admin/countries` |
 | **Hôtel** | Channel manager · Gestion ménage |
@@ -1588,14 +1588,21 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 |--------|-------|----------|-------------|
 | **10** | Modificateurs menu | ✅ | `MenuModifierGroup/Option`, sheet client, panier + commande |
 | **10** | ETA préparation food | ✅ | `food_prep_minutes` marchand, `estimated_prep_minutes` panier/checkout |
-| **11** | Analytics ecommerce marchand | P1 | Funnel boutique, top produits, abandon panier |
-| **11** | Critères Burkina ready | P1 | Checklist §11.12 — seed BF, geo Ouaga, smoke tests |
-| **12** | Order again | P1 | Récommander depuis `/profile/orders` |
-| **12** | Split livraison multi-boutiques | P1 | Mode/adresse par vendeur au checkout |
+| **11** | Analytics ecommerce marchand | ✅ | `GET /orders/merchant/analytics`, `/merchant/shop/analytics` |
+| **11** | Critères Burkina ready | ✅ | Geo Ouaga/Bobo enrichi, `scripts/smoke-burkina-ready.sh` |
+| **12** | Order again | ✅ | `POST /orders/:id/reorder`, bouton profil + liste |
+| **12** | Split livraison multi-boutiques | ✅ | `shop_deliveries` checkout, `ShopSplitDeliveryForm` |
+| **13** | Réservations invité → compte | ✅ | `linkGuestBookingsByPhone`, `POST /bookings/mine/claim`, auto à la connexion |
+| **13** | Rappels booking WhatsApp/SMS | ✅ | `processDueBookingReminders`, cron `POST /internal/cron/booking-reminders` |
+| **13** | Funnels PostHog checkout | ✅ | `captureCheckoutStep`, events `/cart` → confirmation |
+| **13** | Politique annulation hôtel | ✅ | `cancellation_policy` settings, affichage `MerchantHotelTab` |
+| **14** | Notifications livraison push | ✅ | `delivery.service` + libellés FR statuts commande |
+| **14** | Export CSV commandes marchand | ✅ | `GET /orders/merchant/export`, bouton `ShopOrdersPanel` |
+| **14** | Politique no-show booking | ✅ | `no_show_policy`, formulaire + fiche publique |
+| **15** | Wizard inscription établissement | ✅ | Catégories API, geo multi-pays, modules par vertical, `country_code` |
+| **15** | Largeurs pages publiques desktop | ✅ | `PUBLIC_NARROW` / `PUBLIC_CONTENT` / `PublicPageHeader` |
 | — | P0 Mobile Money réel | Reporté | Simulation conservée — prérequis prod UEMOA |
 | — | Paiement réservation hôtel/RDV | P1 | Après MM réel |
-| — | Rappels SMS/WhatsApp booking | P1 | Cron + templates |
-| — | Fiche chambre riche | P1 | Galerie, équipements, politique annulation |
 | — | Remboursement paiement réel | P2 | Après intégration MM |
 | — | GPS livreur | P2 | Carte suivi live |
 
@@ -1613,6 +1620,55 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 | Alertes stock bas | ✅ | `ShopProductsPanel`, `merchantListFilters.ts` |
 | Modificateurs menu | ✅ | migration `menu_modifiers_food_prep`, `MenuItemModifierSheet` |
 | ETA food checkout | ✅ | `food_prep_minutes`, `estimated_prep_minutes` |
+
+### Phase 16 — Onboarding vertical, SAV & fiche chambre (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Onboarding marchand vertical** | ✅ | `/merchant/onboarding`, checklist par catégorie, redirect post-OTP |
+| **Retours SAV structuré** | ✅ | `OrderReturn` API + `/profile/orders/[id]` + `/merchant/shop/returns` |
+| **Fiche chambre détail** | ✅ | `RoomDetailSheet`, équipements complets sur fiche hôtel publique |
+
+### Phase 15 — Wizard marchand & layout public (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Wizard `/merchant/signup` refondu** | ✅ | `MerchantSignupWizard`, catégories API, villes/communes geo, hints modules |
+| **Pays dynamique à l'inscription** | ✅ | `country_code` API, plus de `CI` hardcodé sur `location` |
+| **Layout pages publiques** | ✅ | `pageLayout.ts`, `PublicPageHeader`, contact/CGU/privacy/login |
+
+### Phase 14 — Livraison, ops marchand & no-show (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Notifications livraison push** | ✅ | `DeliveryService` + libellés FR `order-status-labels.ts` |
+| **Export CSV commandes** | ✅ | `exportMerchantOrdersCsv`, bouton `/merchant/shop/orders` |
+| **Politique no-show booking** | ✅ | `no_show_policy`, `BookingForm` + paramètres marchand |
+
+### Phase 13 — Booking invité, rappels & analytics checkout (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Réservations invité rattachables** | ✅ | `linkGuestBookingsByPhone`, auto login/OTP, `POST /bookings/mine/claim` |
+| **Rappels booking WhatsApp/SMS** | ✅ | Push client + wa.me/SMS simulé invité ; cron fallback sans Redis |
+| **Funnels PostHog checkout** | ✅ | `lib/analytics.ts`, events `checkout_funnel` par étape marketplace |
+| **Politique annulation hôtel** | ✅ | `MerchantBookingSettings.cancellation_policy`, UI marchand + fiche publique |
+
+### Phase 12 — Order again & split livraison (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Order again (1 clic)** | ✅ | `reorderFromOrder`, `OrderAgainButton`, `/profile/orders` + détail |
+| **Split livraison multi-boutiques** | ✅ | `ShopCheckoutDeliveryDto`, `shop_deliveries`, `ShopSplitDeliveryForm` |
+
+### Phase 11 — Analytics boutique & Burkina ready (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Analytics ecommerce marchand** | ✅ | `getMerchantShopAnalytics`, `ShopAnalyticsPanel`, `/merchant/shop/analytics` |
+| **CA, conversion, top produits** | ✅ | Revenus, panier moyen, statuts, abandons PENDING > 24 h |
+| **Geo BF enrichi** | ✅ | Communes Ouaga (Cissin, Ouaga 2000, Dassasgho…) + Bobo-Dioulasso |
+| **Smoke tests Burkina** | ✅ | `scripts/smoke-burkina-ready.sh` — geo, search, marketplace scopés BF |
 
 ### Phase 10 — Restaurant profondeur (juin 2026)
 

@@ -306,6 +306,7 @@ export class MerchantsService {
     data: {
       business_name: string; category_slug: string; description?: string;
       phone?: string; whatsapp?: string; address?: string; district?: string; city?: string;
+      country_code?: string;
       organization_id?: string;
       create_organization?: { name: string; type: OrganizationType };
     },
@@ -364,6 +365,8 @@ export class MerchantsService {
       .replace(/^-+|-+$/g, '')
       + '-' + Date.now().toString(36)
 
+    const countryCode = (data.country_code ?? 'CI').toUpperCase()
+
     const merchant = await this.prisma.merchant.create({
       data: {
         business_name: data.business_name,
@@ -378,8 +381,8 @@ export class MerchantsService {
         is_active: false,
         location: data.district ? {
           create: {
-            city: data.city ?? 'Abidjan',
-            country: 'CI',
+            city: data.city ?? defaultCityForCountry(countryCode),
+            country: countryCode,
             district: data.district,
             address: data.address ?? null,
           },

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Smartphone, Loader2, CheckCircle2, ChevronLeft, RefreshCw } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
@@ -9,7 +9,23 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 
 export default function VerifyPhonePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      }
+    >
+      <VerifyPhoneContent />
+    </Suspense>
+  )
+}
+
+function VerifyPhoneContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isNewSignup = searchParams.get('new') === 'true'
   const { isAuthenticated, activeMerchantId } = useAuthStore()
   const { hydrated } = useAuthReady()
   const [step, setStep] = useState<'send' | 'verify' | 'done'>('send')
@@ -63,7 +79,8 @@ export default function VerifyPhonePage() {
     const data = await res.json()
     if (res.ok) {
       setStep('done')
-      setTimeout(() => router.push('/merchant/dashboard'), 2000)
+      const next = isNewSignup ? '/merchant/onboarding?new=true' : '/merchant/dashboard'
+      setTimeout(() => router.push(next), 2000)
     } else {
       setError(data.message ?? 'Code invalide')
     }

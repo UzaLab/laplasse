@@ -14,6 +14,7 @@ import { AvailabilityService } from './availability.service'
 import { FraudService } from '../fraud/fraud.service'
 import { AuditService } from '../audit/audit.service'
 import { CreateBookingDto, UpdateBookingStatusDto, UpdateMyBookingDto } from './dto/booking.dto'
+import { phoneMatchTail } from '../common/phone-match'
 import { BookingStatus, BookingType } from '../../generated/prisma/client'
 
 @Injectable()
@@ -336,13 +337,18 @@ export class BookingsService {
       })
     }
 
-    await this.notificationQueue.scheduleBookingReminder({
-      bookingId: booking.id,
-      userId: userId ?? merchant.owner_id,
-      remindAt: new Date(bookedAt.getTime() - 24 * 60 * 60 * 1000),
-      title: 'Rappel de réservation',
-      body: `Rappel : réservation demain chez ${merchant.business_name}.`,
-    })
+    const remindAt = new Date(bookedAt.getTime() - 24 * 60 * 60 * 1000)
+    if (remindAt.getTime() > Date.now()) {
+      await this.notificationQueue.scheduleBookingReminder({
+        bookingId: booking.id,
+        userId: userId ?? undefined,
+        guestPhone: userId ? undefined : dto.guest_phone,
+        remindAt,
+        title: 'Rappel de réservation',
+        body: `Rappel : réservation demain chez ${merchant.business_name}.`,
+        merchantName: merchant.business_name,
+      })
+    }
 
     return booking
   }
@@ -439,6 +445,41 @@ export class BookingsService {
       limit: opts.limit,
       totalPages: Math.max(1, Math.ceil(total / opts.limit)),
     }
+  }
+
+  /** Rattache les réservations invité (user_id null) au compte si le téléphone correspond. */
+  async linkGuestBookingsByPhone(userId: string, phone?: string | null): Promise<{ linked: number }> {
+    const tail = phone ? phoneMatchTail(phone) : null
+    if (!tail) return { linked: 0 }
+
+    const result = await this.prisma.booking.updateMany({
+      where: {
+        user_id: null,
+        guest_phone: { contains: tail },
+        status: { not: 'CANCELLED' },
+      },
+      data: { user_id: userId },
+    })
+
+    if (result.count > 0) {
+      await this.audit.log({
+        userId,
+        action: 'UPDATE',
+        entityType: 'Booking',
+        entityId: userId,
+        payload: { linked: result.count, phone_tail: tail, kind: 'guest_claim' },
+      })
+    }
+
+    return { linked: result.count }
+  }
+
+  async claimGuestBookings(userId: string): Promise<{ linked: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { phone: true },
+    })
+    return this.linkGuestBookingsByPhone(userId, user?.phone)
   }
 
   async cancelMyBooking(userId: string, bookingId: string) {

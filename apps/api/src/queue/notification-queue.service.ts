@@ -13,12 +13,16 @@ export interface PushNotificationJob {
 
 export interface BookingReminderJob {
   bookingId: string
-  userId: string
   title: string
   body: string
+  merchantName: string
+  userId?: string
+  guestPhone?: string
 }
 
 type QueueJob = PushNotificationJob | BookingReminderJob
+
+const REMINDER_LEAD_MS = 24 * 60 * 60 * 1000
 
 @Injectable()
 export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
@@ -93,7 +97,53 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       })
       return
     }
-    this.logger.log(`Rappel booking ${payload.bookingId} planifié (Redis requis pour exécution différée)`)
+    this.logger.log(
+      `Rappel booking ${payload.bookingId} planifié (Redis requis pour exécution différée — cron fallback actif)`,
+    )
+  }
+
+  /** Rattrapage si Redis indisponible ou job perdu — appelé par cron externe. */
+  async processDueBookingReminders(): Promise<{ processed: number; skipped: number }> {
+    const now = new Date()
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        reminder_sent_at: null,
+        status: { in: ['PENDING', 'CONFIRMED'] },
+        booked_at: { gt: now },
+      },
+      include: {
+        merchant: { select: { business_name: true } },
+        user: { select: { id: true, phone: true } },
+      },
+      take: 200,
+    })
+
+    let processed = 0
+    let skipped = 0
+
+    for (const booking of bookings) {
+      const remindAt = new Date(booking.booked_at.getTime() - REMINDER_LEAD_MS)
+      if (remindAt > now) {
+        skipped++
+        continue
+      }
+
+      const merchantName = booking.merchant.business_name
+      const title = 'Rappel de réservation'
+      const body = `Rappel : votre réservation chez ${merchantName} approche.`
+
+      await this.processReminder({
+        bookingId: booking.id,
+        userId: booking.user_id ?? undefined,
+        guestPhone: booking.user_id ? undefined : booking.guest_phone,
+        title,
+        body,
+        merchantName,
+      })
+      processed++
+    }
+
+    return { processed, skipped }
   }
 
   private async processPush(payload: PushNotificationJob) {
@@ -144,22 +194,46 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   private async processReminder(payload: BookingReminderJob) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: payload.bookingId },
-      select: { status: true, reminder_sent_at: true },
+      select: { status: true, reminder_sent_at: true, booked_at: true },
     })
     if (!booking || booking.reminder_sent_at) return
     if (booking.status !== 'CONFIRMED' && booking.status !== 'PENDING') return
 
-    await this.processPush({
-      userId: payload.userId,
-      type: 'booking_reminder',
-      title: payload.title,
-      body: payload.body,
-      data: { booking_id: payload.bookingId },
+    if (payload.userId) {
+      await this.processPush({
+        userId: payload.userId,
+        type: 'booking_reminder',
+        title: payload.title,
+        body: payload.body,
+        data: { booking_id: payload.bookingId },
+      })
+    }
+
+    const when = booking.booked_at.toLocaleString('fr-FR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
     })
+    const reminderText = `${payload.body} Rendez-vous le ${when}.`
+
+    if (payload.guestPhone) {
+      const waUrl = this.buildWhatsAppReminderUrl(payload.guestPhone, reminderText)
+      this.logger.log(
+        `WhatsApp rappel booking ${payload.bookingId} → ${payload.guestPhone} (${waUrl})`,
+      )
+      this.logger.log(`SMS simulé [booking_reminder] → ${payload.guestPhone}: ${reminderText}`)
+    }
 
     await this.prisma.booking.update({
       where: { id: payload.bookingId },
       data: { reminder_sent_at: new Date() },
     })
+  }
+
+  private buildWhatsAppReminderUrl(phone: string, text: string): string {
+    let digits = phone.replace(/\D/g, '')
+    if (digits.startsWith('0') && digits.length === 10) {
+      digits = `225${digits.slice(1)}`
+    }
+    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
   }
 }

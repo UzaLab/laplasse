@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { BedDouble, Calendar, ChevronLeft, ChevronRight, Loader2, Users } from 'lucide-react'
+import { BedDouble, Calendar, ChevronLeft, ChevronRight, Info, Loader2, ShieldCheck, Users } from 'lucide-react'
 import type { BookingConfig, MerchantServiceConfig } from '@/lib/bookingConfig'
 import { formatPrice } from '@/lib/bookingConfig'
 import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
@@ -13,6 +13,7 @@ import {
 } from '@/lib/roomListingConfig'
 import { openBookingWithPrefill } from '@/lib/bookingPrefill'
 import { ImageCarousel } from '@/components/ui/ImageGalleryViewer'
+import { RoomDetailSheet } from '@/features/merchant/components/profile/RoomDetailSheet'
 
 interface DayCell {
   date: string
@@ -68,6 +69,7 @@ export function MerchantHotelTab({ merchantId }: Props) {
   const [checkIn, setCheckIn] = useState<string | null>(null)
   const [checkOut, setCheckOut] = useState<string | null>(null)
   const [rangeError, setRangeError] = useState('')
+  const [detailRoomId, setDetailRoomId] = useState<string | null>(null)
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -112,6 +114,7 @@ export function MerchantHotelTab({ merchantId }: Props) {
   )
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId)
+  const detailRoom = detailRoomId ? rooms.find(r => r.id === detailRoomId) : null
 
   const staySummary = useMemo(() => {
     if (!checkIn || !checkOut || !selectedRoom) return null
@@ -226,10 +229,39 @@ export function MerchantHotelTab({ merchantId }: Props) {
               room={room}
               selected={selectedRoomId === room.id}
               onSelect={() => setSelectedRoomId(room.id)}
+              onDetails={() => setDetailRoomId(room.id)}
             />
           ))}
         </div>
       </div>
+
+      {(config?.booking_settings?.cancellation_policy || config?.booking_settings?.no_show_policy) && (
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex gap-3">
+          <ShieldCheck size={20} className="text-brand-500 shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            {config.booking_settings.cancellation_policy && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
+                  Politique d&apos;annulation
+                </p>
+                <p className="text-sm text-slate-700 whitespace-pre-line">
+                  {config.booking_settings.cancellation_policy}
+                </p>
+              </div>
+            )}
+            {config.booking_settings.no_show_policy && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
+                  En cas d&apos;absence (no-show)
+                </p>
+                <p className="text-sm text-slate-700 whitespace-pre-line">
+                  {config.booking_settings.no_show_policy}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {selectedRoomId && (
         <div className="bg-white border border-slate-100 rounded-3xl p-4 sm:p-6">
@@ -375,6 +407,15 @@ export function MerchantHotelTab({ merchantId }: Props) {
           </div>
         </div>
       )}
+
+      {detailRoom && (
+        <RoomDetailSheet
+          room={detailRoom}
+          open
+          onClose={() => setDetailRoomId(null)}
+          onSelect={() => setSelectedRoomId(detailRoom.id)}
+        />
+      )}
     </div>
   )
 }
@@ -383,10 +424,12 @@ function RoomCard({
   room,
   selected,
   onSelect,
+  onDetails,
 }: {
   room: MerchantServiceConfig
   selected: boolean
   onSelect: () => void
+  onDetails: () => void
 }) {
   const rate = room.nightly_rate ?? room.price
   const images = room.image_urls ?? []
@@ -410,50 +453,68 @@ function RoomCard({
           aspectClass="aspect-[4/3]"
         />
       </div>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="text-left p-4 pt-3 flex-1 flex flex-col"
-      >
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="min-w-0">
-            <h3 className="font-extrabold text-slate-900 truncate">{room.name}</h3>
-            {(room.property_type || room.unit_type) && (
-              <p className="text-xs text-slate-400 mt-0.5 truncate">
-                {[propertyTypeLabel(room.property_type), unitTypeLabel(room.unit_type)].filter(Boolean).join(' · ')}
-              </p>
+      <div className="p-4 pt-3 flex-1 flex flex-col">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onSelect}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onSelect()
+            }
+          }}
+          className="text-left flex-1 flex flex-col cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-lg -m-1 p-1"
+        >
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-slate-900 truncate">{room.name}</h3>
+              {(room.property_type || room.unit_type) && (
+                <p className="text-xs text-slate-400 mt-0.5 truncate">
+                  {[propertyTypeLabel(room.property_type), unitTypeLabel(room.unit_type)].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+            <BedDouble size={18} className={selected ? 'text-brand-500 shrink-0' : 'text-slate-300 shrink-0'} />
+          </div>
+          {room.description && (
+            <p className="text-sm text-slate-500 mb-2 line-clamp-2">{room.description}</p>
+          )}
+          <div className="flex flex-wrap gap-x-2 gap-y-1 text-sm mt-auto">
+            {rate != null && (
+              <span className="font-extrabold text-slate-900">
+                {formatPrice(rate)} <span className="font-normal text-slate-500">/ nuit</span>
+              </span>
+            )}
+            {room.capacity != null && (
+              <span className="inline-flex items-center gap-1 text-slate-500 font-semibold text-xs">
+                <Users size={12} /> {room.capacity} pers.
+              </span>
             )}
           </div>
-          <BedDouble size={18} className={selected ? 'text-brand-500 shrink-0' : 'text-slate-300 shrink-0'} />
-        </div>
-        {room.description && (
-          <p className="text-sm text-slate-500 mb-2 line-clamp-2">{room.description}</p>
-        )}
-        <div className="flex flex-wrap gap-x-2 gap-y-1 text-sm mt-auto">
-          {rate != null && (
-            <span className="font-extrabold text-slate-900">
-              {formatPrice(rate)} <span className="font-normal text-slate-500">/ nuit</span>
-            </span>
-          )}
-          {room.capacity != null && (
-            <span className="inline-flex items-center gap-1 text-slate-500 font-semibold text-xs">
-              <Users size={12} /> {room.capacity} pers.
-            </span>
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {chips.map(c => (
+                <span key={c} className="text-[9px] font-bold uppercase tracking-wide bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-full">
+                  {c}
+                </span>
+              ))}
+            </div>
           )}
         </div>
-        {chips.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {chips.map(c => (
-              <span key={c} className="text-[9px] font-bold uppercase tracking-wide bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded-full">
-                {c}
-              </span>
-            ))}
-          </div>
-        )}
-        {selected && (
-          <span className="mt-2 text-[10px] font-bold uppercase text-brand-600">Sélectionnée pour le calendrier</span>
-        )}
-      </button>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onDetails}
+            className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700"
+          >
+            <Info size={12} /> Détails
+          </button>
+          {selected && (
+            <span className="text-[10px] font-bold uppercase text-brand-600">Sélectionnée</span>
+          )}
+        </div>
+      </div>
     </article>
   )
 }

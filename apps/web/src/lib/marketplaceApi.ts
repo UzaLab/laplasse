@@ -24,6 +24,54 @@ export type OrderStatus =
   | 'REFUNDED'
 export type DeliveryType = 'PICKUP' | 'DELIVERY'
 
+export type OrderReturnStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REFUNDED'
+
+export type OrderReturnReason =
+  | 'DEFECTIVE'
+  | 'WRONG_ITEM'
+  | 'NOT_RECEIVED'
+  | 'CHANGED_MIND'
+  | 'OTHER'
+
+export const ORDER_RETURN_REASON_LABELS: Record<OrderReturnReason, string> = {
+  DEFECTIVE: 'Produit défectueux',
+  WRONG_ITEM: 'Mauvais article reçu',
+  NOT_RECEIVED: 'Commande non reçue',
+  CHANGED_MIND: 'Changement d\'avis',
+  OTHER: 'Autre motif',
+}
+
+export const ORDER_RETURN_STATUS_LABELS: Record<OrderReturnStatus, string> = {
+  PENDING: 'En attente',
+  APPROVED: 'Approuvé',
+  REJECTED: 'Refusé',
+  REFUNDED: 'Remboursé',
+}
+
+export interface OrderReturnRequest {
+  id: string
+  order_id: string
+  reason: string
+  description?: string | null
+  merchant_note?: string | null
+  status: OrderReturnStatus
+  created_at: string
+  updated_at?: string
+}
+
+export interface MerchantOrderReturn extends OrderReturnRequest {
+  shop_id: string
+  user_id: string
+  order?: {
+    id: string
+    total: number
+    status: OrderStatus
+    created_at: string
+    user?: { full_name: string | null; email: string; phone?: string | null }
+    items?: Array<{ product_name: string; quantity: number }>
+  }
+}
+
 export interface ProductVariant {
   id: string
   name: string
@@ -166,6 +214,7 @@ export interface Cart {
 export interface OrderItem {
   id: string
   product_id?: string | null
+  menu_item_id?: string | null
   variant_id?: string | null
   product_name: string
   variant_name?: string | null
@@ -231,6 +280,7 @@ export interface Order {
       vehicle: string | null
     } | null
   } | null
+  return_request?: OrderReturnRequest | null
 }
 
 export interface CheckoutOrderResult {
@@ -317,8 +367,18 @@ export interface UpdateProductInput {
   category_id?: string
 }
 
-export interface CheckoutInput {
+export interface ShopCheckoutDeliveryInput {
+  shop_id: string
   delivery_type: DeliveryType
+  delivery_city_id?: string
+  delivery_commune_id?: string
+  delivery_district?: string
+  delivery_address_detail?: string
+  delivery_address?: string
+}
+
+export interface CheckoutInput {
+  delivery_type?: DeliveryType
   delivery_address?: string
   delivery_city_id?: string
   delivery_commune_id?: string
@@ -327,6 +387,14 @@ export interface CheckoutInput {
   customer_note?: string
   customer_phone: string
   applied_promotions?: AppliedPromotionInput[]
+  shop_deliveries?: ShopCheckoutDeliveryInput[]
+}
+
+export interface ReorderResult {
+  cart: Cart
+  added_count: number
+  added: string[]
+  skipped: Array<{ name: string; reason: string }>
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -615,6 +683,15 @@ export async function fetchOrder(orderId: string): Promise<Order | null> {
   return parseJson<Order>(res)
 }
 
+export async function reorderFromOrder(
+  orderId: string,
+): Promise<{ result: ReorderResult | null; error?: string }> {
+  const res = await authApiFetch(`/orders/${orderId}/reorder`, { method: 'POST' })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as ReorderResult
+  return { result }
+}
+
 export async function fetchMerchantOrders(
   shopId: string | null | undefined,
   status?: OrderStatus,
@@ -625,6 +702,62 @@ export async function fetchMerchantOrders(
   const res = await shopApiFetch(path, shopId)
   const data = await parseJson<Order[]>(res)
   return data ?? []
+}
+
+export async function downloadMerchantOrdersCsv(
+  shopId: string | null | undefined,
+  days = 90,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const qs = new URLSearchParams({ days: String(days) })
+  const res = await shopApiFetch(`/orders/merchant/export?${qs}`, shopId)
+  if (!res.ok) {
+    const err = await res.text().catch(() => '')
+    return { ok: false, error: err || 'Export impossible' }
+  }
+  const blob = await res.blob()
+  const stamp = new Date().toISOString().slice(0, 10)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `commandes-${stamp}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  return { ok: true }
+}
+
+export interface ShopAnalyticsSummary {
+  revenue: number
+  orders_total: number
+  orders_completed: number
+  orders_pending: number
+  orders_cancelled: number
+  avg_order_value: number
+  conversion_rate: number
+  abandoned_checkouts: number
+}
+
+export interface ShopAnalyticsTopProduct {
+  product_id: string | null
+  menu_item_id: string | null
+  name: string
+  quantity_sold: number
+  revenue: number
+}
+
+export interface ShopAnalytics {
+  period_days: number
+  summary: ShopAnalyticsSummary
+  orders_by_status: Array<{ status: OrderStatus; count: number }>
+  top_products: ShopAnalyticsTopProduct[]
+  revenue_chart: Array<{ date: string; revenue: number; orders: number }>
+}
+
+export async function fetchShopAnalytics(
+  shopId: string | null | undefined,
+  days = 30,
+): Promise<ShopAnalytics | null> {
+  const res = await shopApiFetch(`/orders/merchant/analytics?days=${days}`, shopId)
+  return parseJson<ShopAnalytics>(res)
 }
 
 export async function fetchMerchantOrder(
@@ -647,6 +780,43 @@ export async function updateOrderStatus(
   if (!res.ok) return { order: null, error: await parseError(res) }
   const order = await res.json() as Order
   return { order }
+}
+
+export async function createOrderReturn(
+  orderId: string,
+  input: { reason: OrderReturnReason; description?: string },
+): Promise<{ result: OrderReturnRequest | null; error?: string }> {
+  const res = await authApiFetch(`/orders/${orderId}/returns`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as OrderReturnRequest
+  return { result }
+}
+
+export async function fetchMerchantReturns(
+  shopId: string | null | undefined,
+  status?: OrderReturnStatus,
+): Promise<MerchantOrderReturn[]> {
+  const qs = status ? `?status=${status}` : ''
+  const res = await shopApiFetch(`/orders/merchant/returns${qs}`, shopId)
+  const data = await parseJson<MerchantOrderReturn[]>(res)
+  return data ?? []
+}
+
+export async function updateOrderReturn(
+  returnId: string,
+  input: { status: 'APPROVED' | 'REJECTED' | 'REFUNDED'; merchant_note?: string },
+  shopId: string | null | undefined,
+): Promise<{ result: MerchantOrderReturn | null; error?: string }> {
+  const res = await shopApiFetch(`/orders/returns/${returnId}`, shopId, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as MerchantOrderReturn
+  return { result }
 }
 
 // ─── Merchant products (auth) ─────────────────────────────────────────────────

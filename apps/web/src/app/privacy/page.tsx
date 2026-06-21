@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { MapPin, ChevronLeft } from 'lucide-react'
+import { PublicPageHeader } from '@/components/layout/PublicPageHeader'
+import { PUBLIC_CONTENT } from '@/lib/pageLayout'
 
 export const metadata = {
   title: 'Politique de Confidentialité — LaPlasse',
@@ -8,19 +9,9 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-3xl mx-auto px-6 py-5 flex items-center gap-4">
-          <Link href="/" className="text-slate-400 hover:text-slate-900" style={{ textDecoration: 'none' }}>
-            <ChevronLeft size={20} />
-          </Link>
-          <div className="flex items-center gap-2">
-            <MapPin size={20} className="text-brand-500" />
-            <span className="font-extrabold text-slate-900">LaPlasse</span>
-          </div>
-        </div>
-      </header>
+      <PublicPageHeader title="Confidentialité" backHref="/" />
 
-      <article className="max-w-3xl mx-auto px-6 py-12">
+      <article className={`${PUBLIC_CONTENT} py-12`}>
         <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Politique de Confidentialité</h1>
         <p className="text-slate-500 text-sm mb-8">Dernière mise à jour : juin 2026</p>
 

@@ -7,6 +7,8 @@ import { Eye, EyeOff, Loader2, MapPin, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_REGISTER_SUBTITLE } from '@/lib/brandCopy'
+import { PUBLIC_AUTH } from '@/lib/pageLayout'
+import { getPhonePlaceholder, getCountryCode } from '@/lib/country'
 
 function RegisterContent() {
   const router = useRouter()
@@ -77,9 +79,11 @@ function RegisterContent() {
     }
   }
 
+  const phonePlaceholder = getPhonePlaceholder(getCountryCode())
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md">
+      <div className={PUBLIC_AUTH}>
 
         {/* Logo */}
         <div className="text-center mb-8">
@@ -143,7 +147,7 @@ function RegisterContent() {
                 type="tel"
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="+225 07 00 00 00 00"
+                placeholder={phonePlaceholder}
                 className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm"
               />
             </div>

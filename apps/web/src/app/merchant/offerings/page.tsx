@@ -49,6 +49,8 @@ interface BookingSettings {
   buffer_min: number
   booking_window_days: number
   auto_confirm: boolean
+  cancellation_policy?: string | null
+  no_show_policy?: string | null
 }
 
 const OFFER_LABELS: Record<BookingType, { title: string; add: string }> = {
@@ -329,6 +331,26 @@ export default function MerchantOfferingsPage() {
               <input type="checkbox" checked={settings.auto_confirm}
                 onChange={e => setSettings(s => s ? { ...s, auto_confirm: e.target.checked } : s)} />
               Confirmation automatique
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
+              <textarea
+                rows={3}
+                value={settings.cancellation_policy ?? ''}
+                onChange={e => setSettings(s => s ? { ...s, cancellation_policy: e.target.value || null } : s)}
+                placeholder="Ex. Annulation gratuite jusqu'à 24 h avant le créneau."
+                className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm resize-y"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Politique no-show</span>
+              <textarea
+                rows={2}
+                value={settings.no_show_policy ?? ''}
+                onChange={e => setSettings(s => s ? { ...s, no_show_policy: e.target.value || null } : s)}
+                placeholder="Ex. Absence sans prévenir : créneau facturé ou pénalité."
+                className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm resize-y"
+              />
             </label>
             <button onClick={saveSettings} disabled={saving}
               className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60">

@@ -17,6 +17,7 @@ import {
   type CheckoutConfirmation,
 } from '@/lib/checkoutSession'
 import { formatOrderRef } from '@/features/profile/components/orders/orderUtils'
+import { captureCheckoutStep } from '@/lib/analytics'
 
 export default function CheckoutConfirmationPage() {
   return (
@@ -68,6 +69,15 @@ function CheckoutConfirmationContent() {
     setConfirmation(stored)
     setReady(true)
   }, [router, status, orderIdsParam])
+
+  useEffect(() => {
+    if (!ready || !confirmation || !status) return
+    captureCheckoutStep(status === 'success' ? 'payment_success' : 'payment_failure', {
+      order_count: confirmation.orderIds.length,
+      total: confirmation.total,
+      source: 'confirmation_page',
+    })
+  }, [ready, confirmation, status])
 
   if (!hydrated) {
     return (

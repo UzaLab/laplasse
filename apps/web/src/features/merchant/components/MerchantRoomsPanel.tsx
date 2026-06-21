@@ -82,6 +82,8 @@ interface BookingSettings {
   buffer_min: number
   booking_window_days: number
   auto_confirm: boolean
+  cancellation_policy?: string | null
+  no_show_policy?: string | null
 }
 
 type RoomFormState = {
@@ -766,6 +768,26 @@ export function MerchantRoomsPanel() {
               onChange={e => setSettings(s => s ? { ...s, auto_confirm: e.target.checked } : s)}
             />
             Confirmation automatique
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
+            <textarea
+              rows={3}
+              value={settings.cancellation_policy ?? ''}
+              onChange={e => setSettings(s => s ? { ...s, cancellation_policy: e.target.value || null } : s)}
+              placeholder="Ex. Annulation gratuite jusqu'à 48 h avant l'arrivée."
+              className={`mt-1 ${INPUT} resize-y`}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Politique no-show</span>
+            <textarea
+              rows={2}
+              value={settings.no_show_policy ?? ''}
+              onChange={e => setSettings(s => s ? { ...s, no_show_policy: e.target.value || null } : s)}
+              placeholder="Ex. Absence sans annulation : 1ère nuit facturée."
+              className={`mt-1 ${INPUT} resize-y`}
+            />
           </label>
           <button
             type="button"

@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { OtpService } from '../otp/otp.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
+import { BookingsService } from '../bookings/bookings.service'
 import { RegisterDto, LoginDto } from './dto/auth.dto'
 import {
   createRefreshTokenValue,
@@ -32,7 +33,14 @@ export class AuthService {
     private readonly otp: OtpService,
     private readonly notifications: NotificationsService,
     private readonly loyalty: LoyaltyService,
+    private readonly bookings: BookingsService,
   ) {}
+
+  private afterAuthLinkBookings(userId: string, phone?: string | null) {
+    void this.bookings.linkGuestBookingsByPhone(userId, phone).catch(err => {
+      this.logger.warn(`Rattachement réservations invité échoué: ${(err as Error).message}`)
+    })
+  }
 
   async register(dto: RegisterDto): Promise<AuthSessionResult> {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
@@ -77,6 +85,8 @@ export class AuthService {
       this.notifications.sendWelcome(user.id, user.full_name ?? undefined),
     ]).catch(() => {})
 
+    this.afterAuthLinkBookings(user.id, phone)
+
     return { user, ...tokens }
   }
 
@@ -84,7 +94,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email, is_active: true },
       select: {
-        id: true, email: true, full_name: true, avatar: true,
+        id: true, email: true, full_name: true, avatar: true, phone: true,
         role: true, password_hash: true, created_at: true,
         merchants: {
           select: {
@@ -110,6 +120,8 @@ export class AuthService {
 
     const { password_hash: _, ...safeUser } = user
     const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+
+    this.afterAuthLinkBookings(user.id, user.phone)
 
     return { user: safeUser, ...tokens }
   }
@@ -189,6 +201,7 @@ export class AuthService {
     })
 
     const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+    this.afterAuthLinkBookings(user.id, user.phone ?? phone)
     return { user: { ...user, is_verified: true }, ...tokens }
   }
 
@@ -242,6 +255,7 @@ export class AuthService {
     }
 
     const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+    this.afterAuthLinkBookings(user.id, user.phone ?? phone)
     return { user: { ...user, is_verified: true }, ...tokens }
   }
 

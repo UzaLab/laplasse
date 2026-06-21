@@ -84,7 +84,7 @@ async function main() {
     },
   })
 
-  for (const name of ['Centre', 'Gounghin', 'Koulouba', 'Patte d\'Oie', 'Zogona']) {
+  for (const name of ['Centre', 'Cissin', 'Dassasgho', 'Gounghin', 'Koulouba', 'Ouaga 2000', 'Patte d\'Oie', 'Zogona']) {
     const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
     await prisma.geoCommune.upsert({
       where: { city_id_slug: { city_id: ouaga.id, slug } },
@@ -117,6 +117,29 @@ async function main() {
   }
 
   console.log('✅ Géo BF/SN : Ouagadougou + Dakar')
+
+  const bobo = await prisma.geoCity.upsert({
+    where: { country_slug: { country: 'BF', slug: 'bobo-dioulasso' } },
+    update: { is_active: true },
+    create: {
+      country: 'BF',
+      name: 'Bobo-Dioulasso',
+      slug: 'bobo-dioulasso',
+      is_default: false,
+      is_active: true,
+    },
+  })
+
+  for (const name of ['Centre', 'Dafra', 'Koko', 'Sarfalao']) {
+    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    await prisma.geoCommune.upsert({
+      where: { city_id_slug: { city_id: bobo.id, slug } },
+      update: { is_active: true },
+      create: { city_id: bobo.id, name, slug, is_active: true },
+    })
+  }
+
+  console.log('✅ Géo BF : Bobo-Dioulasso')
 
   // ─── USERS ───────────────────────────────────────────────────────────────────
 

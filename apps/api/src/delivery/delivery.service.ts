@@ -1,10 +1,22 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { NotificationQueueService } from '../queue/notification-queue.service'
+import { orderStatusLabelFr } from '../common/order-status-labels'
 import { DeliveryJobStatus, OrderStatus } from '../../generated/prisma/client'
+
+const DELIVERY_JOB_MESSAGES: Partial<Record<DeliveryJobStatus, string>> = {
+  ASSIGNED: 'Un livreur a été assigné à votre commande.',
+  PICKED_UP: 'Votre commande a été récupérée par le livreur.',
+  IN_TRANSIT: 'Votre commande est en route.',
+  DELIVERED: 'Votre commande a été livrée.',
+}
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationQueue: NotificationQueueService,
+  ) {}
 
   async listCouriers(country?: string, city?: string) {
     return this.prisma.deliveryCourier.findMany({
@@ -76,21 +88,27 @@ export class DeliveryService {
     })
     if (!courier) throw new NotFoundException('Coursier introuvable')
 
-    return this.prisma.deliveryJob.update({
+    const updated = await this.prisma.deliveryJob.update({
       where: { id: jobId },
       data: {
         courier_id: courierId,
         status: 'ASSIGNED',
         assigned_at: new Date(),
       },
-      include: { courier: true, order: { select: { id: true, status: true } } },
+      include: {
+        courier: true,
+        order: { select: { id: true, status: true, user_id: true } },
+      },
     })
+
+    await this.notifyDeliveryUpdate(updated.order.user_id, updated.order.id, 'ASSIGNED')
+    return updated
   }
 
   async updateJobStatus(jobId: string, status: DeliveryJobStatus) {
     const job = await this.prisma.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { order: true },
+      include: { order: { select: { id: true, user_id: true, status: true } } },
     })
     if (!job) throw new NotFoundException('Course introuvable')
 
@@ -118,14 +136,42 @@ export class DeliveryService {
     if (status === 'PICKED_UP' || status === 'IN_TRANSIT') orderStatus = 'OUT_FOR_DELIVERY'
     if (status === 'DELIVERED') orderStatus = 'DELIVERED'
 
-    if (orderStatus) {
+    if (orderStatus && job.order.status !== orderStatus) {
       await this.prisma.order.update({
         where: { id: job.order_id },
         data: { status: orderStatus },
       })
+      await this.notifyDeliveryUpdate(job.order.user_id, job.order_id, status, orderStatus)
+    } else {
+      await this.notifyDeliveryUpdate(job.order.user_id, job.order_id, status)
     }
 
     return updated
+  }
+
+  private async notifyDeliveryUpdate(
+    userId: string,
+    orderId: string,
+    jobStatus: DeliveryJobStatus,
+    orderStatus?: OrderStatus,
+  ) {
+    const body =
+      DELIVERY_JOB_MESSAGES[jobStatus]
+      ?? (orderStatus
+        ? `Votre commande est maintenant : ${orderStatusLabelFr(orderStatus)}.`
+        : 'Mise à jour de votre livraison.')
+
+    await this.notificationQueue.enqueuePush({
+      userId,
+      type: 'delivery_status',
+      title: 'Suivi livraison',
+      body,
+      data: {
+        order_id: orderId,
+        delivery_status: jobStatus,
+        order_status: orderStatus ?? null,
+      },
+    })
   }
 
   async trackByToken(token: string) {
@@ -160,15 +206,24 @@ export class DeliveryService {
   }
 
   async dispatchOrder(orderId: string, courierId?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { user_id: true },
+    })
+    if (!order) throw new NotFoundException('Commande introuvable')
+
     const job = await this.createJobForOrder(orderId)
     if (courierId) {
       await this.assignCourier(job.id, courierId)
       await this.updateJobStatus(job.id, 'PICKED_UP')
+    } else {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'OUT_FOR_DELIVERY' },
+      })
+      await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
     }
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: courierId ? 'OUT_FOR_DELIVERY' : 'OUT_FOR_DELIVERY' },
-    })
+
     return this.prisma.deliveryJob.findUnique({
       where: { id: job.id },
       include: { courier: true },

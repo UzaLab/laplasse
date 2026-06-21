@@ -451,6 +451,23 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
 
         {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
 
+        {(config?.booking_settings?.cancellation_policy || config?.booking_settings?.no_show_policy) && (
+          <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-600 space-y-2">
+            {config.booking_settings.cancellation_policy && (
+              <p>
+                <span className="font-bold text-slate-700">Annulation : </span>
+                {config.booking_settings.cancellation_policy}
+              </p>
+            )}
+            {config.booking_settings.no_show_policy && (
+              <p>
+                <span className="font-bold text-slate-700">Absence (no-show) : </span>
+                {config.booking_settings.no_show_policy}
+              </p>
+            )}
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={loading}

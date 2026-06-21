@@ -87,6 +87,12 @@ export class BookingsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('mine/claim')
+  claimMine(@CurrentUser('id') userId: string) {
+    return this.bookingsService.claimGuestBookings(userId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('mine')
   myBookings(
     @CurrentUser('id') userId: string,

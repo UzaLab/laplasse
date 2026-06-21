@@ -234,6 +234,7 @@ export class MerchantsController {
     @Body() body: {
       business_name: string; category_slug: string; description?: string;
       phone?: string; whatsapp?: string; address?: string; district?: string; city?: string;
+      country_code?: string;
       organization_id?: string;
       create_organization?: { name: string; type: 'CHAIN' | 'GROUP' | 'MULTI_SITE' };
     },

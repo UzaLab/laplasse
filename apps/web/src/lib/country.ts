@@ -26,6 +26,20 @@ export function getDefaultCity(country = DEFAULT_COUNTRY): string {
   return CITY_BY_COUNTRY[country.toUpperCase()] ?? DEFAULT_CITY
 }
 
+const PHONE_PLACEHOLDER_BY_COUNTRY: Record<string, string> = {
+  CI: '+225 07 00 00 00 00',
+  BF: '+226 70 00 00 00',
+  SN: '+221 77 000 00 00',
+}
+
+export function getPhonePlaceholder(country = DEFAULT_COUNTRY): string {
+  return PHONE_PLACEHOLDER_BY_COUNTRY[country.toUpperCase()] ?? PHONE_PLACEHOLDER_BY_COUNTRY.CI
+}
+
+export function getCountryLabel(code: string): string {
+  return SUPPORTED_COUNTRIES.find(c => c.code === code.toUpperCase())?.label ?? code
+}
+
 /** Côté client : lit le cookie lp_country */
 export function getClientCountryCode(): string {
   if (typeof document === 'undefined') return DEFAULT_COUNTRY

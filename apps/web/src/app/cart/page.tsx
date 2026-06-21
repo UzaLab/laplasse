@@ -40,6 +40,7 @@ import {
 } from '@/lib/cartPromo'
 import { detectCartKind } from '@/lib/orderFlow'
 import { notify } from '@/lib/notify'
+import { captureCheckoutStep } from '@/lib/analytics'
 
 export default function CartPage() {
   const router = useRouter()
@@ -132,6 +133,15 @@ export default function CartPage() {
     if (!ready) return
     load()
   }, [ready])
+
+  useEffect(() => {
+    if (loading || !cart) return
+    captureCheckoutStep('cart_viewed', {
+      item_count: cart.item_count,
+      merchant_count: cart.merchant_count,
+      subtotal: cart.subtotal,
+    })
+  }, [loading, cart])
 
   const updateQty = async (itemId: string, quantity: number) => {
     setUpdatingId(itemId)

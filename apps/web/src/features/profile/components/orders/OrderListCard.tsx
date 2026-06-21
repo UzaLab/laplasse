@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Order } from '@/lib/marketplaceApi'
 import { formatPrice, PLACEHOLDER_PRODUCT_IMAGE } from '@/lib/marketplaceApi'
 import { OrderStatusBadge } from '@/features/profile/components/orders/OrderStatusBadge'
+import { OrderAgainButton } from '@/features/profile/components/orders/OrderAgainButton'
 import {
   formatOrderRef,
   formatOrderTitle,
@@ -45,13 +46,14 @@ export function OrderListCard({ order }: { order: Order }) {
         <OrderStatusBadge status={order.status} />
       </div>
 
-      <div className="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-4 px-0.5 md:px-0 shrink-0">
+      <div className="flex flex-col items-end gap-2 shrink-0">
         <div
           className={`text-sm font-extrabold ${cancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}
         >
           {formatPrice(order.total)}
         </div>
-        <Link
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
           href={
             pendingPayment
               ? `/checkout/payment?orderIds=${order.id}`
@@ -66,6 +68,8 @@ export function OrderListCard({ order }: { order: Order }) {
         >
           {pendingPayment ? 'Payer' : 'Détails'}
         </Link>
+        {!pendingPayment && <OrderAgainButton order={order} />}
+        </div>
       </div>
     </article>
   )

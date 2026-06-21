@@ -8,8 +8,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common'
+import type { Response } from 'express'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -25,9 +27,11 @@ import {
   CreateProductDto,
   UpdateCartItemDto,
   UpdateOrderStatusDto,
+  CreateOrderReturnDto,
+  UpdateOrderReturnDto,
   UpdateProductDto,
 } from './dto/marketplace.dto'
-import { OrderStatus } from '../../generated/prisma/client'
+import { OrderStatus, OrderReturnStatus } from '../../generated/prisma/client'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import type { DeliveryQuoteRequest } from '../delivery-zones/delivery-zones.service'
 import { AddressesService } from '../addresses/addresses.service'
@@ -290,6 +294,76 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/export')
+  async exportMerchantOrders(
+    @CurrentUser('id') userId: string,
+    @Res() res: Response,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+    @Query('days') days?: string,
+  ) {
+    const parsedDays = days ? Number(days) : 90
+    const csv = await this.svc.exportMerchantOrdersCsv(
+      userId,
+      shopId ?? merchantId,
+      Number.isFinite(parsedDays) ? parsedDays : 90,
+    )
+    const stamp = new Date().toISOString().slice(0, 10)
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="commandes-${stamp}.csv"`)
+    res.send(`\uFEFF${csv}`)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/returns')
+  merchantReturns(
+    @CurrentUser('id') userId: string,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+    @Query('status') status?: OrderReturnStatus,
+  ) {
+    return this.svc.listMerchantReturns(userId, shopId ?? merchantId, status)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('orders/returns/:returnId')
+  updateReturn(
+    @CurrentUser('id') userId: string,
+    @Param('returnId') returnId: string,
+    @Body() dto: UpdateOrderReturnDto,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.updateOrderReturn(userId, returnId, dto, shopId ?? merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('orders/:id/returns')
+  createReturn(
+    @CurrentUser('id') userId: string,
+    @Param('id') orderId: string,
+    @Body() dto: CreateOrderReturnDto,
+  ) {
+    return this.svc.createOrderReturn(userId, orderId, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/analytics')
+  merchantShopAnalytics(
+    @CurrentUser('id') userId: string,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+    @Query('days') days?: string,
+  ) {
+    const parsedDays = days ? Number(days) : 30
+    return this.svc.getMerchantShopAnalytics(
+      userId,
+      shopId ?? merchantId,
+      Number.isFinite(parsedDays) ? parsedDays : 30,
+    )
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/merchant/:orderId')
   merchantOrder(
     @CurrentUser('id') userId: string,
@@ -298,6 +372,12 @@ export class MarketplaceController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.svc.getMerchantOrder(userId, orderId, shopId ?? merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('orders/:id/reorder')
+  reorderOrder(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.svc.reorderFromOrder(userId, id)
   }
 
   @UseGuards(JwtAuthGuard)

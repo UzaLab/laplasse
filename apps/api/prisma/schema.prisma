@@ -127,6 +127,7 @@ model User {
   audit_logs       AuditLog[]
   cart             Cart?
   orders           Order[]
+  order_returns    OrderReturn[]
   shops            Shop[]
   promotion_redemptions PromotionRedemption[]
   addresses        UserAddress[]
@@ -874,12 +875,14 @@ enum ServiceKind {
 }
 
 model MerchantBookingSettings {
-  merchant_id         String  @id
-  max_capacity        Int     @default(20)
-  slot_duration_min   Int     @default(60)
-  buffer_min          Int     @default(15)
-  booking_window_days Int     @default(30)
-  auto_confirm        Boolean @default(false)
+  merchant_id           String  @id
+  max_capacity          Int     @default(20)
+  slot_duration_min     Int     @default(60)
+  buffer_min            Int     @default(15)
+  booking_window_days   Int     @default(30)
+  auto_confirm          Boolean @default(false)
+  cancellation_policy   String?
+  no_show_policy        String?
 
   merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
 }
@@ -1135,6 +1138,7 @@ model Shop {
   collections      ShopCollection[]
   menu_sections    MenuSection[]
   menu_items       MenuItem[]
+  order_returns    OrderReturn[]
 
   @@index([owner_id])
   @@index([slug])
@@ -1316,6 +1320,34 @@ enum OrderSource {
   FOOD
 }
 
+enum OrderReturnStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+model OrderReturn {
+  id            String            @id @default(cuid())
+  order_id      String            @unique
+  user_id       String
+  shop_id       String?
+  reason        String
+  description   String?
+  status        OrderReturnStatus @default(PENDING)
+  merchant_note String?
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
+  resolved_at   DateTime?
+
+  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop  Shop? @relation(fields: [shop_id], references: [id], onDelete: SetNull)
+
+  @@index([shop_id, status])
+  @@index([user_id])
+}
+
 model Order {
   id                  String       @id @default(cuid())
   user_id             String
@@ -1347,6 +1379,7 @@ model Order {
   payment     PaymentTransaction?
   redemption  PromotionRedemption?
   delivery_job DeliveryJob?
+  return_request OrderReturn?
 
   @@index([user_id])
   @@index([shop_id, status])

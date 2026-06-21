@@ -7,6 +7,8 @@ import { Eye, EyeOff, Loader2, MapPin, Smartphone } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_AUTH_SUBTITLE } from '@/lib/brandCopy'
+import { PUBLIC_AUTH } from '@/lib/pageLayout'
+import { getPhonePlaceholder, getCountryCode } from '@/lib/country'
 
 type LoginMode = 'email' | 'otp'
 
@@ -110,11 +112,13 @@ function LoginForm() {
     }
   }
 
+  const phonePlaceholder = getPhonePlaceholder(getCountryCode())
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4">
 
       {/* Card */}
-      <div className="w-full max-w-md">
+      <div className={PUBLIC_AUTH}>
 
         {/* Logo */}
         <div className="text-center mb-8">
@@ -216,7 +220,7 @@ function LoginForm() {
                   type="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
-                  placeholder="+225 07 XX XX XX XX"
+                  placeholder={phonePlaceholder}
                   disabled={otpSent}
                   className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm disabled:bg-slate-50"
                 />

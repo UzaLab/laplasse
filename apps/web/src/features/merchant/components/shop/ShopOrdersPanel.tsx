@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Loader2, ShoppingBag } from 'lucide-react'
+import { ChevronRight, Download, Loader2, ShoppingBag } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { matchesSearchQuery } from '@/lib/merchantListFilters'
 import { FilterPill, MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
 import {
   fetchMerchantOrders,
+  downloadMerchantOrdersCsv,
   formatPrice,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
@@ -16,6 +17,7 @@ import {
   type Order,
   type OrderStatus,
 } from '@/lib/marketplaceApi'
+import { notify } from '@/lib/notify'
 
 const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]>> = {
   PENDING: [{ status: 'CONFIRMED', label: 'Confirmer' }, { status: 'CANCELLED', label: 'Annuler' }],
@@ -61,6 +63,7 @@ export function ShopOrdersPanel() {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [exporting, setExporting] = useState(false)
   const debouncedSearch = useDebounce(searchQuery, 250)
 
   const load = useCallback(async () => {
@@ -108,13 +111,35 @@ export function ShopOrdersPanel() {
     setProcessingId(null)
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    const result = await downloadMerchantOrdersCsv(activeShopId, 90)
+    setExporting(false)
+    if (result.ok) {
+      notify.success('Export CSV téléchargé')
+    } else {
+      notify.error(result.error)
+    }
+  }
+
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-extrabold text-slate-900">Commandes</h2>
-        <p className="text-slate-400 text-sm mt-0.5">
-          Suivez et mettez à jour les commandes de votre boutique.
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold text-slate-900">Commandes</h2>
+          <p className="text-slate-400 text-sm mt-0.5">
+            Suivez et mettez à jour les commandes de votre boutique.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={exporting || !activeShopId}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-slate-300 disabled:opacity-60"
+        >
+          {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          Export CSV (90 j)
+        </button>
       </div>
 
       <MerchantListToolbar

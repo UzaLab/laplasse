@@ -69,6 +69,7 @@ describe('AuthService', () => {
       otp as unknown as OtpService,
       { sendWelcome: jest.fn() } as never,
       { getOrCreateAccount: jest.fn() } as never,
+      { linkGuestBookingsByPhone: jest.fn().mockResolvedValue({ linked: 0 }) } as never,
     )
     jest.clearAllMocks()
   })

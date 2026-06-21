@@ -29,6 +29,8 @@ export interface BookingSettingsConfig {
   buffer_min: number
   booking_window_days: number
   auto_confirm: boolean
+  cancellation_policy?: string | null
+  no_show_policy?: string | null
 }
 
 export interface BookingConfig {

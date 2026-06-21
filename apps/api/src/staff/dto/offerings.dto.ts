@@ -25,6 +25,14 @@ export class UpdateBookingSettingsDto {
   @IsOptional()
   @IsBoolean()
   auto_confirm?: boolean
+
+  @IsOptional()
+  @IsString()
+  cancellation_policy?: string
+
+  @IsOptional()
+  @IsString()
+  no_show_policy?: string
 }
 
 export class CreateAvailabilityBlockDto {

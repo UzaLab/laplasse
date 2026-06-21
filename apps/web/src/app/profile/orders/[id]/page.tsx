@@ -30,6 +30,8 @@ import {
   PLACEHOLDER_PRODUCT_IMAGE,
 } from '@/lib/marketplaceApi'
 import { deliveryTrackingPath } from '@/lib/deliveryApi'
+import { OrderAgainButton } from '@/features/profile/components/orders/OrderAgainButton'
+import { OrderReturnRequestForm } from '@/features/profile/components/orders/OrderReturnRequestForm'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 function whatsAppSupportUrl(phone: string, message: string): string | undefined {
@@ -135,6 +137,7 @@ export default function ProfileOrderDetailPage() {
                 Payer maintenant
               </Link>
             )}
+            {!pendingPayment && <OrderAgainButton order={order} variant="detail" />}
             <Link
               href={`/profile/orders/${order.id}/receipt`}
               target="_blank"
@@ -225,6 +228,8 @@ export default function ProfileOrderDetailPage() {
             </div>
           </div>
         </div>
+
+        <OrderReturnRequestForm order={order} />
 
         {/* Timeline */}
         <div className="bg-white/80 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">

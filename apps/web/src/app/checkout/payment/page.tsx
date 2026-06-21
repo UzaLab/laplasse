@@ -29,6 +29,7 @@ import {
 } from '@/lib/marketplaceApi'
 import { notify } from '@/lib/notify'
 import { isFoodOrderCart } from '@/lib/orderFlow'
+import { captureCheckoutStep } from '@/lib/analytics'
 
 export default function CheckoutPaymentPage() {
   return (
@@ -88,6 +89,14 @@ function CheckoutPaymentPageContent() {
 
     void load()
   }, [hydrated, isAuthenticated, router, resumeOrderIds.join(','), isFoodRoute])
+
+  useEffect(() => {
+    if (!ready || !session || isFoodRoute) return
+    captureCheckoutStep('payment_started', {
+      order_count: session.checkoutResult.orders.length,
+      total: session.checkoutResult.total,
+    })
+  }, [ready, session, isFoodRoute])
 
   const isFoodFlow =
     isFoodRoute
