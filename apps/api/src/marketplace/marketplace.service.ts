@@ -22,8 +22,13 @@ import {
   UpdateOrderStatusDto,
   UpdateProductDto,
 } from './dto/marketplace.dto'
-import { generatePaymentReference, slugify } from './marketplace.util'
+import { generatePaymentReference, slugify, MENU_MIRROR_SLUG_PREFIX, menuMirrorProductSlug, isMenuMirrorProductSlug } from './marketplace.util'
 import { ShopsService } from '../shops/shops.service'
+import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
+import { PromotionsService } from '../promotions/promotions.service'
+import { SearchService } from '../search/search.service'
+import { ShopCollectionsService } from '../shop-collections/shop-collections.service'
+import { DeliveryService } from '../delivery/delivery.service'
 
 @Injectable()
 export class MarketplaceService {
@@ -31,6 +36,11 @@ export class MarketplaceService {
     private readonly prisma: PrismaService,
     private readonly notificationQueue: NotificationQueueService,
     private readonly shopsService: ShopsService,
+    private readonly deliveryZones: DeliveryZonesService,
+    private readonly promotionsService: PromotionsService,
+    private readonly searchService: SearchService,
+    private readonly shopCollections: ShopCollectionsService,
+    private readonly deliveryService: DeliveryService,
   ) {}
 
   private shopPublicSelect = {
@@ -140,12 +150,55 @@ export class MarketplaceService {
     }
   }
 
-  private mapCartItem(
+  private async resolveProductCategoryId(input?: {
+    category_id?: string
+    category_slug?: string
+  }) {
+    if (!input) return undefined
+    if (input.category_id === '') return null
+    if (input.category_id) {
+      const cat = await this.prisma.productCategory.findFirst({
+        where: { id: input.category_id, is_active: true },
+        select: { id: true },
+      })
+      if (!cat) throw new BadRequestException('Catégorie produit invalide')
+      return cat.id
+    }
+    if (input.category_slug) {
+      const cat = await this.prisma.productCategory.findFirst({
+        where: { slug: input.category_slug.trim(), is_active: true },
+        select: { id: true },
+      })
+      if (!cat) throw new BadRequestException('Catégorie produit invalide')
+      return cat.id
+    }
+    return undefined
+  }
+
+  private async assertShopProductCategory(shopId: string, categoryId: string | null | undefined) {
+    const enabledIds = await this.shopsService.getEnabledProductCategoryIds(shopId)
+    if (enabledIds.length && !categoryId) {
+      throw new BadRequestException('Sélectionnez une catégorie produit')
+    }
+    await this.shopsService.assertProductCategoryAllowed(shopId, categoryId)
+  }
+
+  private mapRawCartItem(
     item: {
       id: string
       quantity: number
       variant_id: string | null
-      product: {
+      menu_item_id?: string | null
+      menu_item?: {
+        id: string
+        name: string
+        price: number
+        currency: string
+        image_url: string | null
+        is_available: boolean
+        merchant: { id: string; business_name: string; slug: string; logo?: string | null }
+      } | null
+      product?: {
         id: string
         name: string
         slug: string
@@ -155,6 +208,7 @@ export class MarketplaceService {
         image_url: string | null
         status: ProductStatus
         shop_id: string
+        category_id: string | null
         allow_pickup: boolean
         allow_delivery: boolean
         variants?: { id: string; name: string; price: number; stock_quantity: number }[]
@@ -165,10 +219,57 @@ export class MarketplaceService {
           logo?: string | null
           merchant_id?: string | null
         }
-      }
+      } | null
       variant?: { id: string; name: string; price: number; stock_quantity: number } | null
     },
   ) {
+    if (item.menu_item_id && item.menu_item) {
+      const m = item.menu_item
+      const unitPrice = m.price
+      return {
+        id: item.id,
+        quantity: item.quantity,
+        variant_id: null as string | null,
+        unit_price: unitPrice,
+        line_total: unitPrice * item.quantity,
+        variant: null,
+        line_kind: 'menu' as const,
+        menu_item_id: m.id,
+        menu_item: {
+          id: m.id,
+          name: m.name,
+          price: m.price,
+          currency: m.currency,
+          image_url: m.image_url,
+        },
+        product: {
+          id: m.id,
+          name: m.name,
+          slug: `menu-${m.id}`,
+          price: m.price,
+          currency: m.currency,
+          stock_quantity: 9999,
+          image_url: m.image_url,
+          status: 'ACTIVE' as ProductStatus,
+          shop_id: null as string | null,
+          category_id: null,
+          allow_pickup: true,
+          allow_delivery: true,
+          has_variants: false,
+          merchant: {
+            id: m.merchant.id,
+            business_name: m.merchant.business_name,
+            slug: m.merchant.slug,
+            logo: m.merchant.logo ?? null,
+          },
+        },
+      }
+    }
+
+    if (!item.product) {
+      throw new BadRequestException('Article de panier invalide')
+    }
+
     const unitPrice = this.resolveUnitPrice(item.product, item.variant)
     return {
       id: item.id,
@@ -184,6 +285,9 @@ export class MarketplaceService {
             stock_quantity: item.variant.stock_quantity,
           }
         : null,
+      line_kind: 'product' as const,
+      menu_item_id: null as string | null,
+      menu_item: null,
       product: {
         id: item.product.id,
         name: item.product.name,
@@ -194,11 +298,12 @@ export class MarketplaceService {
         image_url: item.product.image_url,
         status: item.product.status,
         shop_id: item.product.shop_id,
+        category_id: item.product.category_id,
         allow_pickup: item.product.allow_pickup,
         allow_delivery: item.product.allow_delivery,
         shop: item.product.shop,
         merchant: {
-          id: item.product.shop.id,
+          id: item.product.shop.merchant_id ?? item.product.shop.id,
           business_name: item.product.shop.name,
           slug: item.product.shop.slug,
         },
@@ -209,17 +314,69 @@ export class MarketplaceService {
 
   private buildCartResponse(
     cart: { id: string },
-    rawItems: Parameters<MarketplaceService['mapCartItem']>[0][],
+    rawItems: Parameters<MarketplaceService['mapRawCartItem']>[0][],
   ) {
-    const items = rawItems.map(i => this.mapCartItem(i))
+    const items = rawItems.map(i => this.mapRawCartItem(i))
     const subtotal = items.reduce((sum, i) => sum + i.line_total, 0)
+    const kind = this.detectCartKindFromMapped(items)
+
+    if (kind === 'food') {
+      const merchantMap = new Map<
+        string,
+        { id: string; business_name: string; slug: string; subtotal: number; item_count: number }
+      >()
+      for (const item of items) {
+        const m = item.product.merchant
+        const existing = merchantMap.get(m.id)
+        if (existing) {
+          existing.subtotal += item.line_total
+          existing.item_count += item.quantity
+        } else {
+          merchantMap.set(m.id, {
+            id: m.id,
+            business_name: m.business_name,
+            slug: m.slug,
+            subtotal: item.line_total,
+            item_count: item.quantity,
+          })
+        }
+      }
+      const merchants = Array.from(merchantMap.values())
+      const single = merchants.length === 1 ? merchants[0] : null
+      return {
+        id: cart.id,
+        items,
+        subtotal,
+        currency: 'XOF',
+        kind,
+        shops: [],
+        shop_count: 0,
+        shop_id: null,
+        shop: null,
+        merchants,
+        merchant_count: merchants.length,
+        merchant_id: single?.id ?? null,
+        merchant: single
+          ? {
+              id: single.id,
+              business_name: single.business_name,
+              slug: single.slug,
+              subtotal: single.subtotal,
+              item_count: single.item_count,
+            }
+          : null,
+        item_count: items.reduce((n, i) => n + i.quantity, 0),
+        delivery_options: { allow_pickup: true, allow_delivery: true },
+      }
+    }
+
     const shopMap = new Map<
       string,
       { id: string; name: string; slug: string; subtotal: number; item_count: number }
     >()
 
     for (const item of items) {
-      const s = item.product.shop
+      const s = item.product.shop!
       const existing = shopMap.get(s.id)
       if (existing) {
         existing.subtotal += item.line_total
@@ -259,6 +416,7 @@ export class MarketplaceService {
       items,
       subtotal,
       currency: 'XOF',
+      kind,
       shops,
       shop_count: shops.length,
       shop_id: singleShop?.id ?? null,
@@ -275,16 +433,133 @@ export class MarketplaceService {
     }
   }
 
+  private detectCartKindFromMapped(
+    items: Array<{ line_kind: 'menu' | 'product' }>,
+  ): 'empty' | 'marketplace' | 'food' | 'mixed' {
+    if (!items.length) return 'empty'
+    const flags = items.map(i => i.line_kind === 'menu')
+    if (flags.every(Boolean)) return 'food'
+    if (flags.every(f => !f)) return 'marketplace'
+    return 'mixed'
+  }
+
+  private detectCartKindFromRaw(
+    items: Array<{ menu_item_id?: string | null; product_id?: string | null }>,
+  ): 'empty' | 'marketplace' | 'food' | 'mixed' {
+    if (!items.length) return 'empty'
+    const hasMenu = items.some(i => i.menu_item_id)
+    const hasProduct = items.some(i => i.product_id)
+    if (hasMenu && hasProduct) return 'mixed'
+    if (hasMenu) return 'food'
+    if (hasProduct) return 'marketplace'
+    return 'empty'
+  }
+
+  private assertHomogeneousCartFromRaw(
+    existingItems: Array<{ menu_item_id?: string | null; product_id?: string | null }>,
+    incomingIsFood: boolean,
+  ) {
+    const kind = this.detectCartKindFromRaw(existingItems)
+    if (kind === 'empty' || kind === 'mixed') return
+    if (kind === 'food' && !incomingIsFood) {
+      throw new BadRequestException(
+        'Finalisez ou videz votre commande restaurant avant d\'ajouter des produits boutique.',
+      )
+    }
+    if (kind === 'marketplace' && incomingIsFood) {
+      throw new BadRequestException(
+        'Videz votre panier marketplace avant de commander au restaurant.',
+      )
+    }
+  }
+
+  private merchantOrderScope(shop: { id: string; merchant_id: string | null }) {
+    if (shop.merchant_id) {
+      return {
+        OR: [
+          { shop_id: shop.id },
+          { order_source: 'FOOD' as const, merchant_id: shop.merchant_id },
+        ],
+      }
+    }
+    return { shop_id: shop.id }
+  }
+
   private async resolveShopBySlug(slug: string) {
     return this.shopsService.getByMerchantSlug(slug)
   }
 
   // ─── Products (public) ───────────────────────────────────────────────────────
 
-  async listPublicProducts(shopSlug: string) {
+  async listPublicProducts(
+    shopSlug: string,
+    query?: { category?: string; q?: string; collection?: string },
+  ) {
     const shop = await this.resolveShopBySlug(shopSlug)
+
+    if (query?.collection?.trim()) {
+      const productIds = await this.shopCollections.getProductIdsForCollection(
+        shop.id,
+        query.collection.trim(),
+      )
+      if (!productIds?.length) return []
+      let products = await this.fetchPublicProductsByIds(shop.id, productIds)
+
+      if (query?.category?.trim()) {
+        const cat = await this.prisma.productCategory.findFirst({
+          where: { slug: query.category.trim(), is_active: true },
+          select: { id: true },
+        })
+        if (cat) {
+          products = products.filter(p => p.category_id === cat.id)
+        } else {
+          return []
+        }
+      }
+
+      if (query?.q?.trim()) {
+        const q = query.q.trim().toLowerCase()
+        products = products.filter(
+          p =>
+            p.name.toLowerCase().includes(q) ||
+            (p.description?.toLowerCase().includes(q) ?? false),
+        )
+      }
+
+      return products
+    }
+
+    if (query?.q?.trim()) {
+      const meili = await this.searchService.searchProducts({
+        q: query.q.trim(),
+        category: query?.category,
+        shop: shopSlug,
+        limit: 100,
+      })
+      if (meili?.data.length) {
+        const ids = meili.data.map(p => p.id)
+        return this.fetchPublicProductsByIds(shop.id, ids)
+      }
+      if (meili) return []
+    }
+
+    let categoryId: string | undefined
+    if (query?.category?.trim()) {
+      const cat = await this.prisma.productCategory.findFirst({
+        where: { slug: query.category.trim(), is_active: true },
+        select: { id: true },
+      })
+      if (!cat) return []
+      categoryId = cat.id
+    }
+
     const products = await this.prisma.product.findMany({
-      where: { shop_id: shop.id, status: 'ACTIVE' },
+      where: {
+        shop_id: shop.id,
+        status: 'ACTIVE',
+        slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
+        ...(categoryId ? { category_id: categoryId } : {}),
+      },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
       select: {
         id: true,
@@ -296,6 +571,8 @@ export class MarketplaceService {
         stock_quantity: true,
         image_url: true,
         status: true,
+        category_id: true,
+        category: { select: { id: true, name: true, slug: true } },
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
           select: { id: true, name: true, price: true, stock_quantity: true },
@@ -305,6 +582,65 @@ export class MarketplaceService {
     return products.filter(
       p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0),
     )
+  }
+
+  private async fetchPublicProductsByIds(shopId: string, ids: string[]) {
+    const products = await this.prisma.product.findMany({
+      where: {
+        shop_id: shopId,
+        id: { in: ids },
+        status: 'ACTIVE',
+        slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        price: true,
+        currency: true,
+        stock_quantity: true,
+        image_url: true,
+        status: true,
+        category_id: true,
+        category: { select: { id: true, name: true, slug: true } },
+        variants: {
+          orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
+          select: { id: true, name: true, price: true, stock_quantity: true },
+        },
+      },
+    })
+    const order = new Map(ids.map((id, index) => [id, index]))
+    return products
+      .filter(p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0))
+      .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+  }
+
+  async listPublicShopProductCategories(shopSlug: string) {
+    const shop = await this.resolveShopBySlug(shopSlug)
+    return this.prisma.productCategory.findMany({
+      where: {
+        is_active: true,
+        products: {
+          some: {
+            shop_id: shop.id,
+            status: 'ACTIVE',
+            slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
+            OR: [
+              { stock_quantity: { gt: 0 } },
+              { variants: { some: { stock_quantity: { gt: 0 } } } },
+            ],
+          },
+        },
+      },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, slug: true, icon: true },
+    })
+  }
+
+  async listPublicShopCollections(shopSlug: string) {
+    const shop = await this.resolveShopBySlug(shopSlug)
+    return this.shopCollections.listPublicForShop(shop.id)
   }
 
   async getPublicProduct(shopSlug: string, productSlug: string) {
@@ -355,6 +691,7 @@ export class MarketplaceService {
       where: { shop_id: shop.id },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
       include: {
+        category: { select: { id: true, name: true, slug: true, parent_id: true } },
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
         },
@@ -394,10 +731,13 @@ export class MarketplaceService {
     const status = dto.status ?? (stock > 0 ? 'ACTIVE' : 'DRAFT')
     this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
     const imageUrls = this.resolveImageUrls(dto)
+    const categoryId = await this.resolveProductCategoryId(dto)
+    await this.assertShopProductCategory(shop.id, categoryId)
 
     const created = await this.prisma.product.create({
       data: {
         shop_id: shop.id,
+        category_id: categoryId ?? undefined,
         name: dto.name,
         slug,
         description: dto.description,
@@ -430,6 +770,7 @@ export class MarketplaceService {
         ...this.productImagesInclude,
       },
     })
+    void this.searchService.syncProduct(created.id)
     return this.attachProductImages(created)
   }
 
@@ -480,6 +821,10 @@ export class MarketplaceService {
         ? this.resolveImageUrls({ image_url: dto.image_url })
         : undefined
 
+    const categoryId = await this.resolveProductCategoryId(dto)
+    const finalCategoryId = categoryId !== undefined ? categoryId : existing.category_id
+    await this.assertShopProductCategory(shop.id, finalCategoryId)
+
     await this.prisma.product.update({
       where: { id: productId },
       data: {
@@ -488,6 +833,7 @@ export class MarketplaceService {
         composition: dto.composition,
         price,
         stock_quantity: stock,
+        ...(categoryId !== undefined ? { category_id: categoryId } : {}),
         ...(imageUrls !== undefined ? { image_url: imageUrls[0] ?? null } : {}),
         allow_pickup: dto.allow_pickup,
         allow_delivery: dto.allow_delivery,
@@ -506,6 +852,7 @@ export class MarketplaceService {
         ...this.productImagesInclude,
       },
     })
+    void this.searchService.syncProduct(productId)
     return this.attachProductImages(withImages)
   }
 
@@ -519,12 +866,32 @@ export class MarketplaceService {
       where: { id: productId },
       data: { status: 'ARCHIVED' },
     })
+    void this.searchService.removeProduct(productId)
     return { success: true }
   }
 
   // ─── Cart ────────────────────────────────────────────────────────────────────
 
   private cartItemInclude = {
+    menu_item: {
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        currency: true,
+        image_url: true,
+        is_available: true,
+        merchant: {
+          select: {
+            id: true,
+            business_name: true,
+            slug: true,
+            logo: true,
+            is_active: true,
+          },
+        },
+      },
+    },
     product: {
       select: {
         id: true,
@@ -538,6 +905,7 @@ export class MarketplaceService {
         shop_id: true,
         allow_pickup: true,
         allow_delivery: true,
+        category_id: true,
         variants: { select: { id: true, name: true, price: true, stock_quantity: true } },
         shop: true,
       },
@@ -546,6 +914,35 @@ export class MarketplaceService {
       select: { id: true, name: true, price: true, stock_quantity: true },
     },
   } as const
+
+  private filterActiveCartItems(
+    items: Awaited<ReturnType<MarketplaceService['getOrCreateCart']>>['items'],
+  ): Awaited<ReturnType<MarketplaceService['getOrCreateCart']>>['items'] {
+    return items.filter(i => {
+      if (i.menu_item_id) return i.menu_item?.is_available ?? false
+      return i.product?.status === 'ACTIVE'
+    })
+  }
+
+  private resolveOrderOwnerId(order: {
+    shop?: { owner_id: string } | null
+    merchant?: { owner_id: string } | null
+  }) {
+    return order.shop?.owner_id ?? order.merchant?.owner_id
+  }
+
+  private resolveOrderMerchantMeta(order: {
+    merchant?: { id: string; business_name: string; slug: string } | null
+    shop?: { id: string; name: string; slug: string } | null
+    merchant_id?: string | null
+    shop_id?: string | null
+  }) {
+    return {
+      id: order.merchant?.id ?? order.shop?.id ?? order.merchant_id ?? '',
+      business_name: order.merchant?.business_name ?? order.shop?.name ?? '',
+      slug: order.merchant?.slug ?? order.shop?.slug ?? '',
+    }
+  }
 
   private async getOrCreateCart(userId: string) {
     return this.prisma.cart.upsert({
@@ -560,7 +957,7 @@ export class MarketplaceService {
 
   async getCart(userId: string) {
     const cart = await this.getOrCreateCart(userId)
-    const items = cart.items.filter(i => i.product.status === 'ACTIVE')
+    const items = this.filterActiveCartItems(cart.items)
     return this.buildCartResponse(cart, items)
   }
 
@@ -575,9 +972,17 @@ export class MarketplaceService {
     if (!product || product.status !== 'ACTIVE') {
       throw new BadRequestException('Produit indisponible')
     }
+    if (isMenuMirrorProductSlug(product.slug)) {
+      throw new BadRequestException(
+        'Ce produit provient d\'un ancien flux menu — recommandez depuis le menu du restaurant.',
+      )
+    }
     if (!product.shop.is_active || product.shop.status !== 'ACTIVE') {
       throw new BadRequestException('Boutique indisponible')
     }
+
+    const cart = await this.getOrCreateCart(userId)
+    this.assertHomogeneousCartFromRaw(cart.items, false)
 
     const hasVariants = product.variants.length > 0
     let variant: (typeof product.variants)[number] | null = null
@@ -597,7 +1002,6 @@ export class MarketplaceService {
       throw new BadRequestException('Stock insuffisant')
     }
 
-    const cart = await this.getOrCreateCart(userId)
     const variantId = variant?.id ?? null
 
     const existing = await this.prisma.cartItem.findFirst({
@@ -631,6 +1035,41 @@ export class MarketplaceService {
     return this.getCart(userId)
   }
 
+  /** Ajoute un plat du menu au panier — entité MenuItem, sans produit boutique. */
+  async addMenuItemToCart(userId: string, menuItemId: string, quantity: number) {
+    const menuItem = await this.prisma.menuItem.findFirst({
+      where: { id: menuItemId, is_available: true },
+      include: {
+        merchant: { select: { id: true, is_active: true } },
+      },
+    })
+    if (!menuItem) throw new NotFoundException('Plat introuvable ou indisponible')
+    if (!menuItem.merchant.is_active) {
+      throw new BadRequestException('Ce restaurant n\'accepte pas de commandes pour le moment')
+    }
+
+    const cart = await this.getOrCreateCart(userId)
+    this.assertHomogeneousCartFromRaw(cart.items, true)
+
+    const existing = cart.items.find(i => i.menu_item_id === menuItemId)
+    if (existing) {
+      await this.prisma.cartItem.update({
+        where: { id: existing.id },
+        data: { quantity: existing.quantity + quantity },
+      })
+    } else {
+      await this.prisma.cartItem.create({
+        data: {
+          cart_id: cart.id,
+          menu_item_id: menuItemId,
+          quantity,
+        },
+      })
+    }
+
+    return this.getCart(userId)
+  }
+
   async updateCartItem(userId: string, itemId: string, quantity: number) {
     const cart = await this.getOrCreateCart(userId)
     const item = cart.items.find(i => i.id === itemId)
@@ -638,7 +1077,12 @@ export class MarketplaceService {
 
     if (quantity === 0) {
       await this.prisma.cartItem.delete({ where: { id: item.id } })
-    } else {
+    } else if (item.menu_item_id) {
+      if (!item.menu_item?.is_available) {
+        throw new BadRequestException('Plat indisponible')
+      }
+      await this.prisma.cartItem.update({ where: { id: item.id }, data: { quantity } })
+    } else if (item.product) {
       const availableStock = this.resolveAvailableStock(item.product, item.variant)
       if (availableStock < quantity) {
         throw new BadRequestException('Stock insuffisant')
@@ -657,21 +1101,135 @@ export class MarketplaceService {
 
   // ─── Checkout & Orders ─────────────────────────────────────────────────────
 
-  async checkout(userId: string, dto: CheckoutDto) {
-    if (dto.delivery_type === 'DELIVERY' && !dto.delivery_address?.trim()) {
-      throw new BadRequestException('Adresse de livraison requise')
+  async applyCartPromo(userId: string, code: string, shopIdFilter?: string) {
+    const rawCart = await this.getOrCreateCart(userId)
+    const activeItems = this.filterActiveCartItems(rawCart.items)
+    const retailItems = activeItems.filter(i => i.product_id && !i.menu_item_id)
+    if (!retailItems.length) {
+      throw new BadRequestException(
+        'Les codes promo s\'appliquent aux achats marketplace, pas aux commandes restaurant.',
+      )
     }
 
+    const cart = this.buildCartResponse(rawCart, retailItems)
+    const shopGroups = new Map<string, { subtotal: number; name: string; merchantId: string | null }>()
+
+    for (const item of cart.items) {
+      const sid = item.product.shop_id
+      const shop = item.product.shop
+      if (!sid || !shop) continue
+      const existing = shopGroups.get(sid)
+      if (existing) {
+        existing.subtotal += item.line_total
+      } else {
+        shopGroups.set(sid, {
+          subtotal: item.line_total,
+          name: shop.name,
+          merchantId: shop.merchant_id ?? null,
+        })
+      }
+    }
+
+    const applications: Array<{
+      shop_id: string
+      shop_name: string
+      valid: boolean
+      code: string
+      promotion_id?: string
+      promotion_title?: string
+      discount: number
+      free_delivery: boolean
+      message: string
+    }> = []
+
+    for (const [shopId, group] of shopGroups) {
+      if (shopIdFilter && shopId !== shopIdFilter) continue
+
+      if (!group.merchantId) {
+        applications.push({
+          shop_id: shopId,
+          shop_name: group.name,
+          valid: false,
+          code: code.trim().toUpperCase(),
+          discount: 0,
+          free_delivery: false,
+          message: 'Promotions indisponibles pour cette boutique',
+        })
+        continue
+      }
+
+      const shopLineItems = cart.items
+        .filter(i => i.product.shop_id === shopId)
+        .map(i => ({
+          category_id: i.product.category_id ?? null,
+          line_total: i.line_total,
+        }))
+
+      const result = await this.promotionsService.validateForShop({
+        code,
+        merchantId: group.merchantId,
+        shopId,
+        subtotal: group.subtotal,
+        lineItems: shopLineItems,
+      })
+
+      applications.push({
+        shop_id: shopId,
+        shop_name: group.name,
+        valid: result.valid,
+        code: code.trim().toUpperCase(),
+        promotion_id: result.valid ? result.promotion.id : undefined,
+        promotion_title: result.valid ? result.promotion.title : undefined,
+        discount: result.valid ? result.discount : 0,
+        free_delivery: result.valid ? result.free_delivery : false,
+        message: result.message,
+      })
+    }
+
+    const total_discount = applications.reduce((sum, a) => sum + (a.valid ? a.discount : 0), 0)
+
+    return { applications, total_discount }
+  }
+
+  async checkout(userId: string, dto: CheckoutDto) {
     const rawCart = await this.getOrCreateCart(userId)
-    const activeItems = rawCart.items.filter(i => i.product.status === 'ACTIVE')
+    const activeItems = this.filterActiveCartItems(rawCart.items)
     if (!activeItems.length) {
       throw new BadRequestException('Panier vide')
     }
 
-    if (dto.delivery_type === 'DELIVERY') {
-      const blocked = activeItems.filter(i => !i.product.allow_delivery)
+    const cartKind = this.detectCartKindFromRaw(activeItems)
+    if (cartKind === 'mixed') {
+      throw new BadRequestException('Panier incompatible — videz-le et recommencez.')
+    }
+    if (cartKind === 'food') {
+      return this.checkoutFoodOrder(userId, dto, rawCart, activeItems)
+    }
+
+    return this.checkoutMarketplaceOrder(userId, dto, rawCart, activeItems)
+  }
+
+  private async checkoutMarketplaceOrder(
+    userId: string,
+    dto: CheckoutDto,
+    rawCart: Awaited<ReturnType<MarketplaceService['getOrCreateCart']>>,
+    activeItems: typeof rawCart.items,
+  ) {
+    const isDelivery = dto.delivery_type === 'DELIVERY'
+
+    if (isDelivery) {
+      const hasStructured =
+        dto.delivery_city_id?.trim() && dto.delivery_commune_id?.trim()
+      const hasLegacy = dto.delivery_address?.trim()
+      if (!hasStructured && !hasLegacy) {
+        throw new BadRequestException('Adresse de livraison requise (ville, commune et quartier)')
+      }
+    }
+
+    if (isDelivery) {
+      const blocked = activeItems.filter(i => i.product && !i.product.allow_delivery)
       if (blocked.length) {
-        const names = blocked.map(i => i.product.name).join(', ')
+        const names = blocked.map(i => i.product!.name).join(', ')
         throw new BadRequestException(
           `Livraison indisponible pour : ${names}. Retirez ces articles ou choisissez le retrait sur place.`,
         )
@@ -679,9 +1237,9 @@ export class MarketplaceService {
     }
 
     if (dto.delivery_type === 'PICKUP') {
-      const blocked = activeItems.filter(i => !i.product.allow_pickup)
+      const blocked = activeItems.filter(i => i.product && !i.product.allow_pickup)
       if (blocked.length) {
-        const names = blocked.map(i => i.product.name).join(', ')
+        const names = blocked.map(i => i.product!.name).join(', ')
         throw new BadRequestException(
           `Retrait sur place indisponible pour : ${names}.`,
         )
@@ -703,12 +1261,57 @@ export class MarketplaceService {
     }
 
     const groups = new Map<string, typeof cart.items>()
+    const subtotals: Record<string, number> = {}
     for (const item of cart.items) {
       const sid = item.product.shop_id
+      if (!sid) {
+        throw new BadRequestException('Article marketplace invalide dans le panier')
+      }
       const list = groups.get(sid) ?? []
       list.push(item)
       groups.set(sid, list)
+      subtotals[sid] = (subtotals[sid] ?? 0) + item.line_total
     }
+
+    let deliveryQuotes: Awaited<ReturnType<DeliveryZonesService['quote']>> | null = null
+    let cityName: string | undefined
+    let communeName: string | undefined
+
+    if (isDelivery && dto.delivery_city_id && dto.delivery_commune_id) {
+      const [city, commune] = await Promise.all([
+        this.prisma.geoCity.findUnique({ where: { id: dto.delivery_city_id } }),
+        this.prisma.geoCommune.findUnique({ where: { id: dto.delivery_commune_id } }),
+      ])
+      cityName = city?.name
+      communeName = commune?.name
+
+      deliveryQuotes = await this.deliveryZones.quote({
+        shop_ids: Array.from(groups.keys()),
+        city_id: dto.delivery_city_id,
+        commune_id: dto.delivery_commune_id,
+        subtotals,
+        order_flow: 'marketplace',
+      })
+
+      const unavailable = deliveryQuotes.quotes.filter(q => !q.available)
+      if (unavailable.length) {
+        const names = unavailable.map(q => q.shop_name).join(', ')
+        throw new BadRequestException(
+          `Livraison indisponible pour : ${names}. ${unavailable[0].message ?? ''}`.trim(),
+        )
+      }
+    }
+
+    const promoByShop = new Map(
+      (dto.applied_promotions ?? []).map(p => [p.shop_id, p]),
+    )
+
+    const deliveryAddress = isDelivery
+      ? dto.delivery_address?.trim()
+        || [dto.delivery_district, communeName, cityName, dto.delivery_address_detail]
+          .filter(Boolean)
+          .join(', ')
+      : undefined
 
     const checkoutOrders = await this.prisma.$transaction(async tx => {
       const results: Array<{
@@ -716,6 +1319,9 @@ export class MarketplaceService {
         paymentId: string
         reference: string
         amount: number
+        subtotal: number
+        discount_amount: number
+        delivery_fee: number
         shop: { id: string; name: string; slug: string }
         merchant: { id: string; business_name: string; slug: string }
       }> = []
@@ -724,20 +1330,65 @@ export class MarketplaceService {
         const subtotal = items.reduce((sum, i) => sum + i.line_total, 0)
         const reference = generatePaymentReference()
         const shopInfo = items[0].product.shop
+        if (!shopInfo) {
+          throw new BadRequestException('Boutique introuvable pour cette commande')
+        }
         const linkedMerchantId = shopInfo.merchant_id ?? null
+
+        let deliveryFee = 0
+        if (isDelivery && deliveryQuotes) {
+          const quote = deliveryQuotes.quotes.find(q => q.shop_id === groupShopId)
+          deliveryFee = quote?.fee ?? 0
+        }
+
+        let discountAmount = 0
+        let promotionId: string | null = null
+        const applied = promoByShop.get(groupShopId)
+
+        if (applied && linkedMerchantId) {
+          const shopLineItems = items.map(i => ({
+            category_id: i.product.category_id ?? null,
+            line_total: i.line_total,
+          }))
+          const validation = await this.promotionsService.validateForShop({
+            code: applied.code,
+            merchantId: linkedMerchantId,
+            shopId: groupShopId,
+            subtotal,
+            lineItems: shopLineItems,
+          })
+          if (!validation.valid || validation.promotion.id !== applied.promotion_id) {
+            throw new BadRequestException(
+              `Code promo invalide pour ${shopInfo.name}`,
+            )
+          }
+          discountAmount = validation.discount
+          promotionId = validation.promotion.id
+          if (validation.free_delivery) {
+            deliveryFee = 0
+          }
+        }
+
+        const total = Math.max(0, subtotal - discountAmount + deliveryFee)
 
         const order = await tx.order.create({
           data: {
             user_id: userId,
             shop_id: groupShopId,
             merchant_id: linkedMerchantId,
+            promotion_id: promotionId,
             status: 'PENDING',
             delivery_type: dto.delivery_type,
-            delivery_address: dto.delivery_address,
+            delivery_address: deliveryAddress,
+            delivery_city_id: dto.delivery_city_id,
+            delivery_commune_id: dto.delivery_commune_id,
+            delivery_district: dto.delivery_district,
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
             subtotal,
-            total: subtotal,
+            discount_amount: discountAmount,
+            delivery_fee: deliveryFee,
+            total,
             items: {
               create: items.map(item => ({
                 product_id: item.product.id,
@@ -752,16 +1403,41 @@ export class MarketplaceService {
           },
         })
 
+        if (promotionId && discountAmount > 0) {
+          await tx.promotionRedemption.create({
+            data: {
+              promotion_id: promotionId,
+              order_id: order.id,
+              user_id: userId,
+              amount_saved: discountAmount,
+            },
+          })
+          await tx.promotion.update({
+            where: { id: promotionId },
+            data: { uses_count: { increment: 1 } },
+          })
+        } else if (promotionId) {
+          await tx.promotion.update({
+            where: { id: promotionId },
+            data: { uses_count: { increment: 1 } },
+          })
+        }
+
         const payment = await tx.paymentTransaction.create({
           data: {
             user_id: userId,
             shop_id: groupShopId,
             merchant_id: linkedMerchantId,
             purpose: 'ORDER',
-            amount: subtotal,
+            amount: total,
             reference,
             order_id: order.id,
-            metadata: { simulator: true, order_id: order.id },
+            metadata: {
+              simulator: true,
+              order_id: order.id,
+              discount_amount: discountAmount,
+              delivery_fee: deliveryFee,
+            },
           },
         })
 
@@ -775,6 +1451,9 @@ export class MarketplaceService {
           paymentId: payment.id,
           reference: payment.reference,
           amount: payment.amount,
+          subtotal,
+          discount_amount: discountAmount,
+          delivery_fee: deliveryFee,
           shop: shopPayload,
           merchant: {
             id: shopPayload.id,
@@ -788,11 +1467,203 @@ export class MarketplaceService {
     })
 
     const total = checkoutOrders.reduce((sum, o) => sum + o.amount, 0)
+    const totalDiscount = checkoutOrders.reduce((sum, o) => sum + o.discount_amount, 0)
+    const totalDelivery = checkoutOrders.reduce((sum, o) => sum + o.delivery_fee, 0)
     const first = checkoutOrders[0]
 
     return {
       orders: checkoutOrders,
       total,
+      total_discount: totalDiscount,
+      total_delivery_fee: totalDelivery,
+      currency: 'XOF',
+      provider: 'SIMULATOR',
+      instructions: 'Confirmez avec simulateResult success ou failure.',
+      orderId: first.orderId,
+      paymentId: first.paymentId,
+      reference: first.reference,
+      amount: total,
+    }
+  }
+
+  private async checkoutFoodOrder(
+    userId: string,
+    dto: CheckoutDto,
+    rawCart: Awaited<ReturnType<MarketplaceService['getOrCreateCart']>>,
+    activeItems: typeof rawCart.items,
+  ) {
+    const isDelivery = dto.delivery_type === 'DELIVERY'
+
+    if (isDelivery) {
+      const hasStructured =
+        dto.delivery_city_id?.trim() && dto.delivery_commune_id?.trim()
+      const hasLegacy = dto.delivery_address?.trim()
+      if (!hasStructured && !hasLegacy) {
+        throw new BadRequestException('Adresse de livraison requise (ville, commune et quartier)')
+      }
+    }
+
+    const cart = this.buildCartResponse(rawCart, activeItems)
+    const groups = new Map<string, typeof cart.items>()
+    const subtotals: Record<string, number> = {}
+
+    for (const item of cart.items) {
+      const mid = item.product.merchant.id
+      const list = groups.get(mid) ?? []
+      list.push(item)
+      groups.set(mid, list)
+      subtotals[mid] = (subtotals[mid] ?? 0) + item.line_total
+    }
+
+    let deliveryQuotes: Awaited<ReturnType<DeliveryZonesService['quote']>> | null = null
+    let cityName: string | undefined
+    let communeName: string | undefined
+
+    if (isDelivery && dto.delivery_city_id && dto.delivery_commune_id) {
+      const [city, commune] = await Promise.all([
+        this.prisma.geoCity.findUnique({ where: { id: dto.delivery_city_id } }),
+        this.prisma.geoCommune.findUnique({ where: { id: dto.delivery_commune_id } }),
+      ])
+      cityName = city?.name
+      communeName = commune?.name
+
+      deliveryQuotes = await this.deliveryZones.quote({
+        merchant_ids: Array.from(groups.keys()),
+        city_id: dto.delivery_city_id,
+        commune_id: dto.delivery_commune_id,
+        subtotals,
+        order_flow: 'food',
+      })
+
+      const unavailable = deliveryQuotes.quotes.filter(q => !q.available)
+      if (unavailable.length) {
+        const names = unavailable.map(q => q.shop_name).join(', ')
+        throw new BadRequestException(
+          `Livraison indisponible pour : ${names}. ${unavailable[0].message ?? ''}`.trim(),
+        )
+      }
+    }
+
+    const deliveryAddress = isDelivery
+      ? dto.delivery_address?.trim()
+        || [dto.delivery_district, communeName, cityName, dto.delivery_address_detail]
+          .filter(Boolean)
+          .join(', ')
+      : undefined
+
+    const checkoutOrders = await this.prisma.$transaction(async tx => {
+      const results: Array<{
+        orderId: string
+        paymentId: string
+        reference: string
+        amount: number
+        subtotal: number
+        discount_amount: number
+        delivery_fee: number
+        shop: { id: string; name: string; slug: string }
+        merchant: { id: string; business_name: string; slug: string }
+      }> = []
+
+      for (const [merchantId, items] of groups) {
+        const subtotal = items.reduce((sum, i) => sum + i.line_total, 0)
+        const reference = generatePaymentReference()
+        const merchantInfo = items[0].product.merchant
+
+        let deliveryFee = 0
+        if (isDelivery && deliveryQuotes) {
+          const quote = deliveryQuotes.quotes.find(
+            q => q.merchant_id === merchantId || q.shop_id === merchantId,
+          )
+          deliveryFee = quote?.fee ?? 0
+        }
+
+        const total = subtotal + deliveryFee
+
+        const order = await tx.order.create({
+          data: {
+            user_id: userId,
+            shop_id: null,
+            merchant_id: merchantId,
+            order_source: 'FOOD',
+            status: 'PENDING',
+            delivery_type: dto.delivery_type,
+            delivery_address: deliveryAddress,
+            delivery_city_id: dto.delivery_city_id,
+            delivery_commune_id: dto.delivery_commune_id,
+            delivery_district: dto.delivery_district,
+            customer_note: dto.customer_note,
+            customer_phone: dto.customer_phone,
+            subtotal,
+            discount_amount: 0,
+            delivery_fee: deliveryFee,
+            total,
+            items: {
+              create: items.map(item => ({
+                menu_item_id: item.menu_item_id,
+                product_id: null,
+                variant_id: null,
+                product_name: item.menu_item?.name ?? item.product.name,
+                variant_name: null,
+                unit_price: item.unit_price,
+                quantity: item.quantity,
+                line_total: item.line_total,
+              })),
+            },
+          },
+        })
+
+        const payment = await tx.paymentTransaction.create({
+          data: {
+            user_id: userId,
+            shop_id: null,
+            merchant_id: merchantId,
+            purpose: 'ORDER',
+            amount: total,
+            reference,
+            order_id: order.id,
+            metadata: {
+              simulator: true,
+              order_id: order.id,
+              order_source: 'FOOD',
+              delivery_fee: deliveryFee,
+            },
+          },
+        })
+
+        const merchantPayload = {
+          id: merchantInfo.id,
+          business_name: merchantInfo.business_name,
+          slug: merchantInfo.slug,
+        }
+        results.push({
+          orderId: order.id,
+          paymentId: payment.id,
+          reference: payment.reference,
+          amount: payment.amount,
+          subtotal,
+          discount_amount: 0,
+          delivery_fee: deliveryFee,
+          shop: {
+            id: merchantPayload.id,
+            name: merchantPayload.business_name,
+            slug: merchantPayload.slug,
+          },
+          merchant: merchantPayload,
+        })
+      }
+
+      return results
+    })
+
+    const total = checkoutOrders.reduce((sum, o) => sum + o.amount, 0)
+    const totalDelivery = checkoutOrders.reduce((sum, o) => sum + o.delivery_fee, 0)
+    const first = checkoutOrders[0]
+
+    return {
+      orders: checkoutOrders,
+      total,
+      total_discount: 0,
+      total_delivery_fee: totalDelivery,
       currency: 'XOF',
       provider: 'SIMULATOR',
       instructions: 'Confirmez avec simulateResult success ou failure.',
@@ -805,13 +1676,23 @@ export class MarketplaceService {
 
   private async removeOrderItemsFromCart(
     userId: string,
-    orderItems: Array<{ product_id: string | null; variant_id: string | null }>,
+    orderItems: Array<{
+      product_id: string | null
+      menu_item_id?: string | null
+      variant_id: string | null
+    }>,
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     const cart = await tx.cart.findUnique({ where: { user_id: userId } })
     if (!cart) return
 
     for (const item of orderItems) {
+      if (item.menu_item_id) {
+        await tx.cartItem.deleteMany({
+          where: { cart_id: cart.id, menu_item_id: item.menu_item_id },
+        })
+        continue
+      }
       if (!item.product_id) continue
       await tx.cartItem.deleteMany({
         where: {
@@ -905,13 +1786,16 @@ export class MarketplaceService {
       await this.removeOrderItemsFromCart(userId, order.items, tx)
     })
 
-    await this.notificationQueue.enqueuePush({
-      userId: order.shop.owner_id,
-      type: 'order_created',
-      title: 'Nouvelle commande',
-      body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
-      data: { order_id: order.id, shop_id: order.shop_id },
-    })
+    const ownerId = this.resolveOrderOwnerId(order)
+    if (ownerId) {
+      await this.notificationQueue.enqueuePush({
+        userId: ownerId,
+        type: 'order_created',
+        title: 'Nouvelle commande',
+        body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
+        data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
+      })
+    }
 
     return {
       status: 'SUCCESS',
@@ -990,12 +1874,14 @@ export class MarketplaceService {
 
     for (const payment of payments) {
       const order = payment.order!
+      const ownerId = this.resolveOrderOwnerId(order)
+      if (!ownerId) continue
       await this.notificationQueue.enqueuePush({
-        userId: order.shop.owner_id,
+        userId: ownerId,
         type: 'order_created',
         title: 'Nouvelle commande',
         body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
-        data: { order_id: order.id, shop_id: order.shop_id },
+        data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
       })
     }
 
@@ -1009,6 +1895,109 @@ export class MarketplaceService {
     }
   }
 
+  async resumePendingPayments(userId: string, orderIds: string[]) {
+    if (!orderIds.length) {
+      throw new BadRequestException('Au moins une commande est requise')
+    }
+
+    const uniqueIds = [...new Set(orderIds)]
+    const orders = await this.prisma.order.findMany({
+      where: {
+        id: { in: uniqueIds },
+        user_id: userId,
+        status: 'PENDING',
+      },
+      include: {
+        items: true,
+        shop: { select: { id: true, name: true, slug: true } },
+        merchant: { select: { id: true, business_name: true, slug: true } },
+        payment: true,
+      },
+      orderBy: { created_at: 'asc' },
+    })
+
+    if (orders.length !== uniqueIds.length) {
+      throw new BadRequestException('Commande(s) introuvable(s) ou déjà traitée(s)')
+    }
+
+    if (orders.some(o => !o.payment || o.payment.status !== 'PENDING')) {
+      throw new BadRequestException('Paiement déjà traité ou expiré')
+    }
+
+    const checkoutOrders = orders.map(o => ({
+      orderId: o.id,
+      paymentId: o.payment!.id,
+      reference: o.payment!.reference,
+      amount: o.total,
+      merchant: this.resolveOrderMerchantMeta(o),
+    }))
+
+    const total = orders.reduce((sum, o) => sum + o.total, 0)
+    const totalDiscount = orders.reduce((sum, o) => sum + o.discount_amount, 0)
+    const totalDelivery = orders.reduce((sum, o) => sum + o.delivery_fee, 0)
+    const first = orders[0]
+
+    const items = orders.flatMap(o => {
+      const merchantMeta = this.resolveOrderMerchantMeta(o)
+      return o.items.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        line_total: item.line_total,
+        variant_id: item.variant_id,
+        variant: item.variant_name ? { name: item.variant_name } : null,
+        product: {
+          id: item.product_id ?? item.menu_item_id ?? item.id,
+          name: item.product_name,
+          slug: '',
+          image_url: null,
+          shop_id: o.shop_id,
+          merchant: merchantMeta,
+        },
+      }))
+    })
+
+    return {
+      checkoutResult: {
+        orders: checkoutOrders,
+        total,
+        total_discount: totalDiscount,
+        total_delivery_fee: totalDelivery,
+        currency: first.currency,
+        provider: 'SIMULATOR',
+        instructions: 'Confirmez avec simulateResult success ou failure.',
+        orderId: checkoutOrders[0].orderId,
+        paymentId: checkoutOrders[0].paymentId,
+        reference: checkoutOrders[0].reference,
+        amount: total,
+      },
+      cartSnapshot: {
+        items,
+        subtotal: orders.reduce((sum, o) => sum + o.subtotal, 0),
+        currency: first.currency,
+        item_count: items.reduce((sum, i) => sum + i.quantity, 0),
+        merchant_count: orders.length,
+        merchants: orders.map(o => {
+          const merchantMeta = this.resolveOrderMerchantMeta(o)
+          return {
+            id: merchantMeta.id,
+            business_name: merchantMeta.business_name,
+            slug: merchantMeta.slug,
+            subtotal: o.subtotal,
+            item_count: o.items.reduce((sum, i) => sum + i.quantity, 0),
+          }
+        }),
+        merchant: null,
+      },
+      deliveryType: first.delivery_type,
+      deliveryAddress: first.delivery_address ?? undefined,
+      customerPhone: first.customer_phone ?? undefined,
+      customerNote: first.customer_note ?? undefined,
+      discountAmount: totalDiscount,
+      deliveryFee: totalDelivery,
+    }
+  }
+
   async listMyOrders(userId: string) {
     return this.prisma.order.findMany({
       where: { user_id: userId },
@@ -1017,7 +2006,7 @@ export class MarketplaceService {
         items: true,
         shop: { select: { name: true, slug: true, logo: true } },
         merchant: { select: { business_name: true, slug: true, logo: true } },
-        payment: { select: { status: true, reference: true, paid_at: true } },
+        payment: { select: { id: true, status: true, reference: true, paid_at: true } },
       },
       take: 50,
     })
@@ -1029,19 +2018,89 @@ export class MarketplaceService {
       include: {
         items: true,
         shop: { select: { name: true, slug: true, phone: true, whatsapp: true } },
-        merchant: { select: { business_name: true, slug: true, phone: true, whatsapp: true } },
-        payment: { select: { status: true, reference: true, paid_at: true } },
+        merchant: { select: { business_name: true, slug: true, phone: true, whatsapp: true, logo: true } },
+        payment: { select: { id: true, status: true, reference: true, paid_at: true } },
+        delivery_job: {
+          select: {
+            id: true,
+            status: true,
+            tracking_token: true,
+            eta_minutes: true,
+            assigned_at: true,
+            picked_up_at: true,
+            delivered_at: true,
+            courier: { select: { full_name: true, phone: true, vehicle: true } },
+          },
+        },
       },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
     return order
   }
 
+  async getMerchantOrder(userId: string, orderId: string, shopId?: string) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, ...this.merchantOrderScope(shop) },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                slug: true,
+                image_url: true,
+              },
+            },
+            menu_item: {
+              select: { id: true, image_url: true },
+            },
+          },
+        },
+        shop: { select: { name: true, slug: true, phone: true, whatsapp: true } },
+        merchant: { select: { business_name: true, slug: true, phone: true, whatsapp: true, logo: true } },
+        user: { select: { id: true, full_name: true, email: true, phone: true } },
+        payment: { select: { id: true, status: true, reference: true, paid_at: true } },
+        promotion: { select: { title: true, code: true } },
+        delivery_job: {
+          select: {
+            id: true,
+            status: true,
+            tracking_token: true,
+            eta_minutes: true,
+            assigned_at: true,
+            picked_up_at: true,
+            delivered_at: true,
+            courier: { select: { id: true, full_name: true, phone: true, vehicle: true } },
+          },
+        },
+      },
+    })
+    if (!order) throw new NotFoundException('Commande introuvable')
+
+    const [delivery_city, delivery_commune] = await Promise.all([
+      order.delivery_city_id
+        ? this.prisma.geoCity.findUnique({
+            where: { id: order.delivery_city_id },
+            select: { id: true, name: true },
+          })
+        : null,
+      order.delivery_commune_id
+        ? this.prisma.geoCommune.findUnique({
+            where: { id: order.delivery_commune_id },
+            select: { id: true, name: true },
+          })
+        : null,
+    ])
+
+    return { ...order, delivery_city, delivery_commune }
+  }
+
   async listMerchantOrders(userId: string, shopId?: string, status?: OrderStatus) {
     const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
     return this.prisma.order.findMany({
       where: {
-        shop_id: shop.id,
+        ...this.merchantOrderScope(shop),
         ...(status ? { status } : {}),
       },
       orderBy: { created_at: 'desc' },
@@ -1057,22 +2116,28 @@ export class MarketplaceService {
   async updateOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, shopId?: string) {
     const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, shop_id: shop.id },
+      where: { id: orderId, ...this.merchantOrderScope(shop) },
       include: { user: { select: { id: true } } },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
 
     const allowed: Record<string, OrderStatus[]> = {
       PENDING: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['PREPARING', 'CANCELLED'],
-      PREPARING: ['READY', 'CANCELLED'],
-      READY: ['COMPLETED', 'CANCELLED'],
-      COMPLETED: [],
-      CANCELLED: [],
+      CONFIRMED: ['PENDING', 'PREPARING', 'CANCELLED', 'REFUNDED'],
+      PREPARING: ['CONFIRMED', 'READY', 'CANCELLED', 'REFUNDED'],
+      READY: ['PREPARING', 'COMPLETED', 'OUT_FOR_DELIVERY', 'CANCELLED'],
+      OUT_FOR_DELIVERY: ['READY', 'DELIVERED', 'COMPLETED'],
+      DELIVERED: ['OUT_FOR_DELIVERY', 'COMPLETED'],
+      COMPLETED: ['READY', 'REFUNDED'],
+      CANCELLED: ['PENDING'],
       REFUNDED: [],
     }
     if (!allowed[order.status]?.includes(dto.status)) {
       throw new BadRequestException(`Transition ${order.status} → ${dto.status} non autorisée`)
+    }
+
+    if (dto.status === 'OUT_FOR_DELIVERY' && order.delivery_type === 'DELIVERY') {
+      await this.deliveryService.createJobForOrder(orderId)
     }
 
     const updated = await this.prisma.order.update({
@@ -1127,9 +2192,30 @@ export class MarketplaceService {
     q?: string
     merchant?: string
     shop?: string
+    category?: string
     sort?: string
     maxPrice?: number
+    country?: string
   }) {
+    const countryCode = query?.country?.trim().toUpperCase()
+    if (query?.q?.trim()) {
+      const meili = await this.searchService.searchProducts({
+        q: query.q.trim(),
+        category: query?.category,
+        shop: query?.shop ?? query?.merchant,
+        country: countryCode,
+        sort:
+          query?.sort === 'price_asc'
+            ? 'price_asc'
+            : query?.sort === 'price_desc'
+              ? 'price_desc'
+              : 'newest',
+        maxPrice: query?.maxPrice,
+        limit: 100,
+      })
+      if (meili) return meili.data
+    }
+
     const orderBy =
       query?.sort === 'price_asc'
         ? { price: 'asc' as const }
@@ -1137,10 +2223,21 @@ export class MarketplaceService {
           ? { price: 'desc' as const }
           : { created_at: 'desc' as const }
 
+    let categoryId: string | undefined
+    if (query?.category?.trim()) {
+      const cat = await this.prisma.productCategory.findFirst({
+        where: { slug: query.category.trim(), is_active: true },
+        select: { id: true },
+      })
+      categoryId = cat?.id
+      if (!categoryId) return []
+    }
+
     return this.prisma.product.findMany({
       where: {
         status: 'ACTIVE',
         stock_quantity: { gt: 0 },
+        ...(categoryId ? { category_id: categoryId } : {}),
         ...(query?.maxPrice != null && query.maxPrice > 0
           ? { price: { lte: query.maxPrice } }
           : {}),
@@ -1150,6 +2247,7 @@ export class MarketplaceService {
         shop: {
           is_active: true,
           status: 'ACTIVE',
+          ...(countryCode ? { country: countryCode } : {}),
           ...(query?.merchant || query?.shop
             ? { slug: query.shop ?? query.merchant }
             : {}),
@@ -1164,6 +2262,7 @@ export class MarketplaceService {
         currency: true,
         image_url: true,
         created_at: true,
+        category: { select: { id: true, name: true, slug: true } },
         shop: { select: { name: true, slug: true, logo: true } },
       },
     }).then(rows =>

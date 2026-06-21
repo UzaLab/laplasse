@@ -41,7 +41,7 @@ describe('AdminController — modération', () => {
           provide: ComplaintsService,
           useValue: { findAll: jest.fn(), moderate: jest.fn() },
         },
-        { provide: SearchService, useValue: { syncAllMerchants: jest.fn() } },
+        { provide: SearchService, useValue: { syncAllMerchants: jest.fn(), syncAllProducts: jest.fn() } },
         { provide: MerchantsService, useValue: { recalculateTrustScore: jest.fn(), recalculateAllTrustScores: jest.fn() } },
         { provide: NotificationsService, useValue: { sendToUser: jest.fn() } },
         { provide: AuditService, useValue: { log: jest.fn() } },

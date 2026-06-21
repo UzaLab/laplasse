@@ -22,14 +22,23 @@ import { useCartStore } from '@/stores/cartStore'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import {
+  applyCartPromo,
   fetchCart,
   fetchFeaturedProducts,
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
   updateCartItemQuantity,
   type Cart,
+  type CartPromoApplication,
   type FeaturedProduct,
 } from '@/lib/marketplaceApi'
+import {
+  getCartPromos,
+  getTotalPromoDiscount,
+  saveCartPromos,
+  clearCartPromos,
+} from '@/lib/cartPromo'
+import { detectCartKind } from '@/lib/orderFlow'
 import { notify } from '@/lib/notify'
 
 export default function CartPage() {
@@ -43,6 +52,68 @@ export default function CartPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [promoCode, setPromoCode] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [appliedPromos, setAppliedPromos] = useState<CartPromoApplication[]>([])
+
+  useEffect(() => {
+    setAppliedPromos(getCartPromos('marketplace'))
+  }, [])
+
+  const cartShopIds = useMemo(
+    () => cart?.merchants.map(m => m.id) ?? [],
+    [cart?.merchants],
+  )
+
+  useEffect(() => {
+    if (!cart) return
+    const kind = detectCartKind(cart.items, cart.kind)
+    if (kind === 'food') {
+      router.replace('/commande')
+      return
+    }
+    if (!cart.items.length) {
+      clearCartPromos('marketplace')
+      setAppliedPromos([])
+      return
+    }
+    const pruned = getCartPromos('marketplace', cartShopIds)
+    saveCartPromos('marketplace', pruned, cartShopIds)
+    setAppliedPromos(pruned)
+  }, [cart, cartShopIds, router])
+
+  const promoDiscount = useMemo(
+    () => getTotalPromoDiscount(appliedPromos),
+    [appliedPromos],
+  )
+
+  const estimatedTotal = useMemo(() => {
+    const base = cart?.subtotal ?? 0
+    return Math.max(0, base - promoDiscount)
+  }, [cart?.subtotal, promoDiscount])
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) {
+      notify.error('Entrez un code promo')
+      return
+    }
+    setPromoLoading(true)
+    const result = await applyCartPromo(promoCode.trim())
+    setPromoLoading(false)
+    if ('error' in result) {
+      notify.error(result.error)
+      return
+    }
+    const valid = result.applications.filter(a => a.valid)
+    if (!valid.length) {
+      notify.error(result.applications[0]?.message ?? 'Code promo invalide')
+      return
+    }
+    const merged = [...appliedPromos.filter(p => !valid.some(v => v.shop_id === p.shop_id)), ...valid]
+    const shopIds = cart?.merchants.map(m => m.id) ?? valid.map(v => v.shop_id)
+    setAppliedPromos(merged)
+    saveCartPromos('marketplace', merged, shopIds)
+    notify.success(valid.map(v => v.message).join(' · '))
+  }
 
   const load = async () => {
     setLoading(true)
@@ -272,30 +343,54 @@ export default function CartPage() {
                     <input
                       type="text"
                       value={promoCode}
-                      onChange={e => setPromoCode(e.target.value)}
+                      onChange={e => setPromoCode(e.target.value.toUpperCase())}
                       placeholder="Entrez votre code"
                       className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
                     />
                     <button
                       type="button"
-                      className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap"
+                      onClick={handleApplyPromo}
+                      disabled={promoLoading}
+                      className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap disabled:opacity-50"
                     >
-                      Appliquer
+                      {promoLoading ? '…' : 'Appliquer'}
                     </button>
                   </div>
+                  {appliedPromos.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {appliedPromos.map(p => (
+                        <div
+                          key={p.shop_id}
+                          className="flex justify-between items-center text-xs bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2"
+                        >
+                          <span className="font-bold text-emerald-800">
+                            {p.code} — {p.shop_name}
+                          </span>
+                          <span className="text-emerald-700 font-semibold">{p.message}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px w-full bg-slate-100 mb-6" />
+
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between items-center text-sm text-emerald-700 font-medium mb-4">
+                    <span>Remise promo</span>
+                    <span className="font-bold">− {formatPrice(promoDiscount, cart?.currency)}</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-end mb-8">
                   <div>
                     <span className="block text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">
                       Total estimé
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">Toutes taxes comprises</span>
+                    <span className="text-xs text-slate-400 font-medium">Hors frais de livraison</span>
                   </div>
                   <span className="text-3xl font-extrabold text-brand-600 leading-none">
-                    {formatPrice(cart?.subtotal ?? 0, cart?.currency)}
+                    {formatPrice(estimatedTotal, cart?.currency)}
                   </span>
                 </div>
 

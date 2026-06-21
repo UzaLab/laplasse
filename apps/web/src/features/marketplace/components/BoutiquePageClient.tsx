@@ -14,7 +14,11 @@ import {
 } from 'lucide-react'
 import {
   fetchMerchantProducts,
+  fetchShopProductCategories,
+  fetchShopCollections,
   type MarketplaceProduct,
+  type ProductCategoryOption,
+  type ShopCollectionPublic,
 } from '@/lib/marketplaceApi'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { useAuthReady } from '@/hooks/useAuthReady'
@@ -62,12 +66,24 @@ function BoutiqueFiltersPanel({
   priceFilter,
   onPriceFilterChange,
   priceCeiling,
+  categories,
+  selectedCategory,
+  onCategoryChange,
+  collections,
+  selectedCollection,
+  onCollectionChange,
 }: {
   search: string
   onSearchChange: (v: string) => void
   priceFilter: number
   onPriceFilterChange: (v: number) => void
   priceCeiling: number
+  categories: ProductCategoryOption[]
+  selectedCategory: string
+  onCategoryChange: (slug: string) => void
+  collections: ShopCollectionPublic[]
+  selectedCollection: string
+  onCollectionChange: (slug: string) => void
 }) {
   return (
     <>
@@ -83,6 +99,92 @@ function BoutiqueFiltersPanel({
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
         />
       </div>
+
+      {categories.length > 0 && (
+        <>
+          <div className="h-px w-full bg-slate-100 mb-8" />
+          <div className="mb-8">
+            <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
+              Catégories
+            </h4>
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <button
+                  type="button"
+                  onClick={() => onCategoryChange('')}
+                  className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                    !selectedCategory
+                      ? 'border-brand-500 bg-brand-500'
+                      : 'border-slate-200 group-hover:border-brand-400'
+                  }`}
+                />
+                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                  Toutes
+                </span>
+              </label>
+              {categories.map(cat => (
+                <label key={cat.slug} className="flex items-center gap-3 cursor-pointer group">
+                  <button
+                    type="button"
+                    onClick={() => onCategoryChange(cat.slug)}
+                    className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                      selectedCategory === cat.slug
+                        ? 'border-brand-500 bg-brand-500'
+                        : 'border-slate-200 group-hover:border-brand-400'
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                    {cat.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {collections.length > 0 && (
+        <>
+          <div className="h-px w-full bg-slate-100 mb-8" />
+          <div className="mb-8">
+            <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
+              Collections
+            </h4>
+            <div className="space-y-3 max-h-48 overflow-y-auto">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <button
+                  type="button"
+                  onClick={() => onCollectionChange('')}
+                  className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                    !selectedCollection
+                      ? 'border-brand-500 bg-brand-500'
+                      : 'border-slate-200 group-hover:border-brand-400'
+                  }`}
+                />
+                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                  Toutes
+                </span>
+              </label>
+              {collections.map(col => (
+                <label key={col.slug} className="flex items-center gap-3 cursor-pointer group">
+                  <button
+                    type="button"
+                    onClick={() => onCollectionChange(col.slug)}
+                    className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                      selectedCollection === col.slug
+                        ? 'border-brand-500 bg-brand-500'
+                        : 'border-slate-200 group-hover:border-brand-400'
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                    {col.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="h-px w-full bg-slate-100 mb-8" />
 
@@ -142,26 +244,48 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   const { isAuthenticated } = useAuthReady()
   const addItem = useCartStore(s => s.addItem)
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
+  const [categories, setCategories] = useState<ProductCategoryOption[]>([])
+  const [collections, setCollections] = useState<ShopCollectionPublic[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedCollection, setSelectedCollection] = useState('')
   const [sort, setSort] = useState<SortOption>('recommended')
   const [addingId, setAddingId] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    void fetchShopProductCategories(merchant.slug).then(data => {
+      if (data) setCategories(data)
+    })
+    void fetchShopCollections(merchant.slug).then(data => {
+      if (data) setCollections(data)
+    })
+  }, [merchant.slug])
+
+  useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetchMerchantProducts(merchant.slug)
+    fetchMerchantProducts(merchant.slug, {
+      category: selectedCategory || undefined,
+      collection: selectedCollection || undefined,
+      q: debouncedSearch || undefined,
+    })
       .then(data => {
         if (cancelled) return
-        const list = data ?? []
-        setProducts(list)
+        setProducts(data ?? [])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [merchant.slug])
+  }, [merchant.slug, selectedCategory, selectedCollection, debouncedSearch])
 
   const priceCeiling = useMemo(() => {
     if (products.length === 0) return 100_000
@@ -175,20 +299,18 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   }, [priceCeiling])
 
   const filtered = useMemo(() => {
-    let list = products.filter(p => p.price <= priceFilter)
-    if (search.trim()) {
-      const q = search.trim().toLowerCase()
-      list = list.filter(p => p.name.toLowerCase().includes(q))
-    }
+    const list = products.filter(p => p.price <= priceFilter)
     return sortProducts(list, sort)
-  }, [products, priceFilter, search, sort])
+  }, [products, priceFilter, sort])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (search.trim()) count += 1
+    if (selectedCategory) count += 1
+    if (selectedCollection) count += 1
     if (priceFilter < priceCeiling) count += 1
     return count
-  }, [search, priceFilter, priceCeiling])
+  }, [search, selectedCategory, selectedCollection, priceFilter, priceCeiling])
 
   const handleAddToCart = async (product: MarketplaceProduct) => {
     if (!isAuthenticated) {
@@ -297,6 +419,12 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
                 priceCeiling={priceCeiling}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                collections={collections}
+                selectedCollection={selectedCollection}
+                onCollectionChange={setSelectedCollection}
               />
             </div>
 
@@ -327,6 +455,36 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 </select>
               </div>
             </div>
+
+            {collections.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar mb-5 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollection('')}
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-sm font-bold border transition-colors ${
+                    !selectedCollection
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300'
+                  }`}
+                >
+                  Toutes
+                </button>
+                {collections.map(col => (
+                  <button
+                    key={col.slug}
+                    type="button"
+                    onClick={() => setSelectedCollection(selectedCollection === col.slug ? '' : col.slug)}
+                    className={`shrink-0 px-3 py-1.5 rounded-xl text-sm font-bold border transition-colors ${
+                      selectedCollection === col.slug
+                        ? 'bg-brand-500 text-white border-brand-500'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300'
+                    }`}
+                  >
+                    {col.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {loading ? (
               <div className="flex items-center justify-center py-24">
@@ -415,6 +573,12 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
                 priceCeiling={priceCeiling}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                collections={collections}
+                selectedCollection={selectedCollection}
+                onCollectionChange={setSelectedCollection}
               />
 
               <button
@@ -430,6 +594,8 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                   type="button"
                   onClick={() => {
                     setSearch('')
+                    setSelectedCategory('')
+                    setSelectedCollection('')
                     setPriceFilter(priceCeiling)
                   }}
                   className="w-full mt-3 py-3 text-slate-500 text-sm font-bold hover:text-slate-900 transition-colors"

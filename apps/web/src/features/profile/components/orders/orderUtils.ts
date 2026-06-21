@@ -9,7 +9,7 @@ export const ORDER_FILTER_TABS: { id: OrderFilterTab; label: string }[] = [
   { id: 'cancelled', label: 'Annulées' },
 ]
 
-const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY']
+const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED']
 const CANCELLED_STATUSES: OrderStatus[] = ['CANCELLED', 'REFUNDED']
 
 export function filterOrdersByTab(orders: Order[], tab: OrderFilterTab): Order[] {
@@ -17,7 +17,7 @@ export function filterOrdersByTab(orders: Order[], tab: OrderFilterTab): Order[]
     case 'active':
       return orders.filter(o => ACTIVE_STATUSES.includes(o.status))
     case 'delivered':
-      return orders.filter(o => o.status === 'COMPLETED')
+      return orders.filter(o => o.status === 'COMPLETED' || o.status === 'DELIVERED')
     case 'cancelled':
       return orders.filter(o => CANCELLED_STATUSES.includes(o.status))
     default:
@@ -44,7 +44,7 @@ export type OrderDisplayStatus = 'active' | 'delivered' | 'cancelled' | 'other'
 
 export function getOrderDisplayStatus(status: OrderStatus): OrderDisplayStatus {
   if (ACTIVE_STATUSES.includes(status)) return 'active'
-  if (status === 'COMPLETED') return 'delivered'
+  if (status === 'COMPLETED' || status === 'DELIVERED') return 'delivered'
   if (CANCELLED_STATUSES.includes(status)) return 'cancelled'
   return 'other'
 }
@@ -61,7 +61,9 @@ export const ORDER_DETAIL_STATUS_LABELS: Partial<Record<OrderStatus, string>> = 
   CONFIRMED: 'Commande confirmée',
   PREPARING: 'En préparation',
   READY: 'Prête — en attente de retrait/livraison',
-  COMPLETED: 'Commande livrée',
+  OUT_FOR_DELIVERY: 'En cours de livraison',
+  DELIVERED: 'Livrée au client',
+  COMPLETED: 'Commande terminée',
   CANCELLED: 'Commande annulée',
   REFUNDED: 'Commande remboursée',
 }

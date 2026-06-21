@@ -15,7 +15,7 @@ interface SearchBarProps {
 export function SearchBar({
   value,
   onChange,
-  placeholder = 'Restaurant, bar, boutique…',
+  placeholder = 'Établissements, produits, services…',
   className,
   autoFocus,
 }: SearchBarProps) {

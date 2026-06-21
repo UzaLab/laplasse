@@ -2,22 +2,31 @@
 
 import { useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { BadgeCheck, SlidersHorizontal, X, TrendingUp, MapPin, Star, Search } from 'lucide-react'
-import Link from 'next/link'
+import { BadgeCheck, SlidersHorizontal, X, TrendingUp, MapPin, Star, Search, Store, ShoppingBag, Loader2 } from 'lucide-react'
 
 import { Navbar } from '@/components/layout/Navbar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { SearchBar } from '@/features/discovery/components/SearchBar'
 import { SearchResultCard, type SearchHit } from '@/features/discovery/components/SearchResultCard'
-import { useCategories, useSearch } from '@/features/discovery/hooks/useDiscovery'
+import { ProductSearchResultCard } from '@/features/discovery/components/ProductSearchResultCard'
+import { useCategories, useSearch, usePaginatedUnifiedSearch } from '@/features/discovery/hooks/useDiscovery'
 import { useDebounce } from '@/lib/hooks/useDebounce'
+import { getDefaultCity, getCountryCode } from '@/lib/country'
+import { allCityLabel, popularInCityLabel } from '@/lib/brandCopy'
 
-// Cocody-first : un seul quartier sélectionnable pour le MVP
+type ResultTab = 'all' | 'merchants' | 'products'
+
 const COCODY_DISTRICTS = ['Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Adjamé', 'Koumassi']
 
 const SORT_OPTIONS = [
   { value: 'trust_score', label: 'Mieux noté' },
   { value: 'created_at', label: 'Plus récents' },
+]
+
+const RESULT_TABS: { value: ResultTab; label: string; icon: typeof Store }[] = [
+  { value: 'all', label: 'Tout', icon: Search },
+  { value: 'merchants', label: 'Établissements', icon: Store },
+  { value: 'products', label: 'Produits', icon: ShoppingBag },
 ]
 
 function FilterPill({
@@ -39,37 +48,89 @@ function FilterPill({
   )
 }
 
+function parseResultTab(value: string | null): ResultTab {
+  if (value === 'merchants' || value === 'products') return value
+  return 'all'
+}
+
+function LoadMoreButton({
+  onClick,
+  loading,
+  label,
+}: {
+  onClick: () => void
+  loading: boolean
+  label: string
+}) {
+  return (
+    <div className="flex justify-center pt-6">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={loading}
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
+      >
+        {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+        {label}
+      </button>
+    </div>
+  )
+}
+
 function SearchContent() {
   const searchParams = useSearchParams()
+  const defaultCity = getDefaultCity(getCountryCode())
 
-  const [query, setQuery]                   = useState(searchParams.get('q') ?? '')
+  const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') ?? '')
   const [selectedDistrict, setSelectedDistrict] = useState('')
-  const [verified, setVerified]             = useState(false)
-  const [sort, setSort]                     = useState<'trust_score' | 'created_at'>('trust_score')
-  const [showAdvanced, setShowAdvanced]     = useState(false)
+  const [verified, setVerified] = useState(false)
+  const [sort, setSort] = useState<'trust_score' | 'created_at'>('trust_score')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [resultTab, setResultTab] = useState<ResultTab>(
+    parseResultTab(searchParams.get('type')),
+  )
 
   const debouncedQuery = useDebounce(query, 350)
   const { data: categories } = useCategories()
 
-  const { data: results, isLoading, isFetching } = useSearch({
-    q:        debouncedQuery || undefined,
+  const searchParamsBase = {
+    q: debouncedQuery || undefined,
     category: selectedCategory || undefined,
-    city:     'Abidjan',
+    city: defaultCity,
     district: selectedDistrict || undefined,
     verified: verified || undefined,
     sort,
-  }, true)
+    type: resultTab,
+  }
 
-  // Fallback trending quand 0 résultat
-  const merchants  = (results?.data ?? []) as SearchHit[]
-  const total      = results?.meta.total ?? 0
-  const hasResults = merchants.length > 0
-  const noResults  = !isLoading && !isFetching && merchants.length === 0
+  const {
+    merchants,
+    products,
+    hasMoreMerchants,
+    hasMoreProducts,
+    isLoading,
+    isFetching,
+    loadingMore,
+    loadMoreMerchants,
+    loadMoreProducts,
+    isError,
+  } = usePaginatedUnifiedSearch(searchParamsBase, true)
+
+  const hasMerchants = merchants.length > 0
+  const hasProducts = products.length > 0
+  const hasResults =
+    resultTab === 'merchants'
+      ? hasMerchants
+      : resultTab === 'products'
+        ? hasProducts
+        : hasMerchants || hasProducts
+
+  const noResults = !isLoading && !isFetching && !hasResults && !isError
 
   const { data: trendingResult } = useSearch({
-    city: 'Abidjan', sort: 'trust_score', limit: 8,
-  }, noResults)
+    city: defaultCity, sort: 'trust_score', limit: 8,
+  }, noResults && resultTab !== 'products')
   const trending = (trendingResult?.data ?? []) as SearchHit[]
 
   const clearAll = useCallback(() => {
@@ -85,17 +146,15 @@ function SearchContent() {
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
 
-      {/* ── STICKY HEADER ────────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 pt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-2.5">
 
-          {/* Search bar */}
           <div className="flex items-center gap-2">
             <div className="flex-1">
               <SearchBar
                 value={query}
                 onChange={setQuery}
-                placeholder="Restaurant, spa, boutique…"
+                placeholder="Établissements, produits, services…"
                 autoFocus
               />
             </div>
@@ -113,10 +172,27 @@ function SearchContent() {
             </button>
           </div>
 
-          {/* Catégories pills */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
+            {RESULT_TABS.map(tab => {
+              const Icon = tab.icon
+              return (
+                <FilterPill
+                  key={tab.value}
+                  active={resultTab === tab.value}
+                  onClick={() => setResultTab(tab.value)}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon size={13} />
+                    {tab.label}
+                  </span>
+                </FilterPill>
+              )
+            })}
+          </div>
+
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
             <FilterPill active={!selectedCategory} onClick={() => setSelectedCategory('')}>
-              Tout
+              Toutes catégories
             </FilterPill>
             {categories?.map(cat => (
               <FilterPill
@@ -129,16 +205,14 @@ function SearchContent() {
             ))}
           </div>
 
-          {/* Filtres avancés */}
           {showAdvanced && (
             <div className="pb-2 space-y-2.5 border-t border-slate-100 pt-2.5">
-              {/* Districts */}
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                 <span className="shrink-0 flex items-center gap-1 text-xs font-bold text-slate-500 uppercase tracking-wider">
                   <MapPin size={11} /> Zone
                 </span>
                 <FilterPill active={!selectedDistrict} onClick={() => setSelectedDistrict('')}>
-                  Tout Abidjan
+                  {allCityLabel(defaultCity)}
                 </FilterPill>
                 {COCODY_DISTRICTS.map(d => (
                   <FilterPill
@@ -151,7 +225,6 @@ function SearchContent() {
                 ))}
               </div>
 
-              {/* Verified + Sort */}
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setVerified(v => !v)}
@@ -195,29 +268,21 @@ function SearchContent() {
         </div>
       </div>
 
-      {/* ── RÉSULTATS ─────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 pb-24 md:pb-10">
 
-        {/* Counter */}
-        {!noResults && (
-          <p className="text-sm text-slate-500 font-medium mb-5">
-            {isLoading || isFetching ? (
-              <span className="animate-pulse">Recherche en cours…</span>
-            ) : (
-              <>
-                <span className="font-bold text-slate-900">{total}</span>
-                {' '}établissement{total > 1 ? 's' : ''}
-                {debouncedQuery && (
-                  <> pour &ldquo;<em className="text-brand-600 font-semibold not-italic">{debouncedQuery}</em>&rdquo;</>
-                )}
-                {selectedDistrict && <> · <span className="text-brand-600 font-semibold">{selectedDistrict}</span></>}
-              </>
-            )}
+        {(isLoading || isFetching) && !hasResults && debouncedQuery && (
+          <p className="text-sm text-slate-500 font-medium mb-5 animate-pulse">
+            Recherche en cours…
           </p>
         )}
 
-        {/* Skeleton */}
-        {(isLoading || isFetching) && merchants.length === 0 && (
+        {isError && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Le moteur de recherche est momentanément indisponible. Réessayez dans quelques instants.
+          </div>
+        )}
+
+        {(isLoading || isFetching) && !hasResults && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="bg-white rounded-3xl h-72 animate-pulse border border-slate-100" />
@@ -225,14 +290,56 @@ function SearchContent() {
           </div>
         )}
 
-        {/* Résultats */}
         {!isLoading && hasResults && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {merchants.map(m => <SearchResultCard key={m.id} merchant={m} />)}
+          <div className="space-y-10">
+            {(resultTab === 'all' || resultTab === 'merchants') && hasMerchants && (
+              <section>
+                {resultTab === 'all' && (
+                  <div className="flex items-center gap-2 mb-5">
+                    <Store size={16} className="text-brand-500" />
+                    <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+                      Établissements
+                    </h2>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                  {merchants.map(m => <SearchResultCard key={m.id} merchant={m} />)}
+                </div>
+                {hasMoreMerchants && (
+                  <LoadMoreButton
+                    onClick={loadMoreMerchants}
+                    loading={loadingMore === 'merchants'}
+                    label="Voir plus d'établissements"
+                  />
+                )}
+              </section>
+            )}
+
+            {(resultTab === 'all' || resultTab === 'products') && hasProducts && (
+              <section>
+                {resultTab === 'all' && (
+                  <div className="flex items-center gap-2 mb-5">
+                    <ShoppingBag size={16} className="text-brand-500" />
+                    <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+                      Produits
+                    </h2>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+                  {products.map(p => <ProductSearchResultCard key={p.id} product={p} />)}
+                </div>
+                {hasMoreProducts && (
+                  <LoadMoreButton
+                    onClick={loadMoreProducts}
+                    loading={loadingMore === 'products'}
+                    label="Voir plus de produits"
+                  />
+                )}
+              </section>
+            )}
           </div>
         )}
 
-        {/* ── ZERO RESULT ─────────────────────────────────────────────── */}
         {noResults && (
           <div>
             <div className="flex flex-col items-center py-12 text-center mb-10">
@@ -242,8 +349,8 @@ function SearchContent() {
               <h3 className="text-lg font-extrabold text-slate-900 mb-1">Aucun résultat</h3>
               <p className="text-slate-500 text-sm max-w-xs">
                 {debouncedQuery
-                  ? `Aucun établissement ne correspond à "${debouncedQuery}"${selectedDistrict ? ` à ${selectedDistrict}` : ''}.`
-                  : 'Essayez de modifier vos filtres.'}
+                  ? `Rien ne correspond à "${debouncedQuery}"${selectedDistrict ? ` à ${selectedDistrict}` : ''}.`
+                  : 'Essayez de modifier vos filtres ou votre recherche.'}
               </p>
               {hasFilters && (
                 <button
@@ -253,14 +360,22 @@ function SearchContent() {
                   Supprimer tous les filtres
                 </button>
               )}
+              {resultTab === 'products' && debouncedQuery && (
+                <button
+                  onClick={() => setResultTab('all')}
+                  className="mt-3 text-sm font-bold text-slate-600 hover:text-slate-900 underline"
+                >
+                  Élargir à tous les types
+                </button>
+              )}
             </div>
 
-            {trending.length > 0 && (
+            {trending.length > 0 && resultTab !== 'products' && (
               <div>
                 <div className="flex items-center gap-2 mb-5">
                   <TrendingUp size={16} className="text-brand-500" />
                   <h2 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
-                    Populaires à Abidjan
+                    {popularInCityLabel(defaultCity)}
                   </h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">

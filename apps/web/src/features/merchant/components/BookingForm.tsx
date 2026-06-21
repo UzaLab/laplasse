@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, Loader2, Users, Clock, MapPin } from 'lucide-react'
-import { authApiFetch } from '@/lib/authFetch'
+import { createMerchantBooking } from '@/lib/bookingApi'
+import { BOOKING_PREFILL_EVENT, type BookingPrefillDetail } from '@/lib/bookingPrefill'
 import { useAuthStore } from '@/stores/authStore'
+import { useQueryClient } from '@tanstack/react-query'
 import type { BookingConfig } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
 
@@ -21,6 +23,7 @@ interface Slot {
 
 export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
   const { user, isAuthenticated } = useAuthStore()
+  const queryClient = useQueryClient()
   const [config, setConfig] = useState<BookingConfig | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -88,6 +91,38 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
     }
   }, [config, bookingType, form.service_id])
 
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const detail = (e as CustomEvent<BookingPrefillDetail>).detail
+      if (!detail) return
+      setForm(f => ({
+        ...f,
+        ...(detail.serviceId ? { service_id: detail.serviceId } : {}),
+        ...(detail.roomType ? { room_type: detail.roomType } : {}),
+      }))
+      if (detail.checkIn) setDate(detail.checkIn)
+      if (detail.checkOut) setForm(f => ({ ...f, check_out_date: detail.checkOut! }))
+    }
+    window.addEventListener(BOOKING_PREFILL_EVENT, onPrefill)
+    return () => window.removeEventListener(BOOKING_PREFILL_EVENT, onPrefill)
+  }, [])
+
+  const roomStayTotal = useMemo(() => {
+    if (config?.booking_type !== 'ROOM' || !date || !form.check_out_date || !config) return null
+    const roomOptions = (config.room_services?.length ? config.room_services : config.services.filter(
+      s => s.service_kind === 'ROOM_TYPE',
+    )) ?? []
+    const selected = config.services.find(s => s.id === form.service_id)
+      ?? roomOptions.find(s => s.id === form.service_id)
+    if (!selected) return null
+    const start = new Date(`${date}T12:00:00`)
+    const end = new Date(`${form.check_out_date}T12:00:00`)
+    const nights = Math.round((end.getTime() - start.getTime()) / 86400000)
+    if (nights <= 0) return null
+    const rate = selected.nightly_rate ?? selected.price ?? 0
+    return { nights, rate, total: nights * rate }
+  }, [config, date, form.check_out_date, form.service_id])
+
   if (!config) return null
   if (!config.enabled) return null
 
@@ -96,18 +131,48 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
     s => s.service_kind === 'ROOM_TYPE',
   )) ?? []
   const hasRoomServices = roomOptions.length > 0
-  const showServices = config.services.length > 0 && (
+  const selectableServices = config.services.filter(s => {
+    if (resolvedBookingType === 'APPOINTMENT') {
+      return !s.service_kind || s.service_kind === 'APPOINTMENT'
+    }
+    if (resolvedBookingType === 'CONSULTATION') {
+      return !s.service_kind || s.service_kind === 'CONSULTATION'
+    }
+    if (resolvedBookingType === 'TABLE') {
+      return !s.service_kind || s.service_kind === 'TABLE_MENU'
+    }
+    return true
+  })
+  const showServices = selectableServices.length > 0 && (
     resolvedBookingType === 'APPOINTMENT'
     || resolvedBookingType === 'CONSULTATION'
-    || (resolvedBookingType === 'TABLE' && config.services.some(s => s.service_kind === 'TABLE_MENU'))
+    || resolvedBookingType === 'TABLE'
   )
   const selectedService = config.services.find(s => s.id === form.service_id)
     ?? roomOptions.find(s => s.id === form.service_id)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isRoom && !selectedSlot) {
+    if (isRoom) {
+      if (!date || !form.check_out_date) {
+        setError('Indiquez les dates d\'arrivée et de départ')
+        return
+      }
+      if (form.check_out_date <= date) {
+        setError('La date de départ doit être après l\'arrivée')
+        return
+      }
+    } else if (!selectedSlot) {
       setError('Choisissez un créneau disponible')
+      return
+    }
+    if (
+      (resolvedBookingType === 'APPOINTMENT' || resolvedBookingType === 'CONSULTATION')
+      && !form.service_id
+    ) {
+      setError(resolvedBookingType === 'CONSULTATION'
+        ? 'Choisissez une consultation'
+        : 'Choisissez une prestation')
       return
     }
     setLoading(true)
@@ -120,22 +185,18 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         ? new Date(`${form.check_out_date}T11:00:00`).toISOString()
         : undefined
 
-      const res = await authApiFetch(`/bookings/merchant/${merchantId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guest_name: form.guest_name,
-          guest_phone: form.guest_phone,
-          guest_email: form.guest_email || undefined,
-          booked_at: bookedAt,
-          check_out_at: checkOut,
-          party_size: Number(form.party_size),
-          service_id: form.service_id || undefined,
-          staff_id: form.staff_id || undefined,
-          room_type: isRoom ? form.room_type : undefined,
-          booking_type: resolvedBookingType,
-          notes: form.notes || undefined,
-        }),
+      const res = await createMerchantBooking(merchantId, {
+        guest_name: form.guest_name,
+        guest_phone: form.guest_phone,
+        guest_email: form.guest_email || undefined,
+        booked_at: bookedAt,
+        check_out_at: checkOut,
+        party_size: Number(form.party_size),
+        service_id: form.service_id || undefined,
+        staff_id: form.staff_id || undefined,
+        room_type: isRoom ? form.room_type : undefined,
+        booking_type: resolvedBookingType,
+        notes: form.notes || undefined,
       })
       const data = await res.json()
       if (!res.ok) {
@@ -144,6 +205,10 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         return
       }
       setSuccess(true)
+      if (isAuthenticated) {
+        void queryClient.invalidateQueries({ queryKey: ['my-bookings'] })
+        void queryClient.invalidateQueries({ queryKey: ['my-bookings-dashboard'] })
+      }
     } catch {
       setError('Erreur réseau')
     }
@@ -163,17 +228,25 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
             Voir mes réservations
           </Link>
         )}
+        {!isAuthenticated && (
+          <p className="text-xs text-slate-500 mt-3">
+            <Link href="/login" className="font-bold text-emerald-700 underline">Connectez-vous</Link>
+            {' '}pour retrouver vos réservations dans votre profil.
+          </p>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-xl shadow-slate-200/50">
+    <div id="reservation" className="scroll-mt-28 bg-white border border-slate-200 p-6 rounded-[32px] shadow-xl shadow-slate-200/50">
       <h3 className="text-lg font-extrabold text-slate-900 mb-1 flex items-center gap-2">
         <Calendar size={18} className="text-amber-500" /> {config.cta}
       </h3>
       <p className="text-xs text-slate-400 mb-4">
-        {BOOKING_TYPE_LABELS[resolvedBookingType]} — créneaux selon horaires d&apos;ouverture
+        {isRoom
+          ? 'Séjour — disponibilité par nuit, confirmation par l\'établissement'
+          : `${BOOKING_TYPE_LABELS[resolvedBookingType]} — créneaux selon horaires d'ouverture`}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -187,7 +260,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
             <option value="">
               {resolvedBookingType === 'TABLE' ? 'Menu / formule (optionnel)' : 'Choisir une prestation *'}
             </option>
-            {config.services.map(s => (
+            {selectableServices.map(s => (
               <option key={s.id} value={s.id}>
                 {s.name}
                 {s.duration_min ? ` (${s.duration_min} min)` : ''}
@@ -259,6 +332,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           min={new Date().toISOString().slice(0, 10)}
           value={date}
           onChange={e => setDate(e.target.value)}
+          aria-label={isRoom ? 'Date d\'arrivée' : 'Date'}
           className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
         />
 
@@ -269,9 +343,21 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
             min={date || new Date().toISOString().slice(0, 10)}
             value={form.check_out_date}
             onChange={e => setForm(f => ({ ...f, check_out_date: e.target.value }))}
-            placeholder="Date de départ"
+            aria-label="Date de départ"
             className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
           />
+        )}
+
+        {roomStayTotal && (
+          <div className="rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm">
+            <p className="font-bold text-brand-900">
+              {roomStayTotal.nights} nuit{roomStayTotal.nights > 1 ? 's' : ''} ·{' '}
+              {formatPrice(roomStayTotal.total)}
+            </p>
+            <p className="text-xs text-brand-700 mt-0.5">
+              {formatPrice(roomStayTotal.rate)} / nuit (estimation)
+            </p>
+          </div>
         )}
 
         {!isRoom && date && (

@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
+import { countryRequestHeaders, getDefaultCity } from '@/lib/country'
 
 function getApiUrl(): string {
   // SSR dans Docker : URL interne Coolify (évite le loopback Traefik/SSL)
@@ -33,8 +34,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   for (const base of bases) {
     try {
       const res = await fetchWithTimeout(`${base}${path}`, {
-        headers: { 'Content-Type': 'application/json' },
         ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...countryRequestHeaders(),
+          ...(options?.headers as Record<string, string> | undefined),
+        },
       })
 
       if (res.ok) {
@@ -86,6 +91,16 @@ export interface ApiShopFeaturedProduct {
   shop_slug: string
 }
 
+export interface ApiVerticalFeaturedItem {
+  kind: 'menu' | 'room' | 'service' | 'consultation'
+  badge: string
+  name: string
+  price: string | null
+  image: string
+  tab: string
+  meta: string | null
+}
+
 export interface ApiMerchant {
   id: string
   business_name: string
@@ -107,6 +122,7 @@ export interface ApiMerchant {
   favorites_count: number
   has_marketplace?: boolean
   featured_product?: ApiShopFeaturedProduct
+  featured_vertical?: ApiVerticalFeaturedItem
 }
 
 export interface ApiMerchantDetail extends ApiMerchant {
@@ -133,6 +149,30 @@ export interface ApiSearchResult {
   meta: { total: number; query: string; limit: number; offset: number; processing_time_ms: number }
 }
 
+export interface ApiProductSearchHit {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  image_url?: string | null
+  created_at?: string
+  category?: { id: string; name: string; slug: string } | null
+  merchant: { business_name: string; slug: string; logo?: string | null }
+  _formatted?: Record<string, string>
+}
+
+export interface ApiProductSearchResult {
+  data: ApiProductSearchHit[]
+  meta: { total: number; query: string; limit: number; offset: number; processing_time_ms: number }
+}
+
+export interface ApiUnifiedSearchResult {
+  merchants: ApiSearchResult
+  products: ApiProductSearchResult
+  meta: { query: string; type: 'all' | 'merchants' | 'products'; processing_time_ms: number }
+}
+
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -148,9 +188,12 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : ''
       return apiFetch<ApiPaginated<ApiMerchant>>(`/merchants${qs}`)
     },
-    featured: (city = 'Abidjan', limit = 6) =>
-      apiFetch<ApiMerchant[]>(`/merchants/featured?city=${city}&limit=${limit}`),
-    nearby: (city = 'Abidjan', district?: string, limit = 6) => {
+    featured: (city = getDefaultCity(), limit = 6, country?: string) => {
+      const qs = new URLSearchParams({ city, limit: String(limit) })
+      if (country) qs.set('country', country)
+      return apiFetch<ApiMerchant[]>(`/merchants/featured?${qs}`)
+    },
+    nearby: (city = getDefaultCity(), district?: string, limit = 6) => {
       const qs = new URLSearchParams({ city, limit: String(limit) })
       if (district) qs.set('district', district)
       return apiFetch<ApiMerchant[]>(`/merchants/nearby?${qs}`)
@@ -174,5 +217,28 @@ export const api = {
       if (v !== undefined && v !== false) qs.set(k, String(v))
     })
     return apiFetch<ApiSearchResult>(`/search?${qs}`)
+  },
+
+  searchProducts: (params: {
+    q?: string; category?: string; shop?: string; country?: string;
+    sort?: string; maxPrice?: number; limit?: number; offset?: number
+  }) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined) qs.set(k, String(v))
+    })
+    return apiFetch<ApiProductSearchResult>(`/search/products?${qs}`)
+  },
+
+  searchUnified: (params: {
+    q?: string; type?: 'all' | 'merchants' | 'products'; category?: string;
+    city?: string; district?: string; verified?: boolean; sort?: string;
+    limit?: number; offset?: number; merchantOffset?: number; productOffset?: number
+  }) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== false) qs.set(k, String(v))
+    })
+    return apiFetch<ApiUnifiedSearchResult>(`/search/unified?${qs}`)
   },
 }

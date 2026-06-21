@@ -1,17 +1,37 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
-import { attachShopPreviewsToMerchants } from '../marketplace/shop-preview'
+import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
+import { isMenuMirrorProductSlug } from '../marketplace/marketplace.util'
 
 export interface SearchFilters {
   q?: string
   category?: string
   city?: string
   district?: string
+  country?: string
   verified?: boolean
   sort?: 'trust_score' | 'created_at'
   limit?: number
   offset?: number
+}
+
+export interface ProductSearchFilters {
+  q?: string
+  category?: string
+  shop?: string
+  country?: string
+  sort?: 'price_asc' | 'price_desc' | 'newest'
+  maxPrice?: number
+  limit?: number
+  offset?: number
+}
+
+export interface UnifiedSearchFilters extends SearchFilters {
+  type?: 'all' | 'merchants' | 'products'
+  country?: string
+  merchantOffset?: number
+  productOffset?: number
 }
 
 type MeiliDocument = Record<string, unknown>
@@ -20,6 +40,7 @@ type MeiliDocument = Record<string, unknown>
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name)
   private readonly INDEX_NAME = 'merchants'
+  private readonly PRODUCTS_INDEX = 'products'
   private meiliHost: string
   private meiliKey: string
 
@@ -33,7 +54,9 @@ export class SearchService implements OnModuleInit {
 
   async onModuleInit() {
     await this.ensureIndex()
+    await this.ensureProductsIndex()
     await this.syncAllMerchants()
+    await this.syncAllProducts()
   }
 
   // ─── Meilisearch REST helpers ──────────────────────────────────────────────
@@ -55,6 +78,20 @@ export class SearchService implements OnModuleInit {
     return res.json()
   }
 
+  /** En production, Meilisearch est obligatoire — pas de fallback Prisma. */
+  private isMeiliRequired(): boolean {
+    return (
+      this.config.get<string>('NODE_ENV') === 'production' ||
+      this.config.get<string>('MEILI_REQUIRED') === 'true'
+    )
+  }
+
+  private failMeiliRequired(error: unknown): never {
+    const msg = error instanceof Error ? error.message : String(error)
+    this.logger.error(`Meilisearch required but unavailable: ${msg}`)
+    throw new ServiceUnavailableException('Moteur de recherche indisponible')
+  }
+
   // ─── Index setup ──────────────────────────────────────────────────────────
 
   private async ensureIndex() {
@@ -64,7 +101,7 @@ export class SearchService implements OnModuleInit {
           'business_name', 'description', 'category_name', 'district', 'city', 'tags',
         ],
         filterableAttributes: [
-          'category_slug', 'city', 'district', 'verification_status', 'is_active',
+          'category_slug', 'city', 'district', 'country', 'verification_status', 'is_active',
         ],
         sortableAttributes: ['trust_score', 'created_at'],
         rankingRules: [
@@ -78,6 +115,26 @@ export class SearchService implements OnModuleInit {
       this.logger.log(`Meilisearch index "${this.INDEX_NAME}" configured`)
     } catch (error) {
       this.logger.warn(`Meilisearch not available: ${(error as Error).message}`)
+    }
+  }
+
+  private async ensureProductsIndex() {
+    try {
+      await this.meiliRequest('PATCH', `/indexes/${this.PRODUCTS_INDEX}/settings`, {
+        searchableAttributes: [
+          'name', 'description', 'shop_name', 'category_name',
+        ],
+        filterableAttributes: [
+          'category_slug', 'shop_slug', 'country', 'is_available',
+        ],
+        sortableAttributes: ['price', 'created_at'],
+        rankingRules: [
+          'words', 'typo', 'proximity', 'attribute', 'sort', 'exactness',
+        ],
+      })
+      this.logger.log(`Meilisearch index "${this.PRODUCTS_INDEX}" configured`)
+    } catch (error) {
+      this.logger.warn(`Meilisearch products index not available: ${(error as Error).message}`)
     }
   }
 
@@ -115,6 +172,7 @@ export class SearchService implements OnModuleInit {
         category_icon: m.category.icon ?? null,
         city: m.location?.city ?? null,
         district: m.location?.district ?? null,
+        country: m.location?.country ?? 'CI',
         address: m.location?.address ?? null,
         latitude: m.location?.latitude ?? null,
         longitude: m.location?.longitude ?? null,
@@ -159,6 +217,7 @@ export class SearchService implements OnModuleInit {
         category_icon: m.category.icon ?? null,
         city: m.location?.city ?? null,
         district: m.location?.district ?? null,
+        country: m.location?.country ?? 'CI',
         tags: m.tags.map(t => t.tag.name),
         review_count: (m._count as { reviews: number }).reviews,
         created_at: m.created_at.getTime(),
@@ -171,13 +230,14 @@ export class SearchService implements OnModuleInit {
   // ─── Search ────────────────────────────────────────────────────────────────
 
   async search(filters: SearchFilters) {
-    const { q = '', category, city, district, verified, sort, limit = 20, offset = 0 } = filters
+    const { q = '', category, city, district, country, verified, sort, limit = 20, offset = 0 } = filters
 
     try {
       const filterParts = ['is_active = true']
       if (category) filterParts.push(`category_slug = "${category}"`)
       if (city) filterParts.push(`city = "${city}"`)
       if (district) filterParts.push(`district = "${district}"`)
+      if (country) filterParts.push(`country = "${country.toUpperCase()}"`)
       if (verified) filterParts.push(`verification_status = "VERIFIED"`)
 
       const sortField = sort ?? 'trust_score'
@@ -207,7 +267,7 @@ export class SearchService implements OnModuleInit {
       const regular   = result.hits.filter(h => !h['is_sponsored'] || h['verification_status'] !== 'VERIFIED')
       const sorted    = [...sponsored.slice(0, 3), ...regular]
 
-      const enriched = await attachShopPreviewsToMerchants(
+      const enriched = await attachCardPreviewsToMerchants(
         this.prisma,
         sorted as Array<{ id: string } & Record<string, unknown>>,
       )
@@ -222,13 +282,14 @@ export class SearchService implements OnModuleInit {
           processing_time_ms: result.processingTimeMs,
         },
       }
-    } catch {
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
       return this.fallbackSearch(filters)
     }
   }
 
   private async fallbackSearch(filters: SearchFilters) {
-    const { q, category, city, district, verified, limit = 20, offset = 0 } = filters
+    const { q, category, city, district, country, verified, limit = 20, offset = 0 } = filters
     const merchants = await this.prisma.merchant.findMany({
       where: {
         is_active: true,
@@ -239,6 +300,7 @@ export class SearchService implements OnModuleInit {
           ],
         }),
         ...(category && { category: { slug: category } }),
+        ...(country && { location: { country: country.toUpperCase() } }),
         ...(city && { location: { city: { equals: city, mode: 'insensitive' } } }),
         ...(district && { location: { district: { contains: district, mode: 'insensitive' } } }),
         ...(verified && { verification_status: 'VERIFIED' }),
@@ -283,7 +345,7 @@ export class SearchService implements OnModuleInit {
     }))
 
     return {
-      data: await attachShopPreviewsToMerchants(this.prisma, formatted),
+      data: await attachCardPreviewsToMerchants(this.prisma, formatted),
       meta: { total: merchants.length, query: q ?? '', limit, offset, processing_time_ms: 0 },
     }
   }
@@ -323,33 +385,138 @@ export class SearchService implements OnModuleInit {
         verification_status: h['verification_status'] as string,
         _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['business_name'],
       }))
-    } catch {
-      // Fallback Prisma
-      const merchants = await this.prisma.merchant.findMany({
-        where: {
-          is_active: true,
-          business_name: { contains: q, mode: 'insensitive' },
-        },
-        select: {
-          id: true, business_name: true, slug: true,
-          verification_status: true,
-          category: { select: { name: true, slug: true } },
-          location: { select: { district: true } },
-        },
-        orderBy: { trust_score: 'desc' },
-        take: limit,
-      })
-      return merchants.map(m => ({
-        id: m.id,
-        business_name: m.business_name,
-        slug: m.slug,
-        category_name: m.category.name,
-        category_slug: m.category.slug,
-        district: m.location?.district ?? null,
-        verification_status: m.verification_status,
-        _highlight: null,
-      }))
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
+      return this.autocompleteMerchantsFallback(q, limit)
     }
+  }
+
+  private async autocompleteMerchantsFallback(q: string, limit: number) {
+    const merchants = await this.prisma.merchant.findMany({
+      where: {
+        is_active: true,
+        business_name: { contains: q, mode: 'insensitive' },
+      },
+      select: {
+        id: true, business_name: true, slug: true,
+        verification_status: true,
+        category: { select: { name: true, slug: true } },
+        location: { select: { district: true } },
+      },
+      orderBy: { trust_score: 'desc' },
+      take: limit,
+    })
+    return merchants.map(m => ({
+      id: m.id,
+      business_name: m.business_name,
+      slug: m.slug,
+      category_name: m.category.name,
+      category_slug: m.category.slug,
+      district: m.location?.district ?? null,
+      verification_status: m.verification_status,
+      _highlight: null,
+    }))
+  }
+
+  async autocompleteProducts(q: string, limit = 3, country?: string) {
+    if (!q || q.length < 2) return []
+
+    try {
+      const filterParts = ['is_available = true']
+      if (country) filterParts.push(`country = "${country.toUpperCase()}"`)
+
+      const result = await this.meiliRequest('POST', `/indexes/${this.PRODUCTS_INDEX}/search`, {
+        q,
+        limit,
+        filter: filterParts.join(' AND '),
+        attributesToRetrieve: ['id', 'name', 'slug', 'shop_name', 'shop_slug', 'category_name', 'price', 'currency'],
+        attributesToHighlight: ['name'],
+        highlightPreTag: '<mark>',
+        highlightPostTag: '</mark>',
+        showRankingScore: false,
+      }) as { hits: MeiliDocument[] }
+
+      return result.hits.map(h => ({
+        id: h['id'] as string,
+        name: h['name'] as string,
+        slug: h['slug'] as string,
+        price: h['price'] as number,
+        currency: (h['currency'] as string) ?? 'XOF',
+        category_name: (h['category_name'] as string | null) ?? null,
+        merchant: {
+          business_name: h['shop_name'] as string,
+          slug: h['shop_slug'] as string,
+        },
+        _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['name'],
+      }))
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
+      return this.autocompleteProductsFallback(q, limit, country)
+    }
+  }
+
+  private async autocompleteProductsFallback(q: string, limit: number, country?: string) {
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: 'ACTIVE',
+        AND: [
+          {
+            OR: [
+              { stock_quantity: { gt: 0 } },
+              { variants: { some: { stock_quantity: { gt: 0 } } } },
+            ],
+          },
+          {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        ],
+        shop: {
+          is_active: true,
+          status: 'ACTIVE',
+          ...(country && { country: country.toUpperCase() }),
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        price: true,
+        currency: true,
+        category: { select: { name: true } },
+        shop: { select: { name: true, slug: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+    })
+
+    return products.map(p => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: p.price,
+      currency: p.currency,
+      category_name: p.category?.name ?? null,
+      merchant: {
+        business_name: p.shop.name,
+        slug: p.shop.slug,
+      },
+      _highlight: null,
+    }))
+  }
+
+  async autocompleteUnified(q: string, limit = 6, country?: string) {
+    const merchantLimit = Math.ceil(limit / 2)
+    const productLimit = Math.floor(limit / 2)
+
+    const [merchants, products] = await Promise.all([
+      this.autocomplete(q, merchantLimit),
+      this.autocompleteProducts(q, productLimit, country),
+    ])
+
+    return { merchants, products }
   }
 
   // ─── Trending searches ─────────────────────────────────────────────────────
@@ -370,6 +537,354 @@ export class SearchService implements OnModuleInit {
       return rows.map(r => ({ query: r.query, count: r._count.query }))
     } catch {
       return []
+    }
+  }
+
+  // ─── Products index ────────────────────────────────────────────────────────
+
+  private productSyncInclude = {
+    category: { select: { id: true, name: true, slug: true } },
+    shop: {
+      select: {
+        id: true, name: true, slug: true, logo: true, country: true,
+        is_active: true, status: true,
+      },
+    },
+    variants: { select: { stock_quantity: true } },
+  } as const
+
+  private isProductAvailable(product: {
+    slug: string
+    status: string
+    stock_quantity: number
+    variants: { stock_quantity: number }[]
+    shop: { is_active: boolean; status: string }
+  }): boolean {
+    if (isMenuMirrorProductSlug(product.slug)) return false
+    if (product.status !== 'ACTIVE') return false
+    if (!product.shop.is_active || product.shop.status !== 'ACTIVE') return false
+    if (product.stock_quantity > 0) return true
+    return product.variants.some(v => v.stock_quantity > 0)
+  }
+
+  private buildProductDocument(product: {
+    id: string
+    name: string
+    slug: string
+    description: string | null
+    price: number
+    currency: string
+    image_url: string | null
+    created_at: Date
+    status: string
+    stock_quantity: number
+    category: { id: string; name: string; slug: string } | null
+    shop: { id: string; name: string; slug: string; logo: string | null; country: string; is_active: boolean; status: string }
+    variants: { stock_quantity: number }[]
+  }): MeiliDocument {
+    return {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description ?? '',
+      price: product.price,
+      currency: product.currency,
+      image_url: product.image_url ?? null,
+      shop_id: product.shop.id,
+      shop_name: product.shop.name,
+      shop_slug: product.shop.slug,
+      shop_logo: product.shop.logo ?? null,
+      category_id: product.category?.id ?? null,
+      category_slug: product.category?.slug ?? null,
+      category_name: product.category?.name ?? null,
+      country: product.shop.country,
+      is_available: this.isProductAvailable(product),
+      created_at: product.created_at.getTime(),
+    }
+  }
+
+  async syncAllProducts() {
+    try {
+      const products = await this.prisma.product.findMany({
+        where: {
+          slug: { not: { startsWith: 'menu-item-' } },
+        },
+        include: this.productSyncInclude,
+      })
+
+      if (products.length === 0) return
+
+      const documents = products.map(p => this.buildProductDocument(p))
+      await this.meiliRequest(
+        'POST',
+        `/indexes/${this.PRODUCTS_INDEX}/documents?primaryKey=id`,
+        documents,
+      )
+      this.logger.log(`Synced ${documents.length} products to Meilisearch`)
+    } catch (error) {
+      this.logger.warn(`Meilisearch products sync skipped: ${(error as Error).message}`)
+    }
+  }
+
+  async syncProduct(productId: string) {
+    try {
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        include: this.productSyncInclude,
+      })
+      if (!product) return
+
+      if (isMenuMirrorProductSlug(product.slug) || !this.isProductAvailable(product)) {
+        await this.removeProduct(productId)
+        return
+      }
+
+      await this.meiliRequest(
+        'POST',
+        `/indexes/${this.PRODUCTS_INDEX}/documents?primaryKey=id`,
+        [this.buildProductDocument(product)],
+      )
+    } catch (error) {
+      this.logger.warn(`Meilisearch product sync ${productId}: ${(error as Error).message}`)
+    }
+  }
+
+  async removeProduct(productId: string) {
+    try {
+      await this.meiliRequest(
+        'DELETE',
+        `/indexes/${this.PRODUCTS_INDEX}/documents/${productId}`,
+      )
+    } catch (error) {
+      this.logger.warn(`Meilisearch product remove ${productId}: ${(error as Error).message}`)
+    }
+  }
+
+  async unifiedSearch(filters: UnifiedSearchFilters) {
+    const {
+      type = 'all',
+      country,
+      limit = 20,
+      offset = 0,
+      merchantOffset,
+      productOffset,
+      ...rest
+    } = filters
+    const pageSize = limit
+
+    const resolvedMerchantOffset =
+      type === 'products'
+        ? 0
+        : merchantOffset ?? (type === 'merchants' ? offset : 0)
+    const resolvedProductOffset =
+      type === 'merchants'
+        ? 0
+        : productOffset ?? (type === 'products' ? offset : 0)
+
+    const emptyProducts = {
+      data: [] as Awaited<ReturnType<SearchService['searchProducts']>>['data'],
+      meta: {
+        total: 0,
+        query: rest.q ?? '',
+        limit: pageSize,
+        offset: 0,
+        processing_time_ms: 0,
+      },
+    }
+
+    const [merchants, products] = await Promise.all([
+      type !== 'products'
+        ? this.search({
+            ...rest,
+            country,
+            limit: pageSize,
+            offset: resolvedMerchantOffset,
+          })
+        : Promise.resolve(null),
+      type !== 'merchants'
+        ? this.searchProducts({
+            q: rest.q,
+            country,
+            limit: pageSize,
+            offset: resolvedProductOffset,
+          })
+        : Promise.resolve(null),
+    ])
+
+    return {
+      merchants: merchants ?? {
+        data: [],
+        meta: {
+          total: 0,
+          query: rest.q ?? '',
+          limit: pageSize,
+          offset: 0,
+          processing_time_ms: 0,
+        },
+      },
+      products: products ?? emptyProducts,
+      meta: {
+        query: rest.q ?? '',
+        type,
+        processing_time_ms:
+          (merchants?.meta.processing_time_ms ?? 0) +
+          (products?.meta.processing_time_ms ?? 0),
+      },
+    }
+  }
+
+  async searchProducts(filters: ProductSearchFilters) {
+    const {
+      q = '',
+      category,
+      shop,
+      country,
+      sort,
+      maxPrice,
+      limit = 50,
+      offset = 0,
+    } = filters
+
+    try {
+      const filterParts = ['is_available = true']
+      if (category) filterParts.push(`category_slug = "${category}"`)
+      if (shop) filterParts.push(`shop_slug = "${shop}"`)
+      if (country) filterParts.push(`country = "${country}"`)
+      if (maxPrice != null && maxPrice > 0) filterParts.push(`price <= ${maxPrice}`)
+
+      const sortParam =
+        sort === 'price_asc'
+          ? ['price:asc']
+          : sort === 'price_desc'
+            ? ['price:desc']
+            : q
+              ? undefined
+              : ['created_at:desc']
+
+      const result = await this.meiliRequest(
+        'POST',
+        `/indexes/${this.PRODUCTS_INDEX}/search`,
+        {
+          q,
+          filter: filterParts.join(' AND '),
+          limit,
+          offset,
+          sort: sortParam,
+          attributesToHighlight: ['name', 'description'],
+          highlightPreTag: '<mark>',
+          highlightPostTag: '</mark>',
+        },
+      ) as {
+        hits: MeiliDocument[]
+        estimatedTotalHits?: number
+        processingTimeMs: number
+      }
+
+      return {
+        data: result.hits.map(h => this.formatProductHit(h)),
+        meta: {
+          total: result.estimatedTotalHits ?? result.hits.length,
+          query: q,
+          limit,
+          offset,
+          processing_time_ms: result.processingTimeMs,
+        },
+      }
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
+      return this.fallbackProductSearch(filters)
+    }
+  }
+
+  private async fallbackProductSearch(filters: ProductSearchFilters) {
+    const { q, category, shop, country, sort, maxPrice, limit = 50, offset = 0 } = filters
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: 'ACTIVE',
+        slug: { not: { startsWith: 'menu-item-' } },
+        OR: [
+          { stock_quantity: { gt: 0 } },
+          { variants: { some: { stock_quantity: { gt: 0 } } } },
+        ],
+        shop: {
+          is_active: true,
+          status: 'ACTIVE',
+          ...(country && { country: country.toUpperCase() }),
+          ...(shop && { slug: shop }),
+        },
+        ...(category && { category: { slug: category } }),
+        ...(maxPrice != null && maxPrice > 0 && { price: { lte: maxPrice } }),
+        ...(q && {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
+          ],
+        }),
+      },
+      include: this.productSyncInclude,
+      orderBy:
+        sort === 'price_asc'
+          ? { price: 'asc' }
+          : sort === 'price_desc'
+            ? { price: 'desc' }
+            : { created_at: 'desc' },
+      take: limit,
+      skip: offset,
+    })
+
+    const available = products.filter(p => this.isProductAvailable(p))
+
+    return {
+      data: available.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: p.price,
+        currency: p.currency,
+        image_url: p.image_url,
+        created_at: p.created_at.toISOString(),
+        category: p.category,
+        merchant: {
+          business_name: p.shop.name,
+          slug: p.shop.slug,
+          logo: p.shop.logo,
+        },
+      })),
+      meta: {
+        total: available.length,
+        query: q ?? '',
+        limit,
+        offset,
+        processing_time_ms: 0,
+      },
+    }
+  }
+
+  private formatProductHit(h: MeiliDocument) {
+    return {
+      id: h['id'] as string,
+      name: h['name'] as string,
+      slug: h['slug'] as string,
+      price: h['price'] as number,
+      currency: (h['currency'] as string) ?? 'XOF',
+      image_url: (h['image_url'] as string | null) ?? null,
+      created_at: h['created_at']
+        ? new Date(h['created_at'] as number).toISOString()
+        : undefined,
+      category: h['category_id']
+        ? {
+            id: h['category_id'] as string,
+            name: h['category_name'] as string,
+            slug: h['category_slug'] as string,
+          }
+        : null,
+      merchant: {
+        business_name: h['shop_name'] as string,
+        slug: h['shop_slug'] as string,
+        logo: (h['shop_logo'] as string | null) ?? null,
+      },
+      _formatted: h['_formatted'] as Record<string, string> | undefined,
     }
   }
 }

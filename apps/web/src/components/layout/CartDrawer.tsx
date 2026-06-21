@@ -18,6 +18,7 @@ import {
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
 } from '@/lib/marketplaceApi'
+import { detectCartKind, getCartRoute, getCheckoutRoute } from '@/lib/orderFlow'
 
 export function CartDrawer() {
   const router = useRouter()
@@ -53,6 +54,9 @@ export function CartDrawer() {
 
   const items = cart?.items ?? []
   const hasItems = items.length > 0
+  const cartKind = hasItems ? detectCartKind(items, cart?.kind) : 'empty'
+  const cartPath = getCartRoute(cartKind) ?? '/cart'
+  const checkoutPath = cartKind === 'food' ? getCheckoutRoute('food') : getCheckoutRoute('marketplace')
 
   const goToLogin = () => {
     closeDrawer()
@@ -92,7 +96,9 @@ export function CartDrawer() {
               <ShoppingBag size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900">Mon panier</h2>
+              <h2 className="text-lg font-extrabold text-slate-900">
+                {cartKind === 'food' ? 'Ma commande' : 'Mon panier'}
+              </h2>
               {(cart?.merchant_count ?? 0) > 0 && (
                 <p className="text-xs text-slate-400 font-medium truncate max-w-[220px]">
                   {(cart?.merchant_count ?? 0) > 1
@@ -258,14 +264,14 @@ export function CartDrawer() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => goTo('/cart')}
+                onClick={() => goTo(cartPath)}
                 className="h-12 rounded-xl border-2 border-slate-200 text-slate-900 font-bold text-sm hover:bg-slate-50 transition-colors"
               >
-                Voir le panier
+                {cartKind === 'food' ? 'Voir la commande' : 'Voir le panier'}
               </button>
               <button
                 type="button"
-                onClick={() => goTo('/checkout')}
+                onClick={() => goTo(checkoutPath)}
                 className="h-12 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
               >
                 Commander

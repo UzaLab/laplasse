@@ -5,6 +5,7 @@ import { Star, BadgeCheck, MapPin } from 'lucide-react'
 import { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from './FavoriteButton'
 import { WhatsAppLink } from './WhatsAppLink'
+import { MerchantCardPreview } from './MerchantCardPreview'
 
 export function NearbyCard({ merchant }: { merchant: ApiMerchant }) {
   return (
@@ -38,8 +39,8 @@ export function NearbyCard({ merchant }: { merchant: ApiMerchant }) {
           )}
         </div>
 
-        {/* Content */}
-        <div className="p-4 pb-3">
+        {/* Infos principales */}
+        <div className="p-4 pb-2">
           <div className="flex items-start justify-between gap-2 mb-1">
             <h3 className="font-bold text-base text-slate-900 flex items-center gap-1">
               {merchant.business_name}
@@ -60,6 +61,10 @@ export function NearbyCard({ merchant }: { merchant: ApiMerchant }) {
           </p>
         </div>
       </Link>
+
+      <div className="px-4 pb-3">
+        <MerchantCardPreview merchant={merchant} />
+      </div>
 
       {(merchant.whatsapp || (merchant.tags?.length ?? 0) > 0) && (
         <div className="px-4 pb-4 flex items-center gap-2 flex-wrap">

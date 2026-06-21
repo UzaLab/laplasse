@@ -26,6 +26,7 @@ const SHOP_PUBLIC_SELECT = {
   merchant_id: true,
   status: true,
   is_active: true,
+  enabled_modules: true,
   created_at: true,
   merchant: {
     select: {
@@ -177,6 +178,7 @@ export class ShopsService {
         district: dto.district,
         address: dto.address,
         status: dto.status,
+        enabled_modules: dto.enabled_modules,
       },
       select: SHOP_PUBLIC_SELECT,
     })
@@ -207,5 +209,95 @@ export class ShopsService {
       data: { merchant_id: merchant.id },
       select: SHOP_PUBLIC_SELECT,
     })
+  }
+
+  async withOwnerShop<T>(
+    userId: string,
+    shopId: string,
+    fn: (shop: Awaited<ReturnType<ShopsService['resolveOwnerShop']>>) => Promise<T>,
+  ) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    return fn(shop)
+  }
+
+  async getShopProductCategorySelection(userId: string, shopId: string, country = 'CI') {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const code = country.toUpperCase().slice(0, 2)
+
+    const [categories, enabledRows] = await Promise.all([
+      this.prisma.productCategory.findMany({
+        where: {
+          is_active: true,
+          OR: [
+            { countries: { none: {} } },
+            { countries: { some: { country_code: code } } },
+          ],
+        },
+        orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          icon: true,
+          parent_id: true,
+          sort_order: true,
+        },
+      }),
+      this.prisma.shopProductCategory.findMany({
+        where: { shop_id: shop.id },
+        select: { category_id: true },
+      }),
+    ])
+
+    const enabledSet = new Set(enabledRows.map(r => r.category_id))
+    return categories.map(c => ({
+      ...c,
+      enabled: enabledSet.has(c.id),
+    }))
+  }
+
+  async setShopProductCategories(userId: string, shopId: string, categoryIds: string[]) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const uniqueIds = [...new Set(categoryIds)]
+
+    if (uniqueIds.length) {
+      const valid = await this.prisma.productCategory.findMany({
+        where: { id: { in: uniqueIds }, is_active: true },
+        select: { id: true },
+      })
+      if (valid.length !== uniqueIds.length) {
+        throw new BadRequestException('Une ou plusieurs catégories sont invalides')
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.shopProductCategory.deleteMany({ where: { shop_id: shop.id } }),
+      ...(uniqueIds.length
+        ? [
+            this.prisma.shopProductCategory.createMany({
+              data: uniqueIds.map(category_id => ({ shop_id: shop.id, category_id })),
+            }),
+          ]
+        : []),
+    ])
+
+    return { category_ids: uniqueIds }
+  }
+
+  async getEnabledProductCategoryIds(shopId: string) {
+    const rows = await this.prisma.shopProductCategory.findMany({
+      where: { shop_id: shopId, category: { is_active: true } },
+      select: { category_id: true },
+    })
+    return rows.map(r => r.category_id)
+  }
+
+  async assertProductCategoryAllowed(shopId: string, categoryId: string | null | undefined) {
+    if (!categoryId) return
+    const enabledIds = await this.getEnabledProductCategoryIds(shopId)
+    if (!enabledIds.length) return
+    if (!enabledIds.includes(categoryId)) {
+      throw new BadRequestException('Catégorie non activée pour votre boutique')
+    }
   }
 }

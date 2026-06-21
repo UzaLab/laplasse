@@ -30,14 +30,24 @@ export class PromotionsService {
       throw new BadRequestException('La date de fin doit être après la date de début')
     }
 
+    if (dto.category_id) {
+      const cat = await this.prisma.productCategory.findFirst({
+        where: { id: dto.category_id, is_active: true },
+      })
+      if (!cat) throw new BadRequestException('Catégorie produit invalide')
+    }
+
     return this.prisma.promotion.create({
       data: {
         merchant_id: merchant.id,
+        shop_id: dto.shop_id ?? null,
+        category_id: dto.category_id ?? null,
         title: dto.title,
         description: dto.description,
         type: dto.type,
         value: dto.value,
-        code: dto.code,
+        code: dto.code?.trim().toUpperCase() ?? null,
+        min_order_amount: dto.min_order_amount,
         starts_at: new Date(dto.starts_at),
         ends_at: new Date(dto.ends_at),
         max_uses: dto.max_uses,
@@ -45,10 +55,106 @@ export class PromotionsService {
     })
   }
 
+  computeDiscount(
+    promo: { type: string; value: number },
+    subtotal: number,
+  ): { discount: number; free_delivery: boolean } {
+    switch (promo.type) {
+      case 'PERCENTAGE':
+        return {
+          discount: Math.floor((subtotal * promo.value) / 100),
+          free_delivery: false,
+        }
+      case 'FIXED':
+        return {
+          discount: Math.min(Math.floor(promo.value), subtotal),
+          free_delivery: false,
+        }
+      case 'FREE_DELIVERY':
+        return { discount: 0, free_delivery: true }
+      default:
+        return { discount: 0, free_delivery: false }
+    }
+  }
+
+  async validateForShop(input: {
+    code: string
+    merchantId: string
+    shopId: string
+    subtotal: number
+    lineItems?: Array<{ category_id: string | null; line_total: number }>
+  }) {
+    const code = input.code.trim().toUpperCase()
+    if (!code) {
+      return { valid: false as const, message: 'Code promo requis' }
+    }
+
+    const now = new Date()
+    const promo = await this.prisma.promotion.findFirst({
+      where: {
+        merchant_id: input.merchantId,
+        code,
+        is_active: true,
+        starts_at: { lte: now },
+        ends_at: { gte: now },
+        OR: [{ shop_id: null }, { shop_id: input.shopId }],
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+      },
+    })
+
+    if (!promo) {
+      return { valid: false as const, message: 'Code promo invalide ou expiré' }
+    }
+
+    if (promo.max_uses != null && promo.uses_count >= promo.max_uses) {
+      return { valid: false as const, message: 'Ce code promo a atteint sa limite d\'utilisation' }
+    }
+
+    let eligibleSubtotal = input.subtotal
+    if (promo.category_id) {
+      const lines = input.lineItems ?? []
+      eligibleSubtotal = lines
+        .filter(li => li.category_id === promo.category_id)
+        .reduce((sum, li) => sum + li.line_total, 0)
+      if (eligibleSubtotal <= 0) {
+        return {
+          valid: false as const,
+          message: promo.category
+            ? `Ce code s'applique uniquement à la catégorie « ${promo.category.name} »`
+            : 'Aucun article éligible pour ce code promo',
+        }
+      }
+    }
+
+    if (promo.min_order_amount != null && eligibleSubtotal < promo.min_order_amount) {
+      return {
+        valid: false as const,
+        message: `Commande minimum ${promo.min_order_amount.toLocaleString('fr-FR')} FCFA requise`,
+      }
+    }
+
+    const { discount, free_delivery } = this.computeDiscount(promo, eligibleSubtotal)
+
+    return {
+      valid: true as const,
+      promotion: promo,
+      discount,
+      free_delivery,
+      message: free_delivery
+        ? 'Livraison offerte appliquée'
+        : `Remise de ${discount.toLocaleString('fr-FR')} FCFA`,
+    }
+  }
+
   async getMerchantPromotions(merchantId: string) {
     return this.prisma.promotion.findMany({
       where: { merchant_id: merchantId },
       orderBy: { created_at: 'desc' },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+      },
     })
   }
 

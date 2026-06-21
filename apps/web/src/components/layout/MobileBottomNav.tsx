@@ -2,32 +2,33 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Compass, Search, Heart, User } from 'lucide-react'
+import { Compass, Search, ShoppingBag, Store, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useCartStore, useCartItemCount } from '@/stores/cartStore'
 
-const ITEMS = [
-  { href: '/', label: 'Découvrir', icon: Compass },
-  { href: '/search', label: 'Recherche', icon: Search },
-  { href: '/favoris', label: 'Favoris', icon: Heart },
-  { href: '/profile', label: 'Profil', icon: User },
+const LINK_ITEMS = [
+  { href: '/', label: 'Découvrir', icon: Compass, match: (p: string) => p === '/' },
+  { href: '/search', label: 'Recherche', icon: Search, match: (p: string) => p === '/search' || p.startsWith('/search/') },
+  { href: '/marketplace', label: 'Shop', icon: Store, match: (p: string) => p === '/marketplace' || p.startsWith('/marketplace/') || p.startsWith('/boutique/') || p.includes('/boutique') || p.includes('/p/') },
+  { href: '/profile', label: 'Profil', icon: User, match: (p: string) => p === '/profile' || p.startsWith('/profile/') || p === '/favoris' },
 ] as const
 
 export function MobileBottomNav() {
   const pathname = usePathname()
+  const openDrawer = useCartStore(s => s.openDrawer)
+  const itemCount = useCartItemCount()
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40 safe-area-bottom">
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const active = href === '/'
-          ? pathname === '/'
-          : pathname === href || pathname.startsWith(`${href}/`)
+      {LINK_ITEMS.map(({ href, label, icon: Icon, match }) => {
+        const active = match(pathname)
 
         return (
           <Link
             key={href}
             href={href}
             className={cn(
-              'flex flex-col items-center gap-0.5 transition-colors',
+              'flex flex-col items-center gap-0.5 transition-colors min-w-[56px]',
               active ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700',
             )}
             style={{ textDecoration: 'none' }}
@@ -37,6 +38,24 @@ export function MobileBottomNav() {
           </Link>
         )
       })}
+
+      <button
+        type="button"
+        onClick={openDrawer}
+        className={cn(
+          'relative flex flex-col items-center gap-0.5 transition-colors min-w-[56px]',
+          pathname === '/cart' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700',
+        )}
+        aria-label="Ouvrir le panier"
+      >
+        <ShoppingBag size={20} strokeWidth={pathname === '/cart' ? 2.25 : 2} />
+        {itemCount > 0 && (
+          <span className="absolute top-0 right-2 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full">
+            {itemCount > 9 ? '9+' : itemCount}
+          </span>
+        )}
+        <span className="text-[10px] font-semibold">Panier</span>
+      </button>
     </nav>
   )
 }

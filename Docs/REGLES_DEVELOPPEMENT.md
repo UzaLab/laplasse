@@ -3,7 +3,9 @@
 > Synthèse opérationnelle extraite de `Implementation Blueprint.md`, `cibooks_master_report.md` et Tomes 0–24.
 > Document de référence pour toute contribution au code.
 
-**Version :** 1.9 — Juin 2026 (Marketplace V1.5 clôturée)
+**Version :** 2.0 — Juin 2026 (Marketplace V1.6 — boutique modulaire & checkout structuré)
+
+> **Journal d'exécution** : ce document reflète l'état réel du code. Pour la vision stratégique long terme, voir les Tomes 0–24 et `Implementation Blueprint.md`. Pour l'analyse produit et la roadmap V2+, voir **`ROADMAP_PRODUIT_V2.md`**.
 
 ---
 
@@ -426,7 +428,7 @@ Environnement : WSL2, Docker (PostgreSQL, Redis, Meilisearch), API `:3001`, Web 
 | **Backups automatiques** | P2 | ✅ `scripts/backup.sh` + cron + runbook `Docs/RUNBOOK.md` |
 | **Logs structurés JSON** | P2 | ✅ Winston (`nest-winston`) — JSON en prod, pretty-print en dev, logs rotatifs 30j |
 | **Nombre favoris sur `/profile`** | P2 | ✅ Fetch API `GET /favorites` (corrigé juin 2026) |
-| **Audit log modifications** | P3 | ❌ Table `audit_log` (futur trust/scoring) |
+| **Audit log modifications** | P3 | ✅ Table `AuditLog` + `/admin/audit` (livré V1.0) |
 
 ### Limites rate limiting (implémentées)
 
@@ -593,9 +595,11 @@ Slice ecommerce **boutiques uniquement** (`category_slug = boutiques`). Mobile M
 | Checkout + commandes split par marchand | ✅ | 1 commande + 1 paiement simulateur par boutique |
 | Paiement commandes (simulateur) | ✅ | `POST /orders/checkout` → `POST /orders/pay/confirm` ou `confirm-batch` |
 | Mobile Money réel (Wave/Orange/MTN) | ❌ | **Volontairement hors scope V1.5** → V2+ |
-| Pages client panier + checkout | ✅ | Maquette `cart.md` |
-| Commandes client + marchand | ✅ | `/profile/orders`, `/merchant/orders` |
+| Pages client panier + checkout | ✅ | Maquette `cart.md` — **checkout 4 étapes depuis V1.6** |
+| Commandes client + marchand | ✅ | `/profile/orders`, `/merchant/orders`, `/merchant/shop/orders` |
 | Seed démo boutiques | ✅ | `POST /api/admin/seed-marketplace` |
+| Images produit multiples | ✅ | V1.6 — modèle `ProductImage`, max 10, galerie fiche produit |
+| Composition & modes retrait/livraison produit | ✅ | V1.6 — champs `composition`, `allow_pickup`, `allow_delivery` |
 
 #### Routes API Marketplace (extrait)
 
@@ -608,6 +612,9 @@ Slice ecommerce **boutiques uniquement** (`category_slug = boutiques`). Mobile M
 | `POST` | `/orders/checkout` | Crée N commandes (1 par marchand) + paiements PENDING |
 | `POST` | `/orders/pay/confirm` | Simulateur : success \| failure (1 paiement) |
 | `POST` | `/orders/pay/confirm-batch` | Simulateur batch (panier multi-boutiques) |
+| `GET` | `/marketplace/spotlight` | Boutiques épinglées marketplace (V1.6) |
+| `GET/PATCH` | `/admin/marketplace/spotlight` | Admin — liste + limite spotlight (V1.6) |
+| `GET/PATCH` | `/shops/mine`, `/shops/:slug` | CRUD boutique modulaire (V1.6) |
 
 #### Simulateur paiement commandes
 
@@ -624,6 +631,7 @@ Slice ecommerce **boutiques uniquement** (`category_slug = boutiques`). Mobile M
 | V0.5 MVP discovery | ✅ Livré sans marketplace |
 | V1.0 booking + monétisation SaaS | ✅ Livré |
 | **V1.5 — Marketplace transactions** | ✅ **Livré** (simulateur, sans MM réel) |
+| **V1.6 — Boutique modulaire & UX marketplace** | ✅ **Livré** (juin 2026) |
 | V2.0 Merchant OS + app native + MM réel | Futur |
 
 ### Simulateur de paiement (V1)
@@ -665,6 +673,7 @@ Remplace Mobile Money en développement. Flux :
 
 | Document | Contenu |
 |----------|---------|
+| `ROADMAP_PRODUIT_V2.md` | Analyse parcours, gaps UX, modules verticaux (Glovo/Airbnb), roadmap V2+ |
 | `Implementation Blueprint.md` | Guide technique complet |
 | `cibooks_master_report.md` | Synthèse stratégique |
 | `docs_cuisinefacile.md` | Critères perf/sécurité/tests marketplace (inspiration) |
@@ -672,7 +681,7 @@ Remplace Mobile Money en développement. Flux :
 | `Tome 22` | KPIs, anti-patterns, roadmap |
 | `Tome 23` | Stack technique |
 | `Tome 24` | QA, validation, UX, edge cases |
-| `maquettes/*.md` | Références UI (HTML Tailwind) |
+| `maquettes/*.md` | Références UI (HTML Tailwind) — **legacy brand CIBOOKS** ; produit = LaPlasse |
 
 ---
 
@@ -738,6 +747,56 @@ Multi-établissements marchand + unification icônes Lucide + navigation mobile 
 | Checkout simulé + commandes split par boutique | ✅ |
 | UI maquettes marketplace / panier / fiche produit / boutique | ✅ |
 | Mobile Money réel | ❌ → V2+ |
+
+### V1.6 — LIVRÉE (juin 2026)
+
+Slice **boutique modulaire** + polish marketplace + checkout structuré pour le tracking analytics.
+
+| Feature | Statut | Notes |
+|---------|--------|-------|
+| Entité `Shop` découplée du marchand | ✅ | Migration `20260611000000`, module `shops/` |
+| Dashboard boutique `/merchant/shop/*` | ✅ | Produits, commandes, promos, paramètres |
+| Création boutique `/shop/create` | ✅ | Lien optionnel à un établissement (`merchant_id`) |
+| Vitrine publique `/m/[slug]/boutique` + `/boutique/[slug]` | ✅ | Double URL (marchand legacy + entité Shop) |
+| Marketplace `/marketplace` — refonte mobile | ✅ | Filtres modale, carrousel spotlight, cartes produit |
+| Spotlight boutiques (`marketplace_featured`) | ✅ | `GET /marketplace/spotlight`, admin API limite + toggle |
+| UI admin spotlight | ⚠️ | API admin présente — interface web admin à compléter |
+| Images produit multiples (`ProductImage`) | ✅ | Max 10, upload/URL, galerie fiche produit, migration `20260619100000` |
+| Composition HTML produit | ✅ | Champ `composition`, onglet fiche produit |
+| Retrait / livraison par produit | ✅ | `allow_pickup`, `allow_delivery`, validation checkout |
+| Checkout 4 étapes (URLs distinctes) | ✅ | Voir parcours ci-dessous |
+| Fiche produit — UX mobile/desktop | ✅ | CTA alignés desktop, galerie multi-images |
+| Horaires uniques par jour (`BusinessHour`) | ✅ | Contrainte unique `merchant_id + day` |
+| Déploiement Coolify preprod/prod | ✅ | `./scripts/coolify-deploy.sh`, cache BuildKit web |
+| Mobile Money réel | ❌ | → V2+ |
+
+#### Parcours checkout V1.6 (tracking PostHog)
+
+| Étape | URL | Contenu |
+|-------|-----|---------|
+| 1 — Panier | `/cart` | Lignes, sous-total, promo (UI) |
+| 2 — Livraison | `/checkout` | Mode retrait, adresse, téléphone, note |
+| 3 — Paiement | `/checkout/payment` | Résumé commande + simulateur Mobile Money |
+| 4 — Confirmation | `/checkout/confirmation?status=success\|failure` | Récap complet + CTA commandes |
+
+État inter-étapes : `sessionStorage` via `lib/checkoutSession.ts` (session checkout → confirmation).
+
+Sur **mobile**, le résumé de commande précède le simulateur à l'étape 3.
+
+#### Routes API Shop (extrait V1.6)
+
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| `POST` | `/shops` | Créer une boutique |
+| `GET` | `/shops/mine` | Mes boutiques |
+| `GET` | `/shops/:slug` | Détail public |
+| `PATCH` | `/shops/:id` | Modifier (logo, cover, statut…) |
+| `PATCH` | `/shops/:id/link-merchant` | Lier / délier un établissement |
+| `GET` | `/shops/:slug/products` | Catalogue public boutique |
+
+#### Numérotation versions — note
+
+Dans les **Tomes / Blueprint**, V1.5 désigne l'expansion géographique. Dans ce journal d'exécution, **V1.5 = marketplace ecommerce** et **V1.6 = boutique modulaire**. Les deux référentiels coexistent : stratégie vs delivery.
 
 ---
 

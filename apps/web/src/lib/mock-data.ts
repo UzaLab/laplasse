@@ -7,6 +7,7 @@ export const CATEGORIES: Category[] = [
   { id: '4', name: 'Spas & Bien-être', slug: 'beaute',        icon: 'Sparkles' },
   { id: '5', name: 'Cafés & Brunch',   slug: 'cafes',        icon: 'Coffee' },
   { id: '6', name: 'Hôtels',           slug: 'hotels',       icon: 'BedDouble' },
+  { id: '10', name: 'Résidences',      slug: 'residences',   icon: 'Home' },
   { id: '7', name: 'Pharmacies',       slug: 'pharmacies',   icon: 'Pill' },
 ]
 
@@ -75,8 +76,8 @@ export const SELECTION_MERCHANTS: SpotMerchant[] = [
     id: '3',
     business_name: 'Yalé Design',
     slug: 'yale-design',
-    description: 'Concept store de mode ivoirienne contemporaine. Wax, broderies et créateurs locaux.',
-    sub_category: 'Mode Ivoirienne',
+    description: 'Concept store de mode contemporaine. Wax, broderies et créateurs locaux.',
+    sub_category: 'Mode & créateurs',
     category: { id: '3', name: 'Boutique', slug: 'boutiques', icon: 'Gem' },
     cover_image: 'https://images.unsplash.com/photo-1560243563-062bfc001d68?auto=format&fit=crop&q=80&w=800',
     whatsapp: '+22507000003',

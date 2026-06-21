@@ -136,3 +136,43 @@ export async function linkShopToMerchant(
   const shop = await res.json() as ShopSummary
   return { shop }
 }
+
+export interface ShopProductCategoryOption {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  parent_id: string | null
+  sort_order: number
+  enabled: boolean
+}
+
+export async function fetchShopProductCategories(
+  shopId: string | null | undefined,
+): Promise<ShopProductCategoryOption[]> {
+  if (!shopId) return []
+  const res = await shopApiFetch(`/shops/${shopId}/product-categories`, shopId)
+  if (!res.ok) return []
+  return res.json() as Promise<ShopProductCategoryOption[]>
+}
+
+export async function saveShopProductCategories(
+  shopId: string | null | undefined,
+  categoryIds: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  if (!shopId) return { ok: false, error: 'Boutique introuvable' }
+  const res = await shopApiFetch(`/shops/${shopId}/product-categories`, shopId, {
+    method: 'PUT',
+    body: JSON.stringify({ category_ids: categoryIds }),
+  })
+  if (!res.ok) {
+    try {
+      const data = await res.json()
+      const msg = Array.isArray(data.message) ? data.message.join(', ') : data.message
+      return { ok: false, error: msg ?? 'Erreur' }
+    } catch {
+      return { ok: false, error: 'Erreur' }
+    }
+  }
+  return { ok: true }
+}

@@ -14,6 +14,7 @@ interface AdminStats {
   merchants: { total: number; pending: number; verified: number }
   users: number
   reviews: { total: number; pending: number }
+  product_reviews?: { pending: number }
   complaints?: { open: number }
 }
 
@@ -64,15 +65,22 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
       icon: <Store size={18} />,
       badge: stats?.merchants.pending,
     },
-    { href: '/categories', label: 'Catégories', icon: <Tags size={18} /> },
+    { href: '/admin/product-categories', label: 'Catégories produits', icon: <Tags size={18} /> },
+    { href: '/admin/geo', label: 'Villes & communes', icon: <MapPin size={18} /> },
   ]
 
   const opsNav: NavItem[] = [
     {
       href: '/admin/reviews',
-      label: 'Avis',
+      label: 'Avis établ.',
       icon: <Star size={18} />,
       badge: stats?.reviews.pending,
+    },
+    {
+      href: '/admin/product-reviews',
+      label: 'Avis produits',
+      icon: <Star size={18} />,
+      badge: stats?.product_reviews?.pending,
     },
     {
       href: '/admin/complaints',

@@ -1,10 +1,11 @@
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { MarketplacePageClient } from '@/features/marketplace/components/MarketplacePageClient'
+import { BRAND_MARKETPLACE_INTRO } from '@/lib/brandCopy'
 
 export const metadata = {
   title: 'Marketplace | LaPlasse',
-  description: 'Achetez en direct auprès des meilleures boutiques d\'Abidjan.',
+  description: BRAND_MARKETPLACE_INTRO,
 }
 
 export default function MarketplacePage() {

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Loader2, XCircle } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
@@ -16,6 +16,7 @@ import {
   getCheckoutConfirmation,
   type CheckoutConfirmation,
 } from '@/lib/checkoutSession'
+import { formatOrderRef } from '@/features/profile/components/orders/orderUtils'
 
 export default function CheckoutConfirmationPage() {
   return (
@@ -41,6 +42,7 @@ function CheckoutConfirmationContent() {
 
   const statusParam = searchParams.get('status')
   const status = statusParam === 'failure' ? 'failure' : statusParam === 'success' ? 'success' : null
+  const orderIdsParam = searchParams.get('orderIds') ?? ''
 
   useEffect(() => {
     if (!status) {
@@ -54,9 +56,18 @@ function CheckoutConfirmationContent() {
       return
     }
 
+    if (orderIdsParam) {
+      const ids = orderIdsParam.split(',').filter(Boolean)
+      const match = ids.every(id => stored.orderIds.includes(id))
+      if (!match) {
+        router.replace('/cart')
+        return
+      }
+    }
+
     setConfirmation(stored)
     setReady(true)
-  }, [router, status])
+  }, [router, status, orderIdsParam])
 
   if (!hydrated) {
     return (
@@ -79,6 +90,7 @@ function CheckoutConfirmationContent() {
   const isSuccess = status === 'success'
   const firstName = user?.full_name?.split(' ')[0] ?? ''
   const multiOrders = confirmation.checkoutOrders.length > 1
+  const primaryOrderId = confirmation.orderIds[0]
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -99,6 +111,12 @@ function CheckoutConfirmationContent() {
                   {multiOrders ? 's commandes ont' : ' commande a'} été enregistrée
                   {multiOrders ? 's' : ''} avec succès.
                 </p>
+                {primaryOrderId && (
+                  <p className="text-xs text-slate-400 mt-3 font-mono">
+                    Réf. {formatOrderRef(primaryOrderId)}
+                    {multiOrders && ` (+${confirmation.orderIds.length - 1} autre${confirmation.orderIds.length > 2 ? 's' : ''})`}
+                  </p>
+                )}
               </>
             ) : (
               <>
@@ -121,6 +139,9 @@ function CheckoutConfirmationContent() {
             deliveryAddress={confirmation.deliveryAddress}
             customerPhone={confirmation.customerPhone}
             customerNote={confirmation.customerNote}
+            discountAmount={confirmation.discountAmount}
+            deliveryFee={confirmation.deliveryFee}
+            deliveryQuotes={confirmation.deliveryQuotes}
             references={confirmation.references}
             className="mb-8"
           />
@@ -134,10 +155,21 @@ function CheckoutConfirmationContent() {
                 {confirmation.checkoutOrders.map(order => (
                   <li
                     key={order.orderId}
-                    className="flex justify-between items-center text-sm bg-slate-50 rounded-xl px-4 py-3"
+                    className="flex justify-between items-center gap-3 text-sm bg-slate-50 rounded-xl px-4 py-3"
                   >
-                    <span className="font-medium text-slate-700">{order.merchant.business_name}</span>
-                    <span className="font-bold text-slate-900 font-mono text-xs">{order.reference}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-700 truncate">{order.merchant.business_name}</p>
+                      <p className="text-xs text-slate-400 font-mono">{order.reference}</p>
+                    </div>
+                    {isSuccess && (
+                      <Link
+                        href={`/profile/orders/${order.orderId}`}
+                        className="text-xs font-bold text-amber-600 hover:text-amber-700 shrink-0 inline-flex items-center gap-1"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        Voir <ExternalLink size={12} />
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -146,16 +178,28 @@ function CheckoutConfirmationContent() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {isSuccess ? (
-              <button
-                type="button"
-                onClick={() => {
-                  clearCheckoutConfirmation()
-                  router.push('/profile/orders')
-                }}
-                className="h-12 px-8 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
-              >
-                Voir mes commandes
-              </button>
+              <>
+                {primaryOrderId && !multiOrders && (
+                  <Link
+                    href={`/profile/orders/${primaryOrderId}`}
+                    onClick={() => clearCheckoutConfirmation()}
+                    className="h-12 px-8 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-colors flex items-center justify-center"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Voir ma commande
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearCheckoutConfirmation()
+                    router.push('/profile/orders')
+                  }}
+                  className="h-12 px-8 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
+                >
+                  {multiOrders ? 'Toutes mes commandes' : 'Mes commandes'}
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -165,7 +209,7 @@ function CheckoutConfirmationContent() {
                 }}
                 className="h-12 px-8 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
               >
-                Réessayer
+                Passer une nouvelle commande
               </button>
             )}
             <Link

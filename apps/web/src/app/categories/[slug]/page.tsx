@@ -1,10 +1,17 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, BadgeCheck, MapPin, MessageCircle, Search } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Search } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { api, ApiCategory, ApiMerchant } from '@/lib/api'
+import { getDefaultCity, getServerCountryCode } from '@/lib/country'
+import {
+  BRAND_OG_LOCALE,
+  categoryPageDescription,
+  categoryPageTitle,
+} from '@/lib/brandCopy'
 import { CategoryIcon } from '@/lib/icons'
+import { CategoryMerchantCard } from '@/features/discovery/components/CategoryMerchantCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,64 +20,12 @@ interface Props {
 }
 
 function MerchantCard({ merchant }: { merchant: ApiMerchant }) {
-  return (
-    <Link href={`/m/${merchant.slug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <article className="bg-white rounded-[24px] border border-slate-100 hover:border-brand-200 hover:shadow-lg transition-all duration-200 overflow-hidden group">
-        <div className="h-48 overflow-hidden bg-slate-100">
-          {merchant.cover_image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={merchant.cover_image}
-              alt={merchant.business_name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <CategoryIcon name={merchant.category.icon} slug={merchant.category.slug} size={40} className="text-slate-300" />
-            </div>
-          )}
-          {merchant.verification_status === 'VERIFIED' && (
-            <div className="absolute top-3 left-3 bg-blue-500/90 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <BadgeCheck size={11} /> Vérifié
-            </div>
-          )}
-        </div>
-
-        <div className="p-5">
-          <h3 className="font-bold text-slate-900 text-lg mb-1 flex items-center gap-1.5">
-            {merchant.business_name}
-            {merchant.verification_status === 'VERIFIED' && (
-              <BadgeCheck size={14} className="text-slate-600 shrink-0" />
-            )}
-          </h3>
-
-          {merchant.location && (
-            <p className="text-sm text-slate-500 flex items-center gap-1 mb-3">
-              <MapPin size={12} />
-              {merchant.location.district ?? merchant.location.city}
-            </p>
-          )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {merchant.whatsapp && (
-              <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <MessageCircle size={10} /> WhatsApp
-              </span>
-            )}
-            {merchant.tags.slice(0, 3).map(tag => (
-              <span key={tag} className="text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-100 px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      </article>
-    </Link>
-  )
+  return <CategoryMerchantCard merchant={merchant} />
 }
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params
+  const defaultCity = getDefaultCity(getServerCountryCode())
 
   let category: ApiCategory
   let merchants: { data: ApiMerchant[]; meta: { total: number } }
@@ -78,7 +33,7 @@ export default async function CategoryPage({ params }: Props) {
   try {
     [category, merchants] = await Promise.all([
       api.categories.bySlug(slug),
-      api.merchants.list({ category: slug, city: 'Abidjan', limit: 24, sort: 'trust_score' }),
+      api.merchants.list({ category: slug, city: defaultCity, limit: 24, sort: 'trust_score' }),
     ])
   } catch {
     notFound()
@@ -107,7 +62,8 @@ export default async function CategoryPage({ params }: Props) {
                 {category.name}
               </h1>
               <p className="text-slate-400 mt-1">
-                <span className="font-bold text-brand-400">{category._count.merchants}</span> établissement{category._count.merchants > 1 ? 's' : ''} à Abidjan
+                <span className="font-bold text-brand-400">{category._count.merchants}</span>
+                {` établissement${category._count.merchants > 1 ? 's' : ''} à ${defaultCity}`}
               </p>
             </div>
           </div>
@@ -168,10 +124,11 @@ export default async function CategoryPage({ params }: Props) {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
+  const defaultCity = getDefaultCity(getServerCountryCode())
   try {
     const cat = await api.categories.bySlug(slug)
-    const title = `${cat.name} à Abidjan — LaPlasse`
-    const description = `Découvrez les meilleurs établissements ${cat.name.toLowerCase()} à Abidjan, Cocody et partout en Côte d'Ivoire sur LaPlasse.`
+    const title = categoryPageTitle(cat.name, defaultCity)
+    const description = categoryPageDescription(cat.name, defaultCity)
     const url = `${BASE_URL}/categories/${slug}`
 
     return {
@@ -180,7 +137,7 @@ export async function generateMetadata({ params }: Props) {
       alternates: { canonical: url },
       openGraph: {
         title, description, url, type: 'website',
-        siteName: 'LaPlasse', locale: 'fr_CI',
+        siteName: 'LaPlasse', locale: BRAND_OG_LOCALE,
       },
       twitter: { card: 'summary', title, description },
     }

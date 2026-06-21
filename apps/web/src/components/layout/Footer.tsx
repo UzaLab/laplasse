@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BookOpen, Globe, Share2, LinkIcon, Heart } from 'lucide-react'
+import { BRAND_FOOTER_TAGLINE } from '@/lib/brandCopy'
 
 export function Footer() {
   return (
@@ -17,8 +18,7 @@ export function Footer() {
               <span className="text-xl font-extrabold tracking-tight text-slate-900">LaPlasse</span>
             </div>
             <p className="text-sm text-slate-500 mb-6">
-              La plateforme de référence pour découvrir, réserver et acheter auprès des
-              meilleurs établissements de Côte d'Ivoire.
+              {BRAND_FOOTER_TAGLINE}
             </p>
             <div className="flex gap-4">
               {[Globe, Share2, LinkIcon].map((Icon, i) => (
@@ -70,7 +70,7 @@ export function Footer() {
         <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400 font-medium">
           <p>© 2026 LaPlasse. Tous droits réservés.</p>
           <p className="flex items-center gap-1">
-            Conçu avec <Heart size={14} className="text-red-500 fill-red-500" /> à Babi.
+            Conçu avec <Heart size={14} className="text-red-500 fill-red-500" /> pour l&apos;excellence locale.
           </p>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { useCartStore, useCartItemCount } from '@/stores/cartStore'
 import { MobileNav } from './MobileNav'
 import { CartDrawer } from './CartDrawer'
 import { CartSync } from './CartSync'
+import { CountrySwitcher } from './CountrySwitcher'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -84,6 +85,9 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-4">
+          <div className="hidden md:block">
+            <CountrySwitcher />
+          </div>
           <Link
             href="/search"
             className="text-slate-600 hover:text-brand-600 transition-colors hidden md:block"

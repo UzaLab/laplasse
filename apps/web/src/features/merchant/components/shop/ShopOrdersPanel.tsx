@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, ShoppingBag } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronRight, Loader2, ShoppingBag } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import {
   fetchMerchantOrders,
@@ -69,10 +70,15 @@ export function ShopOrdersPanel() {
           {orders.map(order => (
             <div key={order.id} className="bg-white border border-slate-100 rounded-[28px] p-5">
               <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
-                <div>
-                  <p className="font-extrabold text-slate-900">
+                <div className="flex-1 min-w-0">
+                  <Link
+                    href={`/merchant/shop/orders/${order.id}`}
+                    className="font-extrabold text-slate-900 hover:text-amber-600 transition-colors inline-flex items-center gap-1"
+                    style={{ textDecoration: 'none' }}
+                  >
                     {order.user?.full_name ?? order.user?.email ?? 'Client'}
-                  </p>
+                    <ChevronRight size={16} className="text-slate-300" />
+                  </Link>
                   <p className="text-sm text-slate-500">
                     {order.user?.phone ?? order.customer_phone ?? '—'}
                   </p>
@@ -113,6 +119,13 @@ export function ShopOrdersPanel() {
 
               {NEXT_STATUS[order.status] && (
                 <div className="flex flex-wrap gap-2 mt-4">
+                  <Link
+                    href={`/merchant/shop/orders/${order.id}`}
+                    className="text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Voir le détail
+                  </Link>
                   {NEXT_STATUS[order.status]!.map(action => (
                     <button
                       key={action.status}

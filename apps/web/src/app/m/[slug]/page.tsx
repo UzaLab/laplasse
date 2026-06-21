@@ -1,9 +1,9 @@
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Star, MapPin,
-  BadgeCheck, Clock, Store, Image as ImageIcon,
-  Wifi, Car, Music, Wind, Utensils, Wine
+  BadgeCheck, Clock,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
@@ -13,8 +13,12 @@ import { ReportTrigger } from '@/features/merchant/components/ReportTrigger'
 import { MerchantViewTracker, MerchantContactButtons } from '@/features/merchant/components/MerchantTracker'
 import { SimilarMerchants } from '@/features/merchant/components/SimilarMerchants'
 import { BookingForm } from '@/features/merchant/components/BookingForm'
-import { MerchantProductsSection } from '@/features/marketplace/components/MerchantProductsSection'
+import { MerchantProfileTabs } from '@/features/merchant/components/profile/MerchantProfileTabs'
+import { MerchantContextualCTAs } from '@/features/merchant/components/MerchantContextualCTAs'
+import { MerchantMobileActionBar } from '@/features/merchant/components/MerchantMobileActionBar'
 import { MerchantReviewsSection } from '@/features/discovery/components/MerchantReviewsSection'
+import { getCategoryBookingCta, isBookingCategory } from '@/lib/categoryBooking'
+import { BRAND_OG_LOCALE, merchantMetaFallback } from '@/lib/brandCopy'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,8 +27,6 @@ interface Props {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 
 function isCurrentlyOpen(merchant: ApiMerchantDetail): boolean {
   const now = new Date()
@@ -41,19 +43,6 @@ function isCurrentlyOpen(merchant: ApiMerchantDetail): boolean {
   const closeNum = ch * 100 + cm
 
   return hour >= openNum && hour < closeNum
-}
-
-function TagIcon({ name }: { name: string }) {
-  const map: Record<string, React.ReactNode> = {
-    'Wi-Fi': <Wifi size={18} className="text-brand-500" />,
-    'Wifi': <Wifi size={18} className="text-brand-500" />,
-    'Parking': <Car size={18} className="text-brand-500" />,
-    'Live Music': <Music size={18} className="text-brand-500" />,
-    'Climatisé': <Wind size={18} className="text-brand-500" />,
-    'Végétarien': <Utensils size={18} className="text-brand-500" />,
-    'Cocktails': <Wine size={18} className="text-brand-500" />,
-  }
-  return <>{map[name] ?? <Store size={18} className="text-brand-500" />}</>
 }
 
 // ── Page ────────────────────────────────────────────────────────────────────
@@ -194,143 +183,33 @@ export default async function MerchantPage({ params }: Props) {
       </header>
 
       {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+      <main className="max-w-7xl mx-auto px-6 py-12 pb-28 lg:pb-12">
+        <div className="flex flex-col lg:grid lg:grid-cols-3 gap-12 items-start">
 
-          {/* ── LEFT: Description & Infos ─────────────────────────────────── */}
-          <div className="lg:col-span-2 space-y-12">
+          {/* ── Onglets verticals ───────────────────────────────────────────── */}
+          <div className="order-1 lg:col-span-2 w-full">
+            <Suspense
+              fallback={
+                <div className="h-64 bg-white rounded-3xl border border-slate-100 animate-pulse" />
+              }
+            >
+              <MerchantProfileTabs merchant={merchant} />
+            </Suspense>
 
-            {/* Description */}
-            {merchant.description && (
-              <section>
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">À propos</h2>
-                <p className="text-slate-600 leading-relaxed text-lg">{merchant.description}</p>
-              </section>
-            )}
-
-            {/* Boutique marketplace */}
-            {merchant.category.slug === 'boutiques' && (
-              <section id="boutique">
-                <MerchantProductsSection
-                  merchantSlug={merchant.slug}
-                  merchantName={merchant.business_name}
-                />
-              </section>
-            )}
-
-            {/* Tags / Services */}
-            {merchant.tags.length > 0 && (
-              <section>
-                <h3 className="text-xl font-bold text-slate-900 mb-6">Services</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-4">
-                  {merchant.tags.map((tag) => (
-                    <div key={tag} className="flex items-center gap-3 text-slate-700 font-medium">
-                      <TagIcon name={tag} />
-                      <span>{tag}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Galerie médias */}
-            {merchant.media.length > 0 && (
-              <section>
-                <h3 className="text-xl font-bold text-slate-900 mb-6">Galerie</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {merchant.media.slice(0, 5).map((m, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={m.id}
-                      src={m.url}
-                      alt={`${merchant.business_name} photo ${i + 1}`}
-                      className={`w-full object-cover rounded-2xl hover:opacity-90 transition-opacity cursor-pointer ${
-                        i === 0 ? 'h-48 col-span-2 md:col-span-1' : 'h-40'
-                      }`}
-                    />
-                  ))}
-                  {merchant.media.length > 5 && (
-                    <div className="relative w-full h-40 rounded-2xl overflow-hidden cursor-pointer group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={merchant.media[5].url} alt="more" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                      <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                        <span className="text-white font-bold flex items-center gap-2">
-                          <ImageIcon size={18} /> +{merchant.media.length - 5} Photos
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Horaires */}
-            {merchant.hours.length > 0 && (
-              <section>
-                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <Clock size={20} className="text-brand-500" /> Horaires
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {merchant.hours.map(h => {
-                    const isToday = new Date().getDay() === h.day
-                    return (
-                      <div
-                        key={h.day}
-                        className={`flex justify-between items-center py-2.5 px-4 rounded-xl text-sm ${
-                          isToday ? 'bg-brand-50 border border-brand-200 font-bold' : 'bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        <span className={isToday ? 'text-brand-700' : ''}>{DAY_NAMES[h.day]}</span>
-                        {h.is_closed ? (
-                          <span className="text-red-500 font-medium">Fermé</span>
-                        ) : (
-                          <span>{h.open_time ?? '--'}–{h.close_time ?? '--'}</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* Localisation */}
-            {merchant.location && (
-              <section>
-                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <MapPin size={20} className="text-brand-500" /> Localisation
-                </h3>
-                <div className="w-full h-64 bg-slate-200 rounded-3xl overflow-hidden relative border border-slate-300">
-                  <div
-                    className="absolute inset-0 bg-cover bg-center opacity-80"
-                    style={{ backgroundImage: `url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Abidjan_OpenStreetMap.png/640px-Abidjan_OpenStreetMap.png')` }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-14 h-14 bg-brand-500 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white animate-bounce">
-                      <MapPin size={24} className="fill-current" />
-                    </div>
-                  </div>
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <p className="bg-white/90 backdrop-blur text-sm font-semibold text-slate-800 px-4 py-2 rounded-xl shadow text-center">
-                      {[merchant.location.address, merchant.location.district, merchant.location.city]
-                        .filter(Boolean).join(', ')}
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* Avis */}
-            <MerchantReviewsSection
-              merchantId={merchant.id}
-              merchantName={merchant.business_name}
-              avgRating={merchant.avg_rating}
-              totalCount={merchant.review_count}
-              initialReviews={merchant.reviews}
-            />
+            {/* Avis — desktop uniquement ici */}
+            <div className="hidden lg:block mt-12">
+              <MerchantReviewsSection
+                merchantId={merchant.id}
+                merchantName={merchant.business_name}
+                avgRating={merchant.avg_rating}
+                totalCount={merchant.review_count}
+                initialReviews={merchant.reviews}
+              />
+            </div>
           </div>
 
-          {/* ── RIGHT: Sticky Sidebar ─────────────────────────────────────── */}
-          <div className="lg:col-span-1 space-y-5 lg:sticky lg:top-24">
+          {/* ── Sidebar sticky ────────────────────────────────────────────── */}
+          <div className="order-2 lg:col-span-1 w-full space-y-5 lg:sticky lg:top-24">
 
             {/* Status + Contact */}
             <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-xl shadow-slate-200/50">
@@ -344,14 +223,27 @@ export default async function MerchantPage({ params }: Props) {
                 {isOpen ? 'Ouvert actuellement' : 'Fermé actuellement'}
               </div>
 
-              <h3 className="text-xl font-extrabold text-slate-900 mb-5">Contacter</h3>
+              <h3 className="text-xl font-extrabold text-slate-900 mb-5 hidden lg:block">Actions</h3>
 
-              <MerchantContactButtons
-                merchantId={merchant.id}
-                whatsapp={merchant.whatsapp}
-                phone={merchant.phone}
-                website={merchant.website}
-              />
+              <div className="hidden lg:block">
+                <MerchantContextualCTAs
+                  categorySlug={merchant.category.slug}
+                  merchantSlug={merchant.slug}
+                  bookingEnabled={isBookingCategory(merchant.category.slug)}
+                  bookingCta={getCategoryBookingCta(merchant.category.slug)}
+                />
+              </div>
+
+              <h3 className="text-xl font-extrabold text-slate-900 mb-5 hidden lg:block">Contacter</h3>
+
+              <div className="hidden lg:block">
+                <MerchantContactButtons
+                  merchantId={merchant.id}
+                  whatsapp={merchant.whatsapp}
+                  phone={merchant.phone}
+                  website={merchant.website}
+                />
+              </div>
             </div>
 
             <BookingForm merchantId={merchant.id} merchantName={merchant.business_name} />
@@ -400,6 +292,17 @@ export default async function MerchantPage({ params }: Props) {
               variant="sidebar"
             />
           </div>
+
+          {/* ── Avis — mobile en bas ──────────────────────────────────────── */}
+          <div className="order-3 lg:hidden w-full">
+            <MerchantReviewsSection
+              merchantId={merchant.id}
+              merchantName={merchant.business_name}
+              avgRating={merchant.avg_rating}
+              totalCount={merchant.review_count}
+              initialReviews={merchant.reviews}
+            />
+          </div>
         </div>
       </main>
 
@@ -414,6 +317,16 @@ export default async function MerchantPage({ params }: Props) {
       )}
 
       <Footer />
+
+      <MerchantMobileActionBar
+        categorySlug={merchant.category.slug}
+        merchantSlug={merchant.slug}
+        merchantId={merchant.id}
+        bookingEnabled={isBookingCategory(merchant.category.slug)}
+        bookingCta={getCategoryBookingCta(merchant.category.slug)}
+        whatsapp={merchant.whatsapp}
+        phone={merchant.phone}
+      />
     </div>
   )
 }
@@ -426,7 +339,10 @@ export async function generateMetadata({ params }: Props) {
     const merchant = await api.merchants.bySlug(slug)
     const title = `${merchant.business_name} — LaPlasse`
     const description = merchant.description
-      ?? `Découvrez ${merchant.business_name} à ${merchant.location?.district ?? merchant.location?.city ?? 'Abidjan'} sur LaPlasse. Horaires, avis, contact.`
+      ?? merchantMetaFallback(
+        merchant.business_name,
+        merchant.location?.district ?? merchant.location?.city ?? null,
+      )
     const image = merchant.cover_image ?? merchant.logo ?? `${BASE_URL}/og-default.jpg`
     const url = `${BASE_URL}/m/${slug}`
 
@@ -441,7 +357,7 @@ export async function generateMetadata({ params }: Props) {
         type: 'website',
         images: [{ url: image, width: 1200, height: 630, alt: merchant.business_name }],
         siteName: 'LaPlasse',
-        locale: 'fr_CI',
+        locale: BRAND_OG_LOCALE,
       },
       twitter: {
         card: 'summary_large_image',

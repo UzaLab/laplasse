@@ -1,22 +1,36 @@
 'use client'
 
 import { ShoppingBag, ArrowRight, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { fetchFeaturedProducts, type FeaturedProduct } from '@/lib/marketplaceApi'
+import { fetchPublicJson, type FeaturedProduct } from '@/lib/marketplaceApi'
 import { ProductCard } from '@/features/marketplace/components/ProductCard'
+import { NetworkErrorBanner } from '@/components/ui/NetworkErrorBanner'
+import { BRAND_MARKETPLACE_SECTION } from '@/lib/brandCopy'
 
 export function MarketplaceSection() {
   const [products, setProducts] = useState<FeaturedProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchFeaturedProducts()
-      .then(data => setProducts(data ?? []))
-      .finally(() => setLoading(false))
+  const loadFeatured = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const result = await fetchPublicJson<FeaturedProduct[]>('/marketplace/featured')
+    if (result.ok) {
+      setProducts(result.data)
+    } else {
+      setProducts([])
+      setError(result.error)
+    }
+    setLoading(false)
   }, [])
 
-  if (!loading && products.length === 0) return null
+  useEffect(() => {
+    void loadFeatured()
+  }, [loadFeatured])
+
+  if (!loading && !error && products.length === 0) return null
 
   return (
     <section className="py-24 bg-white border-t border-slate-100">
@@ -28,16 +42,24 @@ export function MarketplaceSection() {
             Achetez l&apos;expérience.
           </h2>
           <p className="text-slate-500 text-lg">
-            Parcourez les produits de vos lieux favoris et faites-vous livrer chez vous.
-            L&apos;artisanat et le goût d&apos;Abidjan en livraison.
+            {BRAND_MARKETPLACE_SECTION}
           </p>
         </div>
+
+        {error && (
+          <NetworkErrorBanner
+            message={error}
+            onRetry={() => void loadFeatured()}
+            loading={loading}
+            className="max-w-lg mx-auto mb-8"
+          />
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
             <Loader2 size={28} className="animate-spin text-slate-300" />
           </div>
-        ) : (
+        ) : error ? null : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {products.map(product => (
               <ProductCard key={product.id} product={product} />
@@ -45,14 +67,16 @@ export function MarketplaceSection() {
           </div>
         )}
 
-        <div className="text-center mt-12">
-          <Link
-            href="/marketplace"
-            className="inline-flex items-center gap-2 font-bold text-slate-900 border-b-2 border-slate-900 pb-1 hover:text-brand-600 hover:border-brand-600 transition-colors"
-          >
-            Explorer la Marketplace <ArrowRight size={16} />
-          </Link>
-        </div>
+        {!error && (
+          <div className="text-center mt-12">
+            <Link
+              href="/marketplace"
+              className="inline-flex items-center gap-2 font-bold text-slate-900 border-b-2 border-slate-900 pb-1 hover:text-brand-600 hover:border-brand-600 transition-colors"
+            >
+              Explorer la Marketplace <ArrowRight size={16} />
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   )

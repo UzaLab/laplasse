@@ -3,32 +3,40 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import {
-  CalendarCheck, Calendar, Clock, Users, Loader2, ChevronLeft, ChevronRight,
+  BedDouble,
+  Calendar,
+  CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Stethoscope,
+  UtensilsCrossed,
+  Users,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { BookingDetailSheet } from '@/features/profile/components/BookingDetailSheet'
 import { EditBookingModal, type EditableBooking } from '@/features/profile/components/EditBookingModal'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import type { BookingType } from '@/lib/bookingConfig'
+import { BOOKING_TYPE_LABELS } from '@/lib/bookingConfig'
+import {
+  BOOKING_STATUS_LABELS,
+  BOOKING_STATUS_STYLES,
+  BOOKING_TYPE_STYLES,
+  type BookingDisplaySource,
+  getBookingCardMeta,
+  getBookingPricing,
+  getBookingWhenDisplay,
+  isBookingUpcoming,
+} from '@/lib/bookingDisplay'
 
-interface BookingRow {
-  id: string
-  booking_type: BookingType
-  booked_at: string
-  check_out_at?: string | null
-  party_size: number
-  status: string
-  guest_name: string
-  guest_phone: string
-  guest_email?: string | null
-  notes?: string | null
+interface BookingRow extends BookingDisplaySource {
   service_id?: string | null
   staff_id?: string | null
-  room_type?: string | null
   merchant: { id: string; business_name: string; slug: string; cover_image?: string | null }
-  service?: { id: string; name: string } | null
-  staff?: { id: string; name: string } | null
 }
 
 interface BookingsResponse {
@@ -43,33 +51,17 @@ type Tab = 'upcoming' | 'history'
 
 const PAGE_SIZE = 5
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'En attente',
-  CONFIRMED: 'Confirmée',
-  CANCELLED: 'Annulée',
-  COMPLETED: 'Terminée',
-  NO_SHOW: 'Absent',
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
-  CONFIRMED: 'bg-green-50 text-green-700 border-green-200',
-  CANCELLED: 'bg-red-50 text-red-600 border-red-200',
-  COMPLETED: 'bg-slate-50 text-slate-600 border-slate-200',
-  NO_SHOW: 'bg-red-50 text-red-600 border-red-200',
-}
-
 const PLACEHOLDER_COVER =
   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=400'
 
-function isUpcoming(booking: BookingRow) {
-  return (
-    ['PENDING', 'CONFIRMED'].includes(booking.status) &&
-    new Date(booking.booked_at) >= new Date()
-  )
+const TYPE_ICONS: Record<BookingType, React.ReactNode> = {
+  TABLE: <UtensilsCrossed size={14} />,
+  APPOINTMENT: <CalendarCheck size={14} />,
+  ROOM: <BedDouble size={14} />,
+  CONSULTATION: <Stethoscope size={14} />,
+  VENUE: <Calendar size={14} />,
 }
 
-/** Compatible ancienne API (tableau) et nouvelle API (objet paginé). */
 function normalizeBookingsResponse(
   raw: unknown,
   tab: Tab,
@@ -78,7 +70,7 @@ function normalizeBookingsResponse(
 ): BookingsResponse {
   if (Array.isArray(raw)) {
     const filtered = raw.filter(b =>
-      tab === 'upcoming' ? isUpcoming(b) : !isUpcoming(b),
+      tab === 'upcoming' ? isBookingUpcoming(b as BookingRow) : !isBookingUpcoming(b as BookingRow),
     )
     const start = (page - 1) * limit
     return {
@@ -117,6 +109,7 @@ export default function ProfileBookingsPage() {
   const [tab, setTab] = useState<Tab>('upcoming')
   const [page, setPage] = useState(1)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null)
   const [editingBooking, setEditingBooking] = useState<EditableBooking | null>(null)
 
   const { data, isLoading } = useQuery({
@@ -128,6 +121,7 @@ export default function ProfileBookingsPage() {
   const switchTab = (next: Tab) => {
     setTab(next)
     setPage(1)
+    setSelectedBooking(null)
   }
 
   const cancel = async (id: string) => {
@@ -135,6 +129,7 @@ export default function ProfileBookingsPage() {
     try {
       const res = await authApiFetch(`/bookings/mine/${id}/cancel`, { method: 'PATCH' })
       if (res.ok) {
+        setSelectedBooking(null)
         await queryClient.invalidateQueries({ queryKey: ['my-bookings'] })
         await queryClient.invalidateQueries({ queryKey: ['my-bookings-dashboard'] })
       }
@@ -159,9 +154,9 @@ export default function ProfileBookingsPage() {
 
   return (
     <ProfileShell>
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-3">
-          <CalendarCheck size={24} className="text-slate-700" strokeWidth={2} />
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-2 sm:gap-3">
+          <CalendarCheck size={22} className="text-slate-700 shrink-0" strokeWidth={2} />
           Mes réservations
         </h1>
         <p className="text-slate-400 mt-1 text-sm">
@@ -175,13 +170,13 @@ export default function ProfileBookingsPage() {
         </p>
       </div>
 
-      <div className="flex gap-2 mb-8 p-1 bg-white border border-slate-200 rounded-2xl w-max">
+      <div className="flex gap-1.5 sm:gap-2 mb-6 sm:mb-8 p-1 bg-white border border-slate-200 rounded-2xl w-full sm:w-max">
         {(['upcoming', 'history'] as const).map(t => (
           <button
             key={t}
             type="button"
             onClick={() => switchTab(t)}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
               tab === t
                 ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-500 hover:text-slate-900'
@@ -197,9 +192,9 @@ export default function ProfileBookingsPage() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-[28px] border border-slate-100 p-12 text-center">
-          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <CalendarCheck size={28} className="text-slate-300" strokeWidth={1.5} />
+        <div className="bg-white rounded-[24px] sm:rounded-[28px] border border-slate-100 p-8 sm:p-12 text-center">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <CalendarCheck size={26} className="text-slate-300" strokeWidth={1.5} />
           </div>
           <p className="text-slate-500 font-medium mb-2">
             {tab === 'upcoming' ? 'Aucune réservation à venir.' : 'Aucun historique pour le moment.'}
@@ -207,7 +202,7 @@ export default function ProfileBookingsPage() {
           {tab === 'upcoming' && (
             <>
               <p className="text-sm text-slate-400 mb-4">
-                Consultez l&apos;onglet Historique si vos réservations sont passées.
+                Tables, chambres, rendez-vous ou consultations — tout apparaît ici une fois réservé.
               </p>
               <Link
                 href="/search"
@@ -221,15 +216,12 @@ export default function ProfileBookingsPage() {
         </div>
       ) : (
         <>
-          <div className="space-y-6">
+          <div className="space-y-3 sm:space-y-4">
             {items.map(b => (
               <BookingCard
                 key={b.id}
                 booking={b}
-                tab={tab}
-                cancelling={cancellingId === b.id}
-                onCancel={() => cancel(b.id)}
-                onEdit={() => setEditingBooking(b)}
+                onOpen={() => setSelectedBooking(b)}
               />
             ))}
           </div>
@@ -245,12 +237,25 @@ export default function ProfileBookingsPage() {
         </>
       )}
 
+      {selectedBooking && (
+        <BookingDetailSheet
+          booking={selectedBooking}
+          tab={tab}
+          open={!!selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          onEdit={() => setEditingBooking(selectedBooking)}
+          onCancel={() => cancel(selectedBooking.id)}
+          cancelling={cancellingId === selectedBooking.id}
+        />
+      )}
+
       {editingBooking && (
         <EditBookingModal
           booking={editingBooking}
           open={!!editingBooking}
           onClose={() => setEditingBooking(null)}
           onSuccess={() => {
+            setSelectedBooking(null)
             queryClient.invalidateQueries({ queryKey: ['my-bookings'] })
             queryClient.invalidateQueries({ queryKey: ['my-bookings-dashboard'] })
           }}
@@ -262,103 +267,94 @@ export default function ProfileBookingsPage() {
 
 function BookingCard({
   booking,
-  tab,
-  cancelling,
-  onCancel,
-  onEdit,
+  onOpen,
 }: {
   booking: BookingRow
-  tab: Tab
-  cancelling: boolean
-  onCancel: () => void
-  onEdit: () => void
+  onOpen: () => void
 }) {
-  const dt = new Date(booking.booked_at)
-  const canEdit =
-    tab === 'upcoming' && ['PENDING', 'CONFIRMED'].includes(booking.status)
-  const canCancel = canEdit
+  const when = getBookingWhenDisplay(booking)
+  const meta = getBookingCardMeta(booking)
+  const pricing = getBookingPricing(booking)
   const cover = booking.merchant.cover_image || PLACEHOLDER_COVER
 
   return (
-    <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 hover:border-amber-200 transition-colors">
-      <div className="w-full md:w-40 h-32 md:h-auto rounded-2xl overflow-hidden shrink-0 bg-slate-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cover}
-          alt={booking.merchant.business_name}
-          className="w-full h-full object-cover"
-        />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-start gap-3 mb-2">
-          <h3 className="text-xl font-extrabold text-slate-900 truncate">
-            {booking.merchant.business_name}
-          </h3>
-          <span
-            className={`px-3 py-1 text-xs font-bold rounded-lg border shrink-0 ${
-              STATUS_STYLES[booking.status] ?? 'bg-slate-50 text-slate-600 border-slate-200'
-            }`}
-          >
-            {STATUS_LABELS[booking.status] ?? booking.status}
-          </span>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left bg-white rounded-[20px] sm:rounded-[24px] p-4 sm:p-5 border border-slate-100 shadow-sm hover:border-amber-200 hover:shadow-md transition-all active:scale-[0.99]"
+    >
+      <div className="flex gap-3 sm:gap-4">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl sm:rounded-2xl overflow-hidden shrink-0 bg-slate-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cover}
+            alt=""
+            className="w-full h-full object-cover"
+          />
         </div>
 
-        {booking.service && (
-          <p className="text-sm text-slate-400 font-medium mb-2">{booking.service.name}</p>
-        )}
-
-        <div className="flex flex-wrap gap-4 text-sm text-slate-500 font-medium mb-4">
-          <span className="flex items-center gap-1.5">
-            <Calendar size={16} className="text-amber-500 shrink-0" />
-            {dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Clock size={16} className="text-amber-500 shrink-0" />
-            {dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Users size={16} className="text-amber-500 shrink-0" />
-            {booking.party_size} pers.
-          </span>
-        </div>
-
-        {booking.check_out_at && (
-          <p className="text-xs text-slate-400 mb-4">
-            Départ :{' '}
-            {new Date(booking.check_out_at).toLocaleDateString('fr-FR', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-          </p>
-        )}
-
-        {tab === 'upcoming' && (canEdit || canCancel) && (
-          <div className="flex flex-wrap gap-3">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="text-sm font-bold text-slate-600 hover:text-slate-900 border border-slate-200 px-4 py-2 rounded-xl transition-colors"
-              >
-                Modifier
-              </button>
-            )}
-            {canCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                disabled={cancelling}
-                className="text-sm font-bold text-red-600 hover:text-red-700 border border-red-100 bg-red-50 px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
-              >
-                {cancelling ? 'Annulation…' : 'Annuler'}
-              </button>
-            )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                <span
+                  className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${
+                    BOOKING_TYPE_STYLES[booking.booking_type]
+                  }`}
+                >
+                  {TYPE_ICONS[booking.booking_type]}
+                  {BOOKING_TYPE_LABELS[booking.booking_type]}
+                </span>
+                <span
+                  className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${
+                    BOOKING_STATUS_STYLES[booking.status] ?? 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {BOOKING_STATUS_LABELS[booking.status] ?? booking.status}
+                </span>
+              </div>
+              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate">
+                {booking.merchant.business_name}
+              </h3>
+            </div>
+            <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" aria-hidden />
           </div>
-        )}
+
+          <p className="text-xs sm:text-sm font-semibold text-slate-700 line-clamp-2 leading-snug">
+            {when.headline}
+          </p>
+          {when.subline && (
+            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+              {when.showTime ? <Clock size={12} className="text-amber-500 shrink-0" /> : null}
+              {when.subline}
+            </p>
+          )}
+
+          {pricing?.formattedTotal && booking.booking_type === 'ROOM' && (
+            <p className="text-sm font-extrabold text-slate-900 mt-1.5">
+              {pricing.formattedTotal}
+              {pricing.nights > 0 && pricing.formattedUnit && (
+                <span className="text-xs font-semibold text-slate-400 ml-1.5">
+                  ({pricing.formattedUnit} × {pricing.nights})
+                </span>
+              )}
+            </p>
+          )}
+
+          {meta.length > 0 && (
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-1.5 truncate">
+              {meta.join(' · ')}
+            </p>
+          )}
+
+          {(booking.booking_type === 'TABLE' || booking.booking_type === 'ROOM') && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 mt-1 sm:hidden">
+              <Users size={11} /> {booking.party_size} pers.
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -377,18 +373,18 @@ function Pagination({
     .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
 
   return (
-    <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <p className="text-sm text-slate-500 font-medium">
+    <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p className="text-xs sm:text-sm text-slate-500 font-medium text-center sm:text-left">
         {total} réservation{total > 1 ? 's' : ''} · page {page}/{totalPages}
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
           className="flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <ChevronLeft size={16} /> Préc.
+          <ChevronLeft size={16} /> <span className="hidden xs:inline">Préc.</span>
         </button>
         <div className="flex items-center gap-1">
           {pages.map((p, i) => {
@@ -418,7 +414,7 @@ function Pagination({
           disabled={page >= totalPages}
           className="flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Suiv. <ChevronRight size={16} />
+          <span className="hidden xs:inline">Suiv.</span> <ChevronRight size={16} />
         </button>
       </div>
     </div>

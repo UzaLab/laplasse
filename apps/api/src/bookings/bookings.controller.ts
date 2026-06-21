@@ -7,12 +7,15 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import type { Request } from 'express'
 import { Public } from '../auth/decorators/public.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { getAccessTokenFromRequest } from '../auth/auth-cookies'
 import { BookingsService } from './bookings.service'
 import { CreateBookingDto, UpdateBookingStatusDto, UpdateMyBookingDto } from './dto/booking.dto'
 import { BookingStatus } from '../../generated/prisma/client'
@@ -49,22 +52,38 @@ export class BookingsController {
   }
 
   @Public()
+  @Get('merchant/:merchantId/room-calendar')
+  roomCalendar(
+    @Param('merchantId') merchantId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('serviceId') serviceId?: string,
+  ) {
+    return this.bookingsService.getRoomCalendar(merchantId, from, to, serviceId)
+  }
+
+  @Public()
   @Post('merchant/:merchantId')
   async create(
     @Param('merchantId') merchantId: string,
     @Body() dto: CreateBookingDto,
+    @Req() req: Request,
     @Headers('authorization') authHeader?: string,
   ) {
-    let userId: string | undefined
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const payload = await this.jwt.verifyAsync<{ sub: string }>(authHeader.slice(7))
-        userId = payload.sub
-      } catch {
-        userId = undefined
-      }
-    }
+    const userId = await this.resolveOptionalUserId(req, authHeader)
     return this.bookingsService.createForMerchant(merchantId, dto, userId)
+  }
+
+  /** Utilisateur connecté via cookie httpOnly ou Bearer (endpoint public). */
+  private async resolveOptionalUserId(req: Request, authHeader?: string): Promise<string | undefined> {
+    const token = getAccessTokenFromRequest(req, authHeader)
+    if (!token) return undefined
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub: string }>(token)
+      return payload.sub
+    } catch {
+      return undefined
+    }
   }
 
   @UseGuards(JwtAuthGuard)

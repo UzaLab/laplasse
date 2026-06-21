@@ -10,7 +10,7 @@
 
 | Couche | Technologie |
 |--------|------------|
-| Frontend | Next.js 15 + TypeScript + Tailwind CSS v4 |
+| Frontend | Next.js 16 + TypeScript + Tailwind CSS v4 |
 | Backend | NestJS + Prisma + PostgreSQL |
 | Recherche | Meilisearch |
 | Cache | Redis |
@@ -126,21 +126,60 @@ pnpm --filter api db:seed
 
 ## Pages de l'application
 
+### Discovery & profil
+
 | URL | Description |
 |-----|-------------|
 | `/` | Homepage : hero, catégories, établissements |
 | `/search` | Recherche full-text (Meilisearch) |
-| `/m/[slug]` | Page profil d'un établissement |
-| `/categories/[slug]` | Liste marchands par catégorie |
-| `/favoris` | Mes établissements sauvegardés |
-| `/login` | Connexion |
-| `/register` | Inscription |
-| `/merchant/signup` | Créer sa fiche établissement |
-| `/merchant/dashboard` | Tableau de bord marchand |
-| `/merchant/profile/edit` | Modifier son profil |
-| `/admin` | Dashboard admin (stats globales) |
-| `/admin/merchants` | Modération des marchands |
-| `/admin/reviews` | Modération des avis |
+| `/categories`, `/categories/[slug]` | Catégories et listes par catégorie |
+| `/m/[slug]` | Fiche établissement (avis, horaires, WhatsApp) |
+| `/favoris` | Établissements sauvegardés |
+| `/activite` | Activité récente |
+
+### Marketplace & ecommerce
+
+| URL | Description |
+|-----|-------------|
+| `/marketplace` | Catalogue global + spotlight boutiques |
+| `/m/[slug]/boutique` | Vitrine boutique d'un établissement |
+| `/boutique/[slug]` | Vitrine boutique (entité Shop) |
+| `/m/[slug]/p/[productSlug]` | Fiche produit (galerie, variantes, panier) |
+| `/cart` | Panier multi-boutiques |
+| `/checkout` | Étape livraison / retrait |
+| `/checkout/payment` | Étape paiement (simulateur) |
+| `/checkout/confirmation` | Confirmation commande (`?status=success\|failure`) |
+
+### Compte client
+
+| URL | Description |
+|-----|-------------|
+| `/login`, `/register` | Auth |
+| `/profile` | Dashboard utilisateur |
+| `/profile/orders` | Mes commandes |
+| `/profile/bookings` | Mes réservations |
+| `/profile/loyalty` | Fidélité (XP, tiers) |
+| `/profile/referral` | Parrainage |
+| `/profile/notifications` | Notifications in-app |
+
+### Espace marchand
+
+| URL | Description |
+|-----|-------------|
+| `/merchant/signup` | Créer un établissement |
+| `/merchant/dashboard` | Tableau de bord |
+| `/merchant/shop/*` | Gestion boutique (produits, commandes, settings) |
+| `/merchant/bookings` | Réservations |
+| `/merchant/plans` | Plans d'abonnement |
+| `/shop/create` | Créer une boutique |
+
+### Admin
+
+| URL | Description |
+|-----|-------------|
+| `/admin` | Stats globales |
+| `/admin/merchants`, `/admin/reviews`, `/admin/complaints` | Modération |
+| `/admin/growth`, `/admin/audit`, `/admin/fraud` | Croissance, audit, fraude |
 
 ---
 
@@ -151,23 +190,22 @@ pnpm --filter api db:seed
 | GET | `/api/health` | Public | Health check |
 | GET | `/api/categories` | Public | Liste catégories |
 | GET | `/api/merchants/featured` | Public | Marchands mis en avant |
-| GET | `/api/merchants/nearby` | Public | Marchands à proximité |
-| GET | `/api/merchants/:slug` | Public | Profil d'un marchand |
+| GET | `/api/merchants/:slug` | Public | Profil marchand |
 | GET | `/api/search?q=...` | Public | Recherche Meilisearch |
-| POST | `/api/auth/register` | Public | Inscription |
-| POST | `/api/auth/login` | Public | Connexion |
+| GET | `/api/marketplace/products` | Public | Catalogue marketplace |
+| GET | `/api/marketplace/spotlight` | Public | Boutiques épinglées |
+| GET | `/api/shops/:slug/products` | Public | Catalogue boutique |
+| POST | `/api/auth/register`, `/api/auth/login` | Public | Auth |
 | GET | `/api/auth/me` | JWT | Mon profil |
-| POST | `/api/merchants/register` | JWT | Créer ma fiche |
-| GET | `/api/merchants/me/profile` | JWT | Mon profil marchand |
-| PATCH | `/api/merchants/me/profile` | JWT | Modifier mon profil |
-| GET | `/api/favorites` | JWT | Mes favoris |
-| POST | `/api/favorites/:merchantId` | JWT | Toggle favori |
-| POST | `/api/reviews` | JWT | Déposer un avis |
+| GET/POST | `/api/cart`, `/api/cart/items` | JWT | Panier |
+| POST | `/api/orders/checkout` | JWT | Créer commande(s) |
+| POST | `/api/orders/pay/confirm-batch` | JWT | Simulateur paiement |
+| GET/POST/PATCH | `/api/products`, `/api/shops` | JWT | Produits & boutiques marchand |
+| GET/PATCH | `/api/bookings/*` | JWT / Public | Réservations |
 | GET | `/api/admin/stats` | ADMIN | Stats globales |
-| GET | `/api/admin/merchants` | ADMIN | Liste marchands |
-| PATCH | `/api/admin/merchants/:id/verify` | ADMIN | Valider/Rejeter |
-| GET | `/api/admin/reviews` | ADMIN | Liste avis |
-| PATCH | `/api/admin/reviews/:id/moderate` | ADMIN | Modérer un avis |
+| GET/PATCH | `/api/admin/marketplace/spotlight` | ADMIN | Spotlight marketplace |
+
+> Liste complète : voir `Docs/REGLES_DEVELOPPEMENT.md` §13 et §Marketplace V1.5/V1.6.
 
 ---
 
@@ -176,22 +214,21 @@ pnpm --filter api db:seed
 ```
 laplasse/
 ├── apps/
-│   ├── web/              # Next.js 15 (port 3000)
+│   ├── web/              # Next.js 16 (port 3000)
 │   │   └── src/
 │   │       ├── app/      # Pages (App Router)
 │   │       ├── features/ # Composants métier
-│   │       ├── stores/   # Zustand (auth)
-│   │       └── lib/      # API client, TanStack Query
+│   │       ├── stores/   # Zustand (auth, cart)
+│   │       └── lib/      # API client, checkout session
 │   └── api/              # NestJS (port 3001)
 │       └── src/
-│           ├── auth/
-│           ├── merchants/
-│           ├── search/
-│           ├── reviews/
-│           ├── favorites/
-│           └── admin/
-├── docker-compose.yml    # PostgreSQL 5433 · Redis 6379 · Meilisearch 7700
-└── pnpm-workspace.yaml
+│           ├── auth/ merchants/ search/ reviews/ favorites/
+│           ├── admin/ bookings/ payments/ marketplace/ shops/
+│           ├── organizations/ ads/ staff/ loyalty/ referral/
+│           └── promotions/ audit/ fraud/ notifications/ queue/
+├── Docs/                 # Blueprint, REGLES, Tomes, maquettes
+├── scripts/              # backup, coolify-deploy, load-test
+└── docker-compose.yml    # PostgreSQL 5433 · Redis 6379 · Meilisearch 7700
 ```
 
 ---
@@ -221,25 +258,58 @@ NEXT_PUBLIC_DEFAULT_CITY="Abidjan"
 
 ---
 
-## Roadmap V0.5 (MVP Cocody)
+## État du projet (juin 2026)
 
-- [x] Homepage Discovery (Hero + Search + Catégories + Merchant Cards)
-- [x] Page Search full-text (Meilisearch + fallback Prisma)
-- [x] Page Profil Marchand (`/m/[slug]`)
-- [x] Page Catégorie (`/categories/[slug]`)
-- [x] Auth JWT (inscription, connexion, refresh, roles)
-- [x] Merchant Signup multi-étapes
-- [x] Dashboard Marchand
-- [x] Édition profil marchand
-- [x] Système de Reviews (déposer + modérer)
-- [x] Favoris (toggle + page `/favoris`)
-- [x] Dashboard Admin (stats, marchands, avis)
-- [x] Modération marchands + avis
+| Version | Statut | Contenu principal |
+|---------|--------|-------------------|
+| **V0.5** | ✅ Livré | Discovery Cocody — search, profils, avis, auth, admin |
+| **V0.8** | ✅ Clôturée | Loyalty, notifications, referral, promotions, sponsored |
+| **V0.9** | ✅ Livrée | Multi-établissements (1 compte → N marchands) |
+| **V1.0** | ✅ Livrée | Organisations, booking, ads, staff, audit, simulateur abo |
+| **V1.5** | ✅ Livrée | Marketplace — produits, panier multi-boutiques, checkout simulé |
+| **V1.6** | ✅ Livrée | Shop modulaire, spotlight, galerie produit, checkout 4 étapes |
+| **V2.0** | Futur | Mobile Money réel, app native, livraison logistique, IA |
+
+Détail feature par feature : **`Docs/REGLES_DEVELOPPEMENT.md`** (source opérationnelle).
+
+### V0.5 — Discovery (MVP Cocody)
+
+- [x] Homepage, search, catégories, profils marchands
+- [x] Auth JWT, signup marchand, dashboard, modération admin
+- [x] Reviews, favoris, OTP marchand
+
+### V1.5 — Marketplace
+
+- [x] Produits, variantes, panier, commandes split par boutique
+- [x] Paiement simulateur (sans Mobile Money réel)
+
+### V1.6 — Boutique modulaire
+
+- [x] Entité `Shop`, dashboard `/merchant/shop/*`
+- [x] Vitrines `/m/[slug]/boutique` et `/boutique/[slug]`
+- [x] Images produit multiples, composition, retrait/livraison par produit
+- [x] Checkout 4 URLs : `/cart` → `/checkout` → `/checkout/payment` → `/checkout/confirmation`
+- [x] Marketplace spotlight + refonte mobile
+
+### Reste à faire (V2+ / infra)
+
+- [ ] Mobile Money réel (Wave, Orange, MTN)
+- [ ] Livraison opérationnelle (livreurs, tracking)
+- [ ] Domaine `laplasse.ci` + UptimeRobot
+- [ ] UI admin spotlight (API déjà en place)
+- [ ] 50+ marchands actifs Cocody (validation terrain)
 
 ---
 
 ## Documentation
 
 Toute l'architecture est dans `Docs/` :
-- **`Docs/Implementation Blueprint.md`** — guide technique de référence
-- **Tomes 0–24** — documentation stratégique, produit et technique complète
+
+| Document | Rôle |
+|----------|------|
+| **`Docs/REGLES_DEVELOPPEMENT.md`** | **Journal d'exécution** — statut V0.5→V1.6, règles code, comptes seed |
+| **`Docs/ROADMAP_PRODUIT_V2.md`** | **Analyse parcours, gaps UX, modules verticaux (Glovo/Airbnb), roadmap V2+** |
+| **`Docs/Implementation Blueprint.md`** | Guide technique fondateur + vision stratégique |
+| **`Docs/RUNBOOK.md`** | Ops : Docker, backup, déploiement Coolify |
+| **Tomes 0–24** | Spec produit/architecture long terme |
+| **`Docs/maquettes/*.md`** | Références UI (certaines encore brandées CIBOOKS — voir note REGLES) |

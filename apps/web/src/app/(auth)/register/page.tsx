@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
+import { BRAND_REGISTER_SUBTITLE } from '@/lib/brandCopy'
 
 function RegisterContent() {
   const router = useRouter()
@@ -88,7 +89,7 @@ function RegisterContent() {
             </div>
             <span className="text-2xl font-extrabold text-slate-900 tracking-tight">LaPlasse</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Votre guide des meilleures adresses à Abidjan</p>
+          <p className="text-slate-500 mt-2 text-sm">{BRAND_REGISTER_SUBTITLE}</p>
         </div>
 
         <div className="bg-white rounded-[28px] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">

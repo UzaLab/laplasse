@@ -6,8 +6,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
   Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users, UserCircle2,
-  ChevronDown, Plus, Building2, Network, Calendar, Megaphone, Scissors,
-  ShoppingBag,
+  ChevronDown, Plus, Building2, Network, Calendar, Megaphone,
+  ShoppingBag, UtensilsCrossed, BedDouble, Sparkles, Dumbbell, Stethoscope,
 } from 'lucide-react'
 import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
@@ -15,6 +15,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
 import { getShopsForMerchant } from '@/lib/shopApi'
+import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
+import { exploreCityLabel } from '@/lib/brandCopy'
 
 interface MerchantShellProps {
   children: React.ReactNode
@@ -40,6 +43,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   const independentMerchants = organization
     ? merchants.filter(m => m.organization_id !== organization.id)
     : merchants
+  const exploreLabel = exploreCityLabel(getDefaultCity(getCountryCode()))
 
   // Synchronise la liste d'établissements et l'organisation depuis l'API
   useEffect(() => {
@@ -123,6 +127,19 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)
   const canOfferings = PLAN_LIMITS[activeMerchantPlan]?.offeringsManagement ?? false
   const hasLinkedShop = linkedShops.length > 0
+  const categorySlug = activeMerchant?.category_slug
+  const verticalNav = getVerticalNavItems(categorySlug)
+  const hasVerticalModule = verticalNav.length > 0
+
+  const verticalIcon = (icon: VerticalNavIcon) => {
+    switch (icon) {
+      case 'utensils': return <UtensilsCrossed size={17} />
+      case 'bed': return <BedDouble size={17} />
+      case 'dumbbell': return <Dumbbell size={17} />
+      case 'stethoscope': return <Stethoscope size={17} />
+      default: return <Sparkles size={17} />
+    }
+  }
 
   const mainNav: NavItem[] = [
     { href: '/merchant/dashboard', label: "Vue d'ensemble", icon: <LayoutDashboard size={17} /> },
@@ -134,12 +151,18 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       : []),
   ]
 
+  const verticalNavItems: NavItem[] = verticalNav.map(v => ({
+    href: v.href,
+    label: v.label,
+    icon: verticalIcon(v.icon),
+  }))
+
   const editNav: NavItem[] = [
     { href: '/merchant/profile/edit', label: 'Modifier le profil', icon: <Edit size={17} /> },
     { href: '/merchant/hours',        label: 'Horaires',            icon: <Clock size={17} /> },
     { href: '/merchant/media',        label: 'Photos & médias',     icon: <Image size={17} /> },
-    ...(canOfferings
-      ? [{ href: '/merchant/offerings', label: 'Offres & disponibilités', icon: <Scissors size={17} /> }]
+    ...(canOfferings && !hasVerticalModule
+      ? [{ href: '/merchant/offerings', label: 'Offres & disponibilités', icon: <Calendar size={17} /> }]
       : []),
   ]
 
@@ -156,7 +179,9 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       ? pathname === '/merchant/dashboard'
       : href === '/merchant/shop'
         ? pathname === '/merchant/shop' || pathname.startsWith('/merchant/shop/')
-        : pathname.startsWith(href)
+        : href === '/merchant/menu'
+          ? pathname === '/merchant/menu'
+          : pathname.startsWith(href)
 
   const navLink = (item: NavItem) => (
     <Link
@@ -176,7 +201,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   )
 
   const pageName = [
-    ...mainNav, ...editNav, ...growthNav, ...billingNav,
+    ...mainNav, ...verticalNavItems, ...editNav, ...growthNav, ...billingNav,
   ].find(n => isActive(n.href))?.label ?? 'Dashboard'
 
   const SidebarInner = (
@@ -327,6 +352,14 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
           </p>
           <div className="space-y-0.5">{mainNav.map(navLink)}</div>
         </div>
+        {verticalNavItems.length > 0 && (
+          <div>
+            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+              Module métier
+            </p>
+            <div className="space-y-0.5">{verticalNavItems.map(navLink)}</div>
+          </div>
+        )}
         <div>
           <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
             Mon établissement
@@ -361,7 +394,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
             className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all"
             style={{ textDecoration: 'none' }}
           >
-            <Compass size={17} /> Explorer Abidjan
+            <Compass size={17} /> {exploreLabel}
           </Link>
         </div>
       </nav>

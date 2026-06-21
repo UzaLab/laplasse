@@ -1,5 +1,16 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator'
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+} from 'class-validator'
 import { ServiceKind } from '../../../generated/prisma/client'
+
+export const MAX_ROOM_IMAGES = 5
 
 export class CreateStaffDto {
   @IsString()
@@ -35,12 +46,56 @@ export class CreateServiceDto {
 
   @IsOptional()
   @IsInt()
+  @Min(0)
+  nightly_rate?: number
+
+  @IsOptional()
+  @IsInt()
   @Min(1)
   capacity?: number
 
   @IsOptional()
   @IsString()
   staff_id?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(MAX_ROOM_IMAGES)
+  image_urls?: string[]
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bedrooms?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bathrooms?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  beds?: number
+
+  @IsOptional()
+  @IsString()
+  property_type?: string
+
+  @IsOptional()
+  @IsString()
+  unit_type?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  highlights?: string[]
 }
 
 export class UpdateStaffDto extends CreateStaffDto {

@@ -43,7 +43,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-slate-900">3. Conservation</h2>
           <p>
             Les données sont conservées tant que le compte est actif, puis supprimées ou anonymisées
-            conformément aux obligations légales applicables en Côte d&apos;Ivoire.
+            conformément aux obligations légales applicables dans les territoires où LaPlasse est disponible.
           </p>
 
           <h2 className="text-xl font-bold text-slate-900">4. Vos droits</h2>

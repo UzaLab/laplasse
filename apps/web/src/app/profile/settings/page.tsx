@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { ProfileAddressesSection } from '@/features/profile/components/ProfileAddressesSection'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
@@ -125,6 +126,8 @@ export default function ProfileSettingsPage() {
           </div>
         </div>
       </div>
+
+      <ProfileAddressesSection />
 
       {/* Danger zone */}
       <div className="bg-white rounded-[28px] border border-slate-100 overflow-hidden">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -8,7 +8,6 @@ import {
   Banknote,
   Check,
   ChevronRight,
-  Image as ImageIcon,
   Layers,
   Loader2,
   Plus,
@@ -16,25 +15,24 @@ import {
   Store,
   Tag,
   Truck,
-  UploadCloud,
   X,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { ShopSectionLayout } from '@/features/merchant/components/shop/ShopSectionLayout'
 import { RichTextEditor } from '@/components/ui/RichTextEditor'
-import { merchantApiFetch } from '@/lib/merchantApi'
 import { hasHtmlContent } from '@/lib/htmlUtils'
 import {
   createProduct,
   fetchMyProducts,
-  PLACEHOLDER_PRODUCT_IMAGE,
   updateProduct,
   type MarketplaceProduct,
   type ProductStatus,
   type ProductVariantInput,
 } from '@/lib/marketplaceApi'
+import { fetchShopProductCategories, type ShopProductCategoryOption } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
+import { MerchantMediathequeField } from '@/features/merchant/components/MerchantMediathequeField'
 
 const EMPTY_VARIANT: ProductVariantInput = { name: '', price: 0, stock_quantity: 0 }
 const MAX_PRODUCT_IMAGES = 10
@@ -54,6 +52,7 @@ interface ProductFormState {
   stock_quantity: string
   images: string[]
   status: ProductStatus
+  category_id: string
   allow_pickup: boolean
   allow_delivery: boolean
   useVariants: boolean
@@ -68,10 +67,21 @@ const EMPTY_FORM: ProductFormState = {
   stock_quantity: '0',
   images: [],
   status: 'ACTIVE',
+  category_id: '',
   allow_pickup: true,
   allow_delivery: true,
   useVariants: false,
   variants: [],
+}
+
+function flattenShopCategories(categories: ShopProductCategoryOption[]) {
+  const enabled = categories.filter(c => c.enabled)
+  const roots = enabled.filter(c => !c.parent_id)
+  const childrenOf = (parentId: string) => enabled.filter(c => c.parent_id === parentId)
+  return roots.flatMap(root => [
+    { id: root.id, label: root.name },
+    ...childrenOf(root.id).map(c => ({ id: c.id, label: `— ${c.name}` })),
+  ])
 }
 
 function productToForm(product: MarketplaceProduct): ProductFormState {
@@ -89,6 +99,7 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
     stock_quantity: String(product.stock_quantity),
     images,
     status: product.status === 'ARCHIVED' ? 'DRAFT' : product.status,
+    category_id: product.category_id ?? '',
     allow_pickup: product.allow_pickup ?? true,
     allow_delivery: product.allow_delivery ?? true,
     useVariants: variants.length > 0,
@@ -103,16 +114,6 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
 
 function normalizeHtmlField(value: string): string | undefined {
   return hasHtmlContent(value) ? value : undefined
-}
-
-function canAppendImage(url: string, images: string[]) {
-  const trimmed = url.trim()
-  if (!trimmed) return { ok: false as const, error: 'URL invalide' }
-  if (images.includes(trimmed)) return { ok: false as const, error: 'Cette image est déjà ajoutée' }
-  if (images.length >= MAX_PRODUCT_IMAGES) {
-    return { ok: false as const, error: `Maximum ${MAX_PRODUCT_IMAGES} images par produit` }
-  }
-  return { ok: true as const, trimmed }
 }
 
 interface MerchantProductFormProps {
@@ -130,11 +131,16 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM)
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [initialHadVariants, setInitialHadVariants] = useState(false)
   const [notFound, setNotFound] = useState(false)
-  const [imageUrlDraft, setImageUrlDraft] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; label: string }[]>([])
+
+  useEffect(() => {
+    if (!activeShopId) return
+    void fetchShopProductCategories(activeShopId).then(data => {
+      setCategoryOptions(flattenShopCategories(data))
+    })
+  }, [activeShopId])
 
   const loadProduct = useCallback(async () => {
     if (!productId || !activeShopId) return
@@ -155,55 +161,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
     if (isEdit) loadProduct()
   }, [ready, isEdit, loadProduct])
 
-  const uploadImage = async (file: File) => {
-    if (!activeShopId) return
-    setUploading(true)
-    const body = new FormData()
-    body.append('file', file)
-    try {
-      const activeShop = user?.shops?.find(s => s.id === activeShopId)
-      const uploadMerchantId = activeShop?.merchant_id ?? activeMerchantId
-      if (!uploadMerchantId) {
-        notify.error('Pour téléverser une image, liez votre boutique à un établissement ou utilisez une URL.')
-        setUploading(false)
-        return
-      }
-      const res = await merchantApiFetch('/merchants/me/media/upload', uploadMerchantId, {
-        method: 'POST',
-        body,
-      })
-      if (res.ok) {
-        const media = (await res.json()) as { url: string }
-        setForm(f => {
-          const check = canAppendImage(media.url, f.images)
-          if (!check.ok) {
-            notify.error(check.error)
-            return f
-          }
-          return { ...f, images: [...f.images, check.trimmed] }
-        })
-        notify.success('Image téléversée')
-      } else {
-        const d = await res.json().catch(() => ({}))
-        notify.error((d as { message?: string }).message ?? 'Erreur lors de l\'upload')
-      }
-    } catch {
-      notify.error('Impossible d\'envoyer le fichier.')
-    }
-    setUploading(false)
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) void uploadImage(file)
-    e.target.value = ''
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files?.[0]
-    if (file?.type.startsWith('image/')) void uploadImage(file)
-  }
+  const uploadMerchantId = user?.shops?.find(s => s.id === activeShopId)?.merchant_id ?? activeMerchantId
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -234,6 +192,11 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
       return
     }
 
+    if (categoryOptions.length > 0 && !form.category_id) {
+      notify.error('Sélectionnez une catégorie produit')
+      return
+    }
+
     setSaving(true)
 
     const payload = {
@@ -251,6 +214,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
       status: form.status,
       allow_pickup: form.allow_pickup,
       allow_delivery: form.allow_delivery,
+      ...(form.category_id ? { category_id: form.category_id } : {}),
       ...(form.useVariants
         ? {
             variants: variants.map(v => ({
@@ -308,33 +272,6 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
     )
   }
 
-  const canAddMoreImages = form.images.length < MAX_PRODUCT_IMAGES
-
-  const removeImage = (index: number) => {
-    setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== index) }))
-  }
-
-  const setPrimaryImage = (index: number) => {
-    if (index === 0) return
-    setForm(f => {
-      const next = [...f.images]
-      const [picked] = next.splice(index, 1)
-      next.unshift(picked)
-      return { ...f, images: next }
-    })
-  }
-
-  const addImageFromUrl = () => {
-    const check = canAppendImage(imageUrlDraft, form.images)
-    if (!check.ok) {
-      notify.error(check.error)
-      return
-    }
-    setForm(f => ({ ...f, images: [...f.images, check.trimmed] }))
-    setImageUrlDraft('')
-    notify.success('Image ajoutée')
-  }
-
   return (
     <ShopSectionLayout hideTabs>
       <div>
@@ -380,7 +317,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || uploading}
+                disabled={saving}
                 className="bg-slate-900 text-white px-5 sm:px-6 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-slate-900/10 hover:bg-slate-800 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -433,120 +370,16 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
 
             {/* Médias */}
             <section className={CARD_CLASS}>
-              <h2 className="text-lg font-extrabold text-slate-900 mb-2 flex items-center justify-between gap-2 flex-wrap">
-                Images du produit
-                <span className="text-xs font-medium text-slate-400 font-normal">
-                  {form.images.length}/{MAX_PRODUCT_IMAGES} — JPG, PNG, WEBP
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 mb-6">
-                La première image est l&apos;image principale (vignette et fiche produit).
-              </p>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handleFileChange}
+              <MerchantMediathequeField
+                mode="multiple"
+                merchantId={uploadMerchantId}
+                values={form.images}
+                onChangeValues={urls => setForm(f => ({ ...f, images: urls }))}
+                max={MAX_PRODUCT_IMAGES}
+                label="Images du produit"
+                hint={`La première image est l'image principale — ${form.images.length}/${MAX_PRODUCT_IMAGES}`}
+                disabled={saving}
               />
-
-              {canAddMoreImages && (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={e => { if (e.key === 'Enter') fileInputRef.current?.click() }}
-                  onClick={() => !uploading && fileInputRef.current?.click()}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-colors ${
-                    uploading
-                      ? 'border-brand-300 bg-brand-50 cursor-wait'
-                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-brand-300 cursor-pointer group'
-                  }`}
-                >
-                  {uploading ? (
-                    <Loader2 size={32} className="animate-spin text-brand-500 mb-4" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center text-brand-500 mb-4 shadow-sm group-hover:scale-110 transition-transform">
-                      <UploadCloud size={32} />
-                    </div>
-                  )}
-                  <h3 className="font-bold text-slate-900 mb-1">
-                    {uploading ? 'Envoi en cours…' : 'Ajouter une image'}
-                  </h3>
-                  <p className="text-sm text-slate-500 mb-4">Glissez-déposez ou cliquez pour parcourir</p>
-                  <span className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm">
-                    Sélectionner un fichier
-                  </span>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <label className={LABEL_CLASS}>Ou URL de l&apos;image</label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="url"
-                    value={imageUrlDraft}
-                    onChange={e => setImageUrlDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageFromUrl() } }}
-                    placeholder="https://…"
-                    className={`${INPUT_CLASS} flex-1`}
-                    disabled={!canAddMoreImages}
-                  />
-                  <button
-                    type="button"
-                    onClick={addImageFromUrl}
-                    disabled={!canAddMoreImages || !imageUrlDraft.trim()}
-                    className="shrink-0 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Ajouter
-                  </button>
-                </div>
-              </div>
-
-              {form.images.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-6">
-                  {form.images.map((url, index) => (
-                    <div
-                      key={`${url}-${index}`}
-                      className={`relative rounded-xl border overflow-hidden bg-slate-50 aspect-square ${
-                        index === 0 ? 'border-brand-400 ring-2 ring-brand-100' : 'border-slate-200'
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      {index === 0 && (
-                        <span className="absolute top-2 left-2 bg-brand-500 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
-                          Principale
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
-                        aria-label="Retirer l'image"
-                      >
-                        <X size={14} />
-                      </button>
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setPrimaryImage(index)}
-                          className="absolute bottom-2 left-2 right-2 py-1.5 rounded-lg bg-white/95 text-[10px] font-bold text-slate-700 hover:text-brand-600 shadow-sm"
-                        >
-                          Définir principale
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-6 w-full aspect-[2/1] max-h-40 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-300">
-                  <ImageIcon size={32} className="opacity-50 mb-2" />
-                  <span className="text-sm font-medium text-slate-400">Aucune image pour l&apos;instant</span>
-                </div>
-              )}
             </section>
 
             {/* Tarification & inventaire */}
@@ -736,11 +569,25 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
                 Organisation
               </h2>
               <div>
-                <label className={LABEL_CLASS}>Catégorie</label>
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-600">
-                  <Store size={16} className="text-brand-500 shrink-0" />
-                  Boutique — définie par votre établissement
-                </div>
+                <label className={LABEL_CLASS}>Catégorie produit</label>
+                <select
+                  required={categoryOptions.length > 0}
+                  value={form.category_id}
+                  onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+                  className={INPUT_CLASS}
+                >
+                  <option value="">
+                    {categoryOptions.length
+                      ? '— Choisir une catégorie —'
+                      : '— Activez des catégories dans l\'onglet Produits —'}
+                  </option>
+                  {categoryOptions.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-2">
+                  Seules les catégories activées pour votre boutique sont proposées ici.
+                </p>
               </div>
             </section>
 

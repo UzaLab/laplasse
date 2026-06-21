@@ -10,6 +10,8 @@ import {
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
+import { exploreCityLabel } from '@/lib/brandCopy'
 
 interface ProfileShellProps {
   children: React.ReactNode
@@ -37,6 +39,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
   }
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  const exploreLabel = exploreCityLabel(getDefaultCity(getCountryCode()))
 
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 
@@ -64,7 +67,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
       ? [{ href: '/shop/create', label: 'Créer ma boutique', icon: <ShoppingBag size={17} /> }]
       : []),
     ...(isAdmin ? [{ href: '/admin', label: 'Administration', icon: <ShieldCheck size={17} /> }] : []),
-    { href: '/search', label: 'Explorer Abidjan', icon: <Compass size={17} /> },
+    { href: '/search', label: exploreLabel, icon: <Compass size={17} /> },
   ]
 
   const isActive = (href: string) =>

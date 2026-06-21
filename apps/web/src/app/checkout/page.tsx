@@ -1,48 +1,300 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { ArrowRight, Loader2, UtensilsCrossed } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
+import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
-import { useRequireAuth } from '@/hooks/useRequireAuth'
+import { GuestCheckoutAuth } from '@/features/marketplace/components/GuestCheckoutAuth'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
   buildCheckoutSession,
+  getCheckoutDraft,
+  getCheckoutFormState,
+  getCheckoutSession,
+  saveCheckoutDraft,
   saveCheckoutSession,
+  type CheckoutDraft,
 } from '@/lib/checkoutSession'
 import {
   checkout,
   fetchCart,
+  formatPrice,
   type Cart,
 } from '@/lib/marketplaceApi'
+import {
+  fetchDeliveryQuote,
+  fetchGeoCities,
+  fetchGeoCommunes,
+  type DeliveryQuoteItem,
+  type GeoCity,
+  type GeoCommune,
+} from '@/lib/geoApi'
+import {
+  getCartPromos,
+  getFreeDeliveryShopIds,
+  getTotalPromoDiscount,
+  computeEffectiveDeliveryFee,
+  toAppliedPromotionInputs,
+} from '@/lib/cartPromo'
 import { notify } from '@/lib/notify'
+import {
+  createUserAddress,
+  fetchMyAddresses,
+  type UserAddress,
+} from '@/lib/addressesApi'
+
+import { getDeliveryVehicleLabel } from '@/lib/deliveryVehicles'
+import {
+  detectCartKind,
+  getCartRoute,
+  getPaymentRoute,
+  type OrderFlow,
+} from '@/lib/orderFlow'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { ready, hydrated, isAuthenticated } = useRequireAuth('/checkout')
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const routeFlow: OrderFlow = pathname.startsWith('/commande') ? 'food' : 'marketplace'
+  const foodFlowParam = searchParams.get('flow') === 'food'
+  const { ready, hydrated, isAuthenticated, user } = useAuthReady()
   const [cart, setCart] = useState<Cart | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   const [deliveryType, setDeliveryType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP')
   const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [deliveryCityId, setDeliveryCityId] = useState('')
+  const [deliveryCommuneId, setDeliveryCommuneId] = useState('')
+  const [deliveryDistrict, setDeliveryDistrict] = useState('')
+  const [deliveryAddressDetail, setDeliveryAddressDetail] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
 
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
+  const [saveNewAddress, setSaveNewAddress] = useState(false)
+  const [newAddressLabel, setNewAddressLabel] = useState('')
+
+  const [cities, setCities] = useState<GeoCity[]>([])
+  const [communes, setCommunes] = useState<GeoCommune[]>([])
+  const [deliveryQuotes, setDeliveryQuotes] = useState<DeliveryQuoteItem[]>([])
+  const [quoteLoading, setQuoteLoading] = useState(false)
+
+  const cartShopIds = useMemo(
+    () => cart?.merchants.map(m => m.id) ?? [],
+    [cart?.merchants],
+  )
+
+  const appliedPromos = useMemo(
+    () => (routeFlow === 'marketplace' ? getCartPromos('marketplace', cartShopIds) : []),
+    [routeFlow, cartShopIds],
+  )
+  const promoDiscount = useMemo(() => getTotalPromoDiscount(appliedPromos), [appliedPromos])
+  const freeDeliveryShopIds = useMemo(
+    () => getFreeDeliveryShopIds(appliedPromos),
+    [appliedPromos],
+  )
+  const deliveryFee = useMemo(
+    () => computeEffectiveDeliveryFee(deliveryQuotes, freeDeliveryShopIds),
+    [deliveryQuotes, freeDeliveryShopIds],
+  )
+
+  const checkoutTotal = useMemo(() => {
+    const subtotal = cart?.subtotal ?? 0
+    const fee = deliveryType === 'DELIVERY' ? deliveryFee : 0
+    const discount = routeFlow === 'food' ? 0 : promoDiscount
+    return Math.max(0, subtotal - discount + fee)
+  }, [cart?.subtotal, promoDiscount, deliveryFee, deliveryType, routeFlow])
+
   useEffect(() => {
     if (!ready) return
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
     fetchCart().then(data => {
       setCart(data)
       setLoading(false)
+      if (!data?.items.length) return
+      const kind = detectCartKind(data.items, data.kind)
+      if (routeFlow === 'food' && kind === 'marketplace') {
+        router.replace('/checkout')
+      } else if (routeFlow === 'marketplace' && kind === 'food') {
+        router.replace('/commande/livraison')
+      } else if (kind === 'mixed') {
+        notify.error('Panier incompatible — videz-le avant de continuer.')
+        router.replace(getCartRoute('food') ?? '/cart')
+      }
     })
-  }, [ready])
+    void fetchGeoCities().then(r => {
+      if (r.ok) setCities(r.data)
+    })
+  }, [ready, isAuthenticated, routeFlow, router])
+
+  useEffect(() => {
+    const saved = getCheckoutFormState()
+    if (!saved) return
+    setDeliveryType(saved.deliveryType)
+    setDeliveryAddress(saved.deliveryAddress ?? '')
+    setDeliveryCityId(saved.deliveryCityId ?? '')
+    setDeliveryCommuneId(saved.deliveryCommuneId ?? '')
+    setDeliveryDistrict(saved.deliveryDistrict ?? '')
+    setDeliveryAddressDetail(saved.deliveryAddressDetail ?? '')
+    setCustomerNote(saved.customerNote ?? '')
+    if (saved.customerPhone?.trim()) setCustomerPhone(saved.customerPhone)
+    setSelectedAddressId(saved.selectedAddressId ?? null)
+    setSaveNewAddress(saved.saveNewAddress ?? false)
+    setNewAddressLabel(saved.newAddressLabel ?? '')
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return
+    const saved = getCheckoutFormState()
+    if (saved?.customerPhone?.trim()) {
+      setCustomerPhone(saved.customerPhone)
+    } else if (user?.phone?.trim()) {
+      setCustomerPhone(user.phone)
+    }
+  }, [ready, user?.phone])
+
+  const applySavedAddress = useCallback((addr: UserAddress) => {
+    setSelectedAddressId(addr.id)
+    setDeliveryCityId(addr.city_id)
+    setDeliveryCommuneId(addr.commune_id)
+    setDeliveryDistrict(addr.district)
+    setDeliveryAddressDetail(addr.address_detail ?? '')
+    setSaveNewAddress(false)
+  }, [])
+
+  const clearAddressSelection = useCallback(() => {
+    setSelectedAddressId(null)
+  }, [])
+
+  useEffect(() => {
+    if (!ready) return
+    void fetchMyAddresses().then(addrs => {
+      setSavedAddresses(addrs)
+      const saved = getCheckoutFormState()
+      if (!saved?.deliveryCityId && addrs.length > 0) {
+        const preferred = addrs.find(a => a.is_default) ?? addrs[0]
+        applySavedAddress(preferred)
+      } else if (saved?.selectedAddressId) {
+        const match = addrs.find(a => a.id === saved.selectedAddressId)
+        if (match) applySavedAddress(match)
+      }
+    })
+  }, [ready, applySavedAddress])
+
+  useEffect(() => {
+    const draft: CheckoutDraft = {
+      deliveryType,
+      deliveryAddress: deliveryAddress || undefined,
+      deliveryCityId: deliveryCityId || undefined,
+      deliveryCommuneId: deliveryCommuneId || undefined,
+      deliveryDistrict: deliveryDistrict || undefined,
+      deliveryAddressDetail: deliveryAddressDetail || undefined,
+      customerNote: customerNote || undefined,
+      customerPhone: customerPhone || undefined,
+      selectedAddressId: selectedAddressId ?? undefined,
+      saveNewAddress: saveNewAddress || undefined,
+      newAddressLabel: newAddressLabel || undefined,
+    }
+    saveCheckoutDraft(draft)
+  }, [
+    deliveryType,
+    deliveryAddress,
+    deliveryCityId,
+    deliveryCommuneId,
+    deliveryDistrict,
+    deliveryAddressDetail,
+    customerNote,
+    customerPhone,
+    selectedAddressId,
+    saveNewAddress,
+    newAddressLabel,
+  ])
+
+  const selectedCity = cities.find(c => c.id === deliveryCityId)
+
+  useEffect(() => {
+    if (!selectedCity?.slug) {
+      setCommunes([])
+      return
+    }
+    void fetchGeoCommunes(selectedCity.slug).then(r => {
+      if (r.ok) setCommunes(r.data.communes)
+    })
+  }, [selectedCity?.slug])
+
+  const cartKind = useMemo(
+    () => (cart ? detectCartKind(cart.items, cart.kind) : 'empty'),
+    [cart],
+  )
+
+  const isFoodFlow = useMemo(
+    () => routeFlow === 'food' || foodFlowParam || cartKind === 'food',
+    [routeFlow, foodFlowParam, cartKind],
+  )
+
+  const loadDeliveryQuote = useCallback(async () => {
+    if (!cart || deliveryType !== 'DELIVERY' || !deliveryCityId || !deliveryCommuneId) {
+      setDeliveryQuotes([])
+      return
+    }
+    setQuoteLoading(true)
+    const subtotals = Object.fromEntries(
+      cart.merchants.map(m => [m.id, m.subtotal]),
+    )
+    const result = await fetchDeliveryQuote(
+      isFoodFlow
+        ? {
+            merchant_ids: cart.merchants.map(m => m.id),
+            city_id: deliveryCityId,
+            commune_id: deliveryCommuneId,
+            subtotals,
+            order_flow: 'food',
+          }
+        : {
+            shop_ids: cart.merchants.map(m => m.id),
+            city_id: deliveryCityId,
+            commune_id: deliveryCommuneId,
+            subtotals,
+            order_flow: 'marketplace',
+          },
+    )
+    setQuoteLoading(false)
+    if (result.ok) {
+      setDeliveryQuotes(result.data.quotes)
+    } else {
+      setDeliveryQuotes([])
+      notify.error(result.error)
+    }
+  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, isFoodFlow])
+
+  useEffect(() => {
+    void loadDeliveryQuote()
+  }, [loadDeliveryQuote])
 
   const allowPickup = cart?.delivery_options?.allow_pickup ?? true
   const allowDelivery = cart?.delivery_options?.allow_delivery ?? true
+
+  const Steps = isFoodFlow ? FoodCheckoutSteps : CheckoutSteps
+  const paymentPath = getPaymentRoute(isFoodFlow ? 'food' : 'marketplace')
+  const emptyCartHref = isFoodFlow ? '/commande' : '/cart'
+  const loginRedirect = isFoodFlow ? '/commande/livraison' : '/checkout'
+
+  useEffect(() => {
+    if (isFoodFlow && allowDelivery) {
+      setDeliveryType('DELIVERY')
+    }
+  }, [isFoodFlow, allowDelivery])
 
   useEffect(() => {
     if (!cart) return
@@ -50,19 +302,73 @@ export default function CheckoutPage() {
     else if (!allowPickup && allowDelivery) setDeliveryType('DELIVERY')
   }, [cart, allowPickup, allowDelivery])
 
+  const formattedDeliveryAddress = useMemo(() => {
+    if (deliveryType !== 'DELIVERY') return undefined
+    const cityName = cities.find(c => c.id === deliveryCityId)?.name
+    const communeName = communes.find(c => c.id === deliveryCommuneId)?.name
+    return [deliveryDistrict, communeName, cityName, deliveryAddressDetail]
+      .filter(Boolean)
+      .join(', ')
+  }, [
+    deliveryType,
+    deliveryDistrict,
+    deliveryCityId,
+    deliveryCommuneId,
+    deliveryAddressDetail,
+    cities,
+    communes,
+  ])
+
   const handleCheckout = async () => {
     if (!cart) return
-    if (deliveryType === 'DELIVERY' && !deliveryAddress.trim()) {
-      notify.error('Adresse de livraison requise')
+
+    const phone = customerPhone.trim()
+    if (!phone) {
+      notify.error('Le numéro de téléphone est obligatoire')
       return
+    }
+
+    if (deliveryType === 'DELIVERY') {
+      if (!deliveryCityId || !deliveryCommuneId || !deliveryDistrict.trim()) {
+        notify.error('Ville, commune et quartier requis pour la livraison')
+        return
+      }
+      const unavailable = deliveryQuotes.filter(q => !q.available)
+      if (unavailable.length) {
+        notify.error(`Livraison indisponible : ${unavailable.map(q => q.shop_name).join(', ')}`)
+        return
+      }
+
+      if (saveNewAddress && !selectedAddressId) {
+        const { address, error: addrErr } = await createUserAddress({
+          label: newAddressLabel.trim() || undefined,
+          city_id: deliveryCityId,
+          commune_id: deliveryCommuneId,
+          district: deliveryDistrict.trim(),
+          address_detail: deliveryAddressDetail.trim() || undefined,
+          is_default: savedAddresses.length === 0,
+        })
+        if (addrErr) {
+          notify.warning(`Adresse non enregistrée : ${addrErr}`)
+        } else if (address) {
+          setSavedAddresses(prev => [...prev, address])
+          setSelectedAddressId(address.id)
+          setSaveNewAddress(false)
+        }
+      }
     }
 
     setSubmitting(true)
     const { result, error: err } = await checkout({
       delivery_type: deliveryType,
-      delivery_address: deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
+      delivery_city_id: deliveryType === 'DELIVERY' ? deliveryCityId : undefined,
+      delivery_commune_id: deliveryType === 'DELIVERY' ? deliveryCommuneId : undefined,
+      delivery_district: deliveryType === 'DELIVERY' ? deliveryDistrict : undefined,
+      delivery_address_detail: deliveryType === 'DELIVERY' ? deliveryAddressDetail : undefined,
+      delivery_address: deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
       customer_note: customerNote || undefined,
-      customer_phone: customerPhone || undefined,
+      customer_phone: phone,
+      applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
     })
 
     if (!result) {
@@ -74,13 +380,36 @@ export default function CheckoutPage() {
     saveCheckoutSession(
       buildCheckoutSession(cart, result, {
         deliveryType,
-        deliveryAddress: deliveryType === 'DELIVERY' ? deliveryAddress : undefined,
+        deliveryAddress: formattedDeliveryAddress,
+        deliveryCityId,
+        deliveryCommuneId,
+        deliveryDistrict,
+        deliveryAddressDetail: deliveryAddressDetail || undefined,
         customerPhone: customerPhone || undefined,
         customerNote: customerNote || undefined,
+        selectedAddressId: selectedAddressId ?? undefined,
+        saveNewAddress: saveNewAddress || undefined,
+        newAddressLabel: newAddressLabel || undefined,
+        discountAmount: isFoodFlow ? 0 : promoDiscount,
+        deliveryFee: deliveryType === 'DELIVERY' ? deliveryFee : 0,
+        deliveryQuotes: deliveryType === 'DELIVERY' ? deliveryQuotes : undefined,
       }),
     )
+    saveCheckoutDraft({
+      deliveryType,
+      deliveryAddress: formattedDeliveryAddress,
+      deliveryCityId: deliveryCityId || undefined,
+      deliveryCommuneId: deliveryCommuneId || undefined,
+      deliveryDistrict: deliveryDistrict || undefined,
+      deliveryAddressDetail: deliveryAddressDetail || undefined,
+      customerPhone: customerPhone || undefined,
+      customerNote: customerNote || undefined,
+      selectedAddressId: selectedAddressId ?? undefined,
+      saveNewAddress: saveNewAddress || undefined,
+      newAddressLabel: newAddressLabel || undefined,
+    })
 
-    router.push('/checkout/payment')
+    router.push(paymentPath)
   }
 
   if (!hydrated) {
@@ -91,7 +420,26 @@ export default function CheckoutPage() {
     )
   }
 
-  if (!isAuthenticated) return null
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA]">
+        <Navbar />
+        <Steps current={2} />
+        <main className={`${PAGE_CONTAINER} py-12 max-w-xl`}>
+          <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Finaliser votre commande</h1>
+          <p className="text-slate-500 mb-8">Identifiez-vous par SMS pour accéder à votre panier.</p>
+          <GuestCheckoutAuth />
+          <p className="text-sm text-slate-500 mt-6 text-center">
+            Déjà un compte ?{' '}
+            <Link href={`/login?redirect=${encodeURIComponent(loginRedirect)}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
+              Se connecter
+            </Link>
+          </p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -107,7 +455,7 @@ export default function CheckoutPage() {
         <Navbar />
         <main className={`${PAGE_CONTAINER} pt-28 pb-16 text-center`}>
           <p className="text-slate-500 mb-4">Votre panier est vide.</p>
-          <Link href="/cart" className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
+          <Link href={emptyCartHref} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
             Retour au panier
           </Link>
         </main>
@@ -119,12 +467,23 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
-      <CheckoutSteps current={2} />
+      <Steps current={2} />
 
       <main className={`${PAGE_CONTAINER} py-12`}>
         <div className="mb-8">
+          {isFoodFlow && (
+            <div className="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100 flex gap-3">
+              <UtensilsCrossed size={22} className="text-orange-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-orange-900 text-sm">Commande restaurant</p>
+                <p className="text-xs text-orange-800 mt-0.5">
+                  Préparation estimée 25–45 min · choisissez livraison ou retrait sur place
+                </p>
+              </div>
+            </div>
+          )}
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Livraison & retrait
+            {isFoodFlow ? 'Où souhaitez-vous recevoir votre commande ?' : 'Livraison & retrait'}
           </h1>
           {cart.merchant_count > 1 ? (
             <p className="text-slate-500 mt-2 font-medium">
@@ -180,36 +539,205 @@ export default function CheckoutPage() {
                       )}
                     </div>
                   )}
-                  {allowPickup && allowDelivery && (
-                    <p className="text-xs text-slate-500 mt-3">
-                      Options communes à tous les articles de votre panier.
-                    </p>
-                  )}
                 </div>
 
                 {deliveryType === 'DELIVERY' && (
-                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
-                    <label className="block text-sm font-bold text-slate-900 mb-2">
-                      Adresse de livraison
-                    </label>
-                    <textarea
-                      value={deliveryAddress}
-                      onChange={e => setDeliveryAddress(e.target.value)}
-                      rows={3}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
-                      placeholder="Quartier, rue, repères…"
-                    />
-                  </div>
+                  <>
+                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                      <p className="text-sm font-bold text-slate-900">Adresse de livraison</p>
+
+                      {savedAddresses.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            Adresses enregistrées
+                          </p>
+                          {savedAddresses.map(addr => (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => applySavedAddress(addr)}
+                              className={`w-full text-left rounded-xl px-4 py-3 border transition-colors ${
+                                selectedAddressId === addr.id
+                                  ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500/20'
+                                  : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+                              }`}
+                            >
+                              <p className="text-sm font-bold text-slate-900">
+                                {addr.label || 'Adresse'}
+                                {addr.is_default && (
+                                  <span className="ml-2 text-[10px] font-bold uppercase text-brand-600">
+                                    Par défaut
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                                {[addr.district, addr.commune.name, addr.city.name]
+                                  .filter(Boolean)
+                                  .join(', ')}
+                              </p>
+                            </button>
+                          ))}
+                          {selectedAddressId && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                clearAddressSelection()
+                                setDeliveryCityId('')
+                                setDeliveryCommuneId('')
+                                setDeliveryDistrict('')
+                                setDeliveryAddressDetail('')
+                              }}
+                              className="text-xs font-bold text-brand-600 hover:text-brand-700"
+                            >
+                              + Utiliser une nouvelle adresse
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {(!selectedAddressId || savedAddresses.length === 0) && (
+                        <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Ville</label>
+                        <select
+                          value={deliveryCityId}
+                          onChange={e => {
+                            clearAddressSelection()
+                            setDeliveryCityId(e.target.value)
+                            setDeliveryCommuneId('')
+                          }}
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                        >
+                          <option value="">Choisir une ville</option>
+                          {cities.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Commune</label>
+                        <select
+                          value={deliveryCommuneId}
+                          onChange={e => {
+                            clearAddressSelection()
+                            setDeliveryCommuneId(e.target.value)
+                          }}
+                          disabled={!deliveryCityId}
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400 disabled:opacity-50"
+                        >
+                          <option value="">Choisir une commune</option>
+                          {communes.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Quartier *</label>
+                        <input
+                          type="text"
+                          value={deliveryDistrict}
+                          onChange={e => {
+                            clearAddressSelection()
+                            setDeliveryDistrict(e.target.value)
+                          }}
+                          placeholder="ex. près du marché, face au Total…"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Complément (optionnel)</label>
+                        <input
+                          type="text"
+                          value={deliveryAddressDetail}
+                          onChange={e => {
+                            clearAddressSelection()
+                            setDeliveryAddressDetail(e.target.value)
+                          }}
+                          placeholder="Immeuble, porte, repères…"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                        />
+                      </div>
+
+                      {!selectedAddressId && (
+                        <div className="pt-2 border-t border-slate-100 space-y-3">
+                          <label className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={saveNewAddress}
+                              onChange={e => setSaveNewAddress(e.target.checked)}
+                              className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500/20"
+                            />
+                            <span className="text-sm font-medium text-slate-700">
+                              Enregistrer cette adresse pour mes prochaines commandes
+                            </span>
+                          </label>
+                          {saveNewAddress && (
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                                Libellé (optionnel)
+                              </label>
+                              <input
+                                type="text"
+                                value={newAddressLabel}
+                                onChange={e => setNewAddressLabel(e.target.value)}
+                                placeholder="Maison, Bureau…"
+                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                        </>
+                      )}
+                    </div>
+
+                    {quoteLoading ? (
+                      <div className="bg-white rounded-3xl border border-slate-100 p-6 flex items-center gap-3 text-slate-500 text-sm">
+                        <Loader2 size={18} className="animate-spin" /> Calcul des frais de livraison…
+                      </div>
+                    ) : deliveryQuotes.length > 0 ? (
+                      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                        <p className="text-sm font-bold text-slate-900 mb-4">Frais de livraison</p>
+                        <ul className="space-y-3">
+                          {deliveryQuotes.map(q => (
+                            <li
+                              key={q.shop_id}
+                              className="flex justify-between gap-3 text-sm bg-slate-50 rounded-xl px-4 py-3"
+                            >
+                              <div>
+                                <p className="font-bold text-slate-900">{q.shop_name}</p>
+                                {q.available && q.zone_name && (
+                                  <p className="text-xs text-slate-500 mt-0.5">
+                                    {q.zone_name}
+                                    {q.vehicle && q.eta_min_minutes != null && (
+                                      <> · {getDeliveryVehicleLabel(q.vehicle ?? 'MOTO').toLowerCase()} · {q.eta_min_minutes}–{q.eta_max_minutes} min</>
+                                    )}
+                                  </p>
+                                )}
+                                {!q.available && (
+                                  <p className="text-xs text-red-600 mt-0.5">{q.message}</p>
+                                )}
+                              </div>
+                              <span className="font-bold text-slate-900 shrink-0">
+                                {q.available ? formatPrice(q.fee) : '—'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
                 )}
 
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">
-                    Téléphone (optionnel)
+                    Téléphone <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="tel"
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value)}
+                    required
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                     placeholder="+225…"
                   />
@@ -244,11 +772,15 @@ export default function CheckoutPage() {
           <div className="w-full lg:w-[400px] shrink-0">
             <CheckoutOrderSummary
               cart={cart}
-              total={cart.subtotal}
+              total={checkoutTotal}
               deliveryType={deliveryType}
-              deliveryAddress={deliveryType === 'DELIVERY' ? deliveryAddress : undefined}
+              deliveryAddress={formattedDeliveryAddress}
               customerPhone={customerPhone || undefined}
               customerNote={customerNote || undefined}
+              discountAmount={isFoodFlow ? 0 : promoDiscount}
+              deliveryFee={deliveryType === 'DELIVERY' ? deliveryFee : 0}
+              deliveryQuotes={deliveryType === 'DELIVERY' ? deliveryQuotes : undefined}
+              freeDeliveryShopIds={isFoodFlow ? [] : [...freeDeliveryShopIds]}
               className="lg:sticky lg:top-28"
             />
             {!submitting && (

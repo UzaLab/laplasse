@@ -1,32 +1,51 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Loader2,
+  RotateCcw,
+  Search,
   ShoppingBag,
   SlidersHorizontal,
+  Store,
   X,
 } from 'lucide-react'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
-  fetchMarketplaceMerchants,
-  fetchMarketplaceProducts,
-  fetchMarketplaceSpotlight,
+  fetchPublicJson,
   type MarketplaceBoutique,
   type MarketplaceCatalogProduct,
   type MarketplaceSpotlightShop,
+  type ProductCategoryNode,
 } from '@/lib/marketplaceApi'
+import { getCountryCode } from '@/lib/country'
+import { NetworkErrorBanner } from '@/components/ui/NetworkErrorBanner'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useCartStore } from '@/stores/cartStore'
 import { ProductCard } from './ProductCard'
 import { SpotlightShopsCarousel } from './SpotlightShopsCarousel'
+import { BRAND_MARKETPLACE_INTRO } from '@/lib/brandCopy'
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
+
+function flattenCategories(
+  nodes: ProductCategoryNode[],
+  depth = 0,
+): { slug: string; name: string; depth: number }[] {
+  return nodes.flatMap(node => [
+    { slug: node.slug, name: node.name, depth },
+    ...flattenCategories(node.children, depth + 1),
+  ])
+}
 
 function MarketplaceFiltersPanel({
   search,
   onSearchChange,
+  categories,
+  selectedCategory,
+  onCategoryChange,
   merchants,
   selectedMerchants,
   onToggleMerchant,
@@ -36,6 +55,9 @@ function MarketplaceFiltersPanel({
 }: {
   search: string
   onSearchChange: (v: string) => void
+  categories: ProductCategoryNode[]
+  selectedCategory: string
+  onCategoryChange: (slug: string) => void
   merchants: MarketplaceBoutique[]
   selectedMerchants: Set<string>
   onToggleMerchant: (slug: string) => void
@@ -43,6 +65,8 @@ function MarketplaceFiltersPanel({
   onPriceFilterChange: (v: number) => void
   priceCeiling: number
 }) {
+  const flatCategories = flattenCategories(categories)
+
   return (
     <>
       <div className="mb-8">
@@ -57,6 +81,53 @@ function MarketplaceFiltersPanel({
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
         />
       </div>
+
+      {flatCategories.length > 0 && (
+        <>
+          <div className="h-px w-full bg-slate-100 mb-8" />
+          <div className="mb-8">
+            <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
+              Catégories
+            </h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <button
+                  type="button"
+                  onClick={() => onCategoryChange('')}
+                  className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                    !selectedCategory
+                      ? 'border-brand-500 bg-brand-500'
+                      : 'border-slate-200 group-hover:border-brand-400'
+                  }`}
+                />
+                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                  Toutes
+                </span>
+              </label>
+              {flatCategories.map(cat => (
+                <label key={cat.slug} className="flex items-center gap-3 cursor-pointer group">
+                  <button
+                    type="button"
+                    onClick={() => onCategoryChange(cat.slug)}
+                    className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                      selectedCategory === cat.slug
+                        ? 'border-brand-500 bg-brand-500'
+                        : 'border-slate-200 group-hover:border-brand-400'
+                    }`}
+                    style={{ marginLeft: cat.depth * 12 }}
+                  />
+                  <span
+                    className="text-sm font-medium text-slate-600 group-hover:text-slate-900"
+                    style={{ paddingLeft: cat.depth * 12 }}
+                  >
+                    {cat.name}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {merchants.length > 0 && (
         <>
@@ -133,9 +204,12 @@ export function MarketplacePageClient() {
   const [merchants, setMerchants] = useState<MarketplaceBoutique[]>([])
   const [spotlight, setSpotlight] = useState<MarketplaceSpotlightShop[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('newest')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [categories, setCategories] = useState<ProductCategoryNode[]>([])
   const [selectedMerchants, setSelectedMerchants] = useState<Set<string>>(new Set())
   const [priceFilter, setPriceFilter] = useState(100_000)
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -146,30 +220,56 @@ export function MarketplacePageClient() {
     return () => clearTimeout(t)
   }, [search])
 
-  useEffect(() => {
-    let cancelled = false
+  const loadCatalog = useCallback(async () => {
     setLoading(true)
-    Promise.all([
-      fetchMarketplaceProducts({ sort }),
-      fetchMarketplaceMerchants(50),
-      fetchMarketplaceSpotlight(),
+    setLoadError(null)
+
+    const qs = new URLSearchParams()
+    if (sort === 'price_asc') qs.set('sort', 'price_asc')
+    else if (sort === 'price_desc') qs.set('sort', 'price_desc')
+    if (selectedCategory) qs.set('category', selectedCategory)
+    if (debouncedSearch) qs.set('q', debouncedSearch)
+    const productPath = `/marketplace/products${qs.toString() ? `?${qs}` : ''}`
+
+    const [productResult, merchantResult, spotlightResult] = await Promise.all([
+      fetchPublicJson<MarketplaceCatalogProduct[]>(productPath),
+      fetchPublicJson<MarketplaceBoutique[]>('/marketplace/merchants?limit=50'),
+      fetchPublicJson<MarketplaceSpotlightShop[]>('/marketplace/spotlight'),
     ])
-      .then(([productList, merchantList, spotlightList]) => {
-        if (cancelled) return
-        const list = productList ?? []
-        setProducts(list)
-        setMerchants(merchantList ?? [])
-        setSpotlight(spotlightList ?? [])
-        if (list.length > 0) {
-          const highest = Math.max(...list.map(p => p.price))
-          setPriceFilter(Math.ceil(highest / 1000) * 1000 || 100_000)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [sort])
+
+    if (!productResult.ok) {
+      setLoadError(productResult.error)
+      setProducts([])
+      setMerchants([])
+      setSpotlight([])
+      setLoading(false)
+      return
+    }
+
+    const list = productResult.data
+    setProducts(list)
+    setMerchants(merchantResult.ok ? merchantResult.data : [])
+    setSpotlight(spotlightResult.ok ? spotlightResult.data : [])
+
+    if (list.length > 0) {
+      const highest = Math.max(...list.map(p => p.price))
+      setPriceFilter(Math.ceil(highest / 1000) * 1000 || 100_000)
+    }
+
+    setLoading(false)
+  }, [sort, selectedCategory, debouncedSearch])
+
+  useEffect(() => {
+    void fetchPublicJson<ProductCategoryNode[]>(
+      `/marketplace/product-categories?country=${encodeURIComponent(getCountryCode())}`,
+    ).then(result => {
+      if (result.ok) setCategories(result.data)
+    })
+  }, [])
+
+  useEffect(() => {
+    void loadCatalog()
+  }, [loadCatalog])
 
   const priceCeiling = useMemo(() => {
     if (products.length === 0) return 100_000
@@ -178,27 +278,20 @@ export function MarketplacePageClient() {
 
   const filtered = useMemo(() => {
     let list = products.filter(p => p.price <= priceFilter)
-    if (debouncedSearch) {
-      const q = debouncedSearch.toLowerCase()
-      list = list.filter(
-        p =>
-          p.name.toLowerCase().includes(q) ||
-          p.merchant.business_name.toLowerCase().includes(q),
-      )
-    }
     if (selectedMerchants.size > 0) {
       list = list.filter(p => selectedMerchants.has(p.merchant.slug))
     }
     return list
-  }, [products, priceFilter, debouncedSearch, selectedMerchants])
+  }, [products, priceFilter, selectedMerchants])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (search.trim()) count += 1
     if (selectedMerchants.size > 0) count += 1
+    if (selectedCategory) count += 1
     if (priceFilter < priceCeiling) count += 1
     return count
-  }, [search, selectedMerchants, priceFilter, priceCeiling])
+  }, [search, selectedMerchants, selectedCategory, priceFilter, priceCeiling])
 
   const toggleMerchant = (slug: string) => {
     setSelectedMerchants(prev => {
@@ -211,6 +304,7 @@ export function MarketplacePageClient() {
 
   const clearFilters = () => {
     setSearch('')
+    setSelectedCategory('')
     setSelectedMerchants(new Set())
     setPriceFilter(priceCeiling)
   }
@@ -238,8 +332,7 @@ export function MarketplacePageClient() {
                 La Marketplace LaPlasse
               </h1>
               <p className="text-lg text-slate-500">
-                L&apos;art de vivre ivoirien, de la table de nos chefs à votre dressing.
-                Achetez en direct auprès des meilleurs établissements d&apos;Abidjan.
+                {BRAND_MARKETPLACE_INTRO}
               </p>
             </div>
           </div>
@@ -274,6 +367,9 @@ export function MarketplacePageClient() {
               <MarketplaceFiltersPanel
                 search={search}
                 onSearchChange={setSearch}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
                 merchants={merchants}
                 selectedMerchants={selectedMerchants}
                 onToggleMerchant={toggleMerchant}
@@ -285,6 +381,15 @@ export function MarketplacePageClient() {
           </aside>
 
           <div className="flex-1 w-full min-w-0">
+            {loadError && (
+              <NetworkErrorBanner
+                message={loadError}
+                onRetry={() => void loadCatalog()}
+                loading={loading}
+                className="mb-6"
+              />
+            )}
+
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
               <div className="flex items-center justify-between sm:justify-end gap-3 text-sm w-full sm:w-auto">
                 <span className="text-slate-400 font-medium shrink-0">Trier par :</span>
@@ -305,8 +410,49 @@ export function MarketplacePageClient() {
                 <Loader2 size={28} className="animate-spin text-slate-300" />
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl border border-slate-100">
-                <p className="text-slate-500 font-medium">Aucun produit ne correspond à vos filtres.</p>
+              <div className="text-center py-16 px-6 bg-white rounded-3xl border border-slate-100">
+                {products.length === 0 && activeFilterCount === 0 && !debouncedSearch ? (
+                  <>
+                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Store size={28} className="text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-extrabold text-slate-900 mb-2">
+                      Catalogue en cours d&apos;enrichissement
+                    </h3>
+                    <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
+                      Aucun produit disponible dans votre pays pour le moment. Explorez les établissements ou devenez vendeur.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <Link
+                        href="/search"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-full text-sm font-bold hover:bg-slate-800"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <Search size={16} /> Explorer les établissements
+                      </Link>
+                      <Link
+                        href="/merchant/signup"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-800 rounded-full text-sm font-bold hover:bg-slate-50"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <Store size={16} /> Devenir vendeur
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-slate-500 font-medium mb-4">
+                      Aucun produit ne correspond à vos filtres.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-50 text-brand-700 rounded-full text-sm font-bold hover:bg-brand-100 border border-brand-100"
+                    >
+                      <RotateCcw size={16} /> Réinitialiser les filtres
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 items-stretch">
@@ -376,6 +522,9 @@ export function MarketplacePageClient() {
               <MarketplaceFiltersPanel
                 search={search}
                 onSearchChange={setSearch}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
                 merchants={merchants}
                 selectedMerchants={selectedMerchants}
                 onToggleMerchant={toggleMerchant}

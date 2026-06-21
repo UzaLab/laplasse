@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
 import { getPlanLimits } from '../common/plan-limits'
 import { getCategoryBookingConfig } from '../common/booking-config'
+import { formatLocalDate } from '../common/date-local'
 import { AvailabilityService } from './availability.service'
 import { FraudService } from '../fraud/fraud.service'
 import { AuditService } from '../audit/audit.service'
@@ -91,6 +92,62 @@ export class BookingsService {
     })
   }
 
+  async getRoomCalendar(
+    merchantId: string,
+    from: string,
+    to: string,
+    serviceId?: string,
+  ) {
+    const config = await this.getMerchantConfig(merchantId)
+    if (config.booking_type !== 'ROOM') {
+      return { days: [], message: 'Calendrier chambres non disponible pour cet établissement' }
+    }
+
+    const roomService = serviceId
+      ? config.room_services.find(s => s.id === serviceId)
+      : config.room_services[0]
+
+    const start = new Date(`${from}T12:00:00`)
+    const end = new Date(`${to}T12:00:00`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+      throw new BadRequestException('Plage de dates invalide')
+    }
+
+    const days: Array<{
+      date: string
+      available: boolean
+      nightly_rate: number | null
+      room_type: string | null
+    }> = []
+
+    for (let cursor = new Date(start); cursor < end; cursor.setDate(cursor.getDate() + 1)) {
+      const dateStr = formatLocalDate(cursor)
+      const night = await this.availability.getRoomNightAvailability(merchantId, dateStr, {
+        serviceId: roomService?.id,
+      })
+      days.push({
+        date: dateStr,
+        available: !night.closed && night.available,
+        nightly_rate: roomService?.nightly_rate ?? roomService?.price ?? null,
+        room_type: roomService?.name ?? null,
+      })
+    }
+
+    return {
+      from,
+      to,
+      room_service: roomService
+        ? {
+            id: roomService.id,
+            name: roomService.name,
+            nightly_rate: roomService.nightly_rate ?? roomService.price ?? null,
+            capacity: roomService.capacity,
+          }
+        : null,
+      days,
+    }
+  }
+
   async createForMerchant(merchantId: string, dto: CreateBookingDto, userId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
       where: { id: merchantId, is_active: true },
@@ -113,12 +170,23 @@ export class BookingsService {
     const bookedAt = new Date(dto.booked_at)
     const checkOutAt = dto.check_out_at ? new Date(dto.check_out_at) : undefined
 
-    if (bookedAt <= new Date()) {
+    if (bookingType === 'ROOM') {
+      const checkInDay = new Date(bookedAt)
+      checkInDay.setHours(0, 0, 0, 0)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      if (checkInDay < today) {
+        throw new BadRequestException('La date d\'arrivée doit être aujourd\'hui ou plus tard')
+      }
+    } else if (bookedAt <= new Date()) {
       throw new BadRequestException('La date de réservation doit être dans le futur')
     }
 
     if (bookingType === 'APPOINTMENT' && !dto.service_id) {
       throw new BadRequestException('Veuillez sélectionner une prestation')
+    }
+    if (bookingType === 'CONSULTATION' && !dto.service_id) {
+      throw new BadRequestException('Veuillez sélectionner une consultation')
     }
     if (bookingType === 'ROOM' && !checkOutAt) {
       throw new BadRequestException('Veuillez indiquer la date de départ')
@@ -204,12 +272,24 @@ export class BookingsService {
         ...(status ? { status } : {}),
       },
       include: {
-        service: { select: { name: true } },
-        staff: { select: { name: true } },
+        service: { select: { id: true, name: true, price: true, nightly_rate: true, duration_min: true } },
+        staff: { select: { id: true, name: true } },
+        user: { select: { id: true, full_name: true, email: true } },
       },
       orderBy: { booked_at: 'asc' },
       take: 100,
     })
+  }
+
+  private myBookingsUpcomingWhere(userId: string, now: Date) {
+    return {
+      user_id: userId,
+      status: { in: ['PENDING', 'CONFIRMED'] as BookingStatus[] },
+      OR: [
+        { booked_at: { gte: now } },
+        { booking_type: 'ROOM' as BookingType, check_out_at: { gt: now } },
+      ],
+    }
   }
 
   async listMyBookings(
@@ -219,17 +299,10 @@ export class BookingsService {
     const now = new Date()
     const where =
       opts.tab === 'upcoming'
-        ? {
-            user_id: userId,
-            status: { in: ['PENDING', 'CONFIRMED'] as BookingStatus[] },
-            booked_at: { gte: now },
-          }
+        ? this.myBookingsUpcomingWhere(userId, now)
         : {
             user_id: userId,
-            OR: [
-              { status: { in: ['CANCELLED', 'COMPLETED', 'NO_SHOW'] as BookingStatus[] } },
-              { booked_at: { lt: now } },
-            ],
+            NOT: this.myBookingsUpcomingWhere(userId, now),
           }
 
     const [items, total] = await Promise.all([
@@ -242,7 +315,7 @@ export class BookingsService {
           merchant: {
             select: { id: true, business_name: true, slug: true, cover_image: true },
           },
-          service: { select: { id: true, name: true } },
+          service: { select: { id: true, name: true, price: true, nightly_rate: true, duration_min: true } },
           staff: { select: { id: true, name: true } },
         },
       }),

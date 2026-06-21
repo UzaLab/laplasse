@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Check, ShoppingBag } from 'lucide-react'
+import { BRAND_B2B_PITCH } from '@/lib/brandCopy'
 
 export function B2BSection() {
   return (
@@ -21,8 +22,7 @@ export function B2BSection() {
             Vous tenez un établissement de qualité ?
           </h2>
           <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto md:mx-0">
-            Rejoignez LaPlasse. Gérez vos réservations et vendez vos produits en ligne
-            sur une seule plateforme dédiée au premium ivoirien.
+            {BRAND_B2B_PITCH}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
             <Link

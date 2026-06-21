@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Star, MapPin, BadgeCheck, Zap } from 'lucide-react'
 import { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from './FavoriteButton'
-import { ShopPreviewSnippet } from './ShopPreviewSnippet'
+import { MerchantCardPreview } from './MerchantCardPreview'
 import { WhatsAppLink } from './WhatsAppLink'
 
 export interface SpotMerchantProps extends ApiMerchant {
@@ -12,6 +12,7 @@ export interface SpotMerchantProps extends ApiMerchant {
   has_reservation?: boolean
   has_marketplace?: boolean
   featured_product?: ApiMerchant['featured_product']
+  featured_vertical?: ApiMerchant['featured_vertical']
 }
 
 export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
@@ -93,14 +94,7 @@ export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
           )}
         </div>
 
-        {/* Micro-Marketplace */}
-        {merchant.has_marketplace && merchant.featured_product && (
-          <ShopPreviewSnippet
-            product={merchant.featured_product}
-            merchantSlug={merchant.slug}
-            className="mb-4"
-          />
-        )}
+        <MerchantCardPreview merchant={merchant} className="mb-4" />
 
         {/* CTA Buttons */}
         <div className={`grid gap-3 ${merchant.has_reservation ? 'grid-cols-2' : 'grid-cols-1'}`}>

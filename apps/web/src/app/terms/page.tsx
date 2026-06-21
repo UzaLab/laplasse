@@ -27,9 +27,10 @@ export default function TermsPage() {
         <section className="space-y-4 text-slate-700 leading-relaxed">
           <h2 className="text-xl font-bold text-slate-900">1. Objet</h2>
           <p>
-            LaPlasse est une plateforme de découverte de commerces locaux à Abidjan. Les présentes CGU
-            régissent l&apos;accès et l&apos;utilisation du site et des services associés par les
-            consommateurs et les marchands partenaires.
+            LaPlasse est une plateforme de découverte, de réservation et d&apos;achat auprès
+            de commerces locaux premium. Les présentes CGU régissent l&apos;accès et
+            l&apos;utilisation du site et des services associés par les consommateurs et les
+            marchands partenaires.
           </p>
 
           <h2 className="text-xl font-bold text-slate-900">2. Inscription et compte</h2>

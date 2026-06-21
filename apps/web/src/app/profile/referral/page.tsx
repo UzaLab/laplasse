@@ -7,6 +7,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { referralShareText } from '@/lib/brandCopy'
 
 interface ReferralStats {
   code: string
@@ -42,7 +43,7 @@ export default function ReferralPage() {
   const code = data?.code ?? '...'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
   const shareUrl = `${appUrl}/register?ref=${code}`
-  const shareText = `Rejoins LaPlasse avec mon code parrainage ${code} et découvre les meilleurs établissements d'Abidjan ! 🇨🇮`
+  const shareText = referralShareText(code)
 
   const copyCode = () => {
     navigator.clipboard.writeText(code)

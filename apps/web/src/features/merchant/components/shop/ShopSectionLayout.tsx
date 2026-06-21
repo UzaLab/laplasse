@@ -4,11 +4,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   ExternalLink,
+  FolderOpen,
   LayoutGrid,
   Package,
   Settings,
   ShoppingBag,
   Tag,
+  Truck,
 } from 'lucide-react'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { useAuthStore } from '@/stores/authStore'
@@ -18,8 +20,10 @@ import { cn } from '@/lib/utils'
 const TABS = [
   { href: '/merchant/shop', label: "Vue d'ensemble", icon: LayoutGrid, exact: true },
   { href: '/merchant/shop/products', label: 'Produits', icon: Package },
+  { href: '/merchant/shop/collections', label: 'Collections', icon: FolderOpen },
   { href: '/merchant/shop/orders', label: 'Commandes', icon: ShoppingBag },
   { href: '/merchant/shop/promotions', label: 'Promotions', icon: Tag },
+  { href: '/merchant/shop/delivery-zones', label: 'Livraison', icon: Truck },
   { href: '/merchant/shop/settings', label: 'Paramètres', icon: Settings },
 ] as const
 

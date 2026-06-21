@@ -4,6 +4,8 @@ import {
   PLACEHOLDER_PRODUCT_IMAGE,
   type Cart,
 } from '@/lib/marketplaceApi'
+import type { DeliveryQuoteItem } from '@/lib/geoApi'
+import { formatDeliveryVehicleDisplay } from '@/lib/deliveryVehicles'
 
 interface CheckoutOrderSummaryProps {
   cart: Pick<Cart, 'items' | 'subtotal' | 'currency' | 'item_count'>
@@ -12,6 +14,10 @@ interface CheckoutOrderSummaryProps {
   deliveryAddress?: string
   customerPhone?: string
   customerNote?: string
+  discountAmount?: number
+  deliveryFee?: number
+  deliveryQuotes?: DeliveryQuoteItem[]
+  freeDeliveryShopIds?: string[]
   references?: string[]
   className?: string
 }
@@ -23,6 +29,10 @@ export function CheckoutOrderSummary({
   deliveryAddress,
   customerPhone,
   customerNote,
+  discountAmount = 0,
+  deliveryFee = 0,
+  deliveryQuotes,
+  freeDeliveryShopIds = [],
   references,
   className = '',
 }: CheckoutOrderSummaryProps) {
@@ -63,6 +73,50 @@ export function CheckoutOrderSummary({
           <span>Sous-total ({itemLabel})</span>
           <span className="font-bold text-slate-900">{formatPrice(cart.subtotal, cart.currency)}</span>
         </div>
+        {discountAmount > 0 && (
+          <div className="flex justify-between text-sm text-emerald-700 font-medium">
+            <span>Remise promo</span>
+            <span className="font-bold">− {formatPrice(discountAmount, cart.currency)}</span>
+          </div>
+        )}
+        {deliveryType === 'DELIVERY' && (
+          <div className="flex justify-between text-sm text-slate-600 font-medium">
+            <span>Livraison</span>
+            <span className="font-bold text-slate-900">
+              {deliveryFee > 0 ? formatPrice(deliveryFee, cart.currency) : 'Gratuite'}
+            </span>
+          </div>
+        )}
+        {deliveryType === 'DELIVERY' && deliveryQuotes && deliveryQuotes.length > 0 && (
+          <ul className="space-y-2 text-xs text-slate-500">
+            {deliveryQuotes.map(q => {
+              const promoFree = freeDeliveryShopIds.includes(q.shop_id)
+              return (
+                <li key={q.shop_id} className="bg-slate-50 rounded-lg px-3 py-2">
+                  <span className="font-bold text-slate-700">{q.shop_name}</span>
+                  {q.available ? (
+                    <>
+                      {' '}— {q.zone_name && `${q.zone_name} · `}
+                      {formatDeliveryVehicleDisplay(q.vehicle ?? 'MOTO', q.eta_min_minutes, q.eta_max_minutes)}
+                      {' '}·{' '}
+                      {promoFree ? (
+                        <>
+                          <span className="line-through text-slate-400">{formatPrice(q.fee, cart.currency)}</span>
+                          {' '}
+                          <span className="text-emerald-700 font-bold">Offerte</span>
+                        </>
+                      ) : (
+                        formatPrice(q.fee, cart.currency)
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-red-600"> — {q.message ?? 'Indisponible'}</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
         <div className="flex justify-between text-sm text-slate-600 font-medium">
           <span>Mode de retrait</span>
           <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold">

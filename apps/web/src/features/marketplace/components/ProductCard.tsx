@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { Heart, Loader2, Plus, ShoppingBag, Sparkles } from 'lucide-react'
+import { Loader2, Plus, ShoppingBag, Sparkles } from 'lucide-react'
 import {
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
   type FeaturedProduct,
   type MarketplaceProduct,
 } from '@/lib/marketplaceApi'
+import { ProductFavoriteButton } from './ProductFavoriteButton'
 
 type ProductCardProduct = FeaturedProduct | MarketplaceProduct
 
@@ -75,14 +76,15 @@ export function ProductCard({
                 Best-seller
               </div>
             )}
-            <button
-              type="button"
-              onClick={e => e.preventDefault()}
-              className="absolute top-2 right-2 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-              aria-label="Favoris"
-            >
-              <Heart size={16} />
-            </button>
+            {'id' in product && product.id && (
+              <ProductFavoriteButton
+                productId={product.id}
+                productHref={href}
+                showToast={false}
+                className="absolute top-2 right-2 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                size={16}
+              />
+            )}
           </div>
         </Link>
 
@@ -158,14 +160,15 @@ export function ProductCard({
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             />
-            <button
-              type="button"
-              onClick={e => e.preventDefault()}
-              className="absolute top-4 right-4 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
-              aria-label="Favoris"
-            >
-              <Heart size={16} />
-            </button>
+            {'id' in product && product.id && (
+              <ProductFavoriteButton
+                productId={product.id}
+                productHref={href}
+                showToast={false}
+                className="absolute top-4 right-4 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center"
+                size={16}
+              />
+            )}
           </div>
         </Link>
         <div className="px-2">

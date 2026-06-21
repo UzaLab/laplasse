@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, Smartphone } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
-import { Suspense } from 'react'
+import { BRAND_AUTH_SUBTITLE } from '@/lib/brandCopy'
 
 type LoginMode = 'email' | 'otp'
 
@@ -124,7 +124,7 @@ function LoginForm() {
             </div>
             <span className="text-2xl font-extrabold text-slate-900 tracking-tight">LaPlasse</span>
           </Link>
-          <p className="text-slate-500 mt-2 text-sm">Découvrez les meilleures adresses d&apos;Abidjan</p>
+          <p className="text-slate-500 mt-2 text-sm">{BRAND_AUTH_SUBTITLE}</p>
         </div>
 
         <div className="bg-white rounded-[28px] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">

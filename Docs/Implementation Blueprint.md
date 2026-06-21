@@ -2,10 +2,29 @@
 
 ## Guide d'Exécution Pratique 0→1
 
-**Version :** 2.0 — Mise à jour complète (synthèse Tomes 0–24)
-**Statut :** Document de référence fondateur
+**Version :** 2.1 — Juin 2026 (aligné exécution V1.6)
+**Statut :** Document de référence fondateur — **complété par `REGLES_DEVELOPPEMENT.md` pour l'état réel du code**
 **Confidentialité :** Interne — LaPlasse
 **Date :** Juin 2026
+
+---
+
+## État d'exécution (juin 2026)
+
+> Ce bloc résume où en est le produit **au-delà du scope V0.5** décrit dans les sections historiques ci-dessous.
+> Source opérationnelle : **`Docs/REGLES_DEVELOPPEMENT.md` v2.0**.
+
+| Version (exécution) | Statut | Livrables clés |
+|--------------------|--------|----------------|
+| V0.5 | ✅ | Discovery Cocody |
+| V0.8 | ✅ | Loyalty, referral, promotions, sponsored search |
+| V0.9 | ✅ | Multi-établissements |
+| V1.0 | ✅ | Organisations, booking, ads, audit, simulateur abo |
+| V1.5 | ✅ | Marketplace ecommerce (simulateur paiement) |
+| **V1.6** | ✅ | Shop modulaire, spotlight, galerie produit, checkout 4 URLs |
+| V2.0 | Futur | Mobile Money réel, app native, livraison logistique |
+
+**Note numérotation :** dans ce Blueprint (Tomes 11/22), V1.5 = expansion géographique. Dans REGLES, V1.5 = marketplace. Les deux coexistent : vision vs delivery.
 
 ---
 
@@ -1164,7 +1183,7 @@ QA (local)
 
 # 12. Roadmap Produit (Tomes 11, 22)
 
-## Timeline
+## Timeline stratégique (vision Tomes)
 
 ```
 V0.5 — Functional MVP (juin → septembre 2026)
@@ -1180,7 +1199,7 @@ V1.0 — Production Ready (janvier → avril 2027)
   + Publicités sponsorisées
   + CRM basique, analytics avancés
 
-V1.5 — Growth Scale (avril → août 2027)
+V1.5 — Growth Scale (avril → août 2027)   ← stratégie Tomes
   + Expansion régionale (2e ville)
   + Nouveaux verticaux (hôtels, pharmacies)
   + Booking engine
@@ -1191,6 +1210,22 @@ V2.0 — Ecosystem Platform (août → décembre 2027)
   + Analytics prédictifs
   + Mobile app
 ```
+
+## Timeline exécution (juin 2026 — REGLES)
+
+Accélération par rapport au calendrier stratégique :
+
+```
+V0.5  ✅ Discovery
+V0.8  ✅ Rétention & monétisation lite
+V0.9  ✅ Multi-établissements
+V1.0  ✅ Booking + orgs + ads + audit
+V1.5  ✅ Marketplace ecommerce (simulateur)
+V1.6  ✅ Shop modulaire + checkout structuré + spotlight
+V2.0  → Mobile Money réel, app native, livraison ops
+```
+
+Parcours checkout V1.6 : `/cart` → `/checkout` → `/checkout/payment` → `/checkout/confirmation?status=…`
 
 ## KPIs fondateurs V0.5 (Tome 22)
 
@@ -1252,39 +1287,73 @@ chore: met à jour les dépendances Prisma
 
 ---
 
-# 15. Checklist de Lancement V0.5
+# 15. Checklist de Lancement
 
-## Technique
-- [ ] Monorepo initialisé (apps/web + apps/api)
-- [ ] Docker Compose : PostgreSQL + Redis + Meilisearch
-- [ ] Schéma Prisma migré et seedé
-- [ ] NestJS : auth JWT + RBAC fonctionnel
-- [ ] Meilisearch : index merchants indexé
-- [ ] Next.js : homepage + search + merchant page
-- [ ] Merchant signup flow complet (< 5 min)
-- [ ] Upload photos fonctionnel
-- [ ] Modération avis (PENDING → APPROVED)
-- [ ] Dashboard admin basique
+## V0.5 — Discovery (✅ livré juin 2026)
 
-## Produit
-- [ ] Recherche fonctionne (tolérance fautes, géo)
-- [ ] Catégories navigables
-- [ ] Profils marchands complets
-- [ ] Avis fonctionnels
-- [ ] Favoris fonctionnels
-- [ ] Merchant dashboard (vues, clics)
+### Technique
+- [x] Monorepo initialisé (apps/web + apps/api)
+- [x] Docker Compose : PostgreSQL + Redis + Meilisearch
+- [x] Schéma Prisma migré et seedé
+- [x] NestJS : auth JWT + RBAC fonctionnel
+- [x] Meilisearch : index merchants indexé
+- [x] Next.js : homepage + search + merchant page
+- [x] Merchant signup flow complet (< 5 min)
+- [x] Upload photos fonctionnel
+- [x] Modération avis (PENDING → APPROVED)
+- [x] Dashboard admin basique
 
-## Trust
-- [ ] OTP vérification marchands
-- [ ] Modération basique
-- [ ] Support / contact
-- [ ] CGU + politique de confidentialité
+### Produit
+- [x] Recherche fonctionne (tolérance fautes, géo)
+- [x] Catégories navigables
+- [x] Profils marchands complets
+- [x] Avis fonctionnels
+- [x] Favoris fonctionnels
+- [x] Merchant dashboard (vues, clics)
 
-## Business
+### Trust
+- [x] OTP vérification marchands
+- [x] Modération basique
+- [ ] CGU + politique de confidentialité (pages `/terms`, `/privacy` — contenu à valider juridiquement)
+
+### Business (KPIs terrain — en cours)
 - [ ] 50+ marchands actifs Cocody
 - [ ] Densité suffisante (restaus + salons)
 - [ ] Feedback marchands collecté
-- [ ] Search success rate mesuré
+- [ ] Search success rate mesuré (> 70 %)
+
+## V1.0 — Ops & monétisation (✅ livré)
+
+- [x] Booking engine (TABLE / APPOINTMENT / ROOM)
+- [x] Organisations + feature gating plans
+- [x] Simulateur abonnements SaaS
+- [x] Ads self-service, staff, audit log, fraude basique
+- [x] Déploiement Coolify (preprod + prod)
+
+## V1.5 — Marketplace (✅ livré)
+
+- [x] Produits, variantes, panier multi-boutiques
+- [x] Checkout simulé + commandes split par boutique
+- [x] Pages `/marketplace`, `/cart`, fiche produit, boutique
+- [ ] Mobile Money réel → V2+
+
+## V1.6 — Boutique modulaire (✅ livré)
+
+- [x] Entité `Shop`, module API, dashboard `/merchant/shop/*`
+- [x] Vitrines `/m/[slug]/boutique` et `/boutique/[slug]`
+- [x] Images produit multiples (`ProductImage`, max 10)
+- [x] Composition produit, `allow_pickup` / `allow_delivery`
+- [x] Checkout 4 étapes (URLs distinctes pour tracking PostHog)
+- [x] Marketplace spotlight (`GET /marketplace/spotlight`)
+- [ ] UI admin spotlight (API admin — interface web à compléter)
+
+## V2.0 — Prochaine frontière
+
+- [ ] Intégration Mobile Money réel (Wave, Orange, MTN)
+- [ ] Livraison opérationnelle (livreurs, statuts, tracking)
+- [ ] App native
+- [ ] Domaine `laplasse.ci` + monitoring UptimeRobot
+- [ ] Push FCM production
 
 ---
 
@@ -1305,22 +1374,25 @@ chore: met à jour les dépendances Prisma
 
 ---
 
-# 17. Prochaines Étapes Post-MVP (Tome 22)
+# 17. Prochaines Étapes
 
-## Semaines 6–8
-- Onboarding 50 marchands réels (Abidjan, Cocody)
-- Boucles de feedback terrain
-- Iterations rapides UX
-- Optimisation performance basée sur les métriques
+## Immédiat (post-V1.6)
 
-## Mois 3–4 : Monétisation
-- Plans subscription (Free / Starter / Growth)
-- Sponsored placement (top search)
-- Analytics marchand premium
+- UI admin marketplace spotlight (toggle boutiques épinglées)
+- Domaine `laplasse.ci` + UptimeRobot sur `/api/health`
+- Onboarding 50 marchands réels Cocody (validation terrain)
+- Aligner maquettes `Docs/maquettes/` (rebrand CIBOOKS → LaPlasse)
 
-## Mois 4–6 : Expansion
-- Playbook documenté (réplication Cocody → Yopougon)
-- Nouvelle ville si densité Cocody atteinte
+## V2.0 — Transactions réelles
+
+- Intégration Mobile Money (Wave / Orange / MTN)
+- Livraison opérationnelle (partenaires, tracking commande)
+- App native (React Native ou PWA avancée)
+
+## Expansion (Tomes — si densité Cocody atteinte)
+
+- Playbook réplication Cocody → Yopougon / Plateau
+- Nouvelle ville si KPIs densité validés
 
 ## Mois 6–12 : Features avancées
 - Booking engine (salons, restaurants)

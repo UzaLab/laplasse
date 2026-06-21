@@ -80,6 +80,30 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('guest/otp/send')
+  @HttpCode(HttpStatus.OK)
+  sendGuestOtp(@Body() dto: SendOtpDto) {
+    return this.authService.sendGuestOtp(dto.phone)
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('guest/otp/verify')
+  @HttpCode(HttpStatus.OK)
+  async verifyGuestOtp(
+    @Body() dto: VerifyOtpDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { user, access_token, refresh_token } = await this.authService.guestCheckoutWithPhoneOtp(
+      dto.phone,
+      dto.code,
+    )
+    setAuthCookies(res, this.config, access_token, refresh_token)
+    return { user }
+  }
+
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(

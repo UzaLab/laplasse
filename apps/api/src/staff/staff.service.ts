@@ -10,10 +10,39 @@ import { getCategoryBookingConfig } from '../common/booking-config'
 import { ServiceKind } from '../../generated/prisma/client'
 import { CreateServiceDto, CreateStaffDto } from './dto/staff.dto'
 import { CreateAvailabilityBlockDto, UpdateBookingSettingsDto } from './dto/offerings.dto'
+import { MAX_ROOM_IMAGES } from './dto/staff.dto'
 
 @Injectable()
 export class StaffService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeStringArray(value: unknown, max?: number): string[] {
+    if (!Array.isArray(value)) return []
+    const arr = value
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .map(s => s.trim())
+    return max != null ? arr.slice(0, max) : arr
+  }
+
+  private roomListingData(dto: Partial<CreateServiceDto>) {
+    const data: Record<string, unknown> = {}
+    if (dto.image_urls !== undefined) {
+      data.image_urls = this.normalizeStringArray(dto.image_urls, MAX_ROOM_IMAGES)
+    }
+    if (dto.amenities !== undefined) {
+      data.amenities = this.normalizeStringArray(dto.amenities)
+    }
+    if (dto.highlights !== undefined) {
+      data.highlights = this.normalizeStringArray(dto.highlights)
+    }
+    if (dto.bedrooms !== undefined) data.bedrooms = dto.bedrooms
+    if (dto.bathrooms !== undefined) data.bathrooms = dto.bathrooms
+    if (dto.beds !== undefined) data.beds = dto.beds
+    if (dto.property_type !== undefined) data.property_type = dto.property_type || null
+    if (dto.unit_type !== undefined) data.unit_type = dto.unit_type || null
+    if (dto.nightly_rate !== undefined) data.nightly_rate = dto.nightly_rate
+    return data
+  }
 
   private async resolveMerchant(userId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
@@ -207,6 +236,8 @@ export class StaffService {
     const merchant = await this.resolveMerchant(userId, merchantId)
     this.assertOfferingsPlan(merchant)
     const kind = dto.service_kind ?? this.defaultServiceKind(merchant.category.slug)
+    const nightlyRate = dto.nightly_rate ?? (kind === 'ROOM_TYPE' ? dto.price : undefined)
+    const price = dto.price ?? nightlyRate
     return this.prisma.merchantService.create({
       data: {
         merchant_id: merchant.id,
@@ -214,9 +245,11 @@ export class StaffService {
         service_kind: kind,
         description: dto.description,
         duration_min: dto.duration_min ?? this.defaultDuration(kind),
-        price: dto.price,
+        price,
+        nightly_rate: nightlyRate ?? price,
         capacity: dto.capacity,
         staff_id: dto.staff_id || null,
+        ...this.roomListingData(dto),
       },
       include: { staff: { select: { id: true, name: true } } },
     })
@@ -232,11 +265,29 @@ export class StaffService {
     this.assertOfferingsPlan(merchant)
     const row = await this.prisma.merchantService.findFirst({ where: { id, merchant_id: merchant.id } })
     if (!row) throw new NotFoundException('Prestation introuvable')
+    const nightlyRate = dto.nightly_rate ?? (dto.price !== undefined && row.service_kind === 'ROOM_TYPE' ? dto.price : undefined)
+    const price = dto.price ?? (nightlyRate !== undefined ? nightlyRate : undefined)
+    const {
+      image_urls: _iu,
+      amenities: _am,
+      highlights: _hi,
+      bedrooms: _br,
+      bathrooms: _ba,
+      beds: _be,
+      property_type: _pt,
+      unit_type: _ut,
+      nightly_rate: _nr,
+      price: _pr,
+      ...rest
+    } = dto
     return this.prisma.merchantService.update({
       where: { id },
       data: {
-        ...dto,
+        ...rest,
+        ...(price !== undefined ? { price } : {}),
+        ...(nightlyRate !== undefined ? { nightly_rate: nightlyRate } : {}),
         staff_id: dto.staff_id !== undefined ? (dto.staff_id || null) : undefined,
+        ...this.roomListingData(dto),
       },
       include: { staff: { select: { id: true, name: true } } },
     })

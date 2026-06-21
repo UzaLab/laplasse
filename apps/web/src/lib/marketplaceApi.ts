@@ -1,6 +1,12 @@
 import { authApiFetch } from './authFetch'
 import { authUrl } from './authClient'
+import { countryRequestHeaders } from './country'
 import { shopApiFetch } from './shopApi'
+import { fetchWithTimeout } from './fetchWithTimeout'
+
+export type FetchResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -10,6 +16,8 @@ export type OrderStatus =
   | 'CONFIRMED'
   | 'PREPARING'
   | 'READY'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
   | 'COMPLETED'
   | 'CANCELLED'
   | 'REFUNDED'
@@ -39,6 +47,8 @@ export interface MarketplaceProduct {
   allow_delivery?: boolean
   has_variants?: boolean
   variants?: ProductVariant[]
+  category_id?: string | null
+  category?: { id: string; name: string; slug: string; parent_id?: string | null } | null
   merchant?: {
     id: string
     business_name: string
@@ -59,7 +69,29 @@ export interface FeaturedProduct {
 
 export interface MarketplaceCatalogProduct extends FeaturedProduct {
   created_at?: string
+  category?: { id: string; name: string; slug: string } | null
   merchant: { business_name: string; slug: string; logo?: string | null }
+}
+
+export interface ProductCategoryNode {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  sort_order: number
+  children: ProductCategoryNode[]
+}
+
+export interface FavoriteProduct {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  image_url: string | null
+  status: string
+  stock_quantity: number
+  merchant: { id: string; business_name: string; slug: string }
 }
 
 export interface MarketplaceBoutique {
@@ -87,6 +119,15 @@ export interface CartItem {
   quantity: number
   unit_price: number
   line_total: number
+  line_kind?: 'menu' | 'product'
+  menu_item_id?: string | null
+  menu_item?: {
+    id: string
+    name: string
+    price: number
+    currency: string
+    image_url?: string | null
+  } | null
   variant_id?: string | null
   variant?: ProductVariant | null
   product: MarketplaceProduct & {
@@ -106,6 +147,7 @@ export interface Cart {
   items: CartItem[]
   subtotal: number
   currency: string
+  kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   merchant: { id: string; business_name: string; slug: string } | null
   merchants: CartMerchantGroup[]
   merchant_count: number
@@ -125,6 +167,11 @@ export interface OrderItem {
   unit_price: number
   quantity: number
   line_total: number
+  product?: {
+    id: string
+    slug: string
+    image_url?: string | null
+  } | null
 }
 
 export interface Order {
@@ -132,12 +179,20 @@ export interface Order {
   status: OrderStatus
   delivery_type: DeliveryType
   delivery_address?: string | null
+  delivery_city_id?: string | null
+  delivery_commune_id?: string | null
+  delivery_district?: string | null
+  delivery_city?: { id: string; name: string } | null
+  delivery_commune?: { id: string; name: string } | null
   customer_note?: string | null
   customer_phone?: string | null
   subtotal: number
   total: number
+  discount_amount?: number | null
+  delivery_fee?: number | null
   created_at: string
   items: OrderItem[]
+  promotion?: { title: string; code: string | null } | null
   merchant?: {
     business_name: string
     slug: string
@@ -151,9 +206,25 @@ export interface Order {
     phone?: string | null
   }
   payment?: {
+    id?: string
     status: string
     reference: string
     paid_at?: string | null
+  } | null
+  delivery_job?: {
+    id: string
+    status: string
+    tracking_token: string
+    eta_minutes: number | null
+    assigned_at: string | null
+    picked_up_at: string | null
+    delivered_at: string | null
+    courier: {
+      id?: string
+      full_name: string
+      phone: string | null
+      vehicle: string | null
+    } | null
   } | null
 }
 
@@ -168,6 +239,8 @@ export interface CheckoutOrderResult {
 export interface CheckoutResult {
   orders: CheckoutOrderResult[]
   total: number
+  total_discount?: number
+  total_delivery_fee?: number
   currency: string
   provider: string
   instructions: string
@@ -175,6 +248,24 @@ export interface CheckoutResult {
   paymentId: string
   reference: string
   amount: number
+}
+
+export interface AppliedPromotionInput {
+  shop_id: string
+  promotion_id: string
+  code: string
+}
+
+export interface CartPromoApplication {
+  shop_id: string
+  shop_name: string
+  valid: boolean
+  code: string
+  promotion_id?: string
+  promotion_title?: string
+  discount: number
+  free_delivery: boolean
+  message: string
 }
 
 export interface ConfirmPaymentResult {
@@ -203,6 +294,7 @@ export interface CreateProductInput {
   allow_pickup?: boolean
   allow_delivery?: boolean
   variants?: ProductVariantInput[]
+  category_id?: string
 }
 
 export interface UpdateProductInput {
@@ -217,13 +309,19 @@ export interface UpdateProductInput {
   allow_pickup?: boolean
   allow_delivery?: boolean
   variants?: ProductVariantInput[]
+  category_id?: string
 }
 
 export interface CheckoutInput {
   delivery_type: DeliveryType
   delivery_address?: string
+  delivery_city_id?: string
+  delivery_commune_id?: string
+  delivery_district?: string
+  delivery_address_detail?: string
   customer_note?: string
-  customer_phone?: string
+  customer_phone: string
+  applied_promotions?: AppliedPromotionInput[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -235,12 +333,28 @@ export function formatPrice(amount: number | null | undefined, currency = 'XOF')
 }
 
 async function publicFetch<T>(path: string): Promise<T | null> {
+  const result = await fetchPublicJson<T>(path)
+  return result.ok ? result.data : null
+}
+
+export async function fetchPublicJson<T>(path: string, options?: RequestInit): Promise<FetchResult<T>> {
   try {
-    const res = await fetch(authUrl(path))
-    if (!res.ok) return null
-    return res.json() as Promise<T>
-  } catch {
-    return null
+    const res = await fetchWithTimeout(authUrl(path), {
+      ...options,
+      headers: {
+        ...countryRequestHeaders(),
+        ...(options?.headers as Record<string, string> | undefined),
+      },
+    })
+    if (!res.ok) {
+      return { ok: false, error: await parseError(res) }
+    }
+    return { ok: true, data: await res.json() as T }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { ok: false, error: 'La requête a expiré. Vérifiez votre connexion.' }
+    }
+    return { ok: false, error: 'Impossible de joindre le serveur. Réessayez.' }
   }
 }
 
@@ -259,21 +373,30 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+export { parseError as parseApiError }
+
 // ─── Public ───────────────────────────────────────────────────────────────────
 
 export function fetchFeaturedProducts() {
   return publicFetch<FeaturedProduct[]>('/marketplace/featured')
 }
 
+export function fetchProductCategories(country?: string) {
+  const qs = country ? `?country=${encodeURIComponent(country)}` : ''
+  return publicFetch<ProductCategoryNode[]>(`/marketplace/product-categories${qs}`)
+}
+
 export function fetchMarketplaceProducts(params?: {
   q?: string
   merchant?: string
+  category?: string
   sort?: string
   maxPrice?: number
 }) {
   const qs = new URLSearchParams()
   if (params?.q) qs.set('q', params.q)
   if (params?.merchant) qs.set('merchant', params.merchant)
+  if (params?.category) qs.set('category', params.category)
   if (params?.sort) qs.set('sort', params.sort)
   if (params?.maxPrice != null) qs.set('maxPrice', String(params.maxPrice))
   const query = qs.toString()
@@ -290,8 +413,63 @@ export function fetchMarketplaceSpotlight() {
   return publicFetch<MarketplaceSpotlightShop[]>('/marketplace/spotlight')
 }
 
-export function fetchMerchantProducts(shopSlug: string) {
-  return publicFetch<MarketplaceProduct[]>(`/shops/${shopSlug}/products`)
+export interface ProductCategoryOption {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+}
+
+export function fetchMerchantProducts(
+  shopSlug: string,
+  params?: { category?: string; q?: string; collection?: string },
+) {
+  const qs = new URLSearchParams()
+  if (params?.category) qs.set('category', params.category)
+  if (params?.q) qs.set('q', params.q)
+  if (params?.collection) qs.set('collection', params.collection)
+  const query = qs.toString()
+  return publicFetch<MarketplaceProduct[]>(
+    `/shops/${shopSlug}/products${query ? `?${query}` : ''}`,
+  )
+}
+
+export interface ShopCollectionPublic {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  product_count: number
+}
+
+export function fetchShopCollections(shopSlug: string) {
+  return publicFetch<ShopCollectionPublic[]>(`/shops/${shopSlug}/collections`)
+}
+
+export interface ShopCollectionMine {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  sort_order: number
+  is_active: boolean
+  product_count: number
+  product_ids?: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ShopCollectionProduct {
+  id: string
+  name: string
+  slug: string
+  status: string
+  image_url?: string | null
+  sort_order: number
+}
+
+export function fetchShopProductCategories(shopSlug: string) {
+  return publicFetch<ProductCategoryOption[]>(`/shops/${shopSlug}/product-categories`)
 }
 
 export function fetchProductDetail(shopSlug: string, productSlug: string) {
@@ -337,6 +515,21 @@ export async function clearCart(): Promise<boolean> {
   return res.ok
 }
 
+export async function applyCartPromo(
+  code: string,
+  shopId?: string,
+): Promise<
+  | { applications: CartPromoApplication[]; total_discount: number }
+  | { error: string }
+> {
+  const res = await authApiFetch('/cart/promo/apply', {
+    method: 'POST',
+    body: JSON.stringify({ code, ...(shopId ? { shop_id: shopId } : {}) }),
+  })
+  if (!res.ok) return { error: await parseError(res) }
+  return res.json() as Promise<{ applications: CartPromoApplication[]; total_discount: number }>
+}
+
 // ─── Orders (auth) ────────────────────────────────────────────────────────────
 
 export async function checkout(
@@ -377,6 +570,35 @@ export async function confirmBatchOrderPayments(
   return { result }
 }
 
+export interface ResumePaymentSession {
+  checkoutResult: CheckoutResult
+  cartSnapshot: {
+    items: CartItem[]
+    subtotal: number
+    currency: string
+    item_count: number
+    merchant_count: number
+    merchants: CartMerchantGroup[]
+    merchant: Cart['merchant']
+  }
+  deliveryType: DeliveryType
+  deliveryAddress?: string
+  customerPhone?: string
+  customerNote?: string
+  discountAmount?: number
+  deliveryFee?: number
+}
+
+export async function fetchResumePayment(
+  orderIds: string[],
+): Promise<{ session: ResumePaymentSession | null; error?: string }> {
+  const qs = orderIds.map(id => encodeURIComponent(id)).join(',')
+  const res = await authApiFetch(`/orders/pay/resume?orderIds=${qs}`)
+  if (!res.ok) return { session: null, error: await parseError(res) }
+  const session = (await res.json()) as ResumePaymentSession
+  return { session }
+}
+
 export async function fetchMyOrders(): Promise<Order[]> {
   const res = await authApiFetch('/orders/mine')
   const data = await parseJson<Order[]>(res)
@@ -398,6 +620,14 @@ export async function fetchMerchantOrders(
   const res = await shopApiFetch(path, shopId)
   const data = await parseJson<Order[]>(res)
   return data ?? []
+}
+
+export async function fetchMerchantOrder(
+  orderId: string,
+  shopId: string | null | undefined,
+): Promise<Order | null> {
+  const res = await shopApiFetch(`/orders/merchant/${orderId}`, shopId)
+  return parseJson<Order>(res)
 }
 
 export async function updateOrderStatus(
@@ -465,6 +695,8 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   CONFIRMED: 'Confirmée',
   PREPARING: 'En préparation',
   READY: 'Prête',
+  OUT_FOR_DELIVERY: 'En livraison',
+  DELIVERED: 'Livrée',
   COMPLETED: 'Terminée',
   CANCELLED: 'Annulée',
   REFUNDED: 'Remboursée',
@@ -475,6 +707,8 @@ export const ORDER_STATUS_STYLES: Record<string, string> = {
   CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   PREPARING: 'bg-blue-50 text-blue-700 border-blue-200',
   READY: 'bg-violet-50 text-violet-700 border-violet-200',
+  OUT_FOR_DELIVERY: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  DELIVERED: 'bg-teal-50 text-teal-700 border-teal-200',
   COMPLETED: 'bg-slate-50 text-slate-600 border-slate-200',
   CANCELLED: 'bg-red-50 text-red-600 border-red-200',
   REFUNDED: 'bg-slate-50 text-slate-500 border-slate-200',

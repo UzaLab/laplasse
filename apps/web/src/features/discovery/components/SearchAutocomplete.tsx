@@ -3,16 +3,30 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Search, BadgeCheck, Loader2, TrendingUp, Store } from 'lucide-react'
+import { Search, BadgeCheck, Loader2, TrendingUp, Store, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
+import { countryRequestHeaders } from '@/lib/country'
+import { formatPrice } from '@/lib/marketplaceApi'
 
-interface Suggestion {
+interface MerchantSuggestion {
   id: string
   business_name: string
   slug: string
   category_name: string
   district: string | null
   verification_status: string
+  _highlight: string | null
+}
+
+interface ProductSuggestion {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  category_name: string | null
+  merchant: { business_name: string; slug: string }
   _highlight: string | null
 }
 
@@ -29,6 +43,10 @@ interface Props {
   size?: 'sm' | 'md' | 'lg'
 }
 
+function getApiUrl(): string {
+  return process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+}
+
 function useDebouncedValue<T>(value: T, delay: number) {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
@@ -38,8 +56,19 @@ function useDebouncedValue<T>(value: T, delay: number) {
   return debounced
 }
 
+async function fetchSearchJson<T>(path: string): Promise<T> {
+  const res = await fetchWithTimeout(`${getApiUrl()}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...countryRequestHeaders(),
+    },
+  })
+  if (!res.ok) throw new Error('Search API error')
+  return res.json() as Promise<T>
+}
+
 export function SearchAutocomplete({
-  placeholder = 'Restaurant, Spa, Concept Store…',
+  placeholder = 'Établissements, produits, services…',
   navigateTo = 'search',
   onSearch,
   size = 'md',
@@ -47,7 +76,8 @@ export function SearchAutocomplete({
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [merchants, setMerchants] = useState<MerchantSuggestion[]>([])
+  const [products, setProducts] = useState<ProductSuggestion[]>([])
   const [trending, setTrending] = useState<TrendingItem[]>([])
   const [loading, setLoading] = useState(false)
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 })
@@ -60,22 +90,31 @@ export function SearchAutocomplete({
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/search/trending?limit=6`)
-      .then(r => r.ok ? r.json() : [])
+    fetchSearchJson<TrendingItem[]>('/search/trending?limit=6')
       .then(data => setTrending(Array.isArray(data) ? data : []))
       .catch(() => {})
   }, [])
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
-      setSuggestions([])
+      setMerchants([])
+      setProducts([])
       return
     }
     setLoading(true)
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/search/autocomplete?q=${encodeURIComponent(debouncedQuery)}&limit=6`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { setSuggestions(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => { setSuggestions([]); setLoading(false) })
+    fetchSearchJson<{ merchants: MerchantSuggestion[]; products: ProductSuggestion[] }>(
+      `/search/autocomplete/unified?q=${encodeURIComponent(debouncedQuery)}&limit=8`,
+    )
+      .then(data => {
+        setMerchants(Array.isArray(data.merchants) ? data.merchants : [])
+        setProducts(Array.isArray(data.products) ? data.products : [])
+        setLoading(false)
+      })
+      .catch(() => {
+        setMerchants([])
+        setProducts([])
+        setLoading(false)
+      })
   }, [debouncedQuery])
 
   const updatePanelPos = useCallback(() => {
@@ -115,29 +154,29 @@ export function SearchAutocomplete({
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    const q = query.trim()
-    if (!q) return
+  const goToSearch = useCallback((q: string) => {
     setOpen(false)
     if (navigateTo === 'search' || !onSearch) {
       router.push(`/search?q=${encodeURIComponent(q)}`)
     } else {
       onSearch(q)
     }
-  }, [query, navigateTo, onSearch, router])
+  }, [navigateTo, onSearch, router])
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
+    const q = query.trim()
+    if (!q) return
+    goToSearch(q)
+  }, [query, goToSearch])
 
   const handleTrending = (q: string) => {
     setQuery(q)
-    setOpen(false)
-    if (navigateTo === 'search' || !onSearch) {
-      router.push(`/search?q=${encodeURIComponent(q)}`)
-    } else {
-      onSearch?.(q)
-    }
+    goToSearch(q)
   }
 
-  const showDropdown = open && (suggestions.length > 0 || (!query.trim() && trending.length > 0) || loading)
+  const hasSuggestions = merchants.length > 0 || products.length > 0
+  const showDropdown = open && (hasSuggestions || (!query.trim() && trending.length > 0) || loading)
 
   const inputHeight = size === 'sm' ? 'h-11' : size === 'lg' ? 'h-16' : 'h-14'
   const inputText   = size === 'sm' ? 'text-sm' : 'text-base'
@@ -148,7 +187,7 @@ export function SearchAutocomplete({
       <div className="fixed inset-0 z-[200]" aria-hidden onClick={() => setOpen(false)} />
       <div
         id="search-autocomplete-portal"
-        className="fixed z-[201] bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/40 overflow-hidden"
+        className="fixed z-[201] bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/40 overflow-hidden max-h-[min(70vh,480px)] overflow-y-auto"
         style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width }}
         role="listbox"
       >
@@ -167,7 +206,6 @@ export function SearchAutocomplete({
                   >
                     <Search size={13} className="text-slate-300 shrink-0" />
                     <span className="text-sm font-medium text-slate-700 flex-1">{t.query}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">{t.count}</span>
                   </button>
                 </li>
               ))}
@@ -175,42 +213,84 @@ export function SearchAutocomplete({
           </div>
         )}
 
-        {suggestions.length > 0 && (
-          <ul className="py-1">
-            {suggestions.map(s => (
-              <li key={s.id}>
-                <Link
-                  href={`/m/${s.slug}`}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                    <Store size={15} className="text-slate-500" strokeWidth={2} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="text-sm font-bold text-slate-900 [&_mark]:bg-amber-100 [&_mark]:text-amber-700 [&_mark]:rounded"
-                      dangerouslySetInnerHTML={{ __html: s._highlight ?? s.business_name }}
-                    />
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {s.category_name}{s.district ? ` · ${s.district}` : ''}
-                    </p>
-                  </div>
-                  {s.verification_status === 'VERIFIED' && (
-                    <BadgeCheck size={14} className="text-blue-500 shrink-0" />
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        {merchants.length > 0 && (
+          <div className={products.length > 0 ? 'border-b border-slate-100' : ''}>
+            <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Store size={10} /> Établissements
+            </p>
+            <ul className="py-1">
+              {merchants.map(s => (
+                <li key={s.id}>
+                  <Link
+                    href={`/m/${s.slug}`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                      <Store size={15} className="text-slate-500" strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-bold text-slate-900 [&_mark]:bg-amber-100 [&_mark]:text-amber-700 [&_mark]:rounded"
+                        dangerouslySetInnerHTML={{ __html: s._highlight ?? s.business_name }}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {s.category_name}{s.district ? ` · ${s.district}` : ''}
+                      </p>
+                    </div>
+                    {s.verification_status === 'VERIFIED' && (
+                      <BadgeCheck size={14} className="text-blue-500 shrink-0" />
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div>
+            <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <ShoppingBag size={10} /> Produits
+            </p>
+            <ul className="py-1">
+              {products.map(p => (
+                <li key={p.id}>
+                  <Link
+                    href={`/m/${p.merchant.slug}/p/${p.slug}`}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                      <ShoppingBag size={15} className="text-brand-500" strokeWidth={2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-bold text-slate-900 truncate [&_mark]:bg-amber-100 [&_mark]:text-amber-700 [&_mark]:rounded"
+                        dangerouslySetInnerHTML={{ __html: p._highlight ?? p.name }}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        {p.merchant.business_name}
+                        {p.category_name ? ` · ${p.category_name}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-brand-600 shrink-0">
+                      {formatPrice(p.price, p.currency)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {query.trim().length >= 2 && (
           <div className="border-t border-slate-100">
             <button
               type="button"
-              onClick={() => { setOpen(false); router.push(`/search?q=${encodeURIComponent(query.trim())}`) }}
+              onClick={() => goToSearch(query.trim())}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 transition-colors text-left"
             >
               <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
@@ -255,7 +335,7 @@ export function SearchAutocomplete({
           {query && (
             <button
               type="button"
-              onClick={() => { setQuery(''); setSuggestions([]); inputRef.current?.focus() }}
+              onClick={() => { setQuery(''); setMerchants([]); setProducts([]); inputRef.current?.focus() }}
               className="text-slate-300 hover:text-slate-500 text-lg leading-none transition-colors shrink-0"
               aria-label="Effacer"
             >

@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
-  Heart,
   Loader2,
   Minus,
   Plus,
@@ -32,6 +31,8 @@ import {
   type ProductVariant,
 } from '@/lib/marketplaceApi'
 import { ProductCard } from '@/features/marketplace/components/ProductCard'
+import { ProductFavoriteButton } from '@/features/marketplace/components/ProductFavoriteButton'
+import { ProductReviewsSection } from '@/features/marketplace/components/ProductReviewsSection'
 import { ProductHtmlContent } from '@/components/ui/ProductHtmlContent'
 import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
 import { notify } from '@/lib/notify'
@@ -262,13 +263,14 @@ export default function ProductDetailPage() {
                     </span>
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="absolute top-4 right-4 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-white transition-all shadow-sm"
-                  aria-label="Favoris"
-                >
-                  <Heart size={24} />
-                </button>
+                {product.id && (
+                  <ProductFavoriteButton
+                    productId={product.id}
+                    productHref={`/m/${params.slug}/p/${params.productSlug}`}
+                    className="absolute top-4 right-4 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all shadow-sm"
+                    size={24}
+                  />
+                )}
               </div>
 
               {thumbnails.length > 1 && (
@@ -472,7 +474,7 @@ export default function ProductDetailPage() {
                         <h4 className="font-bold text-slate-900 text-sm">Livraison</h4>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {locationLabel
-                            ? `Disponible à ${merchantDetail?.location?.city ?? 'Abidjan'}.`
+                            ? `Disponible à ${merchantDetail?.location?.city ?? 'près de chez vous'}.`
                             : 'Livraison disponible à la commande.'}
                         </p>
                       </div>
@@ -570,31 +572,7 @@ export default function ProductDetailPage() {
             )}
 
             {activeTab === 'reviews' && (
-              <div className="text-center py-8">
-                {reviewCount > 0 && avgRating != null ? (
-                  <>
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <StarRating rating={avgRating} />
-                      <span className="text-2xl font-extrabold text-slate-900">{avgRating}</span>
-                      <span className="text-slate-500">({reviewCount} avis sur l&apos;établissement)</span>
-                    </div>
-                    <Link
-                      href={`/m/${slug}#avis`}
-                      className="inline-flex items-center gap-2 text-brand-600 font-bold hover:text-brand-700"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      Voir tous les avis <ArrowRight size={16} />
-                    </Link>
-                  </>
-                ) : (
-                  <p className="text-slate-500">
-                    Aucun avis pour le moment.{' '}
-                    <Link href={`/m/${slug}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
-                      Consulter la fiche établissement
-                    </Link>
-                  </p>
-                )}
-              </div>
+              <ProductReviewsSection productSlug={productSlug} shopSlug={slug} />
             )}
           </div>
         </div>

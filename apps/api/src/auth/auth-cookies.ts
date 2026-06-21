@@ -47,6 +47,16 @@ export function getRefreshTokenFromRequest(req: Request): string | null {
   return null
 }
 
+export function getAccessTokenFromRequest(req: Request, authHeader?: string): string | null {
+  const fromCookie = req.cookies?.[ACCESS_COOKIE]
+  if (typeof fromCookie === 'string' && fromCookie.length > 0) return fromCookie
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim()
+    if (token.length > 0) return token
+  }
+  return null
+}
+
 function parseMaxAgeMs(expires: string): number {
   const match = expires.match(/^(\d+)([smhd])$/)
   if (!match) return 15 * 60 * 1000

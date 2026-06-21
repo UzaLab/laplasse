@@ -6,6 +6,7 @@ import { Check, Zap, Crown, Star, Loader2, BadgeCheck } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
+import { BRAND_MERCHANT_PLANS_TITLE } from '@/lib/brandCopy'
 import { PaymentSimulator } from '@/features/merchant/components/PaymentSimulator'
 import type { SubscriptionPlan } from '@/lib/planLimits'
 
@@ -141,11 +142,11 @@ export default function MerchantPlansPage() {
         <div className="text-center mb-12">
           <p className="text-xs font-bold text-amber-600 uppercase tracking-widest mb-3">LaPlasse Plans</p>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 mb-4">
-            Développez votre visibilité sur Abidjan
+            {BRAND_MERCHANT_PLANS_TITLE}
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto">
-            Choisissez le plan adapté à votre établissement et démarquez-vous des milliers
-            d&apos;adresses sur LaPlasse.
+            Choisissez le plan adapté à votre établissement et démarquez-vous sur LaPlasse,
+            là où vos clients vous cherchent.
           </p>
         </div>
 

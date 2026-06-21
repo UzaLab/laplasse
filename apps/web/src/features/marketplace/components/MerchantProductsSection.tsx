@@ -9,9 +9,15 @@ import { ProductCard } from './ProductCard'
 interface MerchantProductsSectionProps {
   merchantSlug: string
   merchantName: string
+  /** Intégré dans les onglets fiche établissement (sans titre section dupliqué) */
+  embedded?: boolean
 }
 
-export function MerchantProductsSection({ merchantSlug, merchantName }: MerchantProductsSectionProps) {
+export function MerchantProductsSection({
+  merchantSlug,
+  merchantName,
+  embedded = false,
+}: MerchantProductsSectionProps) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -38,19 +44,31 @@ export function MerchantProductsSection({ merchantSlug, merchantName }: Merchant
     )
   }
 
-  if (products.length === 0) return null
+  if (products.length === 0) {
+    if (embedded) {
+      return (
+        <div className="text-center py-16 px-6 bg-white rounded-3xl border border-slate-100">
+          <ShoppingBag size={40} className="text-slate-200 mx-auto mb-4" />
+          <p className="font-bold text-slate-700">Boutique en cours de préparation</p>
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <ShoppingBag size={20} className="text-amber-500" />
-          Boutique en ligne
-        </h3>
-        <span className="text-sm text-slate-400 font-medium">
-          {products.length} produit{products.length > 1 ? 's' : ''}
-        </span>
-      </div>
+      {!embedded && (
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <ShoppingBag size={20} className="text-amber-500" />
+            Boutique en ligne
+          </h3>
+          <span className="text-sm text-slate-400 font-medium">
+            {products.length} produit{products.length > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         {products.slice(0, 6).map((product, index) => (

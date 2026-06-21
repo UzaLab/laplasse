@@ -11,7 +11,30 @@ import {
   planLimitMessage,
 } from '../common/plan-limits'
 import { OrganizationType } from '../../generated/prisma/client'
-import { attachShopPreviewsToMerchants } from '../marketplace/shop-preview'
+import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
+
+const DEFAULT_CITY_BY_COUNTRY: Record<string, string> = {
+  CI: 'Abidjan',
+  BF: 'Ouagadougou',
+  SN: 'Dakar',
+}
+
+function defaultCityForCountry(country: string) {
+  return DEFAULT_CITY_BY_COUNTRY[country.toUpperCase()] ?? 'Abidjan'
+}
+
+function buildLocationFilter(opts: { city?: string; district?: string; country?: string }) {
+  const country = (opts.country ?? 'CI').toUpperCase()
+  return {
+    country,
+    ...(opts.city
+      ? { city: { equals: opts.city, mode: 'insensitive' as const } }
+      : {}),
+    ...(opts.district
+      ? { district: { contains: opts.district, mode: 'insensitive' as const } }
+      : {}),
+  }
+}
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -87,13 +110,13 @@ export class MerchantsService {
   // ── Liste publique ──────────────────────────────────────────────────────────
 
   async findAll(query: QueryMerchantsDto) {
+    const country = (query.country ?? 'CI').toUpperCase()
     const where = {
       is_active: true,
-      ...(query.city && {
-        location: { city: { equals: query.city, mode: 'insensitive' as const } },
-      }),
-      ...(query.district && {
-        location: { district: { contains: query.district, mode: 'insensitive' as const } },
+      location: buildLocationFilter({
+        city: query.city,
+        district: query.district,
+        country,
       }),
       ...(query.category && {
         category: { slug: query.category },
@@ -114,7 +137,7 @@ export class MerchantsService {
     const formatted = merchants.map(m => this.formatMerchant(m))
 
     return {
-      data: await attachShopPreviewsToMerchants(this.prisma, formatted),
+      data: await attachCardPreviewsToMerchants(this.prisma, formatted),
       meta: {
         total,
         limit: query.limit ?? 20,
@@ -123,10 +146,12 @@ export class MerchantsService {
     }
   }
 
-  async findFeatured(city = 'Abidjan', limit = 6) {
+  async findFeatured(city?: string, limit = 6, country = 'CI') {
+    const cc = country.toUpperCase()
+    const resolvedCity = city ?? defaultCityForCountry(cc)
     const baseWhere = {
       is_active: true,
-      location: { city: { equals: city, mode: 'insensitive' as const } },
+      location: buildLocationFilter({ city: resolvedCity, country: cc }),
     }
 
     const verified = await this.prisma.merchant.findMany({
@@ -151,20 +176,19 @@ export class MerchantsService {
       merchants = [...verified, ...fallback]
     }
 
-    return attachShopPreviewsToMerchants(
+    return attachCardPreviewsToMerchants(
       this.prisma,
       merchants.map(m => this.formatMerchant(m)),
     )
   }
 
-  async findNearby(city = 'Abidjan', district?: string, lat?: number, lng?: number, radiusKm = 2, limit = 6) {
+  async findNearby(city?: string, district?: string, lat?: number, lng?: number, radiusKm = 2, limit = 6, country = 'CI') {
+    const cc = country.toUpperCase()
+    const resolvedCity = city ?? defaultCityForCountry(cc)
     const merchants = await this.prisma.merchant.findMany({
       where: {
         is_active: true,
-        location: {
-          city: { equals: city, mode: 'insensitive' },
-          ...(district && { district: { contains: district, mode: 'insensitive' } }),
-        },
+        location: buildLocationFilter({ city: resolvedCity, district, country: cc }),
       },
       select: MERCHANT_PUBLIC_SELECT,
       orderBy: { trust_score: 'desc' },
@@ -192,7 +216,7 @@ export class MerchantsService {
         .sort((a, b) => a._distance_km - b._distance_km)
         .slice(0, limit)
 
-      return attachShopPreviewsToMerchants(
+      return attachCardPreviewsToMerchants(
         this.prisma,
         withDistance.map(({ _distance_km, ...m }) => {
           const formatted = this.formatMerchant(m as Record<string, unknown> & { id: string })
@@ -201,7 +225,7 @@ export class MerchantsService {
       )
     }
 
-    return attachShopPreviewsToMerchants(
+    return attachCardPreviewsToMerchants(
       this.prisma,
       merchants.map(m => this.formatMerchant(m)),
     )

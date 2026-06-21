@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -11,6 +12,7 @@ import { MarketplaceSection } from '@/features/discovery/components/MarketplaceS
 import { B2BSection } from '@/features/discovery/components/B2BSection'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
+import { getDefaultCity, getCountryFromCookieStore, COUNTRY_COOKIE } from '@/lib/country'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,9 +34,12 @@ function toCategory(c: ApiCategory) {
 }
 
 export default async function HomePage() {
+  const cookieStore = await cookies()
+  const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
+  const defaultCity = getDefaultCity(country)
   const [categoriesRaw, merchantsRaw] = await Promise.allSettled([
     api.categories.list(),
-    api.merchants.list({ city: 'Abidjan', limit: 6, sort: 'trust_score' }),
+    api.merchants.list({ city: defaultCity, country, limit: 6, sort: 'trust_score' }),
   ])
 
   const categories = categoriesRaw.status === 'fulfilled' ? categoriesRaw.value.map(toCategory) : []
@@ -62,7 +67,7 @@ export default async function HomePage() {
                 La Sélection LaPlasse
               </h2>
               <p className="text-slate-500 text-lg">
-                Les adresses incontournables d'Abidjan.
+                Les adresses incontournables de {defaultCity}.
               </p>
             </div>
             <Link

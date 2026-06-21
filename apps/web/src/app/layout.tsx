@@ -5,6 +5,14 @@ import { PostHogProvider } from '@/providers/PostHogProvider'
 import { AuthBootstrap } from '@/components/AuthBootstrap'
 import { AppToaster } from '@/components/ui/AppToaster'
 import './globals.css'
+import {
+  BRAND_DESCRIPTION,
+  BRAND_KEYWORDS,
+  BRAND_NAME,
+  BRAND_OG_LOCALE,
+  BRAND_TAGLINE,
+  BRAND_TITLE,
+} from '@/lib/brandCopy'
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -18,27 +26,26 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: "LaPlasse — L'élégance ivoirienne à portée de clic",
-    template: '%s — LaPlasse',
+    default: BRAND_TITLE,
+    template: `%s — ${BRAND_NAME}`,
   },
-  description:
-    "Découvrez, réservez et achetez dans les meilleurs restaurants, salons, boutiques et lieux d'Abidjan. LaPlasse, la plateforme de référence pour les commerces locaux en Côte d'Ivoire.",
-  keywords: ['restaurant', 'salon', 'boutique', 'Abidjan', 'Cocody', "Côte d'Ivoire", 'découverte locale', 'commerces locaux', 'LaPlasse'],
-  authors: [{ name: 'LaPlasse', url: BASE_URL }],
-  creator: 'LaPlasse',
+  description: BRAND_DESCRIPTION,
+  keywords: BRAND_KEYWORDS,
+  authors: [{ name: BRAND_NAME, url: BASE_URL }],
+  creator: BRAND_NAME,
   openGraph: {
-    title: "LaPlasse — L'élégance ivoirienne à portée de clic",
-    description: "Découvrez les meilleurs restaurants, salons et boutiques d'Abidjan sur LaPlasse.",
+    title: BRAND_TITLE,
+    description: BRAND_DESCRIPTION,
     url: BASE_URL,
-    siteName: 'LaPlasse',
-    locale: 'fr_CI',
+    siteName: BRAND_NAME,
+    locale: BRAND_OG_LOCALE,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: "LaPlasse — L'élégance ivoirienne à portée de clic",
-    description: "Découvrez les meilleurs lieux d'Abidjan",
-    creator: '@laplasse_ci',
+    title: BRAND_TITLE,
+    description: BRAND_DESCRIPTION,
+    creator: '@laplasse',
   },
   robots: {
     index: true,

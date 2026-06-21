@@ -11,6 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator'
+import { OrderStatus } from '../../../generated/prisma/client'
 export class ProductVariantInputDto {
   @IsString()
   @MinLength(1)
@@ -83,6 +84,14 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductVariantInputDto)
   variants?: ProductVariantInputDto[]
+
+  @IsOptional()
+  @IsString()
+  category_id?: string
+
+  @IsOptional()
+  @IsString()
+  category_slug?: string
 }
 
 /** DTO explicite — évite les problèmes de whitelist ValidationPipe avec PartialType. */
@@ -139,6 +148,14 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductVariantInputDto)
   variants?: ProductVariantInputDto[]
+
+  @IsOptional()
+  @IsString()
+  category_id?: string
+
+  @IsOptional()
+  @IsString()
+  category_slug?: string
 }
 
 export class AddCartItemDto {
@@ -154,10 +171,41 @@ export class AddCartItemDto {
   quantity!: number
 }
 
+export class AddMenuCartItemDto {
+  @IsString()
+  menuItemId!: string
+
+  @IsInt()
+  @Min(1)
+  quantity!: number
+}
+
 export class UpdateCartItemDto {
   @IsInt()
   @Min(0)
   quantity!: number
+}
+
+export class ApplyCartPromoDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  code!: string
+
+  @IsOptional()
+  @IsString()
+  shop_id?: string
+}
+
+export class AppliedPromotionDto {
+  @IsString()
+  shop_id!: string
+
+  @IsString()
+  promotion_id!: string
+
+  @IsString()
+  code!: string
 }
 
 export class CheckoutDto {
@@ -171,13 +219,37 @@ export class CheckoutDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  customer_note?: string
+  delivery_city_id?: string
 
   @IsOptional()
   @IsString()
+  delivery_commune_id?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  delivery_district?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  delivery_address_detail?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  customer_note?: string
+
+  @IsString()
+  @MinLength(6)
   @MaxLength(30)
-  customer_phone?: string
+  customer_phone!: string
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AppliedPromotionDto)
+  applied_promotions?: AppliedPromotionDto[]
 }
 
 export class ConfirmOrderPaymentDto {
@@ -198,6 +270,9 @@ export class ConfirmBatchOrderPaymentDto {
 }
 
 export class UpdateOrderStatusDto {
-  @IsIn(['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])
-  status!: 'CONFIRMED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
+  @IsIn([
+    'PENDING', 'CONFIRMED', 'PREPARING', 'READY',
+    'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED',
+  ])
+  status!: OrderStatus
 }

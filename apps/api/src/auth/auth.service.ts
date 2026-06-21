@@ -192,6 +192,59 @@ export class AuthService {
     return { user: { ...user, is_verified: true }, ...tokens }
   }
 
+  async sendGuestOtp(phone: string) {
+    return this.otp.send(phone, 'guest')
+  }
+
+  async guestCheckoutWithPhoneOtp(phone: string, code: string): Promise<AuthSessionResult> {
+    const valid = await this.otp.verify(phone, 'guest', code)
+    if (!valid) throw new BadRequestException('Code OTP invalide ou expiré')
+
+    const normalized = this.otp.normalizePhone(phone)
+    const phoneVariants = [`+225${normalized.slice(-10)}`, `+226${normalized.slice(-8)}`, `+221${normalized.slice(-9)}`, phone]
+
+    let user = await this.prisma.user.findFirst({
+      where: {
+        is_active: true,
+        OR: phoneVariants.flatMap(p => [
+          { phone: p },
+          { phone: { contains: normalized.slice(-8) } },
+        ]),
+      },
+      select: {
+        id: true, email: true, full_name: true, avatar: true,
+        phone: true, role: true, is_verified: true, created_at: true,
+      },
+    })
+
+    if (!user) {
+      const guestEmail = `guest.${normalized}.${Date.now()}@guest.laplasse.local`
+      user = await this.prisma.user.create({
+        data: {
+          email: guestEmail,
+          phone: phone.startsWith('+') ? phone : `+225${normalized.slice(-10)}`,
+          full_name: 'Client invité',
+          role: 'USER',
+          is_verified: true,
+          is_active: true,
+          country: 'CI',
+        },
+        select: {
+          id: true, email: true, full_name: true, avatar: true,
+          phone: true, role: true, is_verified: true, created_at: true,
+        },
+      })
+    } else {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { is_verified: true },
+      })
+    }
+
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+    return { user: { ...user, is_verified: true }, ...tokens }
+  }
+
   async logout(refreshToken: string | null) {
     if (refreshToken) {
       await this.prisma.authToken.deleteMany({

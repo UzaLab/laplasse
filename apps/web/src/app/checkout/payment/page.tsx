@@ -2,44 +2,85 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Loader2, Smartphone, XCircle } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
+import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
   buildCheckoutConfirmation,
+  clearCheckoutDraft,
   clearCheckoutSession,
+  draftFromCheckoutSession,
   getCheckoutSession,
   saveCheckoutConfirmation,
+  saveCheckoutDraft,
   type CheckoutSession,
 } from '@/lib/checkoutSession'
 import {
   confirmBatchOrderPayments,
   confirmOrderPayment,
+  fetchResumePayment,
   formatPrice,
 } from '@/lib/marketplaceApi'
 import { notify } from '@/lib/notify'
+import { isFoodOrderCart } from '@/lib/orderFlow'
 
 export default function CheckoutPaymentPage() {
   const router = useRouter()
-  const { hydrated, isAuthenticated } = useRequireAuth('/checkout/payment')
+  const pathname = usePathname()
+  const isFoodRoute = pathname.startsWith('/commande')
+  const searchParams = useSearchParams()
+  const resumeOrderIds = searchParams.get('orderIds')?.split(',').map(s => s.trim()).filter(Boolean) ?? []
+  const authPath = isFoodRoute ? '/commande/paiement' : '/checkout/payment'
+  const { hydrated, isAuthenticated } = useRequireAuth(authPath)
   const [session, setSession] = useState<CheckoutSession | null>(null)
   const [ready, setReady] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [resumeMode, setResumeMode] = useState(false)
 
   useEffect(() => {
-    const stored = getCheckoutSession()
-    if (!stored) {
-      router.replace('/checkout')
-      return
+    if (!hydrated || !isAuthenticated) return
+
+    const load = async () => {
+      const stored = getCheckoutSession()
+      if (stored) {
+        saveCheckoutDraft(draftFromCheckoutSession(stored))
+        setSession(stored)
+        setResumeMode(false)
+        setReady(true)
+        return
+      }
+
+      if (resumeOrderIds.length) {
+        const { session: resumed, error } = await fetchResumePayment(resumeOrderIds)
+        if (!resumed) {
+          notify.error(error ?? 'Impossible de reprendre le paiement')
+          router.replace('/profile/orders')
+          return
+        }
+        setSession(resumed as CheckoutSession)
+        setResumeMode(true)
+        setReady(true)
+        return
+      }
+
+      router.replace(isFoodRoute ? '/commande/livraison' : '/checkout')
     }
-    setSession(stored)
-    setReady(true)
-  }, [router])
+
+    void load()
+  }, [hydrated, isAuthenticated, router, resumeOrderIds.join(','), isFoodRoute])
+
+  const isFoodFlow =
+    isFoodRoute
+    || (session?.cartSnapshot?.items
+      ? isFoodOrderCart(session.cartSnapshot.items)
+      : false)
+  const Steps = isFoodFlow ? FoodCheckoutSteps : CheckoutSteps
 
   const handleConfirm = async (simulateResult: 'success' | 'failure') => {
     if (!session) return
@@ -65,8 +106,12 @@ export default function CheckoutPaymentPage() {
     }
 
     saveCheckoutConfirmation(buildCheckoutConfirmation(session, status))
-    clearCheckoutSession()
-    router.push(`/checkout/confirmation?status=${status}`)
+    if (status === 'success') {
+      clearCheckoutSession()
+      clearCheckoutDraft()
+    }
+    const orderIds = session.checkoutResult.orders.map(o => o.orderId).join(',')
+    router.push(`/checkout/confirmation?status=${status}&orderIds=${orderIds}`)
   }
 
   if (!hydrated) {
@@ -92,7 +137,7 @@ export default function CheckoutPaymentPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
-      <CheckoutSteps current={3} />
+      <Steps current={3} />
 
       <main className={`${PAGE_CONTAINER} py-12`}>
         <div className="mb-8">
@@ -100,12 +145,13 @@ export default function CheckoutPaymentPage() {
             Paiement
           </h1>
           <p className="text-slate-500 mt-2 font-medium">
-            Simulateur Mobile Money — {checkoutResult.provider}
+            {resumeMode
+              ? 'Reprise du paiement en attente — simulateur Mobile Money'
+              : `Simulateur Mobile Money — ${checkoutResult.provider}`}
           </p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-10 items-start">
-          {/* Mobile : résumé en premier */}
           <div className="w-full lg:w-[400px] shrink-0 lg:order-2">
             <CheckoutOrderSummary
               cart={cartSnapshot}
@@ -114,6 +160,9 @@ export default function CheckoutPaymentPage() {
               deliveryAddress={session.deliveryAddress}
               customerPhone={session.customerPhone}
               customerNote={session.customerNote}
+              discountAmount={session.discountAmount}
+              deliveryFee={session.deliveryFee}
+              deliveryQuotes={session.deliveryQuotes}
               references={checkoutResult.orders.map(o => o.reference)}
               className="lg:sticky lg:top-28"
             />
@@ -182,14 +231,24 @@ export default function CheckoutPaymentPage() {
                   {checkoutResult.instructions}
                 </p>
 
-                <div className="text-center lg:hidden">
-                  <Link
-                    href="/checkout"
-                    className="text-sm font-bold text-slate-500 hover:text-slate-800"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    ← Modifier la livraison
-                  </Link>
+                <div className="text-center">
+                  {resumeMode ? (
+                    <Link
+                      href="/profile/orders"
+                      className="text-sm font-bold text-slate-500 hover:text-slate-800"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      ← Retour à mes commandes
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/checkout"
+                      className="text-sm font-bold text-slate-500 hover:text-slate-800"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      ← Modifier la livraison
+                    </Link>
+                  )}
                 </div>
               </div>
             )}

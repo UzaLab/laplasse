@@ -1,6 +1,6 @@
 import {
   Controller, Get, Param, Query, Post, Patch, Delete, Body, NotFoundException, UseGuards,
-  UseInterceptors, UploadedFile, BadRequestException,
+  UseInterceptors, UploadedFile, BadRequestException, Req,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
@@ -9,21 +9,33 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { MerchantsService } from './merchants.service'
 import { QueryMerchantsDto } from './dto/query-merchants.dto'
+import { ShopMenuService } from '../shop-menu/shop-menu.service'
+import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 
 @Controller('merchants')
 export class MerchantsController {
-  constructor(private readonly merchantsService: MerchantsService) {}
+  constructor(
+    private readonly merchantsService: MerchantsService,
+    private readonly shopMenu: ShopMenuService,
+  ) {}
 
   @Public()
   @Get()
-  findAll(@Query() query: QueryMerchantsDto) {
-    return this.merchantsService.findAll(query)
+  findAll(@Query() query: QueryMerchantsDto, @Req() req: RequestWithCountry) {
+    const country = query.country ?? req.countryCode ?? DEFAULT_COUNTRY
+    return this.merchantsService.findAll({ ...query, country })
   }
 
   @Public()
   @Get('featured')
-  featured(@Query('city') city?: string, @Query('limit') limit?: string) {
-    return this.merchantsService.findFeatured(city ?? 'Abidjan', limit ? Number(limit) : 6)
+  featured(
+    @Query('city') city?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+    @Req() req?: RequestWithCountry,
+  ) {
+    const cc = country ?? req?.countryCode ?? DEFAULT_COUNTRY
+    return this.merchantsService.findFeatured(city, limit ? Number(limit) : 6, cc)
   }
 
   @Public()
@@ -35,14 +47,18 @@ export class MerchantsController {
     @Query('lng') lng?: string,
     @Query('radius') radius?: string,
     @Query('limit') limit?: string,
+    @Query('country') country?: string,
+    @Req() req?: RequestWithCountry,
   ) {
+    const cc = country ?? req?.countryCode ?? DEFAULT_COUNTRY
     return this.merchantsService.findNearby(
-      city ?? 'Abidjan',
+      city,
       district,
       lat ? Number(lat) : undefined,
       lng ? Number(lng) : undefined,
       radius ? Number(radius) : 2,
       limit ? Number(limit) : 6,
+      cc,
     )
   }
 
@@ -227,6 +243,12 @@ export class MerchantsController {
   }
 
   // ── Routes publiques avec paramètre dynamique (:slug) ───────────────────────
+
+  @Public()
+  @Get(':slug/menu')
+  menu(@Param('slug') slug: string) {
+    return this.shopMenu.listPublicByMerchantSlug(slug)
+  }
 
   @Public()
   @Get(':slug')

@@ -207,14 +207,16 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   {BOOKING_TYPE_LABELS[bookingType]}
                 </p>
 
-                {bookingType === 'APPOINTMENT' && config && config.services.length > 0 && (
+                {(bookingType === 'APPOINTMENT' || bookingType === 'CONSULTATION') && config && config.services.length > 0 && (
                   <select
                     required
                     value={form.service_id}
                     onChange={e => setForm(f => ({ ...f, service_id: e.target.value }))}
                     className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                   >
-                    <option value="">Choisir une prestation *</option>
+                    <option value="">
+                      {bookingType === 'CONSULTATION' ? 'Choisir une consultation *' : 'Choisir une prestation *'}
+                    </option>
                     {config.services.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({s.duration_min} min)

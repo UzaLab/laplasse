@@ -5,6 +5,7 @@ import {
   refreshAuthSession,
   waitForAuthHydration,
 } from '@/lib/authSession'
+import { countryRequestHeaders } from '@/lib/country'
 
 function redirectToLogin() {
   if (typeof window === 'undefined') return
@@ -20,7 +21,11 @@ function buildHeaders(options?: RequestInit): HeadersInit {
   if (options?.body && !isFormData && !existingContentType) {
     base['Content-Type'] = 'application/json'
   }
-  return { ...base, ...(options?.headers as Record<string, string> | undefined) }
+  return {
+    ...base,
+    ...countryRequestHeaders(),
+    ...(options?.headers as Record<string, string> | undefined),
+  }
 }
 
 /** Fetch authentifié via cookies httpOnly, refresh auto sur 401. */

@@ -28,6 +28,9 @@ import { StaffModule } from './staff/staff.module'
 import { AdsModule } from './ads/ads.module'
 import { MarketplaceModule } from './marketplace/marketplace.module'
 import { ShopsModule } from './shops/shops.module'
+import { GeoModule } from './geo/geo.module'
+import { CountryModule } from './common/country/country.module'
+import { DeliveryModule } from './delivery/delivery.module'
 
 @Module({
   imports: [
@@ -58,6 +61,9 @@ import { ShopsModule } from './shops/shops.module'
     AdsModule,
     MarketplaceModule,
     ShopsModule,
+    GeoModule,
+    CountryModule,
+    DeliveryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

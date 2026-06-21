@@ -10,6 +10,8 @@ import { MerchantsService } from '../merchants/merchants.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { AuditService } from '../audit/audit.service'
 import { MarketplaceService } from '../marketplace/marketplace.service'
+import { ProductCategoriesService } from '../marketplace/product-categories.service'
+import { GeoService } from '../geo/geo.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,13 +25,15 @@ export class AdminController {
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
     private readonly marketplace: MarketplaceService,
+    private readonly productCategories: ProductCategoriesService,
+    private readonly geo: GeoService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
 
   @Get('stats')
   async getStats() {
-    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, complaintOpen] =
+    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, productReviewPending, complaintOpen] =
       await Promise.all([
         this.prisma.merchant.count(),
         this.prisma.merchant.count({ where: { verification_status: 'PENDING' } }),
@@ -37,6 +41,7 @@ export class AdminController {
         this.prisma.user.count({ where: { is_active: true } }),
         this.prisma.review.count(),
         this.prisma.review.count({ where: { status: 'PENDING' } }),
+        this.prisma.productReview.count({ where: { status: 'PENDING' } }),
         this.prisma.complaint.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
       ])
 
@@ -44,6 +49,7 @@ export class AdminController {
       merchants: { total: merchantTotal, pending: merchantPending, verified: merchantVerified },
       users,
       reviews: { total: reviewTotal, pending: reviewPending },
+      product_reviews: { pending: productReviewPending },
       complaints: { open: complaintOpen },
     }
   }
@@ -170,6 +176,37 @@ export class AdminController {
     return { id: updated.id, status: updated.status }
   }
 
+  // ── Avis produits ───────────────────────────────────────────────────────────
+
+  @Get('product-reviews')
+  getProductReviews(@Query('filter') filter?: string) {
+    const where = filter === 'pending' ? { status: 'PENDING' as const } : {}
+    return this.prisma.productReview.findMany({
+      where,
+      include: {
+        product: { select: { id: true, name: true, slug: true, shop: { select: { slug: true, name: true } } } },
+        user: { select: { id: true, full_name: true, email: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    })
+  }
+
+  @Patch('product-reviews/:id/moderate')
+  moderateProductReview(
+    @Param('id') id: string,
+    @Body() body: { action: 'approve' | 'reject' | 'delete' },
+  ) {
+    if (body.action === 'delete') {
+      return this.prisma.productReview.delete({ where: { id } }).then(() => ({ deleted: true }))
+    }
+    return this.prisma.productReview.update({
+      where: { id },
+      data: { status: body.action === 'approve' ? 'APPROVED' : 'REJECTED' },
+      select: { id: true, status: true },
+    })
+  }
+
   // ── Signalements ────────────────────────────────────────────────────────────
 
   @Get('complaints')
@@ -218,7 +255,8 @@ export class AdminController {
   @Post('sync-search')
   async syncSearch() {
     await this.searchService.syncAllMerchants()
-    return { ok: true, message: 'Meilisearch re-indexé avec succès' }
+    await this.searchService.syncAllProducts()
+    return { ok: true, message: 'Meilisearch re-indexé (établissements + produits)' }
   }
 
   @Post('seed-marketplace')
@@ -326,5 +364,92 @@ export class AdminController {
     @Body() body: { featured: boolean },
   ) {
     return this.marketplace.setShopMarketplaceFeatured(id, Boolean(body.featured))
+  }
+
+  // ── Catégories produit marketplace ───────────────────────────────────────────
+
+  @Get('product-categories')
+  listProductCategories() {
+    return this.productCategories.listAdmin()
+  }
+
+  @Post('product-categories')
+  createProductCategory(
+    @Body() body: {
+      name: string
+      slug?: string
+      icon?: string
+      parent_id?: string
+      sort_order?: number
+      country_codes?: string[]
+    },
+  ) {
+    if (!body.name?.trim()) throw new BadRequestException('Nom requis')
+    return this.productCategories.create(body)
+  }
+
+  @Patch('product-categories/:id')
+  updateProductCategory(
+    @Param('id') id: string,
+    @Body() body: {
+      name?: string
+      slug?: string
+      icon?: string | null
+      parent_id?: string | null
+      sort_order?: number
+      is_active?: boolean
+      country_codes?: string[]
+    },
+  ) {
+    return this.productCategories.update(id, body)
+  }
+
+  // ── Référentiel géographique ─────────────────────────────────────────────────
+
+  @Get('geo/cities')
+  listGeoCities(@Query('country') country?: string) {
+    return this.geo.listCitiesAdmin(country ?? 'CI')
+  }
+
+  @Post('geo/cities')
+  createGeoCity(
+    @Body() body: { country?: string; name: string; slug?: string; is_default?: boolean },
+  ) {
+    if (!body.name?.trim()) throw new BadRequestException('Nom requis')
+    return this.geo.createCity({
+      country: body.country ?? 'CI',
+      name: body.name,
+      slug: body.slug,
+      is_default: body.is_default,
+    })
+  }
+
+  @Patch('geo/cities/:id')
+  updateGeoCity(
+    @Param('id') id: string,
+    @Body() body: { name?: string; slug?: string; is_active?: boolean; is_default?: boolean },
+  ) {
+    return this.geo.updateCity(id, body)
+  }
+
+  @Get('geo/cities/:cityId/communes')
+  listGeoCommunes(@Param('cityId') cityId: string) {
+    return this.geo.listCommunesAdmin(cityId)
+  }
+
+  @Post('geo/communes')
+  createGeoCommune(@Body() body: { city_id: string; name: string; slug?: string }) {
+    if (!body.city_id || !body.name?.trim()) {
+      throw new BadRequestException('Ville et nom requis')
+    }
+    return this.geo.createCommune(body)
+  }
+
+  @Patch('geo/communes/:id')
+  updateGeoCommune(
+    @Param('id') id: string,
+    @Body() body: { name?: string; slug?: string; is_active?: boolean },
+  ) {
+    return this.geo.updateCommune(id, body)
   }
 }

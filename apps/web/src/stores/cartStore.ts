@@ -1,10 +1,10 @@
 import { create } from 'zustand'
 import {
   addCartItem,
-  fetchCart,
   updateCartItemQuantity,
   type Cart,
 } from '@/lib/marketplaceApi'
+import { authApiFetch } from '@/lib/authFetch'
 import { notify } from '@/lib/notify'
 
 interface CartState {
@@ -22,6 +22,11 @@ interface CartState {
     productId: string,
     quantity: number,
     options?: { variantId?: string; openDrawer?: boolean },
+  ) => Promise<{ error?: string }>
+  addMenuItem: (
+    menuItemId: string,
+    quantity: number,
+    options?: { openDrawer?: boolean },
   ) => Promise<{ error?: string }>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   removeItem: (itemId: string) => Promise<void>
@@ -46,9 +51,15 @@ export const useCartStore = create<CartState>((set, get) => ({
   loadCart: async () => {
     set({ loading: true })
     try {
-      const cart = await fetchCart()
-      set({ cart })
+      const res = await authApiFetch('/cart')
+      if (res.ok) {
+        set({ cart: await res.json() as Cart })
+      } else if (res.status === 503) {
+        notify.error('Impossible de charger le panier', 'Vérifiez votre connexion.')
+        set({ cart: null })
+      }
     } catch {
+      notify.error('Impossible de charger le panier')
       set({ cart: null })
     } finally {
       set({ loading: false })
@@ -69,6 +80,24 @@ export const useCartStore = create<CartState>((set, get) => ({
       notify.error(error)
     }
     return { error }
+  },
+
+  addMenuItem: async (menuItemId, quantity, options) => {
+    const res = await authApiFetch('/cart/menu-items', {
+      method: 'POST',
+      body: JSON.stringify({ menuItemId, quantity }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Erreur panier' }))
+      const error = (err as { message?: string }).message ?? 'Erreur panier'
+      notify.error(error)
+      return { error }
+    }
+    const cart = (await res.json()) as Cart
+    set({ cart })
+    if (options?.openDrawer !== false) set({ drawerOpen: true })
+    notify.success('Ajouté à la commande')
+    return {}
   },
 
   updateQuantity: async (itemId, quantity) => {

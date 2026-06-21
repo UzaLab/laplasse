@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsIn,
   IsOptional,
@@ -105,10 +106,21 @@ export class UpdateShopDto {
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'SUSPENDED'])
   status?: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  enabled_modules?: string[]
 }
 
 export class LinkShopMerchantDto {
   @IsOptional()
   @IsString()
   merchant_id?: string | null
+}
+
+export class SetShopProductCategoriesDto {
+  @IsArray()
+  @IsString({ each: true })
+  category_ids!: string[]
 }

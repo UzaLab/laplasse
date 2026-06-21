@@ -1,5 +1,16 @@
 export const BOUTIQUE_CATEGORY_SLUGS = ['boutiques']
 
+/** Produits miroir créés à la volée pour commander depuis le menu restaurant */
+export const MENU_MIRROR_SLUG_PREFIX = 'menu-item-'
+
+export function isMenuMirrorProductSlug(slug: string): boolean {
+  return slug.startsWith(MENU_MIRROR_SLUG_PREFIX)
+}
+
+export function menuMirrorProductSlug(menuItemId: string): string {
+  return `${MENU_MIRROR_SLUG_PREFIX}${menuItemId}`
+}
+
 export function slugify(text: string): string {
   return text
     .toLowerCase()

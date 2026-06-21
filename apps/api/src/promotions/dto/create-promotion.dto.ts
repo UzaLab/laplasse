@@ -1,5 +1,11 @@
 import {
-  IsString, IsOptional, IsEnum, IsNumber, IsBoolean, IsDateString, IsInt, Min, Max,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
 } from 'class-validator'
 
 export enum PromotionType {
@@ -7,6 +13,7 @@ export enum PromotionType {
   FIXED = 'FIXED',
   FREE_ITEM = 'FREE_ITEM',
   EARLY_ACCESS = 'EARLY_ACCESS',
+  FREE_DELIVERY = 'FREE_DELIVERY',
 }
 
 export class CreatePromotionDto {
@@ -38,4 +45,17 @@ export class CreatePromotionDto {
   @IsInt()
   @Min(1)
   max_uses?: number
+
+  @IsOptional()
+  @IsString()
+  shop_id?: string
+
+  @IsOptional()
+  @IsString()
+  category_id?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  min_order_amount?: number
 }

@@ -5,9 +5,18 @@ export interface MerchantServiceConfig {
   name: string
   duration_min: number
   price: number | null
+  nightly_rate?: number | null
   description?: string | null
   capacity?: number | null
   service_kind?: string
+  image_urls?: string[]
+  bedrooms?: number | null
+  bathrooms?: number | null
+  beds?: number | null
+  property_type?: string | null
+  unit_type?: string | null
+  amenities?: string[]
+  highlights?: string[]
 }
 
 export interface BookingSettingsConfig {

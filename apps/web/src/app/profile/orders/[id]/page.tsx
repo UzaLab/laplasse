@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { OrderTimeline } from '@/features/profile/components/orders/OrderTimeline'
 import { OrderStatusBadge } from '@/features/profile/components/orders/OrderStatusBadge'
 import {
   formatOrderRef,
@@ -28,6 +29,7 @@ import {
   ORDER_STATUS_LABELS,
   PLACEHOLDER_PRODUCT_IMAGE,
 } from '@/lib/marketplaceApi'
+import { deliveryTrackingPath } from '@/lib/deliveryApi'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 function whatsAppSupportUrl(phone: string, message: string): string | undefined {
@@ -102,7 +104,12 @@ export default function ProfileOrderDetailPage() {
   const showTrack =
     displayStatus === 'active' &&
     order.delivery_type === 'DELIVERY' &&
-    !!supportHref
+    !!order.delivery_job?.tracking_token
+  const trackingHref = order.delivery_job?.tracking_token
+    ? deliveryTrackingPath(order.delivery_job.tracking_token)
+    : null
+  const pendingPayment =
+    order.status === 'PENDING' && order.payment?.status === 'PENDING'
 
   return (
     <ProfileShell>
@@ -118,15 +125,25 @@ export default function ProfileOrderDetailPage() {
             Retour aux commandes
           </button>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled
-              title="Bientôt disponible"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-semibold text-slate-400 cursor-not-allowed"
+            {pendingPayment && (
+              <Link
+                href={`/checkout/payment?orderIds=${order.id}`}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors text-sm font-bold shadow-sm"
+                style={{ textDecoration: 'none' }}
+              >
+                <CreditCard size={16} />
+                Payer maintenant
+              </Link>
+            )}
+            <Link
+              href={`/profile/orders/${order.id}/receipt`}
+              target="_blank"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+              style={{ textDecoration: 'none' }}
             >
               <Download size={16} />
               Facture
-            </button>
+            </Link>
             {supportHref ? (
               <a
                 href={supportHref}
@@ -177,16 +194,24 @@ export default function ProfileOrderDetailPage() {
                 )}
                 {statusDetail}
               </div>
-              {showTrack && supportHref && (
-                <a
-                  href={supportHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {pendingPayment && (
+                <Link
+                  href={`/checkout/payment?orderIds=${order.id}`}
+                  className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-2"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <CreditCard size={16} />
+                  Payer maintenant
+                </Link>
+              )}
+              {showTrack && trackingHref && (
+                <Link
+                  href={trackingHref}
                   className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
                   style={{ textDecoration: 'none' }}
                 >
-                  Suivre la commande
-                </a>
+                  Suivre la livraison
+                </Link>
               )}
               {order.merchant?.slug && (
                 <Link
@@ -199,6 +224,12 @@ export default function ProfileOrderDetailPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="bg-white/80 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+          <h2 className="text-lg font-extrabold text-slate-900 mb-6">Suivi de commande</h2>
+          <OrderTimeline status={order.status} deliveryType={order.delivery_type} />
         </div>
 
         {/* Bento grid */}
@@ -282,6 +313,28 @@ export default function ProfileOrderDetailPage() {
                         </p>
                       )}
                     </div>
+                    {order.delivery_job && (
+                      <>
+                        <hr className="border-slate-100" />
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Suivi livraison</p>
+                          {order.delivery_job.courier && (
+                            <p className="text-sm text-slate-700">
+                              Coursier : {order.delivery_job.courier.full_name}
+                            </p>
+                          )}
+                          {trackingHref && (
+                            <Link
+                              href={trackingHref}
+                              className="inline-block mt-2 text-sm font-bold text-amber-600 hover:text-amber-700"
+                              style={{ textDecoration: 'none' }}
+                            >
+                              Voir le suivi en direct →
+                            </Link>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
                 {order.customer_note && (

@@ -10,6 +10,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
+import { BRAND_EXPLORE_EMPTY } from '@/lib/brandCopy'
 import { BOOKING_TYPE_LABELS, type BookingType } from '@/lib/bookingConfig'
 
 interface UserReview {
@@ -220,7 +221,7 @@ export default function ProfilePage() {
                     <Calendar size={12} /> Réservations
                   </span>
                   <h3 className="text-xl font-extrabold text-white mb-2">Aucune réservation à venir</h3>
-                  <p className="text-slate-400 text-sm mb-6">Explorez Abidjan et réservez votre prochaine sortie.</p>
+                  <p className="text-slate-400 text-sm mb-6">{BRAND_EXPLORE_EMPTY}</p>
                   <Link
                     href="/search"
                     className="inline-block bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-400 transition-colors"

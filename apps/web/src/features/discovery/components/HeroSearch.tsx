@@ -89,7 +89,7 @@ export function HeroSearch({ city = 'Abidjan', district = 'Cocody' }: HeroSearch
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Restau, salon de coiffure, boutique..."
+            placeholder="Établissements, produits, services…"
             className="w-full border-none bg-transparent text-base font-medium outline-none placeholder:font-normal"
             style={{ color: 'var(--text-main)' }}
           />

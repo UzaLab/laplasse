@@ -12,6 +12,8 @@ import {
 export function OrderListCard({ order }: { order: Order }) {
   const dt = new Date(order.created_at)
   const cancelled = getOrderDisplayStatus(order.status) === 'cancelled'
+  const pendingPayment =
+    order.status === 'PENDING' && order.payment?.status === 'PENDING'
   const thumb = orderThumbnail(order, PLACEHOLDER_PRODUCT_IMAGE)
 
   return (
@@ -50,11 +52,19 @@ export function OrderListCard({ order }: { order: Order }) {
           {formatPrice(order.total)}
         </div>
         <Link
-          href={`/profile/orders/${order.id}`}
-          className="px-4 py-2 rounded-full bg-slate-50 text-slate-800 text-xs font-bold border border-slate-200 hover:bg-slate-100 transition-colors"
+          href={
+            pendingPayment
+              ? `/checkout/payment?orderIds=${order.id}`
+              : `/profile/orders/${order.id}`
+          }
+          className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
+            pendingPayment
+              ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600'
+              : 'bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100'
+          }`}
           style={{ textDecoration: 'none' }}
         >
-          Détails
+          {pendingPayment ? 'Payer' : 'Détails'}
         </Link>
       </div>
     </article>

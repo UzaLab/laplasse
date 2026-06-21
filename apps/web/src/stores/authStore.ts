@@ -26,6 +26,7 @@ export interface AuthUser {
   email: string
   full_name: string | null
   avatar: string | null
+  phone?: string | null
   role: string
   merchants?: MerchantSummary[]
   shops?: ShopSummary[]

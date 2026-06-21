@@ -1,7 +1,23 @@
 import type { Cart, CheckoutResult } from '@/lib/marketplaceApi'
+import type { DeliveryQuoteItem } from '@/lib/geoApi'
 
 const SESSION_KEY = 'laplasse_checkout_session'
 const CONFIRMATION_KEY = 'laplasse_checkout_confirmation'
+const DRAFT_KEY = 'laplasse_checkout_draft'
+
+export interface CheckoutDraft {
+  deliveryType: 'PICKUP' | 'DELIVERY'
+  deliveryAddress?: string
+  deliveryCityId?: string
+  deliveryCommuneId?: string
+  deliveryDistrict?: string
+  deliveryAddressDetail?: string
+  customerPhone?: string
+  customerNote?: string
+  selectedAddressId?: string
+  saveNewAddress?: boolean
+  newAddressLabel?: string
+}
 
 export interface CheckoutSession {
   checkoutResult: CheckoutResult
@@ -16,8 +32,18 @@ export interface CheckoutSession {
   }
   deliveryType: 'PICKUP' | 'DELIVERY'
   deliveryAddress?: string
+  deliveryCityId?: string
+  deliveryCommuneId?: string
+  deliveryDistrict?: string
+  deliveryAddressDetail?: string
   customerPhone?: string
   customerNote?: string
+  selectedAddressId?: string
+  saveNewAddress?: boolean
+  newAddressLabel?: string
+  discountAmount?: number
+  deliveryFee?: number
+  deliveryQuotes?: DeliveryQuoteItem[]
 }
 
 export interface CheckoutConfirmation {
@@ -32,6 +58,9 @@ export interface CheckoutConfirmation {
   customerNote?: string
   cartSnapshot: CheckoutSession['cartSnapshot']
   checkoutOrders: CheckoutResult['orders']
+  discountAmount?: number
+  deliveryFee?: number
+  deliveryQuotes?: DeliveryQuoteItem[]
 }
 
 function readJson<T>(key: string): T | null {
@@ -76,10 +105,64 @@ export function clearCheckoutConfirmation() {
   sessionStorage.removeItem(CONFIRMATION_KEY)
 }
 
+export function saveCheckoutDraft(draft: CheckoutDraft) {
+  writeJson(DRAFT_KEY, draft)
+}
+
+export function getCheckoutDraft(): CheckoutDraft | null {
+  return readJson<CheckoutDraft>(DRAFT_KEY)
+}
+
+export function clearCheckoutDraft() {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(DRAFT_KEY)
+}
+
+/** Reprend un brouillon depuis la session paiement (retour étape livraison). */
+export function draftFromCheckoutSession(session: CheckoutSession): CheckoutDraft {
+  return {
+    deliveryType: session.deliveryType,
+    deliveryAddress: session.deliveryAddress,
+    deliveryCityId: session.deliveryCityId,
+    deliveryCommuneId: session.deliveryCommuneId,
+    deliveryDistrict: session.deliveryDistrict,
+    deliveryAddressDetail: session.deliveryAddressDetail,
+    customerPhone: session.customerPhone,
+    customerNote: session.customerNote,
+    selectedAddressId: session.selectedAddressId,
+    saveNewAddress: session.saveNewAddress,
+    newAddressLabel: session.newAddressLabel,
+  }
+}
+
+/** Source la plus récente : brouillon actif, sinon session checkout en cours. */
+export function getCheckoutFormState(): CheckoutDraft | null {
+  return getCheckoutDraft() ?? (() => {
+    const session = getCheckoutSession()
+    return session ? draftFromCheckoutSession(session) : null
+  })()
+}
+
 export function buildCheckoutSession(
   cart: Cart,
   checkoutResult: CheckoutResult,
-  delivery: Pick<CheckoutSession, 'deliveryType' | 'deliveryAddress' | 'customerPhone' | 'customerNote'>,
+  delivery: Pick<
+    CheckoutSession,
+    | 'deliveryType'
+    | 'deliveryAddress'
+    | 'deliveryCityId'
+    | 'deliveryCommuneId'
+    | 'deliveryDistrict'
+    | 'deliveryAddressDetail'
+    | 'customerPhone'
+    | 'customerNote'
+    | 'selectedAddressId'
+    | 'saveNewAddress'
+    | 'newAddressLabel'
+    | 'discountAmount'
+    | 'deliveryFee'
+    | 'deliveryQuotes'
+  >,
 ): CheckoutSession {
   return {
     checkoutResult,
@@ -112,5 +195,8 @@ export function buildCheckoutConfirmation(
     customerNote: session.customerNote,
     cartSnapshot: session.cartSnapshot,
     checkoutOrders: session.checkoutResult.orders,
+    discountAmount: session.discountAmount,
+    deliveryFee: session.deliveryFee,
+    deliveryQuotes: session.deliveryQuotes,
   }
 }

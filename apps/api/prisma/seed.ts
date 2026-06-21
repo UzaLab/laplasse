@@ -26,6 +26,7 @@ async function main() {
     prisma.category.upsert({ where: { slug: 'beaute' }, update: {}, create: { name: 'Spas & Bien-être', slug: 'beaute', icon: 'Sparkles', sort_order: 4 } }),
     prisma.category.upsert({ where: { slug: 'cafes' }, update: {}, create: { name: 'Cafés & Brunch', slug: 'cafes', icon: 'Coffee', sort_order: 5 } }),
     prisma.category.upsert({ where: { slug: 'hotels' }, update: {}, create: { name: 'Hôtels', slug: 'hotels', icon: 'BedDouble', sort_order: 6 } }),
+    prisma.category.upsert({ where: { slug: 'residences' }, update: {}, create: { name: 'Résidences & locations', slug: 'residences', icon: 'Home', sort_order: 10 } }),
     prisma.category.upsert({ where: { slug: 'pharmacies' }, update: {}, create: { name: 'Pharmacies', slug: 'pharmacies', icon: 'Pill', sort_order: 7 } }),
     prisma.category.upsert({ where: { slug: 'fitness' }, update: {}, create: { name: 'Sport & Fitness', slug: 'fitness', icon: 'Dumbbell', sort_order: 8 } }),
     prisma.category.upsert({ where: { slug: 'fast-food' }, update: {}, create: { name: 'Fast Food & Street', slug: 'fast-food', icon: 'Sandwich', sort_order: 9 } }),
@@ -34,6 +35,88 @@ async function main() {
   console.log(`✅ ${categories.length} catégories créées`)
 
   const cat = Object.fromEntries(categories.map(c => [c.slug, c]))
+
+  // ─── GÉOGRAPHIE CI (Abidjan) ────────────────────────────────────────────────
+
+  const abidjan = await prisma.geoCity.upsert({
+    where: { country_slug: { country: 'CI', slug: 'abidjan' } },
+    update: { is_default: true, is_active: true },
+    create: {
+      country: 'CI',
+      name: 'Abidjan',
+      slug: 'abidjan',
+      is_default: true,
+      is_active: true,
+    },
+  })
+
+  const abidjanCommunes = [
+    'Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Adjamé', 'Koumassi',
+    'Treichville', 'Abobo', 'Port-Bouët', 'Attécoubé', 'Bingerville',
+  ]
+
+  for (const name of abidjanCommunes) {
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+    await prisma.geoCommune.upsert({
+      where: { city_id_slug: { city_id: abidjan.id, slug } },
+      update: { is_active: true },
+      create: { city_id: abidjan.id, name, slug, is_active: true },
+    })
+  }
+
+  console.log(`✅ Géo CI : Abidjan + ${abidjanCommunes.length} communes`)
+
+  // ─── GÉOGRAPHIE BF (Ouagadougou) ────────────────────────────────────────────
+
+  const ouaga = await prisma.geoCity.upsert({
+    where: { country_slug: { country: 'BF', slug: 'ouagadougou' } },
+    update: { is_default: true, is_active: true },
+    create: {
+      country: 'BF',
+      name: 'Ouagadougou',
+      slug: 'ouagadougou',
+      is_default: true,
+      is_active: true,
+    },
+  })
+
+  for (const name of ['Centre', 'Gounghin', 'Koulouba', 'Patte d\'Oie', 'Zogona']) {
+    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    await prisma.geoCommune.upsert({
+      where: { city_id_slug: { city_id: ouaga.id, slug } },
+      update: { is_active: true },
+      create: { city_id: ouaga.id, name, slug, is_active: true },
+    })
+  }
+
+  // ─── GÉOGRAPHIE SN (Dakar) ──────────────────────────────────────────────────
+
+  const dakar = await prisma.geoCity.upsert({
+    where: { country_slug: { country: 'SN', slug: 'dakar' } },
+    update: { is_default: true, is_active: true },
+    create: {
+      country: 'SN',
+      name: 'Dakar',
+      slug: 'dakar',
+      is_default: true,
+      is_active: true,
+    },
+  })
+
+  for (const name of ['Plateau', 'Almadies', 'Médina', 'Yoff', 'Parcelles Assainies']) {
+    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    await prisma.geoCommune.upsert({
+      where: { city_id_slug: { city_id: dakar.id, slug } },
+      update: { is_active: true },
+      create: { city_id: dakar.id, name, slug, is_active: true },
+    })
+  }
+
+  console.log('✅ Géo BF/SN : Ouagadougou + Dakar')
 
   // ─── USERS ───────────────────────────────────────────────────────────────────
 
@@ -189,6 +272,11 @@ async function main() {
     { slug: 'cafe-brooklyn-2-plateaux', schedule: [{ days:[0,1,2,3,4,5,6], open:'07:30', close:'22:00' }] },
     { slug: 'burger-republic-2-plateaux', schedule: [{ days:[0,1,2,3,4,5,6], open:'11:00', close:'23:30' }] },
     { slug: 'pharmacie-riviera-3',    schedule: [{ days:[0,1,2,3,4,5,6], open:'00:00', close:'23:59' }] },
+    { slug: 'hotel-ivoire-abidjan',   schedule: [{ days:[0,1,2,3,4,5,6], open:'00:00', close:'23:59' }] },
+    { slug: 'hotel-golf-abidjan',     schedule: [{ days:[0,1,2,3,4,5,6], open:'00:00', close:'23:59' }] },
+    { slug: 'beaute-divine-yopougon', schedule: [{ days:[0,1,2,3,4,5,6], open:'09:00', close:'20:00' }] },
+    { slug: 'fitness-palace-cocody',  schedule: [{ days:[0,1,2,3,4,5,6], open:'06:00', close:'22:00' }] },
+    { slug: 'pharmacie-cocody-2-plateaux', schedule: [{ days:[0,1,2,3,4,5,6], open:'08:00', close:'22:00' }] },
     { slug: 'boulangerie-patisserie-paris', schedule: [{ days:[0,1,2,3,4,5,6], open:'06:30', close:'20:00' }] },
   ]
 
@@ -253,6 +341,43 @@ async function main() {
 
   console.log('✅ Vérifications créées')
 
+  // ─── PRODUCT CATEGORIES (marketplace) ───────────────────────────────────────
+
+  const mode = await prisma.productCategory.upsert({
+    where: { slug: 'mode' },
+    update: { is_active: true },
+    create: { name: 'Mode', slug: 'mode', icon: 'Shirt', sort_order: 1 },
+  })
+  const maison = await prisma.productCategory.upsert({
+    where: { slug: 'maison-deco' },
+    update: { is_active: true },
+    create: { name: 'Maison & Déco', slug: 'maison-deco', icon: 'Home', sort_order: 2 },
+  })
+  const artisanat = await prisma.productCategory.upsert({
+    where: { slug: 'artisanat' },
+    update: { is_active: true },
+    create: { name: 'Artisanat', slug: 'artisanat', icon: 'Palette', sort_order: 3 },
+  })
+  const vetements = await prisma.productCategory.upsert({
+    where: { slug: 'mode-vetements' },
+    update: { is_active: true, parent_id: mode.id },
+    create: { name: 'Vêtements', slug: 'mode-vetements', icon: 'Shirt', parent_id: mode.id, sort_order: 1 },
+  })
+  const accessoires = await prisma.productCategory.upsert({
+    where: { slug: 'mode-accessoires' },
+    update: { is_active: true, parent_id: mode.id },
+    create: { name: 'Accessoires', slug: 'mode-accessoires', icon: 'Gem', parent_id: mode.id, sort_order: 2 },
+  })
+
+  for (const cat of [mode, maison, artisanat, vetements, accessoires]) {
+    await prisma.productCategoryCountry.upsert({
+      where: { category_id_country_code: { category_id: cat.id, country_code: 'CI' } },
+      update: {},
+      create: { category_id: cat.id, country_code: 'CI' },
+    })
+  }
+  console.log('✅ Catégories produit marketplace créées')
+
   // ─── MARKETPLACE PRODUCTS (boutiques) ────────────────────────────────────────
 
   const boutiqueProducts: Array<{ merchantSlug: string; products: Array<{ name: string; slug: string; price: number; stock: number; image: string; desc: string }> }> = [
@@ -280,10 +405,34 @@ async function main() {
     if (!mId) continue
     const shopId = `shop_${mId}`
     for (const p of group.products) {
+      const categoryId =
+        group.merchantSlug === 'yale-design'
+          ? vetements.id
+          : group.merchantSlug === 'galerie-korhogo'
+            ? artisanat.id
+            : null
       await prisma.product.upsert({
         where: { shop_id_slug: { shop_id: shopId, slug: p.slug } },
-        update: { name: p.name, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
-        create: { shop_id: shopId, name: p.name, slug: p.slug, price: p.price, stock_quantity: p.stock, image_url: p.image, description: p.desc, status: 'ACTIVE' },
+        update: {
+          name: p.name,
+          price: p.price,
+          stock_quantity: p.stock,
+          image_url: p.image,
+          description: p.desc,
+          status: 'ACTIVE',
+          category_id: categoryId,
+        },
+        create: {
+          shop_id: shopId,
+          name: p.name,
+          slug: p.slug,
+          price: p.price,
+          stock_quantity: p.stock,
+          image_url: p.image,
+          description: p.desc,
+          status: 'ACTIVE',
+          category_id: categoryId,
+        },
       })
       productCount++
     }
@@ -305,12 +454,137 @@ async function main() {
     })
   }
 
+  // ─── ZONES LIVRAISON (seed Abidjan) ─────────────────────────────────────────
+
+  const cocody = await prisma.geoCommune.findFirst({
+    where: { city_id: abidjan.id, slug: 'cocody' },
+  })
+  const plateau = await prisma.geoCommune.findFirst({
+    where: { city_id: abidjan.id, slug: 'plateau' },
+  })
+  const yopougon = await prisma.geoCommune.findFirst({
+    where: { city_id: abidjan.id, slug: 'yopougon' },
+  })
+
+  if (cocody && plateau) {
+    for (const merchantSlug of ['yale-design', 'galerie-korhogo']) {
+      const mId = merchantMap[merchantSlug]
+      if (!mId) continue
+      const shopId = `shop_${mId}`
+      const existing = await prisma.shopDeliveryZone.findFirst({
+        where: { shop_id: shopId, name: 'Abidjan — Cocody & Plateau' },
+      })
+      if (!existing) {
+        await prisma.shopDeliveryZone.create({
+          data: {
+            shop_id: shopId,
+            name: 'Abidjan — Cocody & Plateau',
+            description: 'Livraison moto intra-communes Cocody et Plateau',
+            fee: merchantSlug === 'yale-design' ? 1500 : 2000,
+            min_order_amount: 5000,
+            free_delivery_threshold: 50000,
+            eta_min_minutes: 45,
+            eta_max_minutes: 75,
+            vehicle: 'MOTO',
+            priority: 10,
+            rules: {
+              create: [
+                {
+                  city_id: abidjan.id,
+                  all_communes: false,
+                  communes: { create: [{ commune_id: cocody.id }, { commune_id: plateau.id }] },
+                },
+              ],
+            },
+          },
+        })
+      }
+    }
+    console.log('✅ Zones livraison seed (Cocody + Plateau)')
+  }
+
+  if (yopougon) {
+    const yaleId = merchantMap['yale-design']
+    if (yaleId) {
+      const shopId = `shop_${yaleId}`
+      const existing = await prisma.shopDeliveryZone.findFirst({
+        where: { shop_id: shopId, name: 'Abidjan — Yopougon' },
+      })
+      if (!existing) {
+        await prisma.shopDeliveryZone.create({
+          data: {
+            shop_id: shopId,
+            name: 'Abidjan — Yopougon',
+            fee: 2500,
+            eta_min_minutes: 60,
+            eta_max_minutes: 90,
+            vehicle: 'MOTO',
+            rules: {
+              create: [{ city_id: abidjan.id, all_communes: false, communes: { create: [{ commune_id: yopougon.id }] } }],
+            },
+          },
+        })
+      }
+    }
+  }
+
+  // ─── PROMO CHECKOUT (seed) ───────────────────────────────────────────────────
+
+  const yaleMerchantId = merchantMap['yale-design']
+  if (yaleMerchantId) {
+    const starts = new Date()
+    const ends = new Date()
+    ends.setFullYear(ends.getFullYear() + 1)
+    await prisma.promotion.upsert({
+      where: { merchant_id_code: { merchant_id: yaleMerchantId, code: 'BIENVENUE15' } },
+      update: { is_active: true, ends_at: ends },
+      create: {
+        merchant_id: yaleMerchantId,
+        shop_id: `shop_${yaleMerchantId}`,
+        title: 'Bienvenue — 15 %',
+        description: '−15 % sur votre première commande Yalé Design',
+        type: 'PERCENTAGE',
+        value: 15,
+        code: 'BIENVENUE15',
+        min_order_amount: 10000,
+        starts_at: starts,
+        ends_at: ends,
+        max_uses: 500,
+      },
+    })
+    console.log('✅ Promo seed BIENVENUE15 (Yalé Design)')
+  }
+
   console.log('\n🎉 Base de données LaPlasse initialisée avec succès !')
   console.log(`   → ${categories.length} catégories`)
   console.log('   → Utilisateurs : admin@laplasse.ci / Admin2026!')
   console.log('   → Utilisateurs : ksouary@gmail.com / Ksoary2026!')
   console.log(`   → ${merchantCount} marchands Abidjan`)
   console.log('   → Reviews et horaires créés')
+
+  // ─── VERTICALS, MULTI-PAYS, DELIVERY ─────────────────────────────────────────
+
+  const { seedVerticals } = await import('./seed-verticals')
+  const { seedMultipays } = await import('./seed-multipays')
+  const { seedDelivery } = await import('./seed-delivery')
+
+  await seedVerticals({
+    prisma,
+    merchantMap,
+    testUserId: testUser.id,
+  })
+
+  const multipaysMap = await seedMultipays({ prisma, cat, ouagaCityId: ouaga.id, dakarCityId: dakar.id })
+  Object.assign(merchantMap, multipaysMap)
+
+  // Menus / prestations pour vitrines BF/SN
+  await seedVerticals({
+    prisma,
+    merchantMap,
+    testUserId: testUser.id,
+  })
+
+  await seedDelivery(prisma)
 }
 
 main()

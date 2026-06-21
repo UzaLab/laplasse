@@ -1,6 +1,7 @@
 'use client'
 
 import { SearchAutocomplete } from './SearchAutocomplete'
+import { BRAND_HERO_SUBTITLE, BRAND_TAGLINE_ACCENT, BRAND_TAGLINE_LEAD } from '@/lib/brandCopy'
 
 export function HeroSection() {
   return (
@@ -17,23 +18,22 @@ export function HeroSection() {
 
           {/* Titre */}
           <h1 className="text-5xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight mb-6">
-            L&apos;élégance ivoirienne,{' '}
+            {BRAND_TAGLINE_LEAD},{' '}
             <br className="hidden lg:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 to-amber-300">
-              à portée de clic.
+              {BRAND_TAGLINE_ACCENT}
             </span>
           </h1>
 
           {/* Sous-titre */}
           <p className="text-lg text-slate-500 leading-relaxed mb-10 max-w-2xl mx-auto lg:mx-0">
-            Réservez votre table dans les lieux les plus exclusifs et achetez leurs produits
-            signatures directement depuis notre marketplace hybride.
+            {BRAND_HERO_SUBTITLE}
           </p>
 
           {/* Barre de recherche avec autocomplete */}
           <div className="max-w-2xl mx-auto lg:mx-0">
             <SearchAutocomplete
-              placeholder="Restaurant, Spa, Concept Store…"
+              placeholder="Établissements, produits, services…"
               size="lg"
               navigateTo="search"
             />
@@ -47,7 +47,7 @@ export function HeroSection() {
           <img
             src="https://images.unsplash.com/photo-1544148103-0773bf10d330?auto=format&fit=crop&q=80&w=800"
             className="w-full h-[500px] object-cover rounded-[40px] shadow-2xl border-4 border-white"
-            alt="Restaurant Abidjan"
+            alt="Établissement premium"
           />
 
           {/* Mini card flottante */}

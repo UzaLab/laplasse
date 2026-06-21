@@ -114,6 +114,12 @@ export default function MerchantOfferingsPage() {
     load().catch(() => setLoading(false))
   }, [hydrated, isAuthenticated, load])
 
+  useEffect(() => {
+    if (config?.booking_type === 'ROOM') {
+      router.replace('/merchant/chambres')
+    }
+  }, [config?.booking_type, router])
+
   const offerLabels = OFFER_LABELS[bookingType]
 
   const defaultDuration = useMemo(() => {
@@ -266,7 +272,7 @@ export default function MerchantOfferingsPage() {
 
   return (
     <MerchantShell>
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full">
         <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Offres & disponibilités</h1>
         <p className="text-sm text-slate-500 mb-6">
           {BOOKING_TYPE_LABELS[bookingType]} — tarifs, créneaux et indisponibilités

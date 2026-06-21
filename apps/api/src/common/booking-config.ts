@@ -16,6 +16,7 @@ export const CATEGORY_BOOKING_CONFIG: Record<string, CategoryBookingConfig> = {
   beaute: { type: 'APPOINTMENT', enabled: true, label: 'Rendez-vous', cta: 'Prendre rendez-vous' },
   fitness: { type: 'APPOINTMENT', enabled: true, label: 'Séance', cta: 'Réserver une séance' },
   hotels: { type: 'ROOM', enabled: true, label: 'Chambre', cta: 'Réserver une chambre' },
+  residences: { type: 'ROOM', enabled: true, label: 'Logement', cta: 'Réserver un logement' },
   pharmacies: { type: 'CONSULTATION', enabled: true, label: 'Consultation', cta: 'Prendre rendez-vous' },
   boutiques: { type: null, enabled: false, label: '', cta: '' },
 }

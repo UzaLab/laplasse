@@ -7,14 +7,18 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { MarketplaceService } from './marketplace.service'
+import { ProductCategoriesService } from './product-categories.service'
 import {
   AddCartItemDto,
+  AddMenuCartItemDto,
+  ApplyCartPromoDto,
   CheckoutDto,
   ConfirmBatchOrderPaymentDto,
   ConfirmOrderPaymentDto,
@@ -24,10 +28,28 @@ import {
   UpdateProductDto,
 } from './dto/marketplace.dto'
 import { OrderStatus } from '../../generated/prisma/client'
+import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
+import type { DeliveryQuoteRequest } from '../delivery-zones/delivery-zones.service'
+import { AddressesService } from '../addresses/addresses.service'
+import { CreateUserAddressDto, UpdateUserAddressDto } from '../addresses/dto/user-address.dto'
+import { ShopMenuService } from '../shop-menu/shop-menu.service'
+import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 
 @Controller()
 export class MarketplaceController {
-  constructor(private readonly svc: MarketplaceService) {}
+  constructor(
+    private readonly svc: MarketplaceService,
+    private readonly productCategories: ProductCategoriesService,
+    private readonly deliveryZones: DeliveryZonesService,
+    private readonly addresses: AddressesService,
+    private readonly shopMenu: ShopMenuService,
+  ) {}
+
+  @Public()
+  @Get('marketplace/product-categories')
+  listProductCategories(@Query('country') country?: string) {
+    return this.productCategories.listPublicTree(country ?? 'CI')
+  }
 
   @Public()
   @Get('marketplace/featured')
@@ -36,18 +58,29 @@ export class MarketplaceController {
   }
 
   @Public()
+  @Post('checkout/delivery-quote')
+  deliveryQuote(@Body() body: DeliveryQuoteRequest) {
+    return this.deliveryZones.quote(body)
+  }
+
+  @Public()
   @Get('marketplace/products')
   listCatalog(
+    @Req() req: RequestWithCountry,
     @Query('q') q?: string,
     @Query('merchant') merchant?: string,
+    @Query('category') category?: string,
     @Query('sort') sort?: string,
     @Query('maxPrice') maxPrice?: string,
+    @Query('country') country?: string,
   ) {
     return this.svc.listMarketplaceProducts({
       q,
       merchant,
+      category,
       sort,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      country: country ?? req.countryCode ?? DEFAULT_COUNTRY,
     })
   }
 
@@ -65,8 +98,31 @@ export class MarketplaceController {
 
   @Public()
   @Get('shops/:slug/products')
-  listPublicShop(@Param('slug') slug: string) {
-    return this.svc.listPublicProducts(slug)
+  listPublicShop(
+    @Param('slug') slug: string,
+    @Query('category') category?: string,
+    @Query('q') q?: string,
+    @Query('collection') collection?: string,
+  ) {
+    return this.svc.listPublicProducts(slug, { category, q, collection })
+  }
+
+  @Public()
+  @Get('shops/:slug/collections')
+  listPublicShopCollections(@Param('slug') slug: string) {
+    return this.svc.listPublicShopCollections(slug)
+  }
+
+  @Public()
+  @Get('shops/:slug/menu')
+  listPublicMenuLegacy(@Param('slug') slug: string) {
+    return this.shopMenu.listPublicByMerchantSlug(slug)
+  }
+
+  @Public()
+  @Get('shops/:slug/product-categories')
+  listPublicShopCategories(@Param('slug') slug: string) {
+    return this.svc.listPublicShopProductCategories(slug)
   }
 
   @Public()
@@ -80,8 +136,13 @@ export class MarketplaceController {
 
   @Public()
   @Get('merchants/:slug/products')
-  listPublic(@Param('slug') slug: string) {
-    return this.svc.listPublicProducts(slug)
+  listPublic(
+    @Param('slug') slug: string,
+    @Query('category') category?: string,
+    @Query('q') q?: string,
+    @Query('collection') collection?: string,
+  ) {
+    return this.svc.listPublicProducts(slug, { category, q, collection })
   }
 
   @Public()
@@ -147,6 +208,15 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('cart/menu-items')
+  addMenuItemToCart(
+    @CurrentUser('id') userId: string,
+    @Body() dto: AddMenuCartItemDto,
+  ) {
+    return this.svc.addMenuItemToCart(userId, dto.menuItemId, dto.quantity)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch('cart/items/:itemId')
   updateCartItem(
     @CurrentUser('id') userId: string,
@@ -160,6 +230,15 @@ export class MarketplaceController {
   @Delete('cart')
   clearCart(@CurrentUser('id') userId: string) {
     return this.svc.clearCart(userId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('cart/promo/apply')
+  applyPromo(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApplyCartPromoDto,
+  ) {
+    return this.svc.applyCartPromo(userId, dto.code, dto.shop_id)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -181,6 +260,19 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('orders/pay/resume')
+  resumePayment(
+    @CurrentUser('id') userId: string,
+    @Query('orderIds') orderIdsRaw: string,
+  ) {
+    const orderIds = orderIdsRaw
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+    return this.svc.resumePendingPayments(userId, orderIds)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/mine')
   myOrders(@CurrentUser('id') userId: string) {
     return this.svc.listMyOrders(userId)
@@ -195,6 +287,17 @@ export class MarketplaceController {
     @Query('status') status?: OrderStatus,
   ) {
     return this.svc.listMerchantOrders(userId, shopId ?? merchantId, status)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/:orderId')
+  merchantOrder(
+    @CurrentUser('id') userId: string,
+    @Param('orderId') orderId: string,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.getMerchantOrder(userId, orderId, shopId ?? merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -213,5 +316,41 @@ export class MarketplaceController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.svc.updateOrderStatus(userId, id, dto, shopId ?? merchantId)
+  }
+
+  // ─── Adresses utilisateur (checkout / paramètres) ───────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @Get('addresses')
+  listMyAddresses(@CurrentUser('id') userId: string) {
+    return this.addresses.listMine(userId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('addresses')
+  createAddress(@CurrentUser('id') userId: string, @Body() dto: CreateUserAddressDto) {
+    return this.addresses.create(userId, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('addresses/:id/default')
+  setDefaultAddress(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.addresses.setDefault(userId, id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('addresses/:id')
+  updateAddress(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserAddressDto,
+  ) {
+    return this.addresses.update(userId, id, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('addresses/:id')
+  deleteAddress(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.addresses.remove(userId, id)
   }
 }
