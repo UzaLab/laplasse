@@ -17,7 +17,10 @@ RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
 
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM base AS builder
-ENV NODE_OPTIONS="--max-old-space-size=768"
+# Webpack + 1 worker : pic RAM plus bas que Turbopack sur VPS ~2 Go
+ENV NODE_OPTIONS="--max-old-space-size=640" \
+    NEXT_PRIVATE_WORKER_COUNT=1 \
+    CI=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web ./apps/web
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
@@ -42,10 +45,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST \
     NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
 
-# Limite le parallélisme Next.js (VPS RAM limitée) — 2 workers suffisent sans prérendu API lourd
-ENV NEXT_PRIVATE_WORKER_COUNT=2
 RUN --mount=type=cache,id=laplasse-next-web,target=/app/apps/web/.next/cache \
-    pnpm build
+    pnpm run build:docker
 
 # ── Runner (standalone = ~50 Mo vs image complète) ────────────────────────────
 FROM node:22-alpine AS runner

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Loader2, Smartphone, XCircle } from 'lucide-react'
@@ -31,6 +31,20 @@ import { notify } from '@/lib/notify'
 import { isFoodOrderCart } from '@/lib/orderFlow'
 
 export default function CheckoutPaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      }
+    >
+      <CheckoutPaymentPageContent />
+    </Suspense>
+  )
+}
+
+function CheckoutPaymentPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const isFoodRoute = pathname.startsWith('/commande')

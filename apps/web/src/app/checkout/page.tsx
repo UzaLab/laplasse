@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Loader2, UtensilsCrossed } from 'lucide-react'
@@ -58,6 +58,20 @@ import {
 } from '@/lib/orderFlow'
 
 export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
+        </div>
+      }
+    >
+      <CheckoutPageContent />
+    </Suspense>
+  )
+}
+
+function CheckoutPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()

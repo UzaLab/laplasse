@@ -236,7 +236,7 @@ grep 'suspicious\|ThrottlerException' apps/api/logs/app-$(date +%Y-%m-%d).log
 
 ## 9. Déploiement Coolify (VPS limité)
 
-Les builds Docker sont optimisés pour un VPS modeste (`.dockerignore`, cache pnpm, RAM plafonnée à 768 Mo, deps prod seules en runtime).
+Les builds Docker sont optimisés pour un VPS modeste (`.dockerignore`, cache pnpm, `next build --webpack`, 1 worker Next.js, heap Node 640 Mo, deps prod seules en runtime).
 
 **Règle d'or : ne jamais lancer 4 builds en parallèle.** Sur Coolify → Settings → désactiver le déploiement auto simultané si possible, ou utiliser le script séquentiel :
 
