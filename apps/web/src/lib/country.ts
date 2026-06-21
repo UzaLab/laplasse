@@ -1,9 +1,20 @@
-/** Tenancy pays — slice F2 (local : cookie ou défaut CI) */
+/** Tenancy pays — slice F2 (cookie, sous-domaine ou défaut CI) */
 
 export const DEFAULT_COUNTRY = 'CI'
 export const DEFAULT_CITY = 'Abidjan'
 export const COUNTRY_HEADER = 'X-LaPlasse-Country'
 export const COUNTRY_COOKIE = 'lp_country'
+export const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'laplasse.tech'
+
+export const SUBDOMAIN_BY_COUNTRY: Record<string, string> = {
+  CI: 'ci',
+  BF: 'bf',
+  SN: 'sn',
+}
+
+export const COUNTRY_BY_SUBDOMAIN: Record<string, string> = Object.fromEntries(
+  Object.entries(SUBDOMAIN_BY_COUNTRY).map(([country, subdomain]) => [subdomain, country]),
+)
 
 const CITY_BY_COUNTRY: Record<string, string> = {
   CI: 'Abidjan',
@@ -61,4 +72,32 @@ export function setClientCountry(code: string) {
 
 export function countryRequestHeaders(): Record<string, string> {
   return { [COUNTRY_HEADER]: getCountryCode() }
+}
+
+export function getCountrySubdomain(countryCode: string): string {
+  return SUBDOMAIN_BY_COUNTRY[countryCode.toUpperCase()] ?? countryCode.toLowerCase()
+}
+
+export function parseCountryFromHost(host: string): string | null {
+  const hostname = host.split(':')[0]?.toLowerCase() ?? ''
+  const root = ROOT_DOMAIN.toLowerCase()
+  if (hostname === root || hostname === `www.${root}`) return null
+  if (!hostname.endsWith(`.${root}`)) return null
+  const sub = hostname.slice(0, -(`.${root}`.length)).split('.').pop()
+  if (!sub) return null
+  return COUNTRY_BY_SUBDOMAIN[sub] ?? null
+}
+
+/** Redirect sous-domaine pays (prod laplasse.tech uniquement). */
+export function buildCountrySwitchUrl(
+  countryCode: string,
+  pathname = '/',
+  search = '',
+): string | null {
+  if (typeof window === 'undefined') return null
+  const root = ROOT_DOMAIN.toLowerCase()
+  const host = window.location.hostname.toLowerCase()
+  if (host !== root && host !== `www.${root}` && !host.endsWith(`.${root}`)) return null
+  const sub = getCountrySubdomain(countryCode)
+  return `${window.location.protocol}//${sub}.${root}${pathname}${search}`
 }

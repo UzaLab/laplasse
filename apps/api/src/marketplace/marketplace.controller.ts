@@ -213,7 +213,7 @@ export class MarketplaceController {
     @CurrentUser('id') userId: string,
     @Body() dto: AddMenuCartItemDto,
   ) {
-    return this.svc.addMenuItemToCart(userId, dto.menuItemId, dto.quantity)
+    return this.svc.addMenuItemToCart(userId, dto.menuItemId, dto.quantity, dto.optionIds)
   }
 
   @UseGuards(JwtAuthGuard)

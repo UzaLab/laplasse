@@ -6,6 +6,10 @@ export interface MerchantServiceConfig {
   duration_min: number
   price: number | null
   nightly_rate?: number | null
+  weekend_nightly_rate?: number | null
+  peak_nightly_rate?: number | null
+  peak_months?: unknown
+  min_stay_nights?: number | null
   description?: string | null
   capacity?: number | null
   service_kind?: string

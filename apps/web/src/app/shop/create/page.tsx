@@ -16,21 +16,22 @@ import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { createShop } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
 
 export default function CreateShopPage() {
   const router = useRouter()
   const { user, setActiveShop, updateUser } = useAuthStore()
   const { ready, hydrated, isAuthenticated } = useRequireAuth('/shop/create')
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     name: '',
     description: '',
     phone: '',
     whatsapp: '',
-    city: 'Abidjan',
+    city: getDefaultCity(getCountryCode()),
     district: '',
     merchant_id: '',
-  })
+  }))
 
   const merchants = user?.merchants ?? []
 

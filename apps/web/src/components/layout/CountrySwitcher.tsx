@@ -2,12 +2,23 @@
 
 import { useState } from 'react'
 import { Globe } from 'lucide-react'
-import { getCountryCode, setClientCountry, SUPPORTED_COUNTRIES } from '@/lib/country'
+import {
+  buildCountrySwitchUrl,
+  getCountryCode,
+  setClientCountry,
+  SUPPORTED_COUNTRIES,
+} from '@/lib/country'
 
 export function CountrySwitcher() {
   const [code, setCode] = useState(() => getCountryCode())
 
   const handleChange = (next: string) => {
+    const { pathname, search } = window.location
+    const redirectUrl = buildCountrySwitchUrl(next, pathname, search)
+    if (redirectUrl) {
+      window.location.href = redirectUrl
+      return
+    }
     setClientCountry(next)
     setCode(next)
     window.location.reload()

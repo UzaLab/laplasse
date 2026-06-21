@@ -17,6 +17,7 @@ import {
   CreateMenuSectionDto,
   UpdateMenuItemDto,
   UpdateMenuSectionDto,
+  UpdateMenuSettingsDto,
 } from './dto/shop-menu.dto'
 
 @UseGuards(JwtAuthGuard)
@@ -30,6 +31,15 @@ export class ShopMenuController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.svc.listMine(userId, merchantId)
+  }
+
+  @Patch('settings')
+  updateSettings(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateMenuSettingsDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.updateSettings(userId, dto, merchantId)
   }
 
   @Post('sections')

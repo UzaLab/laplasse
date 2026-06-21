@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MapPin, Store, ArrowRight, ArrowLeft, CheckCircle2, Loader2, Building2, Network } from 'lucide-react'
@@ -8,6 +8,8 @@ import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon } from '@/lib/icons'
 import { getHighestPlan, ORG_TYPE_LABELS, type OrganizationType } from '@/lib/planLimits'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
+import { useGeoCommunesForDefaultCity } from '@/features/discovery/hooks/useGeoCommunes'
 import type { LucideIcon } from 'lucide-react'
 
 const CATEGORIES_STATIC: { slug: string; label: string; Icon: LucideIcon }[] = [
@@ -19,16 +21,14 @@ const CATEGORIES_STATIC: { slug: string; label: string; Icon: LucideIcon }[] = [
   { slug: 'services',      label: 'Services',          Icon: getCategoryIcon('Wrench', 'services') },
 ]
 
-const DISTRICTS = [
-  'Cocody', 'Plateau', 'Zone 4 / Marcory', 'Yopougon',
-  'Adjamé', 'Treichville', 'Bingerville', 'Riviera',
-]
-
 type StructureMode = 'independent' | 'attach_org' | 'create_org'
 
 export default function MerchantSignupPage() {
   const router = useRouter()
   const { isAuthenticated, user, setActiveMerchant, updateUser } = useAuthStore()
+  const defaultCity = getDefaultCity(getCountryCode())
+  const { data: communes = [], isLoading: communesLoading } = useGeoCommunesForDefaultCity()
+  const districtOptions = communes.map(c => c.name)
 
   const existingMerchants = user?.merchants ?? []
   const highestPlan = getHighestPlan(existingMerchants)
@@ -53,8 +53,12 @@ export default function MerchantSignupPage() {
     whatsapp: '',
     address: '',
     district: '',
-    city: 'Abidjan',
+    city: defaultCity,
   })
+
+  useEffect(() => {
+    setForm(f => ({ ...f, city: defaultCity, district: '' }))
+  }, [defaultCity])
 
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -349,23 +353,43 @@ export default function MerchantSignupPage() {
               </div>
 
               <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ville</p>
+                <p className="text-sm font-semibold text-slate-800 mb-4">{form.city}</p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-bold text-slate-700 mb-3">Quartier *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DISTRICTS.map(d => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => set('district', d)}
-                      className={`py-2.5 px-4 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
-                        form.district === d
-                          ? 'border-brand-500 bg-brand-50 text-brand-700'
-                          : 'border-slate-200 text-slate-600 hover:border-brand-300'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
-                </div>
+                {communesLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-500 py-4">
+                    <Loader2 size={16} className="animate-spin" />
+                    Chargement des quartiers…
+                  </div>
+                ) : districtOptions.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {districtOptions.map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => set('district', d)}
+                        className={`py-2.5 px-4 rounded-xl border-2 text-sm font-semibold transition-all text-left ${
+                          form.district === d
+                            ? 'border-brand-500 bg-brand-50 text-brand-700'
+                            : 'border-slate-200 text-slate-600 hover:border-brand-300'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={form.district}
+                    onChange={e => set('district', e.target.value)}
+                    placeholder="Quartier ou commune"
+                    className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                  />
+                )}
               </div>
 
               <div>

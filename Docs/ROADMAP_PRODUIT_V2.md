@@ -3,8 +3,8 @@
 > Audit du parcours web (juin 2026) — marketplace, flux, UX, modules verticaux.  
 > Complète `REGLES_DEVELOPPEMENT.md` (état livré) et les Tomes (vision long terme).
 
-**Version :** 2.0  
-**Date :** 19 juin 2026  
+**Version :** 2.1  
+**Date :** 19 juin 2026 (MAJ Phase 9 — 21 juin 2026)  
 **Statut :** Document de référence produit — recommandations priorisées + journal d'exécution §14
 
 ---
@@ -77,16 +77,16 @@ Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 | Vertical | Catégories | Type booking | Maturité |
 |----------|------------|--------------|----------|
 | Restauration | restaurants, fast-food, cafes, bars-lounges | `TABLE` | Menu structuré ✅, fiche onglets ✅, réservation table ✅, formulaire + créneaux ✅ |
-| Hôtels | hotels | `ROOM` | Chambres + calendrier mois ✅, plage dates ✅, tarif/nuit + total séjour ✅, dispo multi-nuits API ✅ ; tarifs dynamiques saison ⏳ |
+| Hôtels | hotels | `ROOM` | Chambres + calendrier mois ✅, plage dates ✅, tarif/nuit + total séjour ✅, dispo multi-nuits API ✅, tarifs dynamiques week-end/saison ✅ |
 | Beauté / fitness | beaute, fitness | `APPOINTMENT` | Staff + prestations ✅, fiche onglets ✅, réservation + modification ✅ |
 | Pharmacie / défaut | pharmacies, … | `CONSULTATION` | RDV + consultations seed ✅, fiche onglets ✅, modification service ✅ |
 | Retail | boutiques | — | Booking désactivé, focus shop |
 
 **Parcours client :** réservation depuis fiche `/m/[slug]` (vertical-aware) → compte lié via cookie httpOnly → `/profile/bookings` (liste par vertical, fiche détail, modifier/annuler).
 
-**Parcours marchand :** `/merchant/bookings` — filtres statut/type, fiche détail, actions (confirmer, refuser, terminer, absent, annuler), contact client, tarifs hôtel estimés.
+**Parcours marchand :** `/merchant/bookings` — filtres statut/type/recherche, vue liste + agenda, fiche détail, actions (confirmer, refuser, terminer, absent, annuler), contact client, tarifs hôtel estimés.
 
-**Limites restantes :** pas de paiement à la réservation, pas de calendrier visuel marchand global, réservations invité (`user_id` null) invisibles côté profil, tarif hôtel absent si `service_id` manquant sur anciennes réservations.
+**Limites restantes :** pas de paiement à la réservation, réservations invité (`user_id` null) invisibles côté profil, enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
 
 ---
 
@@ -212,7 +212,7 @@ PENDING → CONFIRMED → PREPARING → READY → COMPLETED
 | **Recherche unifiée** | Établissements vs produits séparés | Haute |
 | **Onboarding shop** | Pas de checklist publication | Moyenne |
 | **Fiche établissement** | CTAs contextualisés par vertical | ✅ (`MerchantContextualCTAs`, onglets vertical) |
-| **Copy marque multipays** | Textes « ivoirien / Abidjan » en dur dans l'UI globale | ✅ `brandCopy.ts` + ville dynamique ; quartiers search CI encore en dur ⏳ |
+| **Copy marque multipays** | Textes « ivoirien / Abidjan » en dur dans l'UI globale | ✅ `brandCopy.ts` + ville dynamique ; quartiers search via API geo ✅ |
 
 ---
 
@@ -308,7 +308,7 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 |----------|----------|--------|--------|
 | Menu structuré | P0 vertical | Catégories (Entrées, Plats, Boissons) — distinct du catalog retail | ✅ |
 | Fiche établissement — onglets vertical | P0 UX | `[Vertical]` · Informations · Horaires · Galerie | ✅ |
-| Modificateurs | P1 | Suppléments, sauces, tailles — au-delà des variantes | ⏳ |
+| Modificateurs | P1 | Suppléments, sauces, tailles — groupes/options par plat | ✅ |
 | Flux commande food dédié | P0 | Menu → panier → adresse → paiement → suivi (UX ≠ retail) | ⏳ |
 | Temps préparation / ETA | P1 | Affiché avant validation commande | ⏳ |
 | Statuts livraison | P0 | `OUT_FOR_DELIVERY`, `DELIVERED` | ✅ |
@@ -482,7 +482,7 @@ Pour passer de « V1.6 démo solide » à « marketplace + verticaux crédibles 
 
 Le socle (Shop modulaire, checkout 4 étapes, booking engine, multi-boutiques) est **suffisant pour absorber ces modules** sans refonte totale — à condition de formaliser `enabled_modules[]` et l'admin capabilities.
 
-> **Note multi-pays :** M0/M1 partiels livrés (cookie pays, filtre API, copy dynamique). Reste : sous-domaines, quartiers search geo-aware, lancement BF opérationnel (§11.12).
+> **Note multi-pays :** M0/M1 livrés (cookie pays, filtre API, copy dynamique, sous-domaines `ci|bf|sn.laplasse.tech`, middleware host, redirect CountrySwitcher). Reste : lancement BF opérationnel (§11.12), DNS prod `laplasse.tech`.
 
 ---
 
@@ -522,8 +522,8 @@ Le schéma Prisma prévoit déjà des champs pays — mais l'application les **i
 | `Product.currency`, `Order.currency` | `@default("XOF")` | OK UEMOA, pas multi-devise |
 | API `findFeatured(city = 'Abidjan')` | Default hardcodé | Pas de param pays |
 | Meilisearch | Index `merchants` global | Pas de filtre `country` |
-| Web metadata | ~~`locale: 'fr_CI'`, textes Abidjan~~ | ✅ `brandCopy.ts`, OG `fr`, ville via cookie ; sous-domaines ⏳ |
-| Search districts | Liste quartiers Abidjan (`COCODY_DISTRICTS`) | ⏳ — doit lire `GeoCommune` par ville/pays |
+| Web metadata | ~~`locale: 'fr_CI'`, textes Abidjan~~ | ✅ `brandCopy.ts`, OG `fr`, ville via cookie ; sous-domaines ✅ (`middleware.ts`) |
+| Search districts | Liste quartiers Abidjan (`COCODY_DISTRICTS`) | ✅ — `useGeoCommunesForDefaultCity` + API geo |
 | Copy UI globale | « Élégance ivoirienne », Côte d'Ivoire | ✅ réécriture multipays juin 2026 |
 
 **Conclusion :** le multi-pays n'est pas une feature UI — c'est une **refonte de tenancy géographique** à traiter avant ou en parallèle de l'expansion BF/SN.
@@ -762,22 +762,23 @@ ci.laplasse.com/m/burger-republic-cocody
 | Slug unique | Migration `@@unique([country, slug])` sur Shop/Merchant |
 | Panier | Rejet si produit pays ≠ host country |
 
-#### Slice M1 — UX pays (1–2 semaines)
+#### Slice M1 — UX pays (1–2 semaines) — ✅ code livré (DNS prod ⏳)
 
-| Tâche | Détail |
-|-------|--------|
-| Sélecteur pays header | Drapeau + nom → redirect sous-domaine |
-| GeoIP suggestion | « Vous semblez être au Burkina Faso » |
-| Pages légales par pays | `/terms`, `/privacy` contenu ou URL config |
-| Metadata dynamique | `generateMetadata` lit CountryContext |
-| Sitemap par pays | `bf.laplasse.com/sitemap.xml` |
-| hreflang | `<link rel="alternate" hreflang="fr-BF" …>` |
+| Tâche | Détail | Statut |
+|-------|--------|--------|
+| Sélecteur pays header | Redirect sous-domaine `ci\|bf\|sn.laplasse.tech` | ✅ `CountrySwitcher` + `buildCountrySwitchUrl` |
+| Middleware host | Cookie `lp_country` sync + redirect apex → `ci.` | ✅ `middleware.ts` |
+| GeoIP suggestion | « Vous semblez être au Burkina Faso » | ⏳ |
+| Pages légales par pays | `/terms`, `/privacy` contenu ou URL config | ⏳ |
+| Metadata dynamique | `generateMetadata` lit CountryContext | ⏳ |
+| Sitemap par pays | `bf.laplasse.tech/sitemap.xml` | ⏳ |
+| hreflang | `<link rel="alternate" hreflang="fr-BF" …>` | ⏳ |
 
 #### Slice M2 — Contenu BF (2–4 semaines)
 
 | Tâche | Détail |
 |-------|--------|
-| `CountryCity` / districts Ouaga, Bobo | Remplacer listes Abidjan en dur |
+| `CountryCity` / districts Ouaga, Bobo | Remplacer listes Abidjan en dur — ✅ search + signup ; seed geo BF ⏳ |
 | Seed marchands BF | 20–50 établissements démo Ouagadougou |
 | Paiements BF | Orange Money BF simulateur → réel |
 | Admin pays | `/admin/countries` — activer, config, stats par pays |
@@ -1393,10 +1394,10 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | `apps/web/src/lib/brandCopy.ts` | ✅ Copy globale multipays |
 | `apps/web/src/app/layout.tsx` | ✅ Metadata dynamique, plus de `fr_CI` |
 | `apps/web/src/app/page.tsx` | ✅ Homepage geo-aware (`lp_country`) |
-| `apps/web/src/app/search/page.tsx` | ⚠️ Ville dynamique ✅ ; quartiers Abidjan en dur |
-| Formulaires marchand (`signup`, `shop/create`) | ⚠️ Default `Abidjan` — OK si cookie CI, à généraliser |
+| `apps/web/src/app/search/page.tsx` | ✅ Ville + quartiers dynamiques (`useGeoCommunesForDefaultCity`) |
+| Formulaires marchand (`signup`, `shop/create`, `ShopSettingsPanel`) | ✅ Default ville via `getDefaultCity(getCountryCode())` ; quartiers signup via API geo |
 | `apps/api/src/merchants/merchants.service.ts` | Filtre `location.country` ✅ (M1) |
-| Sous-domaines `bf.laplasse.com` | ⏳ M1 — middleware host |
+| Sous-domaines `ci.laplasse.tech` | ✅ M1 — `middleware.ts` + `CountrySwitcher` redirect |
 
 ---
 
@@ -1470,7 +1471,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | **3** Calendrier hôtel MVP | ✅ V2.2 slice | `nightly_rate` sur `MerchantService`, `GET /bookings/merchant/:id/room-calendar`, `HotelRoomCalendar` |
 | **4** Multi-pays V2.4 M0 | ✅ M0 | Seed geo BF/SN, filtre `shop.country` catalogue, `CountrySwitcher` navbar |
 | **5** Seed verticals | ✅ | `seed-verticals.ts` : menus food, chambres hôtel, prestations beauté/fitness, consultations pharmacie, booking settings, avis produits (CI + BF/SN) |
-| **5** Multi-pays V2.4 M1 | ✅ M1 | `seed-multipays.ts` (8 marchands BF/SN), filtre `location.country` API merchants, homepage geo-aware (`lp_country` cookie) |
+| **5** Multi-pays V2.4 M1 | ✅ M1 | Filtre `location.country`, cookie pays, `middleware.ts` sous-domaines, redirect `CountrySwitcher`, quartiers geo API |
 | **5** Delivery engine V3.0 | ✅ MVP | `DeliveryCourier`/`DeliveryJob`, statuts `OUT_FOR_DELIVERY`/`DELIVERED`, module `/delivery/*`, tracking `/delivery/track/:token` |
 | **5** Modération avis produits | ✅ | `ProductReview.status`, liste publique `APPROVED` only, admin `/admin/product-reviews` |
 
@@ -1508,9 +1509,23 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | **Helpers affichage booking** | ✅ | `lib/bookingDisplay.ts` — dates, tarifs, actions marchand |
 | **Modification CONSULTATION** | ✅ | `EditBookingModal` — sélection service |
 | **Copy marque multipays** | ✅ | `lib/brandCopy.ts` — « excellence locale », plus de focus CI/Abidjan en UI globale |
-| **Profil dashboard — prochaine résa** | ⏳ | Snippet `/profile` encore format date/heure générique (pas par vertical) |
-| **Calendrier visuel marchand bookings** | ⏳ | Vue agenda / mois côté marchand (liste seulement aujourd'hui) |
+| **Profil dashboard — prochaine résa** | ✅ | Snippet `/profile` via `getBookingWhenDisplay`, `getBookingCardMeta`, `getBookingPricing` |
+| **Calendrier visuel marchand bookings** | ✅ | `MerchantBookingAgenda` — toggle Liste/Agenda sur `/merchant/bookings` |
 | **Paiement à la réservation** | ⏳ | Bloqué intégration MM (§5 P0 #1) |
+
+### Phase 9 — Dettes techniques, M1 sous-domaines & profondeur marketplace (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Quartiers search dynamiques** | ✅ | `useGeoCommunesForDefaultCity`, `/search` sans `COCODY_DISTRICTS` |
+| **Formulaires marchand geo-aware** | ✅ | `merchant/signup`, `shop/create`, `ShopSettingsPanel` — ville + quartiers API |
+| **Tarifs hôtel dynamiques** | ✅ | Migration `room_dynamic_pricing`, `room-pricing.ts` API + web |
+| **Enrichissement résa hôtel legacy** | ✅ | `bookings.service.enrichRoomBookings` — match `room_type` → `MerchantService` |
+| **Filtres marchand unifiés** | ✅ | `MerchantListToolbar`, bookings/products/orders |
+| **M1 sous-domaines pays** | ✅ | `middleware.ts`, `country.ts` (`ROOT_DOMAIN`, `buildCountrySwitchUrl`), `CountrySwitcher` |
+| **Alertes stock bas marchand** | ✅ | `ShopProductsPanel` — badge + filtre « Stock bas » (seuil ≤ 5) |
+| **DNS prod laplasse.tech** | ⏳ | Domaine non acheté — middleware actif dès config DNS Coolify |
+| **Migration room_dynamic_pricing prod** | ⏳ | En attente déploiement explicite |
 
 ### Phase 5–6 — Delivery V3.0 (complément long terme)
 
@@ -1526,7 +1541,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 
 ---
 
-## Reste à faire — synthèse priorités (post Phase 8)
+## Reste à faire — synthèse priorités (post Phase 9)
 
 ### 🔴 P0 — Bloquant « marketplace / plateforme réelle »
 
@@ -1534,21 +1549,20 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 |---|-------|--------|
 | 1 | **Mobile Money réel** | Wave / Orange Money / MTN — webhooks, remplacer `SIMULATOR` (§5 P0 #1) — *reporté volontairement* |
 | 2 | **Paiement à la réservation** | Acompte ou total séjour/RDV — dépend P0 #1 |
-| 3 | **Sous-domaines pays (M1)** | `bf.laplasse.com`, redirect sélecteur, middleware host (§11.4) |
+| 3 | **DNS + déploiement laplasse.tech** | Sous-domaines code ✅ — config DNS Coolify + wildcard `*.laplasse.tech` |
 
-### 🟠 P1 — Parité & profondeur métier
+### 🟠 P1 — Parité & profondeur métier (Sprint 10+)
 
 | Domaine | Slices |
 |---------|--------|
-| **Marketplace** | Alertes stock marchand · Analytics e-commerce (conversion, abandon) · Order again · Split livraison multi-boutiques (mode/adresse par vendeur) |
-| **Restaurant** | Modificateurs menu (suppléments) · ETA préparation checkout |
-| **Hôtel** | Tarification dynamique (week-end/saison) · Min stay · Fiche chambre riche · Calendrier marchand |
-| **Booking** | Rappels SMS/WhatsApp auto · Politique no-show · Réservations invité rattachables au compte · Vue agenda marchand |
-| **Profil** | Aligner snippet « prochaine réservation » dashboard sur `bookingDisplay` |
+| **Marketplace** | ~~Alertes stock marchand~~ ✅ · Analytics e-commerce (conversion, abandon) · Order again · Split livraison multi-boutiques (mode/adresse par vendeur) |
+| **Restaurant** | ~~Modificateurs menu (suppléments)~~ ✅ · ~~ETA préparation checkout~~ ✅ |
+| **Hôtel** | ~~Tarification dynamique~~ ✅ · Fiche chambre riche · Notifications rappel séjour |
+| **Booking** | Rappels SMS/WhatsApp auto · Politique no-show · Réservations invité rattachables au compte |
 | **Delivery V3** | Notifications temps réel · GPS livreur · Partenaires logistiques |
-| **Multi-pays** | Quartiers search via `GeoCommune` · Autocomplete merchants par pays · Critères §11.12 « Burkina ready » |
+| **Multi-pays** | Autocomplete merchants par pays · Critères §11.12 « Burkina ready » · Seed BF opérationnel |
 | **Retail** | Retours SAV structuré · SEO produit avancé |
-| **UX transverse** | Funnels PostHog checkout · Onboarding marchand vertical · Wizard publication boutique (✅ fait) |
+| **UX transverse** | Funnels PostHog checkout · Onboarding marchand vertical |
 
 ### 🟡 P2 — Scale & différenciation
 
@@ -1564,26 +1578,50 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 
 ### ✅ Déjà livré (ne pas replanifier)
 
-Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · **Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays)**.
+Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays) · **Phase 9 (dettes geo, M1 sous-domaines, filtres marchand, alertes stock, tarifs dynamiques)**.
 
 ---
 
-### Journal — Prochaines slices (backlog ordonné)
+### Journal — Prochains sprints (backlog ordonné)
 
-| Slice | Priorité | Description |
-|-------|----------|-------------|
-| P0 #1 Mobile Money réel | Reporté | Simulation conservée — prérequis prod UEMOA |
-| Multi-pays M1 sous-domaines | P0 infra | Middleware host + redirect CountrySwitcher |
-| Search quartiers dynamiques | P1 | Remplacer `COCODY_DISTRICTS` par API geo |
-| Paiement réservation hôtel/RDV | P1 | Après MM réel |
-| Calendrier agenda marchand | P1 | Vue semaine/mois `/merchant/bookings` |
-| Profil dashboard booking | P2 | Snippet prochaine résa par vertical |
-| Modificateurs menu | P1 | Options plat (suppléments, tailles) |
-| ETA préparation food checkout | P1 | Affichage délai restaurant au checkout |
-| Tarification hôtel dynamique | P1 | Week-end / saison · min stay |
-| Analytics ecommerce marchand | P1 | Funnel boutique, top produits |
-| Remboursement paiement réel | P2 | Après intégration MM |
-| GPS livreur | P2 | Carte suivi live |
+| Sprint | Slice | Priorité | Description |
+|--------|-------|----------|-------------|
+| **10** | Modificateurs menu | ✅ | `MenuModifierGroup/Option`, sheet client, panier + commande |
+| **10** | ETA préparation food | ✅ | `food_prep_minutes` marchand, `estimated_prep_minutes` panier/checkout |
+| **11** | Analytics ecommerce marchand | P1 | Funnel boutique, top produits, abandon panier |
+| **11** | Critères Burkina ready | P1 | Checklist §11.12 — seed BF, geo Ouaga, smoke tests |
+| **12** | Order again | P1 | Récommander depuis `/profile/orders` |
+| **12** | Split livraison multi-boutiques | P1 | Mode/adresse par vendeur au checkout |
+| — | P0 Mobile Money réel | Reporté | Simulation conservée — prérequis prod UEMOA |
+| — | Paiement réservation hôtel/RDV | P1 | Après MM réel |
+| — | Rappels SMS/WhatsApp booking | P1 | Cron + templates |
+| — | Fiche chambre riche | P1 | Galerie, équipements, politique annulation |
+| — | Remboursement paiement réel | P2 | Après intégration MM |
+| — | GPS livreur | P2 | Carte suivi live |
+
+### Journal — Slices clôturées Phase 9 (juin 2026)
+
+| Slice | Statut | Fichiers clés |
+|-------|--------|---------------|
+| Search quartiers dynamiques | ✅ | `useGeoCommunes.ts`, `/search` |
+| M1 sous-domaines | ✅ | `middleware.ts`, `country.ts`, `CountrySwitcher` |
+| Formulaires ville dynamique | ✅ | signup, shop/create, ShopSettingsPanel |
+| Tarifs hôtel dynamiques | ✅ | migration `room_dynamic_pricing`, `roomPricing.ts` |
+| Agenda marchand bookings | ✅ | `MerchantBookingAgenda.tsx` |
+| Snippet profil prochaine résa | ✅ | `/profile` + `bookingDisplay.ts` |
+| Enrichissement résa legacy | ✅ | `bookings.service.enrichRoomBookings` |
+| Alertes stock bas | ✅ | `ShopProductsPanel`, `merchantListFilters.ts` |
+| Modificateurs menu | ✅ | migration `menu_modifiers_food_prep`, `MenuItemModifierSheet` |
+| ETA food checkout | ✅ | `food_prep_minutes`, `estimated_prep_minutes` |
+
+### Phase 10 — Restaurant profondeur (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Modificateurs menu (groupes + options)** | ✅ | `MenuModifierGroup`, `MenuModifierOption`, éditeur marchand |
+| **Panier food avec options** | ✅ | `selected_modifiers` sur `CartItem`, prix unitaire dynamique |
+| **Commande avec snapshot options** | ✅ | `modifiers` + `variant_name` sur `OrderItem` |
+| **ETA préparation checkout** | ✅ | `Merchant.food_prep_minutes`, `MenuItem.prep_minutes`, affichage `/commande` + checkout |
 
 ---
 

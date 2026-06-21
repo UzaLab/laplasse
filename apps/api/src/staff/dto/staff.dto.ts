@@ -51,6 +51,25 @@ export class CreateServiceDto {
 
   @IsOptional()
   @IsInt()
+  @Min(0)
+  weekend_nightly_rate?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  peak_nightly_rate?: number
+
+  @IsOptional()
+  @IsArray()
+  peak_months?: number[]
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  min_stay_nights?: number
+
+  @IsOptional()
+  @IsInt()
   @Min(1)
   capacity?: number
 

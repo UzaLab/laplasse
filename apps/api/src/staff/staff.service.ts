@@ -247,6 +247,10 @@ export class StaffService {
         duration_min: dto.duration_min ?? this.defaultDuration(kind),
         price,
         nightly_rate: nightlyRate ?? price,
+        weekend_nightly_rate: dto.weekend_nightly_rate ?? null,
+        peak_nightly_rate: dto.peak_nightly_rate ?? null,
+        peak_months: dto.peak_months ?? [],
+        min_stay_nights: dto.min_stay_nights ?? 1,
         capacity: dto.capacity,
         staff_id: dto.staff_id || null,
         ...this.roomListingData(dto),
@@ -278,6 +282,10 @@ export class StaffService {
       unit_type: _ut,
       nightly_rate: _nr,
       price: _pr,
+      weekend_nightly_rate: _wnr,
+      peak_nightly_rate: _pnr,
+      peak_months: _pm,
+      min_stay_nights: _msn,
       ...rest
     } = dto
     return this.prisma.merchantService.update({
@@ -286,6 +294,10 @@ export class StaffService {
         ...rest,
         ...(price !== undefined ? { price } : {}),
         ...(nightlyRate !== undefined ? { nightly_rate: nightlyRate } : {}),
+        ...(dto.weekend_nightly_rate !== undefined ? { weekend_nightly_rate: dto.weekend_nightly_rate || null } : {}),
+        ...(dto.peak_nightly_rate !== undefined ? { peak_nightly_rate: dto.peak_nightly_rate || null } : {}),
+        ...(dto.peak_months !== undefined ? { peak_months: dto.peak_months } : {}),
+        ...(dto.min_stay_nights !== undefined ? { min_stay_nights: dto.min_stay_nights } : {}),
         staff_id: dto.staff_id !== undefined ? (dto.staff_id || null) : undefined,
         ...this.roomListingData(dto),
       },

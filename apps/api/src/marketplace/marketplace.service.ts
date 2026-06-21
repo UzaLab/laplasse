@@ -23,6 +23,15 @@ import {
   UpdateProductDto,
 } from './dto/marketplace.dto'
 import { generatePaymentReference, slugify, MENU_MIRROR_SLUG_PREFIX, menuMirrorProductSlug, isMenuMirrorProductSlug } from './marketplace.util'
+import {
+  computeMenuUnitPrice,
+  estimateFoodPrepMinutes,
+  formatModifiersLabel,
+  modifiersSignature,
+  parseSelectedModifiers,
+  validateMenuModifierSelections,
+  type MenuModifierGroupRow,
+} from '../common/menu-modifiers'
 import { ShopsService } from '../shops/shops.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { PromotionsService } from '../promotions/promotions.service'
@@ -189,6 +198,7 @@ export class MarketplaceService {
       quantity: number
       variant_id: string | null
       menu_item_id?: string | null
+      selected_modifiers?: unknown
       menu_item?: {
         id: string
         name: string
@@ -196,7 +206,14 @@ export class MarketplaceService {
         currency: string
         image_url: string | null
         is_available: boolean
-        merchant: { id: string; business_name: string; slug: string; logo?: string | null }
+        prep_minutes?: number | null
+        merchant: {
+          id: string
+          business_name: string
+          slug: string
+          logo?: string | null
+          food_prep_minutes?: number
+        }
       } | null
       product?: {
         id: string
@@ -225,7 +242,9 @@ export class MarketplaceService {
   ) {
     if (item.menu_item_id && item.menu_item) {
       const m = item.menu_item
-      const unitPrice = m.price
+      const selectedModifiers = parseSelectedModifiers(item.selected_modifiers)
+      const unitPrice = computeMenuUnitPrice(m.price, selectedModifiers)
+      const modifiersLabel = formatModifiersLabel(selectedModifiers)
       return {
         id: item.id,
         quantity: item.quantity,
@@ -235,12 +254,15 @@ export class MarketplaceService {
         variant: null,
         line_kind: 'menu' as const,
         menu_item_id: m.id,
+        selected_modifiers: selectedModifiers,
+        modifiers_label: modifiersLabel,
         menu_item: {
           id: m.id,
           name: m.name,
           price: m.price,
           currency: m.currency,
           image_url: m.image_url,
+          prep_minutes: m.prep_minutes ?? null,
         },
         product: {
           id: m.id,
@@ -261,6 +283,7 @@ export class MarketplaceService {
             business_name: m.merchant.business_name,
             slug: m.merchant.slug,
             logo: m.merchant.logo ?? null,
+            food_prep_minutes: m.merchant.food_prep_minutes ?? 25,
           },
         },
       }
@@ -288,6 +311,8 @@ export class MarketplaceService {
       line_kind: 'product' as const,
       menu_item_id: null as string | null,
       menu_item: null,
+      selected_modifiers: [],
+      modifiers_label: null,
       product: {
         id: item.product.id,
         name: item.product.name,
@@ -343,12 +368,23 @@ export class MarketplaceService {
       }
       const merchants = Array.from(merchantMap.values())
       const single = merchants.length === 1 ? merchants[0] : null
+      const prepSource = items
+        .filter(i => i.line_kind === 'menu')
+        .map(i => ({
+          prep_minutes: i.menu_item?.prep_minutes ?? null,
+          quantity: i.quantity,
+        }))
+      const merchantPrepDefault = items.find(i => i.line_kind === 'menu')?.product.merchant.food_prep_minutes ?? 25
+      const estimated_prep_minutes = prepSource.length
+        ? estimateFoodPrepMinutes(merchantPrepDefault, prepSource)
+        : null
       return {
         id: cart.id,
         items,
         subtotal,
         currency: 'XOF',
         kind,
+        estimated_prep_minutes,
         shops: [],
         shop_count: 0,
         shop_id: null,
@@ -881,6 +917,7 @@ export class MarketplaceService {
         currency: true,
         image_url: true,
         is_available: true,
+        prep_minutes: true,
         merchant: {
           select: {
             id: true,
@@ -888,6 +925,7 @@ export class MarketplaceService {
             slug: true,
             logo: true,
             is_active: true,
+            food_prep_minutes: true,
           },
         },
       },
@@ -1036,11 +1074,25 @@ export class MarketplaceService {
   }
 
   /** Ajoute un plat du menu au panier — entité MenuItem, sans produit boutique. */
-  async addMenuItemToCart(userId: string, menuItemId: string, quantity: number) {
+  async addMenuItemToCart(
+    userId: string,
+    menuItemId: string,
+    quantity: number,
+    optionIds?: string[],
+  ) {
     const menuItem = await this.prisma.menuItem.findFirst({
       where: { id: menuItemId, is_available: true },
       include: {
         merchant: { select: { id: true, is_active: true } },
+        modifier_groups: {
+          orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+          include: {
+            options: {
+              where: { is_available: true },
+              orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+            },
+          },
+        },
       },
     })
     if (!menuItem) throw new NotFoundException('Plat introuvable ou indisponible')
@@ -1048,10 +1100,37 @@ export class MarketplaceService {
       throw new BadRequestException('Ce restaurant n\'accepte pas de commandes pour le moment')
     }
 
+    const groups: MenuModifierGroupRow[] = menuItem.modifier_groups.map(group => ({
+      id: group.id,
+      name: group.name,
+      min_select: group.min_select,
+      max_select: group.max_select,
+      sort_order: group.sort_order,
+      options: group.options.map(option => ({
+        id: option.id,
+        name: option.name,
+        price_delta: option.price_delta,
+        is_available: option.is_available,
+        sort_order: option.sort_order,
+      })),
+    }))
+
+    let selectedModifiers: ReturnType<typeof parseSelectedModifiers> = []
+    try {
+      selectedModifiers = validateMenuModifierSelections(groups, optionIds ?? [])
+    } catch (err) {
+      throw new BadRequestException(err instanceof Error ? err.message : 'Options invalides')
+    }
+
     const cart = await this.getOrCreateCart(userId)
     this.assertHomogeneousCartFromRaw(cart.items, true)
 
-    const existing = cart.items.find(i => i.menu_item_id === menuItemId)
+    const targetSignature = modifiersSignature(selectedModifiers)
+    const existing = cart.items.find(i => {
+      if (i.menu_item_id !== menuItemId) return false
+      return modifiersSignature(parseSelectedModifiers(i.selected_modifiers)) === targetSignature
+    })
+
     if (existing) {
       await this.prisma.cartItem.update({
         where: { id: existing.id },
@@ -1063,6 +1142,7 @@ export class MarketplaceService {
           cart_id: cart.id,
           menu_item_id: menuItemId,
           quantity,
+          selected_modifiers: selectedModifiers as unknown as Prisma.InputJsonValue,
         },
       })
     }
@@ -1603,10 +1683,11 @@ export class MarketplaceService {
                 product_id: null,
                 variant_id: null,
                 product_name: item.menu_item?.name ?? item.product.name,
-                variant_name: null,
+                variant_name: item.modifiers_label ?? null,
                 unit_price: item.unit_price,
                 quantity: item.quantity,
                 line_total: item.line_total,
+                modifiers: (item.selected_modifiers ?? []) as unknown as Prisma.InputJsonValue,
               })),
             },
           },
@@ -1680,6 +1761,7 @@ export class MarketplaceService {
       product_id: string | null
       menu_item_id?: string | null
       variant_id: string | null
+      modifiers?: unknown
     }>,
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
@@ -1688,9 +1770,16 @@ export class MarketplaceService {
 
     for (const item of orderItems) {
       if (item.menu_item_id) {
-        await tx.cartItem.deleteMany({
+        const orderSignature = modifiersSignature(parseSelectedModifiers(item.modifiers))
+        const cartItems = await tx.cartItem.findMany({
           where: { cart_id: cart.id, menu_item_id: item.menu_item_id },
         })
+        for (const cartItem of cartItems) {
+          const cartSignature = modifiersSignature(parseSelectedModifiers(cartItem.selected_modifiers))
+          if (cartSignature === orderSignature) {
+            await tx.cartItem.delete({ where: { id: cartItem.id } })
+          }
+        }
         continue
       }
       if (!item.product_id) continue

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { BedDouble, Calendar, ChevronLeft, ChevronRight, Loader2, Users } from 'lucide-react'
 import type { BookingConfig, MerchantServiceConfig } from '@/lib/bookingConfig'
 import { formatPrice } from '@/lib/bookingConfig'
+import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
 import {
   amenityLabel,
   highlightLabel,
@@ -114,10 +115,9 @@ export function MerchantHotelTab({ merchantId }: Props) {
 
   const staySummary = useMemo(() => {
     if (!checkIn || !checkOut || !selectedRoom) return null
-    const nights = nightsBetween(checkIn, checkOut)
-    if (nights <= 0) return null
-    const rate = selectedRoom.nightly_rate ?? selectedRoom.price ?? 0
-    return { nights, rate, total: nights * rate }
+    const stay = computeStayPricing(selectedRoom, checkIn, checkOut)
+    if (!stay) return null
+    return { nights: stay.nights, rate: stay.averageNightly, total: stay.total, breakdown: stay.breakdown }
   }, [checkIn, checkOut, selectedRoom])
 
   const handleDateClick = (dateStr: string, available: boolean) => {
@@ -159,6 +159,12 @@ export function MerchantHotelTab({ merchantId }: Props) {
     }
     if (nightsBetween(checkIn, checkOut) <= 0) {
       setRangeError('La date de départ doit être après l\'arrivée')
+      return
+    }
+    const minStay = getMinStayNights(selectedRoom)
+    const stay = computeStayPricing(selectedRoom, checkIn, checkOut)
+    if (stay && stay.nights < minStay) {
+      setRangeError(`Séjour minimum : ${minStay} nuit${minStay > 1 ? 's' : ''}`)
       return
     }
     openBookingWithPrefill({

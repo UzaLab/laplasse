@@ -10,13 +10,12 @@ import { SearchBar } from '@/features/discovery/components/SearchBar'
 import { SearchResultCard, type SearchHit } from '@/features/discovery/components/SearchResultCard'
 import { ProductSearchResultCard } from '@/features/discovery/components/ProductSearchResultCard'
 import { useCategories, useSearch, usePaginatedUnifiedSearch } from '@/features/discovery/hooks/useDiscovery'
+import { useGeoCommunesForDefaultCity } from '@/features/discovery/hooks/useGeoCommunes'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { getDefaultCity, getCountryCode } from '@/lib/country'
 import { allCityLabel, popularInCityLabel } from '@/lib/brandCopy'
 
 type ResultTab = 'all' | 'merchants' | 'products'
-
-const COCODY_DISTRICTS = ['Cocody', 'Plateau', 'Marcory', 'Yopougon', 'Adjamé', 'Koumassi']
 
 const SORT_OPTIONS = [
   { value: 'trust_score', label: 'Mieux noté' },
@@ -93,6 +92,7 @@ function SearchContent() {
 
   const debouncedQuery = useDebounce(query, 350)
   const { data: categories } = useCategories()
+  const { data: communes = [], isLoading: communesLoading } = useGeoCommunesForDefaultCity()
 
   const searchParamsBase = {
     q: debouncedQuery || undefined,
@@ -214,13 +214,16 @@ function SearchContent() {
                 <FilterPill active={!selectedDistrict} onClick={() => setSelectedDistrict('')}>
                   {allCityLabel(defaultCity)}
                 </FilterPill>
-                {COCODY_DISTRICTS.map(d => (
+                {communesLoading && (
+                  <span className="text-xs text-slate-400 font-medium px-2">Chargement…</span>
+                )}
+                {communes.map(c => (
                   <FilterPill
-                    key={d}
-                    active={selectedDistrict === d}
-                    onClick={() => setSelectedDistrict(selectedDistrict === d ? '' : d)}
+                    key={c.id}
+                    active={selectedDistrict === c.name}
+                    onClick={() => setSelectedDistrict(selectedDistrict === c.name ? '' : c.name)}
                   >
-                    {d}
+                    {c.name}
                   </FilterPill>
                 ))}
               </div>

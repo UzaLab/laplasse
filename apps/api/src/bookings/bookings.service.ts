@@ -9,6 +9,7 @@ import { NotificationQueueService } from '../queue/notification-queue.service'
 import { getPlanLimits } from '../common/plan-limits'
 import { getCategoryBookingConfig } from '../common/booking-config'
 import { formatLocalDate } from '../common/date-local'
+import { assertMinStay, getNightlyRateForDate } from '../common/room-pricing'
 import { AvailabilityService } from './availability.service'
 import { FraudService } from '../fraud/fraud.service'
 import { AuditService } from '../audit/audit.service'
@@ -24,6 +25,72 @@ export class BookingsService {
     private readonly fraud: FraudService,
     private readonly audit: AuditService,
   ) {}
+
+  private readonly roomServiceSelect = {
+    id: true,
+    name: true,
+    price: true,
+    nightly_rate: true,
+    weekend_nightly_rate: true,
+    peak_nightly_rate: true,
+    peak_months: true,
+    min_stay_nights: true,
+    duration_min: true,
+    merchant_id: true,
+  } as const
+
+  private async enrichRoomBookings<
+    T extends {
+      booking_type: BookingType
+      merchant_id: string
+      room_type: string | null
+      service: Record<string, unknown> | null
+    },
+  >(bookings: T[]): Promise<T[]> {
+    const missing = bookings.filter(
+      b => b.booking_type === 'ROOM' && !b.service && b.room_type?.trim(),
+    )
+    if (!missing.length) return bookings
+
+    const merchantIds = [...new Set(missing.map(b => b.merchant_id))]
+    const services = await this.prisma.merchantService.findMany({
+      where: {
+        merchant_id: { in: merchantIds },
+        service_kind: 'ROOM_TYPE',
+        is_active: true,
+      },
+      select: this.roomServiceSelect,
+    })
+
+    const byKey = new Map<string, (typeof services)[number]>()
+    for (const service of services) {
+      byKey.set(`${service.merchant_id}:${service.name.trim().toLowerCase()}`, service)
+    }
+
+    return bookings.map(booking => {
+      if (booking.booking_type !== 'ROOM' || booking.service || !booking.room_type?.trim()) {
+        return booking
+      }
+
+      const normalized = booking.room_type.trim().toLowerCase()
+      const key = `${booking.merchant_id}:${normalized}`
+      const matched =
+        byKey.get(key)
+        ?? services.find(
+          s =>
+            s.merchant_id === booking.merchant_id
+            && (
+              s.name.trim().toLowerCase().includes(normalized)
+              || normalized.includes(s.name.trim().toLowerCase())
+            ),
+        )
+
+      if (!matched) return booking
+
+      const { merchant_id: _merchantId, ...service } = matched
+      return { ...booking, service }
+    })
+  }
 
   private async resolveMerchant(userId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
@@ -128,7 +195,9 @@ export class BookingsService {
       days.push({
         date: dateStr,
         available: !night.closed && night.available,
-        nightly_rate: roomService?.nightly_rate ?? roomService?.price ?? null,
+        nightly_rate: roomService
+          ? getNightlyRateForDate(roomService, dateStr)
+          : null,
         room_type: roomService?.name ?? null,
       })
     }
@@ -190,6 +259,20 @@ export class BookingsService {
     }
     if (bookingType === 'ROOM' && !checkOutAt) {
       throw new BadRequestException('Veuillez indiquer la date de départ')
+    }
+
+    if (bookingType === 'ROOM' && checkOutAt && dto.service_id) {
+      const roomService = await this.prisma.merchantService.findFirst({
+        where: { id: dto.service_id, merchant_id: merchantId, is_active: true, service_kind: 'ROOM_TYPE' },
+      })
+      if (roomService) {
+        const minStayMsg = assertMinStay(
+          roomService,
+          formatLocalDate(bookedAt),
+          formatLocalDate(checkOutAt),
+        )
+        if (minStayMsg) throw new BadRequestException(minStayMsg)
+      }
     }
 
     await this.availability.assertSlotAvailable(merchantId, bookedAt, {
@@ -266,19 +349,32 @@ export class BookingsService {
 
   async listMerchantBookings(userId: string, merchantId?: string, status?: BookingStatus) {
     const merchant = await this.resolveMerchant(userId, merchantId)
-    return this.prisma.booking.findMany({
+    const bookings = await this.prisma.booking.findMany({
       where: {
         merchant_id: merchant.id,
         ...(status ? { status } : {}),
       },
       include: {
-        service: { select: { id: true, name: true, price: true, nightly_rate: true, duration_min: true } },
+        service: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            nightly_rate: true,
+            weekend_nightly_rate: true,
+            peak_nightly_rate: true,
+            peak_months: true,
+            min_stay_nights: true,
+            duration_min: true,
+          },
+        },
         staff: { select: { id: true, name: true } },
         user: { select: { id: true, full_name: true, email: true } },
       },
       orderBy: { booked_at: 'asc' },
       take: 100,
     })
+    return this.enrichRoomBookings(bookings)
   }
 
   private myBookingsUpcomingWhere(userId: string, now: Date) {
@@ -305,7 +401,7 @@ export class BookingsService {
             NOT: this.myBookingsUpcomingWhere(userId, now),
           }
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,
         orderBy: { booked_at: opts.tab === 'upcoming' ? 'asc' : 'desc' },
@@ -315,12 +411,26 @@ export class BookingsService {
           merchant: {
             select: { id: true, business_name: true, slug: true, cover_image: true },
           },
-          service: { select: { id: true, name: true, price: true, nightly_rate: true, duration_min: true } },
+          service: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            nightly_rate: true,
+            weekend_nightly_rate: true,
+            peak_nightly_rate: true,
+            peak_months: true,
+            min_stay_nights: true,
+            duration_min: true,
+          },
+        },
           staff: { select: { id: true, name: true } },
         },
       }),
       this.prisma.booking.count({ where }),
     ])
+
+    const items = await this.enrichRoomBookings(rawItems)
 
     return {
       items,

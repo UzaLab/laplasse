@@ -22,6 +22,13 @@ import {
   MenuItemThumb,
   MerchantMediathequeField,
 } from '@/features/merchant/components/MerchantMediathequeField'
+import { MenuModifiersEditor } from '@/features/merchant/components/MenuModifiersEditor'
+import {
+  modifierGroupsFromApi,
+  modifierGroupsToPayload,
+  type MenuModifierGroup,
+  type ModifierGroupDraft,
+} from '@/lib/menuModifiers'
 
 interface MenuSection {
   id: string
@@ -39,7 +46,9 @@ interface MenuItem {
   currency: string
   image_url: string | null
   is_available: boolean
+  prep_minutes: number | null
   sort_order: number
+  modifier_groups: MenuModifierGroup[]
 }
 
 const INPUT =
@@ -74,6 +83,10 @@ export function MerchantMenuPanel() {
   const [editForm, setEditForm] = useState<ItemFormState>(EMPTY_ITEM_FORM)
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
   const [sectionEditName, setSectionEditName] = useState('')
+  const [foodPrepMinutes, setFoodPrepMinutes] = useState('25')
+  const [savingPrep, setSavingPrep] = useState(false)
+  const [editPrepMinutes, setEditPrepMinutes] = useState('')
+  const [editModifierGroups, setEditModifierGroups] = useState<ModifierGroupDraft[]>([])
 
   const load = async () => {
     if (!activeMerchantId) return
@@ -83,6 +96,7 @@ export function MerchantMenuPanel() {
       const data = await res.json()
       setSections(data.sections ?? [])
       setItems(data.items ?? [])
+      setFoodPrepMinutes(String(data.food_prep_minutes ?? 25))
     }
     setLoading(false)
   }
@@ -176,6 +190,26 @@ export function MerchantMenuPanel() {
     void load()
   }
 
+  const saveFoodPrepMinutes = async () => {
+    const minutes = Number(foodPrepMinutes)
+    if (!Number.isFinite(minutes) || minutes < 5) {
+      notify.error('Délai de préparation invalide (min. 5 min)')
+      return
+    }
+    setSavingPrep(true)
+    const res = await merchantApiFetch('/merchant-menu/settings', activeMerchantId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ food_prep_minutes: minutes }),
+    })
+    setSavingPrep(false)
+    if (!res.ok) {
+      notify.error(await parseApiError(res))
+      return
+    }
+    notify.success('Délai de préparation enregistré')
+  }
+
   const startEditItem = (item: MenuItem) => {
     setEditingItemId(item.id)
     setEditForm({
@@ -185,6 +219,8 @@ export function MerchantMenuPanel() {
       description: item.description ?? '',
       image_url: item.image_url ?? '',
     })
+    setEditPrepMinutes(item.prep_minutes != null ? String(item.prep_minutes) : '')
+    setEditModifierGroups(modifierGroupsFromApi(item.modifier_groups ?? []))
   }
 
   const saveEditItem = async () => {
@@ -199,6 +235,8 @@ export function MerchantMenuPanel() {
         section_id: editForm.section_id || null,
         description: editForm.description.trim() || undefined,
         image_url: editForm.image_url.trim() || null,
+        prep_minutes: editPrepMinutes.trim() ? Number(editPrepMinutes) : null,
+        modifier_groups: modifierGroupsToPayload(editModifierGroups),
       }),
     })
     setSavingId(null)
@@ -300,6 +338,18 @@ export function MerchantMenuPanel() {
             onChange={url => setEditForm(f => ({ ...f, image_url: url }))}
             label="Photo du plat"
           />
+          <label className="block text-xs">
+            <span className="font-bold text-slate-500">Préparation (min, optionnel)</span>
+            <input
+              type="number"
+              min={1}
+              value={editPrepMinutes}
+              onChange={e => setEditPrepMinutes(e.target.value)}
+              placeholder="Hérite du délai restaurant"
+              className={`mt-1 ${INPUT}`}
+            />
+          </label>
+          <MenuModifiersEditor groups={editModifierGroups} onChange={setEditModifierGroups} />
           <div className="flex gap-2">
             <button
               type="button"
@@ -338,6 +388,11 @@ export function MerchantMenuPanel() {
             {!item.is_available && (
               <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
                 Masqué
+              </span>
+            )}
+            {(item.modifier_groups?.length ?? 0) > 0 && (
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                Options
               </span>
             )}
           </div>
@@ -504,6 +559,29 @@ export function MerchantMenuPanel() {
             Voir le menu public <ExternalLink size={14} />
           </Link>
         )}
+      </div>
+
+      <div className="mb-6 bg-white rounded-2xl border border-slate-100 p-4 flex flex-wrap items-end gap-3">
+        <label className="block flex-1 min-w-[180px]">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+            Délai préparation par défaut (min)
+          </span>
+          <input
+            type="number"
+            min={5}
+            value={foodPrepMinutes}
+            onChange={e => setFoodPrepMinutes(e.target.value)}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={savingPrep}
+          onClick={() => void saveFoodPrepMinutes()}
+          className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60"
+        >
+          {savingPrep ? 'Enregistrement…' : 'Enregistrer délai'}
+        </button>
       </div>
 
       <div className="flex gap-2 mb-6">

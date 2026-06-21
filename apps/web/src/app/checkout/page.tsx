@@ -491,7 +491,10 @@ function CheckoutPageContent() {
               <div>
                 <p className="font-bold text-orange-900 text-sm">Commande restaurant</p>
                 <p className="text-xs text-orange-800 mt-0.5">
-                  Préparation estimée 25–45 min · choisissez livraison ou retrait sur place
+                  {cart.estimated_prep_minutes
+                    ? `Préparation estimée ~ ${cart.estimated_prep_minutes} min · `
+                    : 'Préparation estimée 25–45 min · '}
+                  choisissez livraison ou retrait sur place
                 </p>
               </div>
             </div>

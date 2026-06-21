@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { authUrl } from '@/lib/authClient'
 import { BoutiquePageClient } from '@/features/marketplace/components/BoutiquePageClient'
+import { COUNTRY_COOKIE, getCountryFromCookieStore, getDefaultCity } from '@/lib/country'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +44,11 @@ export default async function BoutiquePage({ params }: Props) {
   const shop = await fetchPublicShop(slug)
   if (!shop) notFound()
 
+  const cookieStore = await cookies()
+  const defaultCity = getDefaultCity(
+    getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value),
+  )
+
   const merchant = {
     business_name: shop.name,
     slug: shop.slug,
@@ -50,7 +57,7 @@ export default async function BoutiquePage({ params }: Props) {
     phone: shop.phone ?? null,
     whatsapp: shop.whatsapp ?? null,
     location: shop.district || shop.city
-      ? { city: shop.city ?? 'Abidjan', district: shop.district ?? null }
+      ? { city: shop.city ?? defaultCity, district: shop.district ?? null }
       : null,
   }
 

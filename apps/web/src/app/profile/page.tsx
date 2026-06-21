@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Heart, Star, Trophy, Gift, Bell, Hand, Calendar, Users,
+  Heart, Star, Trophy, Gift, Bell, Hand, Calendar,
   Loader2, MapPin, ArrowRight, Award,
 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
@@ -11,7 +11,14 @@ import { useQuery } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 import { BRAND_EXPLORE_EMPTY } from '@/lib/brandCopy'
-import { BOOKING_TYPE_LABELS, type BookingType } from '@/lib/bookingConfig'
+import {
+  type BookingDisplaySource,
+  getBookingWhenDisplay,
+  getBookingCardMeta,
+  getBookingPricing,
+  isBookingUpcoming,
+  BOOKING_STATUS_LABELS,
+} from '@/lib/bookingDisplay'
 
 interface UserReview {
   id: string
@@ -40,12 +47,7 @@ function formatMerchantRating(m: FavMerchant) {
   return null
 }
 
-interface BookingRow {
-  id: string
-  booking_type: BookingType
-  booked_at: string
-  party_size: number
-  status: string
+interface BookingRow extends BookingDisplaySource {
   merchant: { business_name: string; slug: string; cover_image?: string | null }
 }
 
@@ -121,26 +123,15 @@ export default function ProfilePage() {
   if (!isAuthenticated || !user) return null
 
   const firstName = user.full_name?.split(' ')[0] ?? 'toi'
-  const nextBooking = bookings.find(
-    b => ['PENDING', 'CONFIRMED'].includes(b.status) && new Date(b.booked_at) >= new Date(),
-  )
+  const nextBooking = bookings.find(isBookingUpcoming)
   const points = loyalty?.account.points ?? 0
   const tierLabel = TIER_LABELS[loyalty?.account.tier ?? 'EXPLORER'] ?? 'Explorateur'
   const nextTier = loyalty?.tiers?.find(t => !t.active && t.min > points)
   const ptsToNext = loyalty?.pointsToNext
 
-  const formatBookingWhen = (iso: string) => {
-    const d = new Date(iso)
-    const today = new Date()
-    const isToday = d.toDateString() === today.toDateString()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const isTomorrow = d.toDateString() === tomorrow.toDateString()
-    const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    if (isToday) return `Aujourd'hui, à ${time}`
-    if (isTomorrow) return `Demain, à ${time}`
-    return `${d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}, à ${time}`
-  }
+  const nextWhen = nextBooking ? getBookingWhenDisplay(nextBooking) : null
+  const nextMeta = nextBooking ? getBookingCardMeta(nextBooking) : []
+  const nextPricing = nextBooking ? getBookingPricing(nextBooking) : null
 
   return (
     <ProfileShell>
@@ -182,6 +173,9 @@ export default function ProfilePage() {
                     <span className="inline-flex items-center gap-1.5 bg-amber-500 text-slate-900 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-4">
                       <span className="w-2 h-2 rounded-full bg-slate-900 animate-pulse" />
                       Prochaine réservation
+                      {nextBooking.status === 'PENDING' && (
+                        <span className="normal-case opacity-80">· {BOOKING_STATUS_LABELS.PENDING}</span>
+                      )}
                     </span>
                     <h3 className="text-2xl font-extrabold text-white mb-2 leading-tight">
                       {nextBooking.merchant.business_name}
@@ -189,13 +183,28 @@ export default function ProfilePage() {
                     <div className="space-y-2 mb-6">
                       <p className="text-slate-300 flex items-center gap-2 text-sm font-medium">
                         <Calendar size={16} className="text-amber-400 shrink-0" />
-                        {formatBookingWhen(nextBooking.booked_at)}
+                        {nextWhen?.headline}
                       </p>
-                      <p className="text-slate-300 flex items-center gap-2 text-sm font-medium">
-                        <Users size={16} className="text-amber-400 shrink-0" />
-                        {nextBooking.party_size} personne{nextBooking.party_size > 1 ? 's' : ''} ·{' '}
-                        {BOOKING_TYPE_LABELS[nextBooking.booking_type]}
-                      </p>
+                      {(nextWhen?.subline || nextWhen?.showTime) && (
+                        <p className="text-slate-400 text-sm font-medium pl-6">
+                          {nextWhen?.subline}
+                        </p>
+                      )}
+                      {nextMeta.length > 0 && (
+                        <p className="text-slate-300 text-sm font-medium pl-6">
+                          {nextMeta.join(' · ')}
+                        </p>
+                      )}
+                      {nextPricing?.formattedTotal && (
+                        <p className="text-amber-300 text-sm font-bold pl-6">
+                          {nextPricing.formattedTotal}
+                          {nextPricing.summary && nextPricing.summary !== nextPricing.formattedTotal && (
+                            <span className="text-slate-400 font-medium ml-1.5 text-xs">
+                              ({nextPricing.summary})
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-3">
                       <Link

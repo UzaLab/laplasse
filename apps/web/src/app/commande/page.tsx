@@ -156,6 +156,9 @@ export default function FoodOrderCartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-slate-900">{item.product.name}</p>
+                      {item.modifiers_label && (
+                        <p className="text-xs text-orange-700 font-medium mt-0.5">{item.modifiers_label}</p>
+                      )}
                       <p className="text-sm text-slate-500 mt-0.5">
                         {formatPrice(item.unit_price)} / unité
                       </p>
@@ -237,7 +240,9 @@ export default function FoodOrderCartPage() {
                   <ArrowRight size={20} />
                 </button>
                 <p className="text-[10px] text-slate-400 text-center mt-4">
-                  Préparation estimée 25–45 min
+                  {cart?.estimated_prep_minutes
+                    ? `Préparation estimée ~ ${cart.estimated_prep_minutes} min`
+                    : 'Préparation estimée 25–45 min'}
                 </p>
               </div>
             </div>

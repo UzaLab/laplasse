@@ -4,15 +4,17 @@ import { Search, MapPin, ChevronDown, SlidersHorizontal, User } from 'lucide-rea
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
 
 interface HeroSearchProps {
   city?: string
   district?: string
 }
 
-export function HeroSearch({ city = 'Abidjan', district = 'Cocody' }: HeroSearchProps) {
+export function HeroSearch({ city, district }: HeroSearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const resolvedCity = city ?? getDefaultCity(getCountryCode())
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -49,7 +51,7 @@ export function HeroSearch({ city = 'Abidjan', district = 'Cocody' }: HeroSearch
         >
           <MapPin size={16} />
           <span>
-            {district}, {city}
+            {district ? `${district}, ${resolvedCity}` : resolvedCity}
           </span>
           <ChevronDown size={14} />
         </button>

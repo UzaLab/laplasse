@@ -10,6 +10,7 @@ import {
   type ShopStatus,
 } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
+import { getCountryCode, getDefaultCity } from '@/lib/country'
 
 const INPUT =
   'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all'
@@ -17,6 +18,7 @@ const LABEL = 'block text-xs font-bold text-slate-500 uppercase tracking-wider m
 
 export function ShopSettingsPanel() {
   const { activeShopId, activeMerchantId, user, updateUser } = useAuthStore()
+  const defaultCity = getDefaultCity(getCountryCode())
   const activeShop = user?.shops?.find(s => s.id === activeShopId)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -29,7 +31,7 @@ export function ShopSettingsPanel() {
     phone: '',
     whatsapp: '',
     email: '',
-    city: 'Abidjan',
+    city: defaultCity,
     district: '',
     address: '',
     status: 'DRAFT' as ShopStatus,
@@ -48,7 +50,7 @@ export function ShopSettingsPanel() {
         phone: shop.phone ?? '',
         whatsapp: shop.whatsapp ?? '',
         email: shop.email ?? '',
-        city: shop.city ?? 'Abidjan',
+        city: shop.city ?? defaultCity,
         district: shop.district ?? '',
         address: shop.address ?? '',
         status: shop.status,
@@ -57,7 +59,7 @@ export function ShopSettingsPanel() {
       })
     }
     setLoading(false)
-  }, [activeShop?.slug])
+  }, [activeShop?.slug, defaultCity])
 
   useEffect(() => { load() }, [load])
 

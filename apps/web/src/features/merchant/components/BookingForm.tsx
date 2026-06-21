@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import type { BookingConfig } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
+import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
 
 interface BookingFormProps {
   merchantId: string
@@ -115,12 +116,9 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
     const selected = config.services.find(s => s.id === form.service_id)
       ?? roomOptions.find(s => s.id === form.service_id)
     if (!selected) return null
-    const start = new Date(`${date}T12:00:00`)
-    const end = new Date(`${form.check_out_date}T12:00:00`)
-    const nights = Math.round((end.getTime() - start.getTime()) / 86400000)
-    if (nights <= 0) return null
-    const rate = selected.nightly_rate ?? selected.price ?? 0
-    return { nights, rate, total: nights * rate }
+    const stay = computeStayPricing(selected, date, form.check_out_date)
+    if (!stay) return null
+    return { nights: stay.nights, rate: stay.averageNightly, total: stay.total, breakdown: stay.breakdown }
   }, [config, date, form.check_out_date, form.service_id])
 
   if (!config) return null
@@ -161,6 +159,19 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
       if (form.check_out_date <= date) {
         setError('La date de départ doit être après l\'arrivée')
         return
+      }
+      const roomOptions = (config.room_services?.length ? config.room_services : config.services.filter(
+        s => s.service_kind === 'ROOM_TYPE',
+      )) ?? []
+      const selectedRoom = config.services.find(s => s.id === form.service_id)
+        ?? roomOptions.find(s => s.id === form.service_id)
+      if (selectedRoom) {
+        const minStay = getMinStayNights(selectedRoom)
+        const stay = computeStayPricing(selectedRoom, date, form.check_out_date)
+        if (stay && stay.nights < minStay) {
+          setError(`Séjour minimum : ${minStay} nuit${minStay > 1 ? 's' : ''}`)
+          return
+        }
       }
     } else if (!selectedSlot) {
       setError('Choisissez un créneau disponible')
@@ -355,7 +366,10 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
               {formatPrice(roomStayTotal.total)}
             </p>
             <p className="text-xs text-brand-700 mt-0.5">
-              {formatPrice(roomStayTotal.rate)} / nuit (estimation)
+              {formatPrice(roomStayTotal.rate)} / nuit en moyenne
+              {roomStayTotal.breakdown.some((n, i, arr) => i > 0 && n.rate !== arr[0].rate) && (
+                <> · tarifs variables selon les nuits</>
+              )}
             </p>
           </div>
         )}

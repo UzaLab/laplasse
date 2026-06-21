@@ -1,11 +1,16 @@
 import type { BookingType } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
+import { computeStayPricing, getBaseNightlyRate } from '@/lib/roomPricing'
 
 export interface BookingServiceInfo {
   id: string
   name: string
   price?: number | null
   nightly_rate?: number | null
+  weekend_nightly_rate?: number | null
+  peak_nightly_rate?: number | null
+  peak_months?: unknown
+  min_stay_nights?: number | null
   duration_min?: number | null
 }
 
@@ -95,25 +100,37 @@ export function getBookingPricing(booking: BookingDisplaySource): BookingPricing
   const svc = booking.service
 
   if (booking.booking_type === 'ROOM') {
-    const nightlyRate = svc?.nightly_rate ?? svc?.price ?? null
-    if (nightlyRate == null) return null
-    const nights = booking.check_out_at
-      ? countRoomNights(booking.booked_at, booking.check_out_at)
-      : 0
-    const total = nights > 0 ? nightlyRate * nights : null
+    if (!svc) return null
+
+    if (booking.check_out_at) {
+      const stay = computeStayPricing(svc, booking.booked_at, booking.check_out_at)
+      if (stay && stay.total > 0) {
+        const formattedTotal = formatPrice(stay.total)
+        const formattedUnit = `${formatPrice(stay.averageNightly)}/nuit (moy.)`
+        const summary = `${stay.nights} nuit${stay.nights > 1 ? 's' : ''} = ${formattedTotal}`
+        return {
+          nightlyRate: stay.averageNightly,
+          nights: stay.nights,
+          unitLabel: 'nuit',
+          total: stay.total,
+          formattedTotal,
+          formattedUnit,
+          summary,
+        }
+      }
+    }
+
+    const nightlyRate = getBaseNightlyRate(svc)
+    if (!nightlyRate) return null
     const formattedUnit = `${formatPrice(nightlyRate)}/nuit`
-    const formattedTotal = total != null ? formatPrice(total) : null
-    const summary = total != null && nights > 0
-      ? `${formatPrice(nightlyRate)}/nuit × ${nights} nuit${nights > 1 ? 's' : ''} = ${formatPrice(total)}`
-      : formattedUnit
     return {
       nightlyRate,
-      nights,
+      nights: 0,
       unitLabel: 'nuit',
-      total,
-      formattedTotal,
+      total: null,
+      formattedTotal: null,
       formattedUnit,
-      summary,
+      summary: formattedUnit,
     }
   }
 

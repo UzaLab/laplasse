@@ -35,6 +35,7 @@ import {
 } from '@/lib/roomListingConfig'
 import { getVerticalModuleCopy } from '@/lib/merchantVertical'
 import { notify } from '@/lib/notify'
+import { PEAK_SEASON_MONTH_OPTIONS } from '@/lib/roomPricing'
 import {
   MenuItemThumb,
   MerchantMediathequeField,
@@ -50,6 +51,10 @@ interface RoomRow {
   description: string | null
   price: number | null
   nightly_rate: number | null
+  weekend_nightly_rate: number | null
+  peak_nightly_rate: number | null
+  peak_months: number[]
+  min_stay_nights: number
   capacity: number | null
   is_active: boolean
   image_urls: string[]
@@ -83,6 +88,10 @@ type RoomFormState = {
   name: string
   description: string
   price: string
+  weekend_price: string
+  peak_price: string
+  peak_months: number[]
+  min_stay_nights: string
   capacity: string
   bedrooms: string
   bathrooms: string
@@ -110,6 +119,12 @@ function normalizeRoom(row: Record<string, unknown>): RoomRow {
     description: (row.description as string | null) ?? null,
     price: (row.price as number | null) ?? null,
     nightly_rate: (row.nightly_rate as number | null) ?? null,
+    weekend_nightly_rate: (row.weekend_nightly_rate as number | null) ?? null,
+    peak_nightly_rate: (row.peak_nightly_rate as number | null) ?? null,
+    peak_months: Array.isArray(row.peak_months)
+      ? (row.peak_months as unknown[]).map(v => Number(v)).filter(n => n >= 1 && n <= 12)
+      : [],
+    min_stay_nights: typeof row.min_stay_nights === 'number' ? row.min_stay_nights : 1,
     capacity: (row.capacity as number | null) ?? null,
     is_active: Boolean(row.is_active ?? true),
     image_urls: asStringArray(row.image_urls),
@@ -128,6 +143,10 @@ function emptyRoomForm(isResidence: boolean): RoomFormState {
     name: '',
     description: '',
     price: '',
+    weekend_price: '',
+    peak_price: '',
+    peak_months: [],
+    min_stay_nights: '1',
     capacity: '1',
     bedrooms: isResidence ? '1' : '',
     bathrooms: isResidence ? '1' : '',
@@ -145,6 +164,10 @@ function roomToForm(room: RoomRow, isResidence: boolean): RoomFormState {
     name: room.name,
     description: room.description ?? '',
     price: String(room.nightly_rate ?? room.price ?? ''),
+    weekend_price: room.weekend_nightly_rate != null ? String(room.weekend_nightly_rate) : '',
+    peak_price: room.peak_nightly_rate != null ? String(room.peak_nightly_rate) : '',
+    peak_months: room.peak_months,
+    min_stay_nights: String(room.min_stay_nights ?? 1),
     capacity: String(room.capacity ?? 1),
     bedrooms: room.bedrooms != null ? String(room.bedrooms) : (isResidence ? '1' : ''),
     bathrooms: room.bathrooms != null ? String(room.bathrooms) : (isResidence ? '1' : ''),
@@ -166,6 +189,10 @@ function buildRoomPayload(form: RoomFormState, isResidence: boolean) {
     duration_min: 1440,
     price,
     nightly_rate: price,
+    weekend_nightly_rate: form.weekend_price ? Number(form.weekend_price) : undefined,
+    peak_nightly_rate: form.peak_price ? Number(form.peak_price) : undefined,
+    peak_months: form.peak_months.length ? form.peak_months : undefined,
+    min_stay_nights: Number(form.min_stay_nights) || 1,
     capacity: Number(form.capacity) || 1,
     image_urls: form.image_urls.slice(0, MAX_ROOM_IMAGES),
     amenities: form.amenities,
@@ -281,7 +308,61 @@ function RoomFormFields({
             className={`mt-1 ${INPUT}`}
           />
         </label>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <label className="block">
+          <span className="text-xs font-bold text-slate-500">Week-end (ven–sam) F CFA</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="Optionnel"
+            value={form.weekend_price}
+            onChange={e => setForm(f => ({ ...f, weekend_price: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Haute saison F CFA</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="Optionnel"
+            value={form.peak_price}
+            onChange={e => setForm(f => ({ ...f, peak_price: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Séjour minimum (nuits)</span>
+          <input
+            type="number"
+            min={1}
+            value={form.min_stay_nights}
+            onChange={e => setForm(f => ({ ...f, min_stay_nights: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+      </div>
+      <div>
+        <span className="text-xs font-bold text-slate-500 block mb-2">Mois haute saison</span>
+        <div className="flex flex-wrap gap-2">
+          {PEAK_SEASON_MONTH_OPTIONS.map(({ month, label }) => (
+            <ToggleChip
+              key={month}
+              label={label}
+              active={form.peak_months.includes(month)}
+              onClick={() => setForm(f => ({
+                ...f,
+                peak_months: f.peak_months.includes(month)
+                  ? f.peak_months.filter(x => x !== month)
+                  : [...f.peak_months, month],
+              }))}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <label className="block sm:col-span-2 lg:col-span-1">
           <span className="text-xs font-bold text-slate-500">
             {isResidence ? 'Voyageurs max' : 'Nombre de chambres (stock)'}
           </span>

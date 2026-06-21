@@ -16,9 +16,16 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAuthReady } from '@/hooks/useAuthReady'
+import { useDebounce } from '@/lib/hooks/useDebounce'
+import { matchesSearchQuery } from '@/lib/merchantListFilters'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { MerchantBookingDetailSheet } from '@/features/merchant/components/MerchantBookingDetailSheet'
+import {
+  MerchantBookingAgenda,
+  MerchantBookingsViewToggle,
+} from '@/features/merchant/components/MerchantBookingAgenda'
+import { MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
 import type { BookingType } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS } from '@/lib/bookingConfig'
 import {
@@ -50,6 +57,22 @@ const STATUS_TABS: { id: StatusTab; label: string }[] = [
   { id: 'all', label: 'Toutes' },
 ]
 
+function bookingSearchFields(booking: BookingDisplaySource) {
+  return [
+    booking.guest_name,
+    booking.guest_phone,
+    booking.guest_email,
+    booking.notes,
+    booking.room_type,
+    booking.service?.name,
+    booking.staff?.name,
+    booking.user?.full_name,
+    booking.user?.email,
+    BOOKING_TYPE_LABELS[booking.booking_type],
+    BOOKING_STATUS_LABELS[booking.status],
+  ]
+}
+
 function matchesStatusTab(booking: BookingDisplaySource, tab: StatusTab): boolean {
   switch (tab) {
     case 'pending':
@@ -71,8 +94,11 @@ export default function MerchantBookingsPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [statusTab, setStatusTab] = useState<StatusTab>('active')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [typeFilter, setTypeFilter] = useState<BookingType | 'ALL'>('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selected, setSelected] = useState<BookingDisplaySource | null>(null)
+  const debouncedSearch = useDebounce(searchQuery, 250)
 
   const fetchBookings = async (): Promise<BookingDisplaySource[]> => {
     setLoading(true)
@@ -107,8 +133,18 @@ export default function MerchantBookingsPage() {
     return bookings
       .filter(b => matchesStatusTab(b, statusTab))
       .filter(b => typeFilter === 'ALL' || b.booking_type === typeFilter)
+      .filter(b => matchesSearchQuery(bookingSearchFields(b), debouncedSearch))
       .sort((a, b) => new Date(a.booked_at).getTime() - new Date(b.booked_at).getTime())
-  }, [bookings, statusTab, typeFilter])
+  }, [bookings, statusTab, typeFilter, debouncedSearch])
+
+  const hasExtraFilters =
+    typeFilter !== 'ALL' || statusTab !== 'active' || searchQuery.trim().length > 0
+
+  const resetFilters = () => {
+    setSearchQuery('')
+    setTypeFilter('ALL')
+    setStatusTab('active')
+  }
 
   const counts = useMemo(() => ({
     pending: bookings.filter(b => b.status === 'PENDING').length,
@@ -146,6 +182,16 @@ export default function MerchantBookingsPage() {
         </p>
       </div>
 
+      <MerchantListToolbar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Nom, téléphone, chambre, notes…"
+        resultCount={filtered.length}
+        totalCount={bookings.length}
+        showReset={hasExtraFilters}
+        onReset={resetFilters}
+      />
+
       <div className="flex gap-1.5 sm:gap-2 mb-4 p-1 bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         {STATUS_TABS.map(t => (
           <button
@@ -169,7 +215,7 @@ export default function MerchantBookingsPage() {
       </div>
 
       {availableTypes.length > 1 && (
-        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
           <Filter size={14} className="text-slate-400 shrink-0" />
           <button
             type="button"
@@ -200,6 +246,8 @@ export default function MerchantBookingsPage() {
         </div>
       )}
 
+      <MerchantBookingsViewToggle view={viewMode} onChange={setViewMode} />
+
       {loading ? (
         <div className="flex justify-center py-24">
           <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -208,14 +256,34 @@ export default function MerchantBookingsPage() {
         <div className="text-center py-16 bg-white rounded-[24px] sm:rounded-[28px] border border-slate-100 px-6">
           <Calendar size={32} className="text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-600">
-            {bookings.length === 0 ? 'Aucune réservation' : 'Aucun résultat pour ce filtre'}
+            {bookings.length === 0
+              ? 'Aucune réservation'
+              : debouncedSearch || hasExtraFilters
+                ? 'Aucun résultat pour cette recherche'
+                : 'Aucun résultat pour ce filtre'}
           </p>
           <p className="text-sm text-slate-400 mt-1">
             {bookings.length === 0
               ? 'Les demandes apparaîtront ici dès qu\'un client réserve.'
-              : 'Essayez un autre filtre ou consultez toutes les réservations.'}
+              : hasExtraFilters
+                ? 'Modifiez la recherche ou réinitialisez les filtres.'
+                : 'Essayez un autre filtre ou consultez toutes les réservations.'}
           </p>
+          {hasExtraFilters && bookings.length > 0 && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="mt-4 text-sm font-bold text-amber-600 hover:text-amber-700 underline"
+            >
+              Réinitialiser les filtres
+            </button>
+          )}
         </div>
+      ) : viewMode === 'calendar' ? (
+        <MerchantBookingAgenda
+          bookings={filtered}
+          onSelect={b => setSelected(b)}
+        />
       ) : (
         <div className="space-y-3 sm:space-y-4">
           {filtered.map(b => (

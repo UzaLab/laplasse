@@ -26,7 +26,7 @@ interface CartState {
   addMenuItem: (
     menuItemId: string,
     quantity: number,
-    options?: { openDrawer?: boolean },
+    options?: { openDrawer?: boolean; optionIds?: string[] },
   ) => Promise<{ error?: string }>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   removeItem: (itemId: string) => Promise<void>
@@ -85,7 +85,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   addMenuItem: async (menuItemId, quantity, options) => {
     const res = await authApiFetch('/cart/menu-items', {
       method: 'POST',
-      body: JSON.stringify({ menuItemId, quantity }),
+      body: JSON.stringify({
+        menuItemId,
+        quantity,
+        optionIds: options?.optionIds ?? [],
+      }),
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: 'Erreur panier' }))

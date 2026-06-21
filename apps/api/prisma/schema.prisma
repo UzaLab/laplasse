@@ -168,6 +168,7 @@ model Merchant {
   organization_id     String?
   is_active           Boolean            @default(true)
   is_sponsored        Boolean            @default(false)
+  food_prep_minutes   Int                @default(25)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -739,18 +740,48 @@ model MenuItem {
   currency     String   @default("XOF")
   image_url    String?
   is_available Boolean  @default(true)
+  prep_minutes Int?
   sort_order   Int      @default(0)
   created_at   DateTime @default(now())
 
-  merchant Merchant    @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
-  shop     Shop?       @relation(fields: [shop_id], references: [id], onDelete: SetNull)
-  section  MenuSection? @relation(fields: [section_id], references: [id], onDelete: SetNull)
-  cart_items  CartItem[]
-  order_items OrderItem[]
+  merchant        Merchant            @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  shop            Shop?               @relation(fields: [shop_id], references: [id], onDelete: SetNull)
+  section         MenuSection?        @relation(fields: [section_id], references: [id], onDelete: SetNull)
+  modifier_groups MenuModifierGroup[]
+  cart_items      CartItem[]
+  order_items     OrderItem[]
 
   @@index([merchant_id, sort_order])
   @@index([shop_id, sort_order])
   @@index([section_id])
+}
+
+model MenuModifierGroup {
+  id           String   @id @default(cuid())
+  menu_item_id String
+  name         String
+  min_select   Int      @default(0)
+  max_select   Int      @default(1)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now())
+
+  menu_item MenuItem             @relation(fields: [menu_item_id], references: [id], onDelete: Cascade)
+  options   MenuModifierOption[]
+
+  @@index([menu_item_id, sort_order])
+}
+
+model MenuModifierOption {
+  id           String  @id @default(cuid())
+  group_id     String
+  name         String
+  price_delta  Int     @default(0)
+  is_available Boolean @default(true)
+  sort_order   Int     @default(0)
+
+  group MenuModifierGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@index([group_id, sort_order])
 }
 
 model PromotionRedemption {
@@ -861,8 +892,12 @@ model MerchantService {
   description   String?
   duration_min  Int         @default(60)
   price         Int?
-  nightly_rate  Int?
-  capacity      Int?
+  nightly_rate          Int?
+  weekend_nightly_rate  Int?
+  peak_nightly_rate     Int?
+  peak_months           Json     @default("[]")
+  min_stay_nights       Int      @default(1)
+  capacity              Int?
   staff_id      String?
   is_active     Boolean     @default(true)
   image_urls    Json        @default("[]")
@@ -1256,14 +1291,15 @@ model Cart {
 }
 
 model CartItem {
-  id           String   @id @default(cuid())
-  cart_id      String
-  product_id   String?
-  menu_item_id String?
-  variant_id   String?
-  quantity     Int      @default(1)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  cart_id            String
+  product_id         String?
+  menu_item_id       String?
+  variant_id         String?
+  quantity           Int      @default(1)
+  selected_modifiers Json     @default("[]")
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   cart      Cart            @relation(fields: [cart_id], references: [id], onDelete: Cascade)
   product   Product?        @relation(fields: [product_id], references: [id], onDelete: Cascade)
@@ -1330,6 +1366,7 @@ model OrderItem {
   unit_price   Int
   quantity     Int
   line_total   Int
+  modifiers    Json    @default("[]")
 
   order     Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)
   product   Product?        @relation(fields: [product_id], references: [id], onDelete: SetNull)

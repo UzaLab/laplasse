@@ -3,6 +3,7 @@ import { authUrl } from './authClient'
 import { countryRequestHeaders } from './country'
 import { shopApiFetch } from './shopApi'
 import { fetchWithTimeout } from './fetchWithTimeout'
+import type { SelectedMenuModifier } from './menuModifiers'
 
 export type FetchResult<T> =
   | { ok: true; data: T }
@@ -121,12 +122,15 @@ export interface CartItem {
   line_total: number
   line_kind?: 'menu' | 'product'
   menu_item_id?: string | null
+  selected_modifiers?: SelectedMenuModifier[]
+  modifiers_label?: string | null
   menu_item?: {
     id: string
     name: string
     price: number
     currency: string
     image_url?: string | null
+    prep_minutes?: number | null
   } | null
   variant_id?: string | null
   variant?: ProductVariant | null
@@ -148,6 +152,7 @@ export interface Cart {
   subtotal: number
   currency: string
   kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
+  estimated_prep_minutes?: number | null
   merchant: { id: string; business_name: string; slug: string } | null
   merchants: CartMerchantGroup[]
   merchant_count: number
