@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -31,7 +33,7 @@ import { notify } from '@/lib/notify'
 import { isFoodOrderCart } from '@/lib/orderFlow'
 import { captureCheckoutStep } from '@/lib/analytics'
 
-export default function CheckoutPaymentPage() {
+function CheckoutPaymentContent() {
   return (
     <Suspense
       fallback={
@@ -281,5 +283,13 @@ function CheckoutPaymentPageContent() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function CheckoutPaymentPage() {
+  return (
+    <SearchParamsWrapper>
+      <CheckoutPaymentContent />
+    </SearchParamsWrapper>
   )
 }

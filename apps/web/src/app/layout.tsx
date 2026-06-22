@@ -25,6 +25,7 @@ import {
   countrySiteUrl,
   countryMetadataDescription,
 } from '@/lib/seoCountry'
+import { LOCALE_COOKIE, type Locale } from '@/i18n'
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -87,18 +88,22 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const cookieStore = await cookies()
+  const initialLocale: Locale =
+    cookieStore.get(LOCALE_COOKIE)?.value === 'en' ? 'en' : 'fr'
+
   return (
-    <html lang="fr" className={outfit.variable}>
+    <html lang={initialLocale} className={outfit.variable} suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icons/icon.svg" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <PostHogProvider>
           <QueryProvider>
-            <LocaleProvider>
+            <LocaleProvider initialLocale={initialLocale}>
               <PwaRegister />
               <AuthBootstrap />
               <AppToaster />

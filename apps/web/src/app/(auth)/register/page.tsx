@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -228,10 +230,18 @@ function RegisterContent() {
   )
 }
 
-export default function RegisterPage() {
+function RegisterContent() {
   return (
     <Suspense fallback={null}>
       <RegisterContent />
     </Suspense>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <SearchParamsWrapper>
+      <RegisterContent />
+    </SearchParamsWrapper>
   )
 }

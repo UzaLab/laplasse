@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -295,7 +297,7 @@ function LoginForm() {
   )
 }
 
-export default function LoginPage() {
+function LoginContent() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -304,5 +306,13 @@ export default function LoginPage() {
     }>
       <LoginForm />
     </Suspense>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <SearchParamsWrapper>
+      <LoginContent />
+    </SearchParamsWrapper>
   )
 }

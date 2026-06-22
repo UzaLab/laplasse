@@ -7,6 +7,7 @@ import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { SUPPORTED_COUNTRIES, getCountryLabel } from '@/lib/country'
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 
 interface DeliveryStats {
   country: string
@@ -31,7 +32,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Annulée',
 }
 
-export default function AdminDeliveryPage() {
+function AdminDeliveryPageContent() {
   const { ready } = useAdminSession()
   const searchParams = useSearchParams()
   const [country, setCountry] = useState(() => searchParams.get('country')?.toUpperCase() ?? 'CI')
@@ -153,5 +154,13 @@ export default function AdminDeliveryPage() {
         )}
       </div>
     </AdminShell>
+  )
+}
+
+export default function AdminDeliveryPage() {
+  return (
+    <SearchParamsWrapper fallback={<div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={28} /></div>}>
+      <AdminDeliveryPageContent />
+    </SearchParamsWrapper>
   )
 }

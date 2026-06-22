@@ -15,7 +15,7 @@ function redirectToHost(request: NextRequest, hostname: string): NextResponse {
   return NextResponse.redirect(`${proto}://${hostname}${path}`)
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (
     pathname.startsWith('/_next')

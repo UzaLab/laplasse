@@ -17,12 +17,22 @@ function readLocaleCookie(): Locale {
   return match?.[1] === 'en' ? 'en' : DEFAULT_LOCALE
 }
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
+export function LocaleProvider({
+  children,
+  initialLocale = DEFAULT_LOCALE,
+}: {
+  children: React.ReactNode
+  initialLocale?: Locale
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale)
 
   useEffect(() => {
-    setLocaleState(readLocaleCookie())
-  }, [])
+    const fromCookie = readLocaleCookie()
+    if (fromCookie !== initialLocale) {
+      setLocaleState(fromCookie)
+      document.documentElement.lang = fromCookie
+    }
+  }, [initialLocale])
 
   const setLocale = useCallback((next: Locale) => {
     document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=31536000;samesite=lax`

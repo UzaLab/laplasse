@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -64,7 +66,7 @@ import {
   type ShopDeliveryState,
 } from '@/features/checkout/components/ShopSplitDeliveryForm'
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   return (
     <Suspense
       fallback={
@@ -988,5 +990,13 @@ function CheckoutPageContent() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <SearchParamsWrapper>
+      <CheckoutContent />
+    </SearchParamsWrapper>
   )
 }

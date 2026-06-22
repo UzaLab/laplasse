@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -425,7 +427,7 @@ function DashboardContent() {
   )
 }
 
-export default function MerchantDashboard() {
+function MerchantDashboard() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -434,5 +436,13 @@ export default function MerchantDashboard() {
     }>
       <DashboardContent />
     </Suspense>
+  )
+}
+
+export default function MerchantDashboard() {
+  return (
+    <SearchParamsWrapper>
+      <MerchantDashboard />
+    </SearchParamsWrapper>
   )
 }

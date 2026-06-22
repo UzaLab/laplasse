@@ -1,5 +1,7 @@
 'use client'
 
+import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -223,7 +225,7 @@ function MerchantAnalyticsContent() {
   )
 }
 
-export default function MerchantAnalyticsPage() {
+function MerchantAnalyticsContent() {
   return (
     <Suspense fallback={
       <MerchantShell>
@@ -234,5 +236,13 @@ export default function MerchantAnalyticsPage() {
     }>
       <MerchantAnalyticsContent />
     </Suspense>
+  )
+}
+
+export default function MerchantAnalyticsPage() {
+  return (
+    <SearchParamsWrapper>
+      <MerchantAnalyticsContent />
+    </SearchParamsWrapper>
   )
 }
