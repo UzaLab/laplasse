@@ -52,8 +52,8 @@ export function RoomDetailSheet({
 
         <RoomDetailView
           room={room}
-          merchantName={merchantName}
-          merchantSlug={merchantSlug}
+          merchant={{ business_name: merchantName, slug: merchantSlug }}
+          merchantId=""
           variant="sheet"
           onSelect={onSelect}
           onClose={onClose}

@@ -2,19 +2,20 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { BedDouble, Calendar, ChevronLeft, ChevronRight, Info, Loader2, ShieldCheck, Users } from 'lucide-react'
+import { BedDouble, Calendar, ChevronLeft, ChevronRight, ExternalLink, Loader2, ShieldCheck, Users } from 'lucide-react'
 import type { BookingConfig, MerchantServiceConfig } from '@/lib/bookingConfig'
 import { formatPrice } from '@/lib/bookingConfig'
 import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
 import {
   amenityLabel,
+  getRoomMaxGuests,
   highlightLabel,
   propertyTypeLabel,
   unitTypeLabel,
+  getRoomPublicPath,
 } from '@/lib/roomListingConfig'
 import { openBookingWithPrefill } from '@/lib/bookingPrefill'
 import { ImageCarousel } from '@/components/ui/ImageGalleryViewer'
-import { RoomDetailSheet } from '@/features/merchant/components/profile/RoomDetailSheet'
 
 interface DayCell {
   date: string
@@ -26,6 +27,7 @@ interface Props {
   merchantId: string
   merchantSlug: string
   merchantName: string
+  categorySlug: string
 }
 
 function monthRange(year: number, month: number) {
@@ -62,7 +64,8 @@ const MONTH_NAMES = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
-export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Props) {
+export function MerchantHotelTab({ merchantId, merchantSlug, categorySlug }: Props) {
+  const isResidence = categorySlug === 'residences'
   const [config, setConfig] = useState<BookingConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
@@ -72,7 +75,6 @@ export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Pro
   const [checkIn, setCheckIn] = useState<string | null>(null)
   const [checkOut, setCheckOut] = useState<string | null>(null)
   const [rangeError, setRangeError] = useState('')
-  const [detailRoomId, setDetailRoomId] = useState<string | null>(null)
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -117,7 +119,6 @@ export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Pro
   )
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId)
-  const detailRoom = detailRoomId ? rooms.find(r => r.id === detailRoomId) : null
 
   const staySummary = useMemo(() => {
     if (!checkIn || !checkOut || !selectedRoom) return null
@@ -231,9 +232,9 @@ export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Pro
               key={room.id}
               room={room}
               merchantSlug={merchantSlug}
+              isResidence={isResidence}
               selected={selectedRoomId === room.id}
               onSelect={() => setSelectedRoomId(room.id)}
-              onDetails={() => setDetailRoomId(room.id)}
             />
           ))}
         </div>
@@ -411,17 +412,6 @@ export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Pro
           </div>
         </div>
       )}
-
-      {detailRoom && (
-        <RoomDetailSheet
-          room={detailRoom}
-          merchantName={merchantName}
-          merchantSlug={merchantSlug}
-          open
-          onClose={() => setDetailRoomId(null)}
-          onSelect={() => setSelectedRoomId(detailRoom.id)}
-        />
-      )}
     </div>
   )
 }
@@ -430,21 +420,23 @@ function RoomCard({
   room,
   selected,
   merchantSlug,
+  isResidence,
   onSelect,
-  onDetails,
 }: {
   room: MerchantServiceConfig
   selected: boolean
   merchantSlug: string
+  isResidence: boolean
   onSelect: () => void
-  onDetails: () => void
 }) {
   const rate = room.nightly_rate ?? room.price
   const images = room.image_urls ?? []
+  const maxGuests = getRoomMaxGuests(room, { isResidence })
   const chips = [
     ...(room.amenities ?? []).slice(0, 3).map(amenityLabel),
     ...(room.highlights ?? []).slice(0, 2).map(highlightLabel),
   ]
+  const detailHref = getRoomPublicPath(merchantSlug, room)
 
   return (
     <article
@@ -494,9 +486,9 @@ function RoomCard({
                 {formatPrice(rate)} <span className="font-normal text-slate-500">/ nuit</span>
               </span>
             )}
-            {room.capacity != null && (
+            {maxGuests != null && (
               <span className="inline-flex items-center gap-1 text-slate-500 font-semibold text-xs">
-                <Users size={12} /> {room.capacity} pers.
+                <Users size={12} /> {maxGuests} pers. max
               </span>
             )}
           </div>
@@ -511,22 +503,13 @@ function RoomCard({
           )}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onDetails}
-              className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700"
-            >
-              <Info size={12} /> Détails
-            </button>
-            <Link
-              href={`/m/${merchantSlug}/chambres/${room.id}`}
-              className="text-xs font-bold text-slate-500 hover:text-slate-800"
-              style={{ textDecoration: 'none' }}
-            >
-              Fiche complète
-            </Link>
-          </div>
+          <Link
+            href={detailHref}
+            className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700"
+            style={{ textDecoration: 'none' }}
+          >
+            <ExternalLink size={12} /> Détails
+          </Link>
           {selected && (
             <span className="text-[10px] font-bold uppercase text-brand-600">Sélectionnée</span>
           )}

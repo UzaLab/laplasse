@@ -98,10 +98,16 @@ export function getVerticalOnboardingSteps(categorySlug: string | undefined): On
         href: servicesHref,
       },
       {
+        id: 'settings',
+        label: 'Paramètres réservation',
+        desc: 'Paiement à la réservation, annulation et créneaux.',
+        href: `${servicesHref}?tab=settings`,
+      },
+      {
         id: 'staff',
         label: 'Équipe & staff',
         desc: 'Coiffeurs, praticiens ou coachs assignables aux créneaux.',
-        href: '/merchant/staff',
+        href: `${servicesHref}?tab=team`,
       },
       {
         id: 'bookings',

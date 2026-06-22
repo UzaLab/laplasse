@@ -196,7 +196,7 @@ export function MerchantSignupWizard() {
         })
       }
 
-      router.push('/merchant/verify-phone?new=true')
+      router.push('/merchant/onboarding?new=true')
     } catch {
       setError('Erreur réseau. Veuillez réessayer.')
       setLoading(false)
@@ -696,8 +696,8 @@ export function MerchantSignupWizard() {
               </div>
 
               <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-                Après création : vérification téléphone OTP, puis configuration de votre fiche
-                (menu, boutique, chambres ou prestations selon la catégorie).
+                Après création, configurez votre fiche (menu, boutique, chambres ou prestations selon la catégorie).
+                La vérification du téléphone pourra être faite plus tard depuis les paramètres.
               </p>
             </div>
           )}

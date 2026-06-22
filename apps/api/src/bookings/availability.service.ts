@@ -1,8 +1,20 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { BookingType } from '../../generated/prisma/client'
+import { BookingType, Prisma } from '../../generated/prisma/client'
 import { getCategoryBookingConfig } from '../common/booking-config'
 import { formatLocalDate, formatLocalTime } from '../common/date-local'
+import {
+  pickStaffForSlot,
+  staffRemainingInSlot,
+  type StaffCapacityProfile,
+  type BookingSlotRef,
+} from '../common/staff-slot-availability'
+import {
+  bookingMatchesRoomService,
+  bookingOccupiesNight,
+  listStayNights,
+  resolveRoomStockCapacity,
+} from '../common/room-night-availability'
 
 export interface SlotResult {
   time: string
@@ -14,6 +26,14 @@ export interface AvailabilityResponse {
   slots: SlotResult[]
   closed: boolean
   reason?: string
+}
+
+type Db = PrismaService | Prisma.TransactionClient
+
+interface RoomServiceRef {
+  id: string
+  name: string
+  capacity: number | null
 }
 
 @Injectable()
@@ -72,11 +92,12 @@ export class AvailabilityService {
     return { closed: false as const, date }
   }
 
-  /** Disponibilité d'une nuit (hôtel / résidence) — indépendante des horaires d'ouverture. */
+  /** Disponibilité d'une nuit (hôtel / résidence) — modèle Airbnb (départ exclusif). */
   async getRoomNightAvailability(
     merchantId: string,
     dateStr: string,
     opts?: { serviceId?: string; excludeBookingId?: string },
+    db: Db = this.prisma,
   ): Promise<{ available: boolean; remaining: number; closed: boolean; reason?: string }> {
     const { settings } = await this.loadMerchantContext(merchantId)
     const dateCheck = this.validateBookingDate(dateStr, settings.booking_window_days)
@@ -84,11 +105,25 @@ export class AvailabilityService {
       return { available: false, remaining: 0, closed: true, reason: dateCheck.reason }
     }
 
+    if (!opts?.serviceId) {
+      return {
+        available: false,
+        remaining: 0,
+        closed: true,
+        reason: 'Type de chambre non spécifié',
+      }
+    }
+
+    const roomService = await this.loadRoomService(merchantId, opts.serviceId, db)
+    if (!roomService) {
+      return { available: false, remaining: 0, closed: true, reason: 'Chambre introuvable' }
+    }
+
     const dayStart = new Date(`${dateStr}T00:00:00`)
     const dayEnd = new Date(dayStart)
     dayEnd.setDate(dayEnd.getDate() + 1)
 
-    const blocks = await this.prisma.merchantAvailabilityBlock.findMany({
+    const blocks = await db.merchantAvailabilityBlock.findMany({
       where: {
         merchant_id: merchantId,
         starts_at: { lt: dayEnd },
@@ -98,40 +133,116 @@ export class AvailabilityService {
 
     const blocked = blocks.some(b => {
       if (b.staff_id) return false
-      if (b.service_id && opts?.serviceId && b.service_id !== opts.serviceId) return false
-      if (b.service_id && !opts?.serviceId) return false
+      if (b.service_id && b.service_id !== opts.serviceId) return false
       if (!b.all_day) return false
-      return !b.service_id || b.service_id === opts?.serviceId
+      return !b.service_id || b.service_id === opts.serviceId
     })
     if (blocked) {
       return { available: false, remaining: 0, closed: true, reason: 'Indisponible ce jour' }
     }
 
-    let roomCapacity = 1
-    if (opts?.serviceId) {
-      const roomService = await this.prisma.merchantService.findFirst({
-        where: { id: opts.serviceId, merchant_id: merchantId, is_active: true, service_kind: 'ROOM_TYPE' },
-      })
-      if (roomService?.capacity) roomCapacity = roomService.capacity
-    }
+    const roomCapacity = resolveRoomStockCapacity(roomService.capacity)
+    const overlap = await this.countRoomNightOverlap(
+      merchantId,
+      dateStr,
+      roomService,
+      opts.excludeBookingId,
+      db,
+    )
 
-    const overlap = await this.prisma.booking.count({
+    const remaining = Math.max(0, roomCapacity - overlap)
+    return { available: remaining > 0, remaining, closed: false }
+  }
+
+  private async loadRoomService(
+    merchantId: string,
+    serviceId: string,
+    db: Db,
+  ): Promise<RoomServiceRef | null> {
+    return db.merchantService.findFirst({
+      where: {
+        id: serviceId,
+        merchant_id: merchantId,
+        is_active: true,
+        service_kind: 'ROOM_TYPE',
+      },
+      select: { id: true, name: true, capacity: true },
+    })
+  }
+
+  /** Compte les réservations actives occupant la nuit (service_id ou legacy room_type). */
+  private async countRoomNightOverlap(
+    merchantId: string,
+    nightDateStr: string,
+    roomService: RoomServiceRef,
+    excludeBookingId?: string,
+    db: Db = this.prisma,
+  ): Promise<number> {
+    const dayStart = new Date(`${nightDateStr}T00:00:00`)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const candidates = await db.booking.findMany({
       where: {
         merchant_id: merchantId,
         booking_type: 'ROOM',
         status: { in: ['PENDING', 'CONFIRMED'] },
-        ...(opts?.excludeBookingId ? { id: { not: opts.excludeBookingId } } : {}),
-        ...(opts?.serviceId ? { service_id: opts.serviceId } : {}),
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
         booked_at: { lt: dayEnd },
         OR: [
           { check_out_at: { gt: dayStart } },
-          { check_out_at: null, booked_at: { gte: dayStart, lt: dayEnd } },
+          { check_out_at: null },
         ],
+      },
+      select: {
+        service_id: true,
+        room_type: true,
+        booked_at: true,
+        check_out_at: true,
       },
     })
 
-    const remaining = Math.max(0, roomCapacity - overlap)
-    return { available: remaining > 0, remaining, closed: false }
+    return candidates.filter(
+      b =>
+        bookingMatchesRoomService(b, roomService.id, roomService.name)
+        && bookingOccupiesNight(b.booked_at, b.check_out_at, nightDateStr),
+    ).length
+  }
+
+  /**
+   * Vérifie la disponibilité de tout un séjour chambre (appelé dans une transaction Serializable).
+   */
+  async assertRoomStayAvailable(
+    merchantId: string,
+    checkIn: Date,
+    checkOut: Date,
+    opts: { serviceId: string; excludeBookingId?: string },
+    db: Db = this.prisma,
+  ): Promise<void> {
+    if (checkOut <= checkIn) {
+      throw new BadRequestException('La date de départ doit être après l\'arrivée')
+    }
+
+    const roomService = await this.loadRoomService(merchantId, opts.serviceId, db)
+    if (!roomService) {
+      throw new BadRequestException('Chambre introuvable ou inactive')
+    }
+
+    const nights = listStayNights(checkIn, checkOut)
+    for (const nightDateStr of nights) {
+      const night = await this.getRoomNightAvailability(
+        merchantId,
+        nightDateStr,
+        { serviceId: opts.serviceId, excludeBookingId: opts.excludeBookingId },
+        db,
+      )
+      if (night.closed || !night.available) {
+        throw new BadRequestException(
+          night.reason
+            ?? `Plus de disponibilité pour « ${roomService.name} » la nuit du ${nightDateStr.split('-').reverse().join('/')}`,
+        )
+      }
+    }
   }
 
   async getAvailableSlots(
@@ -190,11 +301,15 @@ export class AvailabilityService {
     }
 
     let slotDuration = settings.slot_duration_min
+    let serviceCapacity = 1
     if (opts?.serviceId) {
       const service = await this.prisma.merchantService.findFirst({
         where: { id: opts.serviceId, merchant_id: merchantId, is_active: true },
       })
-      if (service) slotDuration = service.duration_min + settings.buffer_min
+      if (service) {
+        slotDuration = service.duration_min + settings.buffer_min
+        serviceCapacity = Math.max(1, service.capacity ?? 1)
+      }
     }
 
     const openMin = this.parseTimeToMinutes(hourRow.open_time)
@@ -210,11 +325,50 @@ export class AvailabilityService {
           { check_out_at: { gt: dayStart } },
           { check_out_at: null, booked_at: { gte: dayStart } },
         ],
-        ...(opts?.staffId ? { staff_id: opts.staffId } : {}),
         ...(opts?.excludeBookingId ? { id: { not: opts.excludeBookingId } } : {}),
       },
-      select: { booked_at: true, check_out_at: true, party_size: true, booking_type: true, staff_id: true, service_id: true },
+      select: {
+        booked_at: true,
+        check_out_at: true,
+        party_size: true,
+        booking_type: true,
+        staff_id: true,
+        service_id: true,
+      },
     })
+
+    const bookingRefs: BookingSlotRef[] = existing
+
+    let eligibleStaff: StaffCapacityProfile[] = []
+    if (bookingType !== 'TABLE' && opts?.serviceId) {
+      const links = await this.prisma.merchantStaffService.findMany({
+        where: {
+          service_id: opts.serviceId,
+          staff: { merchant_id: merchantId, is_active: true },
+        },
+        include: { staff: true },
+      })
+      eligibleStaff = links.map(l => ({
+        id: l.staff.id,
+        max_concurrent_slots: Math.max(1, l.staff.max_concurrent_slots),
+        max_daily_bookings: l.staff.max_daily_bookings,
+      }))
+    }
+
+    if (opts?.staffId && eligibleStaff.length > 0) {
+      eligibleStaff = eligibleStaff.filter(s => s.id === opts.staffId)
+    } else if (opts?.staffId && eligibleStaff.length === 0) {
+      const staffRow = await this.prisma.merchantStaff.findFirst({
+        where: { id: opts.staffId, merchant_id: merchantId, is_active: true },
+      })
+      if (staffRow) {
+        eligibleStaff = [{
+          id: staffRow.id,
+          max_concurrent_slots: Math.max(1, staffRow.max_concurrent_slots),
+          max_daily_bookings: staffRow.max_daily_bookings,
+        }]
+      }
+    }
 
     const isBlocked = (slotStart: Date, slotEnd: Date) => {
       for (const b of blocks) {
@@ -256,13 +410,45 @@ export class AvailabilityService {
         const used = concurrent.reduce((s, b) => s + b.party_size, 0)
         remaining = Math.max(0, settings.max_capacity - used)
         available = remaining > 0
+      } else if (eligibleStaff.length > 0) {
+        if (opts?.staffId) {
+          const staff = eligibleStaff[0]
+          remaining = staffRemainingInSlot(
+            staff,
+            bookingRefs,
+            slotStart,
+            slotEnd,
+            slotDuration,
+            dayStart,
+            dayEnd,
+          )
+          available = remaining > 0
+        } else {
+          remaining = eligibleStaff.reduce(
+            (sum, staff) => sum + staffRemainingInSlot(
+              staff,
+              bookingRefs,
+              slotStart,
+              slotEnd,
+              slotDuration,
+              dayStart,
+              dayEnd,
+            ),
+            0,
+          )
+          available = remaining > 0
+        }
       } else {
-        available = !existing.some(b => {
+        const parallelCapacity = opts?.staffId ? 1 : serviceCapacity
+        const concurrent = existing.filter(b => {
           if (b.booking_type === 'ROOM') return false
+          if (opts?.staffId && b.staff_id !== opts.staffId) return false
+          if (opts?.serviceId && b.service_id && b.service_id !== opts.serviceId) return false
           const bEnd = b.check_out_at ?? new Date(b.booked_at.getTime() + slotDuration * 60_000)
           return b.booked_at < slotEnd && bEnd > slotStart
         })
-        remaining = available ? 1 : 0
+        remaining = Math.max(0, parallelCapacity - concurrent.length)
+        available = remaining > 0
       }
 
       slots.push({
@@ -273,6 +459,95 @@ export class AvailabilityService {
     }
 
     return { slots, closed: false }
+  }
+
+  /** Attribue automatiquement le praticien le moins chargé pour un créneau. */
+  async resolveStaffForBooking(
+    merchantId: string,
+    serviceId: string,
+    bookedAt: Date,
+    preferredStaffId?: string | null,
+    excludeBookingId?: string,
+  ): Promise<string | null> {
+    const { settings } = await this.loadMerchantContext(merchantId)
+    const service = await this.prisma.merchantService.findFirst({
+      where: { id: serviceId, merchant_id: merchantId, is_active: true },
+    })
+    if (!service) return null
+
+    const slotDuration = service.duration_min + settings.buffer_min
+    const dateStr = formatLocalDate(bookedAt)
+    const dayStart = new Date(`${dateStr}T00:00:00`)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+    const slotStart = bookedAt
+    const slotEnd = new Date(bookedAt.getTime() + slotDuration * 60_000)
+
+    const links = await this.prisma.merchantStaffService.findMany({
+      where: {
+        service_id: serviceId,
+        staff: { merchant_id: merchantId, is_active: true },
+      },
+      include: { staff: true },
+    })
+
+    let eligible: StaffCapacityProfile[] = links.map(l => ({
+      id: l.staff.id,
+      max_concurrent_slots: Math.max(1, l.staff.max_concurrent_slots),
+      max_daily_bookings: l.staff.max_daily_bookings,
+    }))
+
+    if (preferredStaffId) {
+      eligible = eligible.filter(s => s.id === preferredStaffId)
+      if (eligible.length === 0) {
+        const row = await this.prisma.merchantStaff.findFirst({
+          where: { id: preferredStaffId, merchant_id: merchantId, is_active: true },
+        })
+        if (row) {
+          eligible = [{
+            id: row.id,
+            max_concurrent_slots: Math.max(1, row.max_concurrent_slots),
+            max_daily_bookings: row.max_daily_bookings,
+          }]
+        }
+      }
+    }
+
+    if (eligible.length === 0) return preferredStaffId ?? null
+
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        merchant_id: merchantId,
+        status: { in: ['PENDING', 'CONFIRMED'] },
+        booked_at: { lt: dayEnd },
+        OR: [
+          { check_out_at: { gt: dayStart } },
+          { check_out_at: null, booked_at: { gte: dayStart } },
+        ],
+        ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
+      },
+      select: { booked_at: true, check_out_at: true, staff_id: true },
+    })
+
+    if (preferredStaffId) {
+      const staff = eligible.find(s => s.id === preferredStaffId)
+      if (staff && staffRemainingInSlot(
+        staff, bookings, slotStart, slotEnd, slotDuration, dayStart, dayEnd,
+      ) > 0) {
+        return preferredStaffId
+      }
+      return null
+    }
+
+    return pickStaffForSlot(
+      eligible,
+      bookings,
+      slotStart,
+      slotEnd,
+      slotDuration,
+      dayStart,
+      dayEnd,
+    )
   }
 
   async assertSlotAvailable(
@@ -291,28 +566,15 @@ export class AvailabilityService {
       if (!opts.checkOutAt) {
         throw new BadRequestException('Veuillez indiquer la date de départ')
       }
-      if (opts.checkOutAt <= bookedAt) {
-        throw new BadRequestException('La date de départ doit être après l\'arrivée')
+      if (!opts.serviceId) {
+        throw new BadRequestException('Veuillez sélectionner une chambre')
       }
-
-      const cursor = new Date(bookedAt)
-      cursor.setHours(0, 0, 0, 0)
-      const end = new Date(opts.checkOutAt)
-      end.setHours(0, 0, 0, 0)
-
-      while (cursor < end) {
-        const dateStr = formatLocalDate(cursor)
-        const night = await this.getRoomNightAvailability(merchantId, dateStr, {
-          serviceId: opts.serviceId,
-          excludeBookingId: opts.excludeBookingId,
-        })
-        if (night.closed || !night.available) {
-          throw new BadRequestException(
-            night.reason ?? `Chambre indisponible la nuit du ${dateStr}`,
-          )
-        }
-        cursor.setDate(cursor.getDate() + 1)
-      }
+      await this.assertRoomStayAvailable(
+        merchantId,
+        bookedAt,
+        opts.checkOutAt,
+        { serviceId: opts.serviceId, excludeBookingId: opts.excludeBookingId },
+      )
       return
     }
 

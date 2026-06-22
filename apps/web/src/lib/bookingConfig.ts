@@ -2,6 +2,7 @@ export type BookingType = 'TABLE' | 'APPOINTMENT' | 'ROOM' | 'CONSULTATION' | 'V
 
 export interface MerchantServiceConfig {
   id: string
+  slug?: string
   name: string
   duration_min: number
   price: number | null
@@ -12,6 +13,8 @@ export interface MerchantServiceConfig {
   min_stay_nights?: number | null
   description?: string | null
   capacity?: number | null
+  max_guests?: number | null
+  surface_sqm?: number | null
   service_kind?: string
   image_urls?: string[]
   bedrooms?: number | null
@@ -21,6 +24,8 @@ export interface MerchantServiceConfig {
   unit_type?: string | null
   amenities?: string[]
   highlights?: string[]
+  staff_id?: string | null
+  staff?: { id: string; name: string } | null
 }
 
 export interface BookingSettingsConfig {
@@ -35,6 +40,15 @@ export interface BookingSettingsConfig {
   no_show_policy?: string | null
 }
 
+export interface StaffMemberConfig {
+  id: string
+  name: string
+  role?: string | null
+  max_concurrent_slots?: number
+  max_daily_bookings?: number | null
+  service_ids?: string[]
+}
+
 export interface BookingConfig {
   enabled: boolean
   booking_type: BookingType | null
@@ -42,10 +56,15 @@ export interface BookingConfig {
   cta: string
   category_slug: string
   services: MerchantServiceConfig[]
-  staff: Array<{ id: string; name: string; role: string | null }>
+  staff: StaffMemberConfig[]
   room_types: string[]
   room_services?: MerchantServiceConfig[]
   booking_settings?: BookingSettingsConfig
+}
+
+export function staffForService(staff: StaffMemberConfig[], serviceId: string): StaffMemberConfig[] {
+  if (!serviceId) return staff
+  return staff.filter(s => s.service_ids?.includes(serviceId))
 }
 
 export const BOOKING_TYPE_LABELS: Record<BookingType, string> = {

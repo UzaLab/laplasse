@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { StaffService } from './staff.service'
-import { CreateStaffDto, CreateServiceDto } from './dto/staff.dto'
+import { CreateStaffDto, CreateServiceDto, SetStaffServicesDto } from './dto/staff.dto'
 import { CreateAvailabilityBlockDto, UpdateBookingSettingsDto } from './dto/offerings.dto'
 
 @Controller('merchants/me')
@@ -74,6 +74,16 @@ export class StaffController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.staff.updateStaff(userId, id, dto, merchantId)
+  }
+
+  @Patch('staff/:id/services')
+  setStaffServices(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: SetStaffServicesDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.staff.setStaffServices(userId, id, dto, merchantId)
   }
 
   @Delete('staff/:id')

@@ -3,8 +3,8 @@
 > Audit du parcours web (juin 2026) — marketplace, flux, UX, modules verticaux.  
 > Complète `REGLES_DEVELOPPEMENT.md` (état livré) et les Tomes (vision long terme).
 
-**Version :** 2.2  
-**Date :** 22 juin 2026 (MAJ Phase 17 déployée + Phase 18 UX marketplace)  
+**Version :** 2.3  
+**Date :** 22 juin 2026 (MAJ Phase 20 hôtel Airbnb MVP — local)  
 **Statut :** Document de référence produit — recommandations priorisées + journal d'exécution §14
 
 ---
@@ -68,7 +68,7 @@ Le tunnel **achat produit** est bout-en-bout (simulateur de paiement). Ce qui ma
 
 **Limites actuelles :**
 - Paiement **simulateur** uniquement (`PaymentProvider.SIMULATOR`)
-- Frais livraison par zones marchand (§12.4) ✅ — moteur delivery **V3.0 MVP** (statuts + tracking token) ; dispatch auto / GPS ⏳
+- Frais livraison par zones marchand (§12.4) ✅ — moteur delivery **V3.0 MVP** (statuts + tracking token + GPS livreur ✅) ; dispatch auto / partenaires flotte ⏳
 - Avis **produits** ✅ + modération admin ✅
 - Remboursements transition `REFUNDED` côté marchand ✅ — pas de reversement Mobile Money
 
@@ -79,7 +79,7 @@ Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 | Vertical | Catégories | Type booking | Maturité |
 |----------|------------|--------------|----------|
 | Restauration | restaurants, fast-food, cafes, bars-lounges | `TABLE` | Menu structuré ✅, fiche onglets ✅, réservation table ✅, formulaire + créneaux ✅ |
-| Hôtels | hotels | `ROOM` | Chambres + calendrier mois ✅, plage dates ✅, tarif/nuit + total séjour ✅, dispo multi-nuits API ✅, tarifs dynamiques week-end/saison ✅ |
+| Hôtels | hotels | `ROOM` | Fiche chambre `/m/[slug]/chambres/[id]` ✅, widget résa inline ✅, stock multi-unités + anti-surbooking ✅, calendrier mois ✅, tarifs dynamiques ✅, config marchand (stock, voyageurs max, surface, lits) ✅ |
 | Beauté / fitness | beaute, fitness | `APPOINTMENT` | Staff + prestations ✅, fiche onglets ✅, réservation + modification ✅ |
 | Pharmacie / défaut | pharmacies, … | `CONSULTATION` | RDV + consultations seed ✅, fiche onglets ✅, modification service ✅ |
 | Retail | boutiques | — | Booking désactivé, focus shop |
@@ -88,7 +88,7 @@ Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 
 **Parcours marchand :** `/merchant/bookings` — filtres statut/type/recherche, vue liste + agenda, fiche détail, actions (confirmer, refuser, terminer, absent, annuler), contact client, tarifs hôtel estimés.
 
-**Limites restantes :** paiement réservation en **simulateur** uniquement (MM réel bloqué) ; rappels SMS/WhatsApp simulés (logs + wa.me) en attendant provider ; enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
+**Limites restantes :** paiement réservation en **simulateur** uniquement (MM réel bloqué) ; rappels SMS/WhatsApp simulés (logs + wa.me) en attendant provider ; extras boutique sur fiche chambre ⏳ ; channel manager / ménage ⏳ P2.
 
 ---
 
@@ -311,10 +311,10 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 | Menu structuré | P0 vertical | Catégories (Entrées, Plats, Boissons) — distinct du catalog retail | ✅ |
 | Fiche établissement — onglets vertical | P0 UX | `[Vertical]` · Informations · Horaires · Galerie | ✅ |
 | Modificateurs | P1 | Suppléments, sauces, tailles — groupes/options par plat | ✅ |
-| Flux commande food dédié | P0 | Menu → panier → adresse → paiement → suivi (UX ≠ retail) | ⏳ |
-| Temps préparation / ETA | P1 | Affiché avant validation commande | ⏳ |
+| Flux commande food dédié | P0 | Menu → panier → adresse → paiement → suivi (UX ≠ retail) | ✅ `?flow=food`, `FoodMenuOrderPanel` |
+| Temps préparation / ETA | P1 | Affiché avant validation commande | ✅ `food_prep_minutes`, checkout |
 | Statuts livraison | P0 | `OUT_FOR_DELIVERY`, `DELIVERED` | ✅ |
-| Suivi temps réel | P2 | Phase 1 : timeline ✅ ; Phase 2 : carte GPS livreur | ⚠️ |
+| Suivi temps réel | P2 | Phase 1 : timeline ✅ ; Phase 2 : carte GPS livreur | ✅ GPS Phase 19 · partenaires flotte ⏳ |
 | Frais distance | P1 | Calcul quartier → quartier (zones commune ✅) | ⚠️ |
 | Commande sans compte | P1 | OTP SMS | ✅ |
 | Onglets Commander / Réserver | Quick win UX | CTAs sidebar → onglets fiche | ✅ |
@@ -323,16 +323,20 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 
 ### 6.3 Module HÔTEL / RÉSIDENCE — type Airbnb / Booking.com
 
-**État actuel :** booking `ROOM`, chambres seed, calendrier 14j API + onglet **Chambres** fiche établissement.
+**État actuel :** booking `ROOM`, fiche chambre dédiée, calendrier par type, stock inventaire (modèle Airbnb).
 
 | Capacité | Priorité | Détail | Statut |
 |----------|----------|--------|--------|
-| Calendrier disponibilité | P0 vertical | Vue mois par chambre/type | ✅ `MerchantHotelTab` + API `room-calendar` |
-| Tarification affichée | P0 | Prix/nuit × nuits = total avant confirmation | ✅ `BookingForm`, fiches profil/marchand |
-| Tarification dynamique | P0 | Prix par nuit, week-end, saison | ⏳ `nightly_rate` fixe par service |
-| Min stay / restrictions | P1 | Nuits minimum, jours check-in | ⏳ |
+| Calendrier disponibilité | P0 vertical | Vue mois par chambre/type, `remaining` par nuit | ✅ `MerchantHotelTab` + API `room-calendar` |
+| Tarification affichée | P0 | Prix/nuit × nuits = total avant confirmation | ✅ `BookingForm`, `RoomBookingWidget`, profil/marchand |
+| Tarification dynamique | P0 | Prix par nuit, week-end, saison | ✅ `room-pricing.ts`, `peak_months` |
+| Stock multi-unités | P0 | `capacity` = inventaire ; décompte par nuit | ✅ `room-night-availability.ts`, transaction Serializable |
+| Anti-surbooking | P0 | Nuit modèle Airbnb (départ exclusif), legacy `room_type` | ✅ `assertRoomStayAvailable`, tests unitaires |
+| Min stay / restrictions | P1 | Nuits minimum | ✅ `min_stay_nights` · jours check-in fixés ⏳ |
 | Paiement à la réservation | P0 | Acompte ou total via MM | ✅ simulateur · MM réel ⏳ |
-| Fiche hébergement riche | P1 | Équipements, règles, annulation, photos/chambre | ⏳ |
+| Fiche chambre publique | P1 | Hero, équipements, galerie, widget résa | ✅ `/m/[slug]/chambres/[id]`, `RoomDetailView` |
+| Config marchand chambre | P1 | Stock, voyageurs max, surface, lits, équipements | ✅ `/merchant/chambres`, migration `max_guests`/`surface_sqm` |
+| Extras / boutique chambre | P2 | Upsell spa, champagne sur fiche chambre | ⏳ maquette `rooms_hotel.md` |
 | Gestion ménage | P2 | Statuts : disponible, occupée, nettoyage | ⏳ |
 | Channel manager | P3 | Sync iCal / OTAs | ⏳ |
 
@@ -386,7 +390,8 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 | Catalogue produits | ✅ | — | — | ✅ | ✅ |
 | Paiement MM | ✅ | ✅ | ✅ | ✅ | ❌ simulé |
 | Suivi livraison GPS | ✅ | — | — | ⚠️ | ⚠️ token only |
-| Calendrier tarifaire | — | ✅ | ✅ | — | ✅ mois + total |
+| Calendrier tarifaire | — | ✅ | ✅ | — | ✅ mois + total + dynamique |
+| Fiche chambre dédiée | — | ✅ | — | — | ✅ `/m/…/chambres/[id]` |
 | Réservation + paiement | — | ✅ | ✅ | — | ✅ résa + simulateur |
 | Menu structuré food | ✅ | — | — | — | ✅ |
 | Avis produits | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -405,8 +410,8 @@ Changements à fort impact, faible refonte backend :
 4. **Erreurs réseau explicites** — toasts + bouton retry (remplacer fetch silencieux)
 5. ~~**Fiche établissement contextualisée**~~ — ✅ CTAs + onglets vertical
 6. ~~**Favoris produits**~~ — ✅ branchés
-7. **Funnels PostHog** — mesurer abandon par étape checkout (URLs déjà distinctes)
-8. **Onboarding marchand vertical** — pack modules proposé à l'inscription selon catégorie
+7. ~~**Funnels PostHog**~~ — ✅ events `checkout_funnel` par étape (Phase 13)
+8. ~~**Onboarding marchand vertical**~~ — ✅ `/merchant/onboarding`, pack modules par catégorie (Phase 16)
 9. **Copy multipays** — ✅ ton « excellence locale » ; reste : quartiers search dynamiques par ville/pays
 
 ---
@@ -458,7 +463,7 @@ model Shop {
 |---------|-------|-----------|----------|
 | **V2.0** | Transactions réelles | MM réel, promos checkout, **zones livraison**, catégories produit, timeline commande | Marketplace crédible |
 | **V2.1** | Module Glovo MVP | Menu restaurant, statuts livraison, OTP guest, onglets Commander/Réserver | Food delivery crédible |
-| **V2.2** | Module Airbnb MVP | Calendrier hôtel, tarifs/nuit, paiement réservation chambre | Hébergement crédible |
+| **V2.2** | Module Airbnb MVP | Calendrier hôtel, tarifs/nuit, fiche chambre, stock, paiement réservation chambre | ✅ MVP local (Phase 20) · deploy prod ⏳ |
 | **V2.3** | Parité e-commerce | Avis/wishlist produits, remboursements, factures PDF | Retail complet |
 | **V2.4** | Multi-pays UEMOA | Sous-domaines, `Country` tenant, villes BF/SN, paiements locaux | Expansion ouest-africaine |
 | **V3.0** | Scale plateforme | Delivery engine (coursiers, GPS), channel manager, analytics funnel | Plateforme multi-verticale |
@@ -480,7 +485,7 @@ Pour passer de « V1.6 démo solide » à « marketplace + verticaux crédibles 
 | **2** | **Zones livraison + promos checkout** | Tarifs commune, codes promo — voir [§12](#12-catégories-produits-codes-promo--zones-de-livraison) |
 | **3** | Suivi commande structuré (timeline + notifs) | Remplace dépendance WhatsApp post-achat |
 | **4** | Module Menu Restaurant | Première brique Glovo |
-| **5** | ~~Calendrier + tarification hôtel~~ | ✅ MVP livré — reste tarifs dynamiques / paiement séjour |
+| **5** | ~~Calendrier + tarification hôtel~~ | ✅ MVP livré (Phase 7–20) — reste **paiement MM réel** séjour |
 
 Le socle (Shop modulaire, checkout 4 étapes, booking engine, multi-boutiques) est **suffisant pour absorber ces modules** sans refonte totale — à condition de formaliser `enabled_modules[]` et l'admin capabilities.
 
@@ -1370,7 +1375,9 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | Panier | `stores/cartStore.ts`, `/cart`, `CartDrawer.tsx` |
 | Checkout | `/checkout/*`, `lib/checkoutSession.ts`, `CheckoutOrderSummary.tsx` |
 | API client | `lib/marketplaceApi.ts`, `lib/shopApi.ts` |
-| Booking | `features/merchant/components/BookingForm.tsx`, `profile/MerchantHotelTab.tsx` |
+| Booking | `BookingForm.tsx`, `MerchantHotelTab.tsx`, `RoomDetailView.tsx`, `RoomBookingWidget.tsx` |
+| Fiche chambre | `/m/[slug]/chambres/[roomId]`, `GET …/merchant-by-slug/:slug/rooms/:id` |
+| Chambres marchand | `/merchant/chambres`, `MerchantRoomsPanel.tsx`, `lib/bookingSettingsApi.ts` |
 | Booking profil | `app/profile/bookings/page.tsx`, `BookingDetailSheet.tsx`, `lib/bookingDisplay.ts` |
 | Booking marchand | `app/merchant/bookings/page.tsx`, `MerchantBookingDetailSheet.tsx` |
 | Copy marque | `lib/brandCopy.ts` |
@@ -1383,7 +1390,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 |---------|----------|
 | Marketplace | `src/marketplace/marketplace.service.ts`, `marketplace.controller.ts` |
 | Shops | `src/shops/shops.service.ts` |
-| Bookings | `src/bookings/` (+ `availability.service`, auth cookie réservation) |
+| Bookings | `src/bookings/` (+ `availability.service`, `room-night-availability.ts`, auth cookie réservation) |
 | Promotions | `src/promotions/` |
 | Payments | `src/payments/` (abonnements ; commandes via marketplace confirm) |
 | Search | `src/search/search.service.ts` (index `merchants` uniquement) |
@@ -1537,15 +1544,15 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | API tracking public | ✅ MVP | `GET /delivery/track/:token`, page `/delivery/track/[token]` |
 | UI dispatch marchand | ✅ MVP | `DeliveryDispatchPanel` — assignation coursier + lien tracking copiable |
 | Lien tracking client | ✅ MVP | `delivery_job` sur orders API + CTA `/profile/orders/[id]` → `/delivery/track/:token` |
-| Notifications temps réel | ⏳ | Push client à chaque étape livraison |
-| Carte GPS livreur | ⏳ | Phase 2 suivi (§6.2) |
+| Notifications temps réel | ✅ | Push client à chaque étape livraison (Phase 14) |
+| Carte GPS livreur | ✅ | Carte sur `/delivery/track/:token` (Phase 19) |
 | Partenaires logistiques | ⏳ | Intégration flotte externe |
 
 ---
 
-## Reste à faire — synthèse priorités (post Phase 18)
+## Reste à faire — synthèse priorités (post Phase 20)
 
-> **Position actuelle (22 juin 2026)** : Phases **1 → 18** livrées et déployées. **Phase 19** livrée en local (non déployée). **Mobile Money réel reporté** (simulateur maintenu). Prochaine vague = déploiement Phase 19 + ops DNS.
+> **Position actuelle (22 juin 2026)** : Phases **1 → 18** déployées prod/preprod. **Phase 19** livrée (local + prod selon déploiement). **Phase 20** (module hôtel Airbnb MVP) livrée **en local** — migration `20260622120000_room_detail_fields` appliquée localement. **Mobile Money réel reporté** (simulateur maintenu). Prochaine vague = **déploiement Phase 19–20** + ops DNS.
 
 ### 🔴 P0 — Bloquant « marketplace / plateforme réelle »
 
@@ -1561,29 +1568,49 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 |---------|--------|
 | **Marketplace** | ~~Analytics e-commerce~~ ✅ · ~~Order again~~ ✅ · ~~Split livraison multi-boutiques~~ ✅ |
 | **Restaurant** | ~~Modificateurs menu (suppléments)~~ ✅ · ~~ETA préparation checkout~~ ✅ |
-| **Hôtel** | ~~Tarification dynamique~~ ✅ · Fiche chambre riche · Notifications rappel séjour |
+| **Hôtel** | ~~Tarification dynamique~~ ✅ · ~~Fiche chambre riche~~ ✅ · ~~Stock / anti-surbooking~~ ✅ · ~~Notifications rappel séjour~~ ✅ · Extras boutique fiche chambre · Channel manager |
 | **Booking** | ~~Rappels SMS/WhatsApp auto~~ ✅ · ~~Politique no-show~~ ✅ · ~~Réservations invité rattachables~~ ✅ |
-| **Delivery V3** | ~~Notifications temps réel~~ ✅ (push) · GPS livreur · Partenaires logistiques |
-| **Multi-pays** | Autocomplete merchants par pays · ~~Critères §11.12 « Burkina ready » (geo + smoke)~~ ✅ · Seed BF opérationnel prod |
-| **Retail** | Retours SAV structuré · SEO produit avancé · ~~Export CSV commandes~~ ✅ |
-| **UX transverse** | ~~Funnels PostHog checkout~~ ✅ · ~~Wizard marchand `/merchant/signup`~~ ✅ · Onboarding marchand vertical |
+| **Delivery V3** | ~~Notifications temps réel~~ ✅ · ~~GPS livreur~~ ✅ · Partenaires logistiques |
+| **Multi-pays** | ~~Autocomplete merchants par pays~~ ✅ · ~~Critères §11.12 « Burkina ready » (geo + smoke)~~ ✅ · Seed BF opérationnel prod |
+| **Retail** | ~~Retours SAV structuré~~ ✅ · ~~SEO produit~~ ✅ · ~~Export CSV commandes~~ ✅ |
+| **UX transverse** | ~~Funnels PostHog checkout~~ ✅ · ~~Wizard marchand `/merchant/signup`~~ ✅ · ~~Onboarding marchand vertical~~ ✅ |
 
 ### 🟡 P2 — Scale & différenciation
 
 | Domaine | Slices |
 |---------|--------|
 | **Paiement** | Remboursement automatique MM (après P0 #1) |
-| **Delivery** | GPS livreur temps réel · Partenaires logistiques |
+| **Delivery** | ~~GPS livreur temps réel~~ ✅ · Partenaires logistiques |
 | **Discovery** | ~~Recommandations · Recently viewed · Fidélité achats~~ ✅ · Carrousels + CTA panier | ✅ Phase 17–18 |
 | **UX transverse** | ~~i18n FR/EN · PWA offline-lite~~ ✅ · Dropdown langue drapeaux | ✅ MVP Phase 17–18 |
 | **Ops** | ~~Export CSV commandes~~ ✅ · Multi-langue FR/EN · PWA offline-lite |
 | **Pharmacie** | Upload ordonnance · Catalogue OTC |
-| **Admin** | `/admin/delivery` stats zones · `/admin/countries` |
+| **Admin** | ~~`/admin/delivery` stats zones~~ ✅ · ~~`/admin/countries`~~ ✅ |
 | **Hôtel** | Channel manager · Gestion ménage |
 
 ### ✅ Déjà livré (ne pas replanifier)
 
-Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays) · **Phase 9 (dettes geo, M1 sous-domaines, filtres marchand, alertes stock, tarifs dynamiques)** · **Phases 10–16 (restaurant, analytics, order again, booking invité, onboarding, SAV)** · **Phase 17 (paiement résa simulateur, discovery, i18n, PWA — déployée preprod + prod)** · **Phase 18 (carrousels reco, fiche produit, toggle paiement marchand)**.
+Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays) · **Phase 9 (dettes geo, M1 sous-domaines, filtres marchand, alertes stock, tarifs dynamiques)** · **Phases 10–16 (restaurant, analytics, order again, booking invité, onboarding, SAV, fiche chambre v1)** · **Phase 17 (paiement résa simulateur, discovery, i18n, PWA — déployée preprod + prod)** · **Phase 18 (carrousels reco, fiche produit, toggle paiement marchand)** · **Phase 19 (multi-pays, SEO, GPS livreur, admin ops — local/prod)** · **Phase 20 (fiche chambre Airbnb, stock, anti-surbooking — local)**.
+
+---
+
+### Phase 20 — Module hôtel Airbnb MVP (juin 2026, ✅ livrée local)
+
+> Complète la Phase 16 (sheet/modale) par une **fiche chambre dédiée** et une **logique inventaire** type Booking.com / Airbnb.
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Fiche chambre publique** | ✅ | `/m/[slug]/chambres/[roomId]` — hero immersif, stats, équipements icônes, galerie, politiques |
+| **Widget résa inline** | ✅ | `RoomBookingWidget.tsx` — dates, voyageurs, total séjour, soumission API |
+| **Config marchand enrichie** | ✅ | `MerchantRoomsPanel` — stock, `max_guests`, `surface_sqm`, lits, SdB ; migration `20260622120000` |
+| **Fix paramètres réservation** | ✅ | `toBookingSettingsPatch()` — PATCH `/merchant/chambres` sans rejet `merchant_id` |
+| **Stock multi-unités** | ✅ | `capacity` = inventaire ; calendrier renvoie `remaining` |
+| **Anti-surbooking** | ✅ | Modèle nuit départ exclusif, legacy `room_type`, `service_id` obligatoire, tx Serializable |
+| **Validation voyageurs max** | ✅ | API `assertRoomBookingRules` + `max_guests` |
+| **UX fiche hôtel** | ✅ | Cartes chambres → lien « Détails » direct ; suppression modale « fiche complète » |
+| **Tests unitaires dispo** | ✅ | `room-night-availability.spec.ts` (6 tests) |
+
+**Reste hôtel post-Phase 20 :** extras boutique sur fiche chambre (maquette) · jours check-in/out configurables marchand · channel manager · ménage.
 
 ---
 
@@ -1656,6 +1683,10 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 | — | Paiement réservation MM réel | ⏸ | Après MM |
 | — | Remboursement paiement réel | ⏸ | Après MM |
 | — | DNS laplasse.tech + wildcard | P0 ops | Domaine + Coolify |
+| **20** | Fiche chambre Airbnb MVP | ✅ local | Page dédiée, widget résa, config marchand |
+| **20** | Stock / anti-surbooking | ✅ local | `room-night-availability`, tx Serializable |
+| **20** | Fix PATCH booking-settings chambres | ✅ local | `bookingSettingsApi.ts` |
+| **20** | Migration room_detail_fields | ✅ local | `max_guests`, `surface_sqm` — ⏳ deploy prod |
 
 ### Journal — Slices clôturées Phase 9 (juin 2026)
 
@@ -1678,7 +1709,7 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 |-------|--------|------------------|
 | **Onboarding marchand vertical** | ✅ | `/merchant/onboarding`, checklist par catégorie, redirect post-OTP |
 | **Retours SAV structuré** | ✅ | `OrderReturn` API + `/profile/orders/[id]` + `/merchant/shop/returns` |
-| **Fiche chambre détail** | ✅ | `RoomDetailSheet`, équipements complets sur fiche hôtel publique |
+| **Fiche chambre détail v1** | ✅ | `RoomDetailSheet` (remplacé par page dédiée Phase 20) |
 
 ### Phase 15 — Wizard marchand & layout public (juin 2026)
 

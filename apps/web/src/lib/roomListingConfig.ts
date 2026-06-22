@@ -1,5 +1,15 @@
 export const MAX_ROOM_IMAGES = 5
 
+export function getRoomPublicPath(
+  merchantSlug: string,
+  roomOrSlug: string | { slug?: string; id: string },
+): string {
+  const roomSlug = typeof roomOrSlug === 'string'
+    ? roomOrSlug
+    : (roomOrSlug.slug ?? roomOrSlug.id)
+  return `/m/${merchantSlug}/chambres/${roomSlug}`
+}
+
 export const HOTEL_CATEGORY_SLUGS = new Set(['hotels'])
 export const RESIDENCE_CATEGORY_SLUGS = new Set(['residences'])
 export const LODGING_CATEGORY_SLUGS = new Set([...HOTEL_CATEGORY_SLUGS, ...RESIDENCE_CATEGORY_SLUGS])
@@ -84,4 +94,51 @@ export function propertyTypeLabel(value: string | null | undefined): string {
 export function unitTypeLabel(value: string | null | undefined): string {
   if (!value) return ''
   return UNIT_TYPES.find(u => u.value === value)?.label ?? value
+}
+
+/** Voyageurs max affichés — max_guests prioritaire ; capacity = fallback résidences uniquement. */
+export function getRoomMaxGuests(
+  room: { max_guests?: number | null; capacity?: number | null },
+  options?: { isResidence?: boolean },
+): number | null {
+  if (room.max_guests != null && room.max_guests > 0) return room.max_guests
+  if (options?.isResidence && room.capacity != null && room.capacity > 0) return room.capacity
+  return null
+}
+
+/** Libellé lit(s) pour fiche chambre. */
+export function getRoomBedLabel(room: {
+  beds?: number | null
+  unit_type?: string | null
+}): string | null {
+  const count = room.beds ?? 0
+  const type = unitTypeLabel(room.unit_type)
+  if (count > 0 && type) {
+    return count === 1 ? `Lit ${type}` : `${count} lits · ${type}`
+  }
+  if (count > 0) return count === 1 ? '1 lit' : `${count} lits`
+  if (type) return type
+  return null
+}
+
+const AMENITY_ICONS: Record<string, string> = {
+  wifi: 'Wifi',
+  ac: 'Wind',
+  parking: 'Car',
+  pool: 'Waves',
+  kitchen: 'UtensilsCrossed',
+  washer: 'Shirt',
+  tv: 'Tv',
+  balcony: 'Sun',
+  garden: 'Trees',
+  elevator: 'ArrowUpDown',
+  security: 'Shield',
+  room_service: 'Bell',
+  gym: 'Dumbbell',
+  spa: 'Sparkles',
+  workspace: 'Laptop',
+}
+
+export function amenityIconName(value: string): string {
+  return AMENITY_ICONS[value] ?? 'Check'
 }

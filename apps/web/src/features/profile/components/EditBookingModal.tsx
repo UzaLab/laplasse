@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { X, Calendar, Clock, Users, Loader2 } from 'lucide-react'
 import { authApiFetch } from '@/lib/authFetch'
 import type { BookingConfig, BookingType } from '@/lib/bookingConfig'
-import { BOOKING_TYPE_LABELS } from '@/lib/bookingConfig'
+import { BOOKING_TYPE_LABELS, staffForService } from '@/lib/bookingConfig'
 
 export interface EditableBooking {
   id: string
@@ -105,6 +105,8 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false))
   }, [open, date, booking.merchant.id, form.service_id, form.staff_id, config?.enabled])
+
+  const eligibleStaff = config ? staffForService(config.staff, form.service_id) : []
 
   if (!open) return null
 
@@ -225,14 +227,15 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   </select>
                 )}
 
-                {bookingType === 'APPOINTMENT' && config && config.staff.length > 0 && (
+                {(bookingType === 'APPOINTMENT' || bookingType === 'CONSULTATION')
+                  && config && eligibleStaff.length > 0 && (
                   <select
                     value={form.staff_id}
                     onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))}
                     className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                   >
                     <option value="">Prestataire (optionnel)</option>
-                    {config.staff.map(s => (
+                    {eligibleStaff.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>

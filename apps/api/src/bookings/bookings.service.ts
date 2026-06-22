@@ -15,12 +15,13 @@ import { FraudService } from '../fraud/fraud.service'
 import { AuditService } from '../audit/audit.service'
 import { CreateBookingDto, UpdateBookingStatusDto, UpdateMyBookingDto } from './dto/booking.dto'
 import { phoneMatchTail } from '../common/phone-match'
-import { BookingStatus, BookingType } from '../../generated/prisma/client'
+import { BookingStatus, BookingType, Prisma } from '../../generated/prisma/client'
 import {
   computeBookingBaseAmount,
   computeDepositAmount,
   generatePaymentReference,
 } from './booking-payment.util'
+import { resolveRoomMaxGuests } from '../common/room-night-availability'
 
 @Injectable()
 export class BookingsService {
@@ -44,6 +45,49 @@ export class BookingsService {
     duration_min: true,
     merchant_id: true,
   } as const
+
+  /** Règles métier chambre : service obligatoire, voyageurs max, séjour minimum. */
+  private async assertRoomBookingRules(
+    merchantId: string,
+    categorySlug: string,
+    serviceId: string,
+    partySize: number,
+    bookedAt: Date,
+    checkOutAt: Date,
+  ) {
+    const roomService = await this.prisma.merchantService.findFirst({
+      where: {
+        id: serviceId,
+        merchant_id: merchantId,
+        is_active: true,
+        service_kind: 'ROOM_TYPE',
+      },
+    })
+    if (!roomService) {
+      throw new BadRequestException('Chambre introuvable ou inactive')
+    }
+
+    const isResidence = categorySlug === 'residences'
+    const maxGuests = resolveRoomMaxGuests(
+      roomService.max_guests,
+      roomService.capacity,
+      isResidence,
+    )
+    if (maxGuests != null && partySize > maxGuests) {
+      throw new BadRequestException(
+        `Maximum ${maxGuests} voyageur${maxGuests > 1 ? 's' : ''} pour « ${roomService.name} »`,
+      )
+    }
+
+    const minStayMsg = assertMinStay(
+      roomService,
+      formatLocalDate(bookedAt),
+      formatLocalDate(checkOutAt),
+    )
+    if (minStayMsg) throw new BadRequestException(minStayMsg)
+
+    return roomService
+  }
 
   private async enrichRoomBookings<
     T extends {
@@ -111,8 +155,16 @@ export class BookingsService {
       where: { id: merchantId, is_active: true },
       include: {
         category: { select: { slug: true, name: true } },
-        services: { where: { is_active: true }, orderBy: { name: 'asc' } },
-        staff: { where: { is_active: true }, orderBy: { name: 'asc' } },
+        services: {
+          where: { is_active: true },
+          orderBy: { name: 'asc' },
+          include: { staff: { select: { id: true, name: true } } },
+        },
+        staff: {
+          where: { is_active: true },
+          orderBy: { name: 'asc' },
+          include: { staff_services: { select: { service_id: true } } },
+        },
       },
     })
     if (!merchant) throw new NotFoundException('Établissement introuvable')
@@ -139,14 +191,21 @@ export class BookingsService {
       cta: catConfig.cta,
       category_slug: merchant.category.slug,
       services: merchant.services,
-      staff: merchant.staff,
+      staff: merchant.staff.map(s => ({
+        id: s.id,
+        name: s.name,
+        role: s.role,
+        max_concurrent_slots: s.max_concurrent_slots,
+        max_daily_bookings: s.max_daily_bookings,
+        service_ids: s.staff_services.map(l => l.service_id),
+      })),
       room_types: roomTypes,
       room_services: roomServices,
       booking_settings: settings,
     }
   }
 
-  async getPublicRoomBySlug(slug: string, roomId: string) {
+  async getPublicRoomBySlug(slug: string, roomSlugOrId: string) {
     const merchant = await this.prisma.merchant.findFirst({
       where: { slug, is_active: true },
       select: {
@@ -154,6 +213,13 @@ export class BookingsService {
         business_name: true,
         slug: true,
         cover_image: true,
+        location: {
+          select: {
+            address: true,
+            district: true,
+            city: true,
+          },
+        },
         category: { select: { slug: true, name: true } },
       },
     })
@@ -161,8 +227,10 @@ export class BookingsService {
 
     const config = await this.getMerchantConfig(merchant.id)
     const room =
-      config.room_services.find(s => s.id === roomId)
-      ?? config.services.find(s => s.id === roomId && s.service_kind === 'ROOM_TYPE')
+      config.room_services.find(s => s.slug === roomSlugOrId || s.id === roomSlugOrId)
+      ?? config.services.find(
+        s => (s.slug === roomSlugOrId || s.id === roomSlugOrId) && s.service_kind === 'ROOM_TYPE',
+      )
 
     if (!room) throw new NotFoundException('Chambre introuvable')
 
@@ -171,6 +239,47 @@ export class BookingsService {
       room,
       booking_settings: config.booking_settings,
       booking_enabled: config.enabled,
+    }
+  }
+
+  async getPublicServiceBySlug(slug: string, serviceSlugOrId: string) {
+    const merchant = await this.prisma.merchant.findFirst({
+      where: { slug, is_active: true },
+      select: {
+        id: true,
+        business_name: true,
+        slug: true,
+        cover_image: true,
+        location: {
+          select: {
+            address: true,
+            district: true,
+            city: true,
+          },
+        },
+        category: { select: { slug: true, name: true } },
+      },
+    })
+    if (!merchant) throw new NotFoundException('Établissement introuvable')
+
+    const config = await this.getMerchantConfig(merchant.id)
+    const allowedKinds = merchant.category.slug === 'pharmacies'
+      ? ['CONSULTATION']
+      : ['APPOINTMENT']
+
+    const service = config.services.find(
+      s => (s.slug === serviceSlugOrId || s.id === serviceSlugOrId)
+        && allowedKinds.includes(s.service_kind ?? 'APPOINTMENT'),
+    )
+    if (!service) throw new NotFoundException('Prestation introuvable')
+
+    return {
+      merchant,
+      service,
+      staff: config.staff.filter(s => s.service_ids?.includes(service.id)),
+      booking_settings: config.booking_settings,
+      booking_enabled: config.enabled,
+      category_slug: merchant.category.slug,
     }
   }
 
@@ -217,6 +326,7 @@ export class BookingsService {
     const days: Array<{
       date: string
       available: boolean
+      remaining: number
       nightly_rate: number | null
       room_type: string | null
     }> = []
@@ -229,6 +339,7 @@ export class BookingsService {
       days.push({
         date: dateStr,
         available: !night.closed && night.available,
+        remaining: night.remaining,
         nightly_rate: roomService
           ? getNightlyRateForDate(roomService, dateStr)
           : null,
@@ -291,39 +402,58 @@ export class BookingsService {
     if (bookingType === 'CONSULTATION' && !dto.service_id) {
       throw new BadRequestException('Veuillez sélectionner une consultation')
     }
+    if (bookingType === 'ROOM' && !dto.service_id) {
+      throw new BadRequestException('Veuillez sélectionner une chambre')
+    }
     if (bookingType === 'ROOM' && !checkOutAt) {
       throw new BadRequestException('Veuillez indiquer la date de départ')
     }
 
+    const partySize = dto.party_size ?? 1
+    let roomServiceForBooking: Awaited<ReturnType<typeof this.assertRoomBookingRules>> | null = null
     if (bookingType === 'ROOM' && checkOutAt && dto.service_id) {
-      const roomService = await this.prisma.merchantService.findFirst({
-        where: { id: dto.service_id, merchant_id: merchantId, is_active: true, service_kind: 'ROOM_TYPE' },
-      })
-      if (roomService) {
-        const minStayMsg = assertMinStay(
-          roomService,
-          formatLocalDate(bookedAt),
-          formatLocalDate(checkOutAt),
-        )
-        if (minStayMsg) throw new BadRequestException(minStayMsg)
-      }
+      roomServiceForBooking = await this.assertRoomBookingRules(
+        merchantId,
+        merchant.category.slug,
+        dto.service_id,
+        partySize,
+        bookedAt,
+        checkOutAt,
+      )
     }
 
-    await this.availability.assertSlotAvailable(merchantId, bookedAt, {
-      bookingType,
-      partySize: dto.party_size ?? 1,
-      checkOutAt,
-      serviceId: dto.service_id,
-      staffId: dto.staff_id,
-    })
+    if (bookingType !== 'ROOM') {
+      await this.availability.assertSlotAvailable(merchantId, bookedAt, {
+        bookingType,
+        partySize,
+        checkOutAt,
+        serviceId: dto.service_id,
+        staffId: dto.staff_id,
+      })
+    }
+
+    let resolvedStaffId = dto.staff_id ?? null
+    if (
+      bookingType !== 'ROOM'
+      && dto.service_id
+      && !resolvedStaffId
+    ) {
+      resolvedStaffId = await this.availability.resolveStaffForBooking(
+        merchantId,
+        dto.service_id,
+        bookedAt,
+        null,
+      )
+    }
 
     let serviceForPayment = null as Awaited<
       ReturnType<typeof this.prisma.merchantService.findFirst>
     > | null
     if (dto.service_id) {
-      serviceForPayment = await this.prisma.merchantService.findFirst({
-        where: { id: dto.service_id, merchant_id: merchantId, is_active: true },
-      })
+      serviceForPayment = roomServiceForBooking
+        ?? await this.prisma.merchantService.findFirst({
+          where: { id: dto.service_id, merchant_id: merchantId, is_active: true },
+        })
     }
 
     const settings = merchant.booking_settings
@@ -350,27 +480,43 @@ export class BookingsService {
       && limits.advancedBooking
     const status: BookingStatus = autoConfirm ? 'CONFIRMED' : 'PENDING'
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        merchant_id: merchantId,
-        user_id: userId ?? null,
-        booking_type: bookingType,
-        guest_name: dto.guest_name,
-        guest_phone: dto.guest_phone,
-        guest_email: dto.guest_email ?? null,
-        booked_at: bookedAt,
-        check_out_at: checkOutAt ?? null,
-        party_size: dto.party_size ?? 1,
-        service_id: dto.service_id ?? null,
-        staff_id: dto.staff_id ?? null,
-        room_type: dto.room_type ?? null,
-        notes: dto.notes ?? null,
-        status,
-      },
-      include: {
-        service: { select: { name: true } },
-      },
-    })
+    const bookingData = {
+      merchant_id: merchantId,
+      user_id: userId ?? null,
+      booking_type: bookingType,
+      guest_name: dto.guest_name,
+      guest_phone: dto.guest_phone,
+      guest_email: dto.guest_email ?? null,
+      booked_at: bookedAt,
+      check_out_at: checkOutAt ?? null,
+      party_size: partySize,
+      service_id: dto.service_id ?? null,
+      staff_id: resolvedStaffId ?? dto.staff_id ?? null,
+      room_type: bookingType === 'ROOM'
+        ? (dto.room_type ?? roomServiceForBooking?.name ?? null)
+        : (dto.room_type ?? null),
+      notes: dto.notes ?? null,
+      status,
+    }
+
+    const booking = bookingType === 'ROOM' && checkOutAt && dto.service_id
+      ? await this.prisma.$transaction(async (tx) => {
+          await this.availability.assertRoomStayAvailable(
+            merchantId,
+            bookedAt,
+            checkOutAt,
+            { serviceId: dto.service_id! },
+            tx,
+          )
+          return tx.booking.create({
+            data: bookingData,
+            include: { service: { select: { name: true } } },
+          })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      : await this.prisma.booking.create({
+          data: bookingData,
+          include: { service: { select: { name: true } } },
+        })
 
     let paymentPayload: {
       id: string
@@ -666,37 +812,79 @@ export class BookingsService {
     if (booking.booking_type === 'ROOM' && !checkOutAt) {
       throw new BadRequestException('Veuillez indiquer la date de départ')
     }
+    if (booking.booking_type === 'ROOM' && !serviceId) {
+      throw new BadRequestException('Veuillez sélectionner une chambre')
+    }
 
-    await this.availability.assertSlotAvailable(booking.merchant_id, bookedAt, {
-      bookingType: booking.booking_type,
-      partySize,
-      checkOutAt: checkOutAt ?? undefined,
-      serviceId: serviceId ?? undefined,
-      staffId: staffId ?? undefined,
-      excludeBookingId: bookingId,
-    })
+    if (booking.booking_type === 'ROOM' && checkOutAt && serviceId) {
+      await this.assertRoomBookingRules(
+        booking.merchant_id,
+        booking.merchant.category.slug,
+        serviceId,
+        partySize,
+        bookedAt,
+        checkOutAt,
+      )
+    } else if (booking.booking_type !== 'ROOM') {
+      await this.availability.assertSlotAvailable(booking.merchant_id, bookedAt, {
+        bookingType: booking.booking_type,
+        partySize,
+        checkOutAt: checkOutAt ?? undefined,
+        serviceId: serviceId ?? undefined,
+        staffId: staffId ?? undefined,
+        excludeBookingId: bookingId,
+      })
+    }
 
-    const updated = await this.prisma.booking.update({
-      where: { id: bookingId },
-      data: {
-        guest_name: dto.guest_name ?? booking.guest_name,
-        guest_phone: dto.guest_phone ?? booking.guest_phone,
-        guest_email: dto.guest_email !== undefined ? (dto.guest_email || null) : booking.guest_email,
-        booked_at: bookedAt,
-        check_out_at: checkOutAt,
-        party_size: partySize,
-        service_id: serviceId,
-        staff_id: staffId,
-        room_type: roomType,
-        notes: dto.notes !== undefined ? (dto.notes || null) : booking.notes,
-        status: 'PENDING',
-      },
-      include: {
-        merchant: { select: { id: true, business_name: true, slug: true, cover_image: true } },
-        service: { select: { id: true, name: true } },
-        staff: { select: { id: true, name: true } },
-      },
-    })
+    let resolvedRoomType = roomType
+    if (booking.booking_type === 'ROOM' && serviceId && !resolvedRoomType) {
+      const svc = await this.prisma.merchantService.findFirst({
+        where: { id: serviceId },
+        select: { name: true },
+      })
+      resolvedRoomType = svc?.name ?? null
+    }
+
+    const updatePayload = {
+      guest_name: dto.guest_name ?? booking.guest_name,
+      guest_phone: dto.guest_phone ?? booking.guest_phone,
+      guest_email: dto.guest_email !== undefined ? (dto.guest_email || null) : booking.guest_email,
+      booked_at: bookedAt,
+      check_out_at: checkOutAt,
+      party_size: partySize,
+      service_id: serviceId,
+      staff_id: staffId,
+      room_type: resolvedRoomType,
+      notes: dto.notes !== undefined ? (dto.notes || null) : booking.notes,
+      status: 'PENDING' as const,
+    }
+
+    const updateInclude = {
+      merchant: { select: { id: true, business_name: true, slug: true, cover_image: true } },
+      service: { select: { id: true, name: true } },
+      staff: { select: { id: true, name: true } },
+    }
+
+    const updated = booking.booking_type === 'ROOM' && checkOutAt && serviceId
+      ? await this.prisma.$transaction(async (tx) => {
+          await this.availability.assertRoomStayAvailable(
+            booking.merchant_id,
+            bookedAt,
+            checkOutAt,
+            { serviceId, excludeBookingId: bookingId },
+            tx,
+          )
+          return tx.booking.update({
+            where: { id: bookingId },
+            data: updatePayload,
+            include: updateInclude,
+          })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      : await this.prisma.booking.update({
+          where: { id: bookingId },
+          data: updatePayload,
+          include: updateInclude,
+        })
 
     const catConfig = getCategoryBookingConfig(booking.merchant.category.slug)
 

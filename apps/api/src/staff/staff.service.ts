@@ -8,8 +8,9 @@ import { PrismaService } from '../prisma/prisma.service'
 import { getPlanLimits } from '../common/plan-limits'
 import { getCategoryBookingConfig } from '../common/booking-config'
 import { ServiceKind } from '../../generated/prisma/client'
-import { CreateServiceDto, CreateStaffDto } from './dto/staff.dto'
+import { CreateServiceDto, CreateStaffDto, SetStaffServicesDto } from './dto/staff.dto'
 import { CreateAvailabilityBlockDto, UpdateBookingSettingsDto } from './dto/offerings.dto'
+import { uniqueMerchantServiceSlug } from '../common/slug.util'
 import { MAX_ROOM_IMAGES } from './dto/staff.dto'
 
 @Injectable()
@@ -38,6 +39,8 @@ export class StaffService {
     if (dto.bedrooms !== undefined) data.bedrooms = dto.bedrooms
     if (dto.bathrooms !== undefined) data.bathrooms = dto.bathrooms
     if (dto.beds !== undefined) data.beds = dto.beds
+    if (dto.max_guests !== undefined) data.max_guests = dto.max_guests
+    if (dto.surface_sqm !== undefined) data.surface_sqm = dto.surface_sqm
     if (dto.property_type !== undefined) data.property_type = dto.property_type || null
     if (dto.unit_type !== undefined) data.unit_type = dto.unit_type || null
     if (dto.nightly_rate !== undefined) data.nightly_rate = dto.nightly_rate
@@ -181,21 +184,92 @@ export class StaffService {
 
   // ── Staff ──────────────────────────────────────────────────────────────────
 
+  private mapStaffResponse(row: {
+    id: string
+    name: string
+    role: string | null
+    is_active: boolean
+    max_concurrent_slots: number
+    max_daily_bookings: number | null
+    staff_services?: Array<{
+      service_id: string
+      service: { id: string; name: string; duration_min: number; price: number | null }
+    }>
+    services?: Array<{ id: string; name: string; duration_min: number; price: number | null }>
+    _count?: { bookings: number }
+  }) {
+    const fromLinks = row.staff_services?.map(l => l.service).filter(Boolean) ?? []
+    const services = fromLinks.length > 0 ? fromLinks : (row.services ?? [])
+    return {
+      id: row.id,
+      name: row.name,
+      role: row.role,
+      is_active: row.is_active,
+      max_concurrent_slots: row.max_concurrent_slots,
+      max_daily_bookings: row.max_daily_bookings,
+      service_ids: row.staff_services?.map(l => l.service_id) ?? services.map(s => s.id),
+      services,
+      _count: row._count,
+    }
+  }
+
   async listStaff(userId: string, merchantId?: string) {
     const merchant = await this.resolveMerchant(userId, merchantId)
     this.assertStaffPlan(merchant)
-    return this.prisma.merchantStaff.findMany({
+    const now = new Date()
+    const rows = await this.prisma.merchantStaff.findMany({
       where: { merchant_id: merchant.id },
-      orderBy: { name: 'asc' },
+      orderBy: [{ is_active: 'desc' }, { name: 'asc' }],
+      include: {
+        staff_services: {
+          include: {
+            service: {
+              select: {
+                id: true,
+                name: true,
+                duration_min: true,
+                price: true,
+                is_active: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            bookings: {
+              where: {
+                status: { in: ['PENDING', 'CONFIRMED'] },
+                booked_at: { gte: now },
+              },
+            },
+          },
+        },
+      },
     })
+    return rows.map(r => this.mapStaffResponse({
+      ...r,
+      staff_services: r.staff_services.filter(
+        l => l.service?.is_active !== false,
+      ) as Array<{
+        service_id: string
+        service: { id: string; name: string; duration_min: number; price: number | null }
+      }>,
+    }))
   }
 
   async createStaff(userId: string, dto: CreateStaffDto, merchantId?: string) {
     const merchant = await this.resolveMerchant(userId, merchantId)
     this.assertStaffPlan(merchant)
-    return this.prisma.merchantStaff.create({
-      data: { merchant_id: merchant.id, name: dto.name, role: dto.role },
+    const row = await this.prisma.merchantStaff.create({
+      data: {
+        merchant_id: merchant.id,
+        name: dto.name,
+        role: dto.role,
+        max_concurrent_slots: dto.max_concurrent_slots ?? 1,
+        max_daily_bookings: dto.max_daily_bookings ?? null,
+      },
     })
+    return this.mapStaffResponse(row)
   }
 
   async updateStaff(
@@ -208,15 +282,70 @@ export class StaffService {
     this.assertStaffPlan(merchant)
     const row = await this.prisma.merchantStaff.findFirst({ where: { id, merchant_id: merchant.id } })
     if (!row) throw new NotFoundException('Membre introuvable')
-    return this.prisma.merchantStaff.update({ where: { id }, data: dto })
+    const updated = await this.prisma.merchantStaff.update({ where: { id }, data: dto })
+    const list = await this.listStaff(userId, merchantId)
+    return list.find(s => s.id === updated.id) ?? this.mapStaffResponse(updated)
+  }
+
+  async setStaffServices(
+    userId: string,
+    staffId: string,
+    dto: SetStaffServicesDto,
+    merchantId?: string,
+  ) {
+    const merchant = await this.resolveMerchant(userId, merchantId)
+    this.assertStaffPlan(merchant)
+    const staff = await this.prisma.merchantStaff.findFirst({
+      where: { id: staffId, merchant_id: merchant.id },
+    })
+    if (!staff) throw new NotFoundException('Membre introuvable')
+
+    const uniqueIds = [...new Set(dto.service_ids)]
+    if (uniqueIds.length > 0) {
+      const valid = await this.prisma.merchantService.findMany({
+        where: { merchant_id: merchant.id, id: { in: uniqueIds }, is_active: true },
+        select: { id: true },
+      })
+      if (valid.length !== uniqueIds.length) {
+        throw new BadRequestException('Une ou plusieurs prestations sont invalides')
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.merchantStaffService.deleteMany({ where: { staff_id: staffId } }),
+      ...(uniqueIds.length > 0
+        ? [
+            this.prisma.merchantStaffService.createMany({
+              data: uniqueIds.map(service_id => ({ staff_id: staffId, service_id })),
+            }),
+          ]
+        : []),
+    ])
+
+    const list = await this.listStaff(userId, merchantId)
+    return list.find(s => s.id === staffId)!
   }
 
   async deleteStaff(userId: string, id: string, merchantId?: string) {
     const merchant = await this.resolveMerchant(userId, merchantId)
     this.assertStaffPlan(merchant)
-    const row = await this.prisma.merchantStaff.findFirst({ where: { id, merchant_id: merchant.id } })
+    const row = await this.prisma.merchantStaff.findFirst({
+      where: { id, merchant_id: merchant.id },
+      include: { _count: { select: { bookings: true } } },
+    })
     if (!row) throw new NotFoundException('Membre introuvable')
-    await this.prisma.merchantStaff.delete({ where: { id } })
+    if (row._count.bookings > 0) {
+      throw new BadRequestException(
+        'Impossible de supprimer : des réservations sont liées à ce membre. Désactivez-le plutôt.',
+      )
+    }
+    await this.prisma.$transaction([
+      this.prisma.merchantService.updateMany({
+        where: { staff_id: id, merchant_id: merchant.id },
+        data: { staff_id: null },
+      }),
+      this.prisma.merchantStaff.delete({ where: { id } }),
+    ])
     return { success: true }
   }
 
@@ -238,10 +367,12 @@ export class StaffService {
     const kind = dto.service_kind ?? this.defaultServiceKind(merchant.category.slug)
     const nightlyRate = dto.nightly_rate ?? (kind === 'ROOM_TYPE' ? dto.price : undefined)
     const price = dto.price ?? nightlyRate
+    const slug = await uniqueMerchantServiceSlug(this.prisma, merchant.id, dto.name)
     return this.prisma.merchantService.create({
       data: {
         merchant_id: merchant.id,
         name: dto.name,
+        slug,
         service_kind: kind,
         description: dto.description,
         duration_min: dto.duration_min ?? this.defaultDuration(kind),
@@ -252,6 +383,8 @@ export class StaffService {
         peak_months: dto.peak_months ?? [],
         min_stay_nights: dto.min_stay_nights ?? 1,
         capacity: dto.capacity,
+        max_guests: dto.max_guests ?? null,
+        surface_sqm: dto.surface_sqm ?? null,
         staff_id: dto.staff_id || null,
         ...this.roomListingData(dto),
       },

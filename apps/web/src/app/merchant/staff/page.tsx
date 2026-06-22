@@ -2,12 +2,18 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/authStore'
+import { getPrestationsModuleHref } from '@/lib/serviceListingConfig'
 
-/** Redirection vers la nouvelle page offres & disponibilités. */
+/** Redirection vers prestations / consultations (onglet équipe inclus). */
 export default function MerchantStaffRedirectPage() {
   const router = useRouter()
+  const { user, activeMerchantId } = useAuthStore()
+
   useEffect(() => {
-    router.replace('/merchant/offerings')
-  }, [router])
+    const merchant = user?.merchants?.find(m => m.id === activeMerchantId)
+    router.replace(`${getPrestationsModuleHref(merchant?.category_slug)}?tab=team`)
+  }, [router, user, activeMerchantId])
+
   return null
 }

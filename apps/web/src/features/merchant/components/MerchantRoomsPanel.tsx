@@ -42,6 +42,7 @@ import {
 } from '@/features/merchant/components/MerchantMediathequeField'
 import { ImageGalleryViewer } from '@/components/ui/ImageGalleryViewer'
 import { BookingPaymentSettingsFields } from '@/features/merchant/components/BookingPaymentSettingsFields'
+import { toBookingSettingsPatch, type MerchantBookingSettings } from '@/lib/bookingSettingsApi'
 
 type Tab = 'rooms' | 'settings' | 'blocks'
 
@@ -57,6 +58,8 @@ interface RoomRow {
   peak_months: number[]
   min_stay_nights: number
   capacity: number | null
+  max_guests: number | null
+  surface_sqm: number | null
   is_active: boolean
   image_urls: string[]
   bedrooms: number | null
@@ -77,16 +80,12 @@ interface BlockRow {
   service?: { id: string; name: string } | null
 }
 
-interface BookingSettings {
+interface BookingSettings extends MerchantBookingSettings {
   max_capacity: number
   slot_duration_min: number
   buffer_min: number
   booking_window_days: number
   auto_confirm: boolean
-  cancellation_policy?: string | null
-  no_show_policy?: string | null
-  require_payment?: boolean
-  deposit_percent?: number
 }
 
 type RoomFormState = {
@@ -98,6 +97,8 @@ type RoomFormState = {
   peak_months: number[]
   min_stay_nights: string
   capacity: string
+  max_guests: string
+  surface_sqm: string
   bedrooms: string
   bathrooms: string
   beds: string
@@ -131,6 +132,8 @@ function normalizeRoom(row: Record<string, unknown>): RoomRow {
       : [],
     min_stay_nights: typeof row.min_stay_nights === 'number' ? row.min_stay_nights : 1,
     capacity: (row.capacity as number | null) ?? null,
+    max_guests: (row.max_guests as number | null) ?? null,
+    surface_sqm: (row.surface_sqm as number | null) ?? null,
     is_active: Boolean(row.is_active ?? true),
     image_urls: asStringArray(row.image_urls),
     bedrooms: (row.bedrooms as number | null) ?? null,
@@ -153,6 +156,8 @@ function emptyRoomForm(isResidence: boolean): RoomFormState {
     peak_months: [],
     min_stay_nights: '1',
     capacity: '1',
+    max_guests: '2',
+    surface_sqm: '',
     bedrooms: isResidence ? '1' : '',
     bathrooms: isResidence ? '1' : '',
     beds: isResidence ? '1' : '',
@@ -174,6 +179,8 @@ function roomToForm(room: RoomRow, isResidence: boolean): RoomFormState {
     peak_months: room.peak_months,
     min_stay_nights: String(room.min_stay_nights ?? 1),
     capacity: String(room.capacity ?? 1),
+    max_guests: room.max_guests != null ? String(room.max_guests) : '',
+    surface_sqm: room.surface_sqm != null ? String(room.surface_sqm) : '',
     bedrooms: room.bedrooms != null ? String(room.bedrooms) : (isResidence ? '1' : ''),
     bathrooms: room.bathrooms != null ? String(room.bathrooms) : (isResidence ? '1' : ''),
     beds: room.beds != null ? String(room.beds) : (isResidence ? '1' : ''),
@@ -185,7 +192,7 @@ function roomToForm(room: RoomRow, isResidence: boolean): RoomFormState {
   }
 }
 
-function buildRoomPayload(form: RoomFormState, isResidence: boolean) {
+function buildRoomPayload(form: RoomFormState) {
   const price = form.price ? Number(form.price) : undefined
   const body: Record<string, unknown> = {
     name: form.name.trim(),
@@ -199,16 +206,16 @@ function buildRoomPayload(form: RoomFormState, isResidence: boolean) {
     peak_months: form.peak_months.length ? form.peak_months : undefined,
     min_stay_nights: Number(form.min_stay_nights) || 1,
     capacity: Number(form.capacity) || 1,
+    max_guests: form.max_guests ? Number(form.max_guests) : undefined,
+    surface_sqm: form.surface_sqm ? Number(form.surface_sqm) : undefined,
     image_urls: form.image_urls.slice(0, MAX_ROOM_IMAGES),
     amenities: form.amenities,
     highlights: form.highlights,
     property_type: form.property_type || undefined,
     unit_type: form.unit_type || undefined,
-  }
-  if (isResidence) {
-    body.bedrooms = Number(form.bedrooms) || 0
-    body.bathrooms = Number(form.bathrooms) || 0
-    body.beds = Number(form.beds) || 0
+    bedrooms: form.bedrooms ? Number(form.bedrooms) : undefined,
+    bathrooms: form.bathrooms ? Number(form.bathrooms) : undefined,
+    beds: form.beds ? Number(form.beds) : undefined,
   }
   return body
 }
@@ -369,7 +376,7 @@ function RoomFormFields({
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <label className="block sm:col-span-2 lg:col-span-1">
           <span className="text-xs font-bold text-slate-500">
-            {isResidence ? 'Voyageurs max' : 'Nombre de chambres (stock)'}
+            {isResidence ? 'Voyageurs max' : 'Stock (chambres identiques)'}
           </span>
           <input
             type="number"
@@ -379,40 +386,65 @@ function RoomFormFields({
             className={`mt-1 ${INPUT}`}
           />
         </label>
-        {isResidence && (
+        {!isResidence && (
           <>
             <label className="block">
-              <span className="text-xs font-bold text-slate-500">Chambres</span>
+              <span className="text-xs font-bold text-slate-500">Voyageurs max</span>
               <input
                 type="number"
-                min={0}
-                value={form.bedrooms}
-                onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))}
+                min={1}
+                placeholder="Ex. 3"
+                value={form.max_guests}
+                onChange={e => setForm(f => ({ ...f, max_guests: e.target.value }))}
                 className={`mt-1 ${INPUT}`}
               />
             </label>
             <label className="block">
-              <span className="text-xs font-bold text-slate-500">Salles de bain</span>
+              <span className="text-xs font-bold text-slate-500">Superficie (m²)</span>
               <input
                 type="number"
-                min={0}
-                value={form.bathrooms}
-                onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))}
-                className={`mt-1 ${INPUT}`}
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-bold text-slate-500">Lits</span>
-              <input
-                type="number"
-                min={0}
-                value={form.beds}
-                onChange={e => setForm(f => ({ ...f, beds: e.target.value }))}
+                min={1}
+                placeholder="Ex. 45"
+                value={form.surface_sqm}
+                onChange={e => setForm(f => ({ ...f, surface_sqm: e.target.value }))}
                 className={`mt-1 ${INPUT}`}
               />
             </label>
           </>
         )}
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Lits</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="Ex. 1"
+            value={form.beds}
+            onChange={e => setForm(f => ({ ...f, beds: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Salles de bain</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="Ex. 1"
+            value={form.bathrooms}
+            onChange={e => setForm(f => ({ ...f, bathrooms: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-bold text-slate-500">Chambres</span>
+          <input
+            type="number"
+            min={0}
+            placeholder={isResidence ? undefined : 'Optionnel'}
+            value={form.bedrooms}
+            onChange={e => setForm(f => ({ ...f, bedrooms: e.target.value }))}
+            className={`mt-1 ${INPUT}`}
+          />
+        </label>
       </div>
 
       <MerchantMediathequeField
@@ -553,7 +585,7 @@ export function MerchantRoomsPanel() {
     const res = await merchantApiFetch('/merchants/me/services', activeMerchantId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildRoomPayload(createForm, isResidence)),
+      body: JSON.stringify(buildRoomPayload(createForm)),
     })
     if (!res.ok) {
       notify.error('Impossible d\'ajouter.')
@@ -572,7 +604,7 @@ export function MerchantRoomsPanel() {
     const res = await merchantApiFetch(`/merchants/me/services/${editingId}`, activeMerchantId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildRoomPayload(editForm, isResidence)),
+      body: JSON.stringify(buildRoomPayload(editForm)),
     })
     if (!res.ok) {
       notify.error('Enregistrement impossible.')
@@ -609,13 +641,26 @@ export function MerchantRoomsPanel() {
   const saveSettings = async () => {
     if (!settings || !activeMerchantId) return
     setSaving(true)
-    await merchantApiFetch('/merchants/me/booking-settings', activeMerchantId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    })
-    setSaving(false)
-    notify.success('Paramètres enregistrés.')
+    try {
+      const res = await merchantApiFetch('/merchants/me/booking-settings', activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toBookingSettingsPatch(settings)),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { message?: string | string[] }
+        const msg = Array.isArray(data.message) ? data.message.join(', ') : (data.message ?? 'Erreur enregistrement')
+        notify.error(msg)
+        return
+      }
+      const updated = (await res.json()) as BookingSettings
+      setSettings(updated)
+      notify.success('Paramètres enregistrés.')
+    } catch {
+      notify.error('Erreur réseau.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const addBlock = async () => {

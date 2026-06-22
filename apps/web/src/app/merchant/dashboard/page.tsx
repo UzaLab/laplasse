@@ -168,22 +168,24 @@ function DashboardContent() {
 
       {/* Phone verification */}
       {phoneVerified === false && (
-        <div className="mb-8 bg-amber-50 border border-amber-200 rounded-[28px] p-6 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shrink-0">
-              <Smartphone size={22} className="text-white" />
+        <div className="mb-8 bg-slate-50 border border-slate-200 rounded-[28px] p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shrink-0">
+              <Smartphone size={18} className="text-slate-500" />
             </div>
             <div>
-              <h3 className="font-extrabold text-amber-900">Vérifiez votre téléphone</h3>
-              <p className="text-amber-700 text-sm">Étape obligatoire pour activer votre fiche.</p>
+              <h3 className="font-bold text-slate-800 text-sm">Téléphone non vérifié</h3>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Recommandé pour sécuriser votre compte — vous pouvez le faire quand vous voulez.
+              </p>
             </div>
           </div>
           <Link
             href="/merchant/verify-phone"
-            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-sm transition-colors shrink-0"
+            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs transition-colors shrink-0"
             style={{ textDecoration: 'none' }}
           >
-            Vérifier →
+            Vérifier
           </Link>
         </div>
       )}

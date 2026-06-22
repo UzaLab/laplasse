@@ -20,6 +20,22 @@ export class CreateStaffDto {
   @IsOptional()
   @IsString()
   role?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  max_concurrent_slots?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  max_daily_bookings?: number
+}
+
+export class SetStaffServicesDto {
+  @IsArray()
+  @IsString({ each: true })
+  service_ids!: string[]
 }
 
 export class CreateServiceDto {
@@ -72,6 +88,16 @@ export class CreateServiceDto {
   @IsInt()
   @Min(1)
   capacity?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  max_guests?: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  surface_sqm?: number
 
   @IsOptional()
   @IsString()

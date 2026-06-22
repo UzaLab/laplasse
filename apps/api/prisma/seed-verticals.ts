@@ -14,6 +14,30 @@ type SeedCtx = {
   productSlugs?: Record<string, string[]>
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'prestation'
+}
+
+async function uniqueServiceSlug(
+  prisma: PrismaClient,
+  merchantId: string,
+  name: string,
+): Promise<string> {
+  const base = slugify(name)
+  let slug = base
+  let n = 1
+  while (await prisma.merchantService.findFirst({ where: { merchant_id: merchantId, slug } })) {
+    slug = `${base}-${n++}`
+  }
+  return slug
+}
+
 const HOTEL_ROOMS: Record<string, Array<{ name: string; nightly: number; capacity: number }>> = {
   'hotel-ivoire-abidjan': [
     { name: 'Chambre Deluxe Lagune', nightly: 185000, capacity: 2 },
@@ -64,7 +88,12 @@ const PHARMACY_SERVICES: Record<string, Array<{ name: string; duration: number; 
 async function upsertBookingSettings(
   prisma: PrismaClient,
   merchantId: string,
-  opts?: { require_payment?: boolean; deposit_percent?: number },
+  opts?: {
+    require_payment?: boolean
+    deposit_percent?: number
+    cancellation_policy?: string
+    no_show_policy?: string
+  },
 ) {
   await prisma.merchantBookingSettings.upsert({
     where: { merchant_id: merchantId },
@@ -76,10 +105,14 @@ async function upsertBookingSettings(
       booking_window_days: 30,
       require_payment: opts?.require_payment ?? false,
       deposit_percent: opts?.deposit_percent ?? 100,
+      cancellation_policy: opts?.cancellation_policy ?? null,
+      no_show_policy: opts?.no_show_policy ?? null,
     },
     update: {
       ...(opts?.require_payment != null ? { require_payment: opts.require_payment } : {}),
       ...(opts?.deposit_percent != null ? { deposit_percent: opts.deposit_percent } : {}),
+      ...(opts?.cancellation_policy != null ? { cancellation_policy: opts.cancellation_policy } : {}),
+      ...(opts?.no_show_policy != null ? { no_show_policy: opts.no_show_policy } : {}),
     },
   })
 }
@@ -156,10 +189,12 @@ async function seedHotelRooms(prisma: PrismaClient, merchantMap: Record<string, 
     })
 
     for (const room of rooms) {
+      const serviceSlug = await uniqueServiceSlug(prisma, merchantId, room.name)
       await prisma.merchantService.create({
         data: {
           merchant_id: merchantId,
           name: room.name,
+          slug: serviceSlug,
           service_kind: 'ROOM_TYPE',
           duration_min: 1440,
           price: room.nightly,
@@ -206,10 +241,12 @@ async function seedBeautyAndFitness(
     })
 
     for (const svc of services) {
+      const serviceSlug = await uniqueServiceSlug(prisma, merchantId, svc.name)
       await prisma.merchantService.create({
         data: {
           merchant_id: merchantId,
           name: svc.name,
+          slug: serviceSlug,
           service_kind: 'APPOINTMENT',
           duration_min: svc.duration,
           price: svc.price,
@@ -218,6 +255,14 @@ async function seedBeautyAndFitness(
       })
     }
     await upsertBookingSettings(prisma, merchantId)
+    if (slug === 'spa-eden-cocody') {
+      await upsertBookingSettings(prisma, merchantId, {
+        require_payment: true,
+        deposit_percent: 30,
+        cancellation_policy: 'Annulation gratuite jusqu\'à 24 h avant le créneau. Passé ce délai, l\'acompte est conservé.',
+        no_show_policy: 'En cas d\'absence sans prévenir, l\'acompte versé n\'est pas remboursé.',
+      })
+    }
   }
 }
 
@@ -231,10 +276,12 @@ async function seedPharmacyConsultations(prisma: PrismaClient, merchantMap: Reco
     })
 
     for (const svc of services) {
+      const serviceSlug = await uniqueServiceSlug(prisma, merchantId, svc.name)
       await prisma.merchantService.create({
         data: {
           merchant_id: merchantId,
           name: svc.name,
+          slug: serviceSlug,
           service_kind: 'CONSULTATION',
           duration_min: svc.duration,
           price: svc.price,

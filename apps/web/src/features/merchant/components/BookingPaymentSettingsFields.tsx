@@ -57,7 +57,7 @@ export function BookingPaymentSettingsFields({
             <span className="text-sm font-bold text-slate-900 w-12 text-right">{depositPercent}%</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">
-            Ex. séjour 100 000 F → {Math.round(100000 * depositPercent / 100).toLocaleString('fr-FR')} F à payer.
+            Ex. prestation 25 000 F → {Math.round(25000 * depositPercent / 100).toLocaleString('fr-FR')} F à payer.
           </p>
         </label>
       )}

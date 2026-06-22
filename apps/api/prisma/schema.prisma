@@ -897,6 +897,7 @@ model MerchantService {
   id            String      @id @default(cuid())
   merchant_id   String
   name          String
+  slug          String
   service_kind  ServiceKind @default(APPOINTMENT)
   description   String?
   duration_min  Int         @default(60)
@@ -907,6 +908,8 @@ model MerchantService {
   peak_months           Json     @default("[]")
   min_stay_nights       Int      @default(1)
   capacity              Int?
+  max_guests            Int?
+  surface_sqm           Int?
   staff_id      String?
   is_active     Boolean     @default(true)
   image_urls    Json        @default("[]")
@@ -923,23 +926,40 @@ model MerchantService {
   staff    MerchantStaff? @relation(fields: [staff_id], references: [id], onDelete: SetNull)
   bookings Booking[]
   blocks   MerchantAvailabilityBlock[]
+  staff_links MerchantStaffService[]
 
+  @@unique([merchant_id, slug])
   @@index([merchant_id])
   @@index([staff_id])
 }
 
-model MerchantStaff {
-  id          String  @id @default(cuid())
-  merchant_id String
-  name        String
-  role        String?
-  is_active   Boolean @default(true)
-  created_at  DateTime @default(now())
+model MerchantStaffService {
+  staff_id   String
+  service_id String
+  created_at DateTime @default(now())
 
-  merchant Merchant                    @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
-  bookings Booking[]
-  services MerchantService[]
-  blocks   MerchantAvailabilityBlock[]
+  staff   MerchantStaff   @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  service MerchantService @relation(fields: [service_id], references: [id], onDelete: Cascade)
+
+  @@id([staff_id, service_id])
+  @@index([service_id])
+}
+
+model MerchantStaff {
+  id                   String   @id @default(cuid())
+  merchant_id          String
+  name                 String
+  role                 String?
+  is_active            Boolean  @default(true)
+  max_concurrent_slots Int      @default(1)
+  max_daily_bookings   Int?
+  created_at           DateTime @default(now())
+
+  merchant      Merchant                    @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  bookings      Booking[]
+  services      MerchantService[]
+  staff_services MerchantStaffService[]
+  blocks        MerchantAvailabilityBlock[]
 
   @@index([merchant_id])
 }

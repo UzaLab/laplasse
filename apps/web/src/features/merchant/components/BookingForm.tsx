@@ -9,8 +9,9 @@ import { BOOKING_PREFILL_EVENT, type BookingPrefillDetail } from '@/lib/bookingP
 import { useAuthStore } from '@/stores/authStore'
 import { useQueryClient } from '@tanstack/react-query'
 import type { BookingConfig } from '@/lib/bookingConfig'
-import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
+import { BOOKING_TYPE_LABELS, formatPrice, staffForService } from '@/lib/bookingConfig'
 import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
+import { computeBookingPaymentPreview, bookingPaymentFootnote } from '@/lib/bookingPaymentDisplay'
 import { useT } from '@/providers/LocaleProvider'
 
 interface BookingFormProps {
@@ -85,6 +86,18 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
       .finally(() => setSlotsLoading(false))
   }, [date, merchantId, form.service_id, form.staff_id, config?.enabled, isRoom])
 
+  const eligibleStaff = useMemo(
+    () => (config ? staffForService(config.staff, form.service_id) : []),
+    [config, form.service_id],
+  )
+
+  useEffect(() => {
+    if (!form.staff_id || !config) return
+    if (!eligibleStaff.some(s => s.id === form.staff_id)) {
+      setForm(f => ({ ...f, staff_id: '' }))
+    }
+  }, [form.staff_id, eligibleStaff, config])
+
   useEffect(() => {
     if (!config || bookingType !== 'ROOM') return
     const roomOptions = (config.room_services?.length ? config.room_services : config.services.filter(
@@ -124,6 +137,12 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
     if (!stay) return null
     return { nights: stay.nights, rate: stay.averageNightly, total: stay.total, breakdown: stay.breakdown }
   }, [config, date, form.check_out_date, form.service_id])
+
+  const servicePaymentPreview = useMemo(() => {
+    if (!config || config.booking_type === 'ROOM') return null
+    const svc = config.services.find(s => s.id === form.service_id)
+    return computeBookingPaymentPreview(svc?.price, config.booking_settings)
+  }, [config, form.service_id])
 
   if (!config) return null
   if (!config.enabled) return null
@@ -297,14 +316,15 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           </select>
         )}
 
-        {resolvedBookingType === 'APPOINTMENT' && config.staff.length > 0 && (
+        {(resolvedBookingType === 'APPOINTMENT' || resolvedBookingType === 'CONSULTATION')
+          && eligibleStaff.length > 0 && (
           <select
             value={form.staff_id}
             onChange={e => setForm(f => ({ ...f, staff_id: e.target.value }))}
             className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
           >
-            <option value="">Prestataire (optionnel)</option>
-            {config.staff.map(s => (
+            <option value="">Prestataire (optionnel — attribution automatique)</option>
+            {eligibleStaff.map(s => (
               <option key={s.id} value={s.id}>{s.name}{s.role ? ` — ${s.role}` : ''}</option>
             ))}
           </select>
@@ -346,7 +366,21 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           )
         )}
 
-        {selectedService?.price != null && (
+        {selectedService?.price != null && selectedService.price > 0 && !isRoom && servicePaymentPreview?.requirePayment && (
+          <div className="rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm">
+            <div className="flex justify-between font-bold text-brand-900">
+              <span>Tarif prestation</span>
+              <span>{formatPrice(servicePaymentPreview.baseAmount)}</span>
+            </div>
+            <div className="flex justify-between text-brand-800 mt-1">
+              <span>À payer maintenant ({servicePaymentPreview.depositPercent} %)</span>
+              <span className="font-extrabold">{formatPrice(servicePaymentPreview.dueNow)}</span>
+            </div>
+          </div>
+        )}
+
+        {selectedService?.price != null && selectedService.price > 0
+          && (!servicePaymentPreview?.requirePayment || isRoom) && (
           <p className="text-sm font-bold text-amber-700 bg-amber-50 rounded-xl px-4 py-2">
             Tarif indicatif : {formatPrice(selectedService.price)}
             {isRoom ? ' / nuit' : ''}
@@ -415,7 +449,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
                     }`}
                   >
                     {s.time}
-                    {s.remaining !== undefined && resolvedBookingType === 'TABLE' && (
+                    {s.remaining !== undefined && s.remaining > 1 && (
                       <span className="text-[10px] ml-1 opacity-70">({s.remaining})</span>
                     )}
                   </button>
@@ -491,6 +525,14 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : config.cta}
         </button>
+
+        <p className="text-center text-xs text-slate-400 font-medium">
+          {bookingPaymentFootnote(
+            isRoom && roomStayTotal
+              ? computeBookingPaymentPreview(roomStayTotal.total, config.booking_settings)
+              : servicePaymentPreview,
+          )}
+        </p>
 
         {!isAuthenticated && (
           <p className="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">

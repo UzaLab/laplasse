@@ -12,6 +12,7 @@ import {
 } from '../common/plan-limits'
 import { OrganizationType } from '../../generated/prisma/client'
 import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
+import { uniqueMerchantSlug } from '../common/slug.util'
 
 const DEFAULT_CITY_BY_COUNTRY: Record<string, string> = {
   CI: 'Abidjan',
@@ -358,12 +359,7 @@ export class MerchantsService {
     const category = await this.prisma.category.findUnique({ where: { slug: data.category_slug } })
     if (!category) throw new BadRequestException('Catégorie introuvable')
 
-    const slug = data.business_name
-      .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      + '-' + Date.now().toString(36)
+    const slug = await uniqueMerchantSlug(this.prisma, data.business_name)
 
     const countryCode = (data.country_code ?? 'CI').toUpperCase()
 

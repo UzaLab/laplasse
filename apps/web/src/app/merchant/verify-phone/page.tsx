@@ -92,8 +92,12 @@ function VerifyPhoneContent() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <Link href="/merchant/dashboard" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-700 mb-6" style={{ textDecoration: 'none' }}>
-          <ChevronLeft size={16} /> Retour
+        <Link
+          href={isNewSignup ? '/merchant/onboarding?new=true' : '/merchant/dashboard'}
+          className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-700 mb-6"
+          style={{ textDecoration: 'none' }}
+        >
+          <ChevronLeft size={16} /> {isNewSignup ? 'Configurer mon établissement' : 'Retour'}
         </Link>
 
         <div className="bg-white border border-slate-100 rounded-[32px] p-8 shadow-xl shadow-slate-200/50">
@@ -110,18 +114,27 @@ function VerifyPhoneContent() {
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900 mb-2">Vérifier votre téléphone</h1>
               <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                Étape obligatoire pour activer votre fiche. Un code à 6 chiffres sera envoyé sur votre numéro WhatsApp/téléphone.
+                Sécurisez votre compte marchand en confirmant votre numéro. Vous pouvez aussi le faire plus tard depuis le tableau de bord.
               </p>
 
               {step === 'send' && (
-                <button
-                  onClick={sendOtp}
-                  disabled={loading}
-                  className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <Smartphone size={18} />}
-                  Envoyer le code OTP
-                </button>
+                <>
+                  <button
+                    onClick={sendOtp}
+                    disabled={loading}
+                    className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <Smartphone size={18} />}
+                    Envoyer le code OTP
+                  </button>
+                  <Link
+                    href={isNewSignup ? '/merchant/onboarding?new=true' : '/merchant/dashboard'}
+                    className="mt-3 block w-full py-3 text-center text-sm font-bold text-slate-500 hover:text-slate-800"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Plus tard
+                  </Link>
+                </>
               )}
 
               {step === 'verify' && (

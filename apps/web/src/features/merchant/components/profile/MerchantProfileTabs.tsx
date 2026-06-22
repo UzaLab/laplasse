@@ -110,10 +110,15 @@ export function MerchantProfileTabs({ merchant }: Props) {
             merchantId={merchant.id}
             merchantSlug={merchant.slug}
             merchantName={merchant.business_name}
+            categorySlug={merchant.category.slug}
           />
         )}
         {activeTab === 'prestations' && (
-          <MerchantOfferingsTab merchantId={merchant.id} categorySlug={merchant.category.slug} />
+          <MerchantOfferingsTab
+            merchantId={merchant.id}
+            categorySlug={merchant.category.slug}
+            merchantSlug={merchant.slug}
+          />
         )}
         {activeTab === 'boutique' && (
           <MerchantProductsSection
