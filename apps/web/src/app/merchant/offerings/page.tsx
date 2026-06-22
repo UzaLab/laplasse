@@ -12,6 +12,7 @@ import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
 import type { BookingConfig, BookingType } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
+import { BookingPaymentSettingsFields } from '@/features/merchant/components/BookingPaymentSettingsFields'
 
 type Tab = 'settings' | 'offers' | 'team' | 'blocks'
 
@@ -51,6 +52,8 @@ interface BookingSettings {
   auto_confirm: boolean
   cancellation_policy?: string | null
   no_show_policy?: string | null
+  require_payment?: boolean
+  deposit_percent?: number
 }
 
 const OFFER_LABELS: Record<BookingType, { title: string; add: string }> = {
@@ -332,6 +335,10 @@ export default function MerchantOfferingsPage() {
                 onChange={e => setSettings(s => s ? { ...s, auto_confirm: e.target.checked } : s)} />
               Confirmation automatique
             </label>
+            <BookingPaymentSettingsFields
+              settings={settings}
+              onChange={patch => setSettings(s => s ? { ...s, ...patch } : s)}
+            />
             <label className="block">
               <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
               <textarea

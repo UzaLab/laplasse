@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Calendar, Loader2, Users, Clock, MapPin } from 'lucide-react'
 import { createMerchantBooking } from '@/lib/bookingApi'
 import { BOOKING_PREFILL_EVENT, type BookingPrefillDetail } from '@/lib/bookingPrefill'
@@ -10,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { BookingConfig } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS, formatPrice } from '@/lib/bookingConfig'
 import { computeStayPricing, getMinStayNights } from '@/lib/roomPricing'
+import { useT } from '@/providers/LocaleProvider'
 
 interface BookingFormProps {
   merchantId: string
@@ -25,6 +27,8 @@ interface Slot {
 export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
   const { user, isAuthenticated } = useAuthStore()
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const t = useT()
   const [config, setConfig] = useState<BookingConfig | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -186,6 +190,14 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         : 'Choisissez une prestation')
       return
     }
+    if (
+      config?.booking_settings?.require_payment
+      && (roomStayTotal?.total || selectedService?.price)
+      && !isAuthenticated
+    ) {
+      setError(t('booking.loginToPay'))
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -213,6 +225,10 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
       if (!res.ok) {
         setError(Array.isArray(data.message) ? data.message.join(', ') : (data.message ?? 'Erreur'))
         setLoading(false)
+        return
+      }
+      if (data.payment_required && data.payment?.id) {
+        router.push(`/bookings/pay?bookingId=${data.id}`)
         return
       }
       setSuccess(true)

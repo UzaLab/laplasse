@@ -41,6 +41,7 @@ import {
   MerchantMediathequeField,
 } from '@/features/merchant/components/MerchantMediathequeField'
 import { ImageGalleryViewer } from '@/components/ui/ImageGalleryViewer'
+import { BookingPaymentSettingsFields } from '@/features/merchant/components/BookingPaymentSettingsFields'
 
 type Tab = 'rooms' | 'settings' | 'blocks'
 
@@ -84,6 +85,8 @@ interface BookingSettings {
   auto_confirm: boolean
   cancellation_policy?: string | null
   no_show_policy?: string | null
+  require_payment?: boolean
+  deposit_percent?: number
 }
 
 type RoomFormState = {
@@ -769,6 +772,10 @@ export function MerchantRoomsPanel() {
             />
             Confirmation automatique
           </label>
+          <BookingPaymentSettingsFields
+            settings={settings}
+            onChange={patch => setSettings(s => s ? { ...s, ...patch } : s)}
+          />
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
             <textarea

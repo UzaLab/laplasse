@@ -64,7 +64,11 @@ export class LoyaltyService {
   }
 
   async earnPoints(userId: string, reason: string, metadata?: Record<string, unknown> | null) {
-    const points = POINTS_TABLE[reason] ?? 0
+    let points = POINTS_TABLE[reason] ?? 0
+    if (reason === 'purchase' || reason === 'booking_payment') {
+      const amount = typeof metadata?.amount === 'number' ? metadata.amount : 0
+      points = amount > 0 ? Math.min(200, Math.max(5, Math.floor(amount / 1000))) : 0
+    }
     if (points === 0) return null
 
     const account = await this.getOrCreateAccount(userId)

@@ -38,6 +38,7 @@ import { AddressesService } from '../addresses/addresses.service'
 import { CreateUserAddressDto, UpdateUserAddressDto } from '../addresses/dto/user-address.dto'
 import { ShopMenuService } from '../shop-menu/shop-menu.service'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
+import { ProductDiscoveryService } from './product-discovery.service'
 
 @Controller()
 export class MarketplaceController {
@@ -47,6 +48,7 @@ export class MarketplaceController {
     private readonly deliveryZones: DeliveryZonesService,
     private readonly addresses: AddressesService,
     private readonly shopMenu: ShopMenuService,
+    private readonly productDiscovery: ProductDiscoveryService,
   ) {}
 
   @Public()
@@ -59,6 +61,88 @@ export class MarketplaceController {
   @Get('marketplace/featured')
   getFeatured() {
     return this.svc.getFeaturedProducts()
+  }
+
+  @Public()
+  @Get('marketplace/recommendations')
+  getRecommendations(
+    @Req() req: RequestWithCountry,
+    @Query('productId') productId?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+  ) {
+    const countryCode = country ?? req.countryCode ?? DEFAULT_COUNTRY
+    return this.productDiscovery.getRecommendations({
+      productId,
+      country: countryCode,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
+  }
+
+  @Public()
+  @Get('marketplace/recently-viewed')
+  getRecentlyViewed(
+    @Req() req: RequestWithCountry,
+    @Query('guestKey') guestKey?: string,
+    @Query('excludeProductId') excludeProductId?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+  ) {
+    const countryCode = country ?? req.countryCode ?? DEFAULT_COUNTRY
+    return this.productDiscovery.getRecentlyViewed({
+      guestKey,
+      country: countryCode,
+      excludeProductId,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('marketplace/recently-viewed/mine')
+  getMyRecentlyViewed(
+    @CurrentUser('id') userId: string,
+    @Req() req: RequestWithCountry,
+    @Query('excludeProductId') excludeProductId?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+  ) {
+    const countryCode = country ?? req.countryCode ?? DEFAULT_COUNTRY
+    return this.productDiscovery.getRecentlyViewed({
+      userId,
+      country: countryCode,
+      excludeProductId,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
+  }
+
+  @Public()
+  @Post('marketplace/products/:productId/view')
+  recordProductView(
+    @Param('productId') productId: string,
+    @Req() req: RequestWithCountry,
+    @Body() body: { guestKey?: string },
+  ) {
+    const countryCode = req.countryCode ?? DEFAULT_COUNTRY
+    return this.productDiscovery.recordView({
+      productId,
+      guestKey: body?.guestKey,
+      country: countryCode,
+    })
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('marketplace/products/:productId/view/mine')
+  recordMyProductView(
+    @Param('productId') productId: string,
+    @CurrentUser('id') userId: string,
+    @Req() req: RequestWithCountry,
+  ) {
+    const countryCode = req.countryCode ?? DEFAULT_COUNTRY
+    return this.productDiscovery.recordView({
+      productId,
+      userId,
+      country: countryCode,
+    })
   }
 
   @Public()

@@ -17,3 +17,11 @@ export class ConfirmSubscriptionPaymentDto {
   @IsIn(['success', 'failure'])
   simulateResult!: 'success' | 'failure'
 }
+
+export class ConfirmBookingPaymentDto {
+  @IsString()
+  paymentId!: string
+
+  @IsIn(['success', 'failure'])
+  simulateResult!: 'success' | 'failure'
+}

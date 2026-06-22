@@ -33,6 +33,9 @@ import {
 import { ProductCard } from '@/features/marketplace/components/ProductCard'
 import { ProductFavoriteButton } from '@/features/marketplace/components/ProductFavoriteButton'
 import { ProductReviewsSection } from '@/features/marketplace/components/ProductReviewsSection'
+import { ProductRecommendations } from '@/features/marketplace/components/ProductRecommendations'
+import { RecentlyViewedProducts } from '@/features/marketplace/components/RecentlyViewedProducts'
+import { recordProductView } from '@/lib/discoveryApi'
 import { ProductHtmlContent } from '@/components/ui/ProductHtmlContent'
 import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
 import { notify } from '@/lib/notify'
@@ -114,6 +117,11 @@ export default function ProductDetailPage() {
 
     return () => { cancelled = true }
   }, [slug, productSlug])
+
+  useEffect(() => {
+    if (!product?.id) return
+    void recordProductView(product.id, isAuthenticated)
+  }, [product?.id, isAuthenticated])
 
   const addToCart = async (redirectToCheckout = false) => {
     if (!isAuthenticated) {
@@ -610,6 +618,13 @@ export default function ProductDetailPage() {
           </div>
         </section>
       )}
+
+      <section className="py-16 bg-slate-50 border-t border-slate-100">
+        <div className={`${PAGE_CONTAINER} space-y-12`}>
+          <RecentlyViewedProducts excludeProductId={product?.id} />
+          <ProductRecommendations productId={product?.id} title="Recommandé pour vous" />
+        </div>
+      </section>
 
       <Footer />
     </div>

@@ -40,6 +40,7 @@ import { SearchService } from '../search/search.service'
 import { ShopCollectionsService } from '../shop-collections/shop-collections.service'
 import { DeliveryService } from '../delivery/delivery.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 
 @Injectable()
 export class MarketplaceService {
@@ -52,6 +53,7 @@ export class MarketplaceService {
     private readonly searchService: SearchService,
     private readonly shopCollections: ShopCollectionsService,
     private readonly deliveryService: DeliveryService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   private shopPublicSelect = {
@@ -1997,6 +1999,11 @@ export class MarketplaceService {
       })
     }
 
+    await this.loyalty.earnPoints(userId, 'purchase', {
+      order_id: order.id,
+      amount: payment.amount,
+    }).catch(() => {})
+
     return {
       status: 'SUCCESS',
       orderId: order.id,
@@ -2075,14 +2082,19 @@ export class MarketplaceService {
     for (const payment of payments) {
       const order = payment.order!
       const ownerId = this.resolveOrderOwnerId(order)
-      if (!ownerId) continue
-      await this.notificationQueue.enqueuePush({
-        userId: ownerId,
-        type: 'order_created',
-        title: 'Nouvelle commande',
-        body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
-        data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
-      })
+      if (ownerId) {
+        await this.notificationQueue.enqueuePush({
+          userId: ownerId,
+          type: 'order_created',
+          title: 'Nouvelle commande',
+          body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
+          data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
+        })
+      }
+      await this.loyalty.earnPoints(userId, 'purchase', {
+        order_id: order.id,
+        amount: payment.amount,
+      }).catch(() => {})
     }
 
     return {

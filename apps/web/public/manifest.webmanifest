@@ -1,0 +1,39 @@
+{
+  "name": "LaPlasse",
+  "short_name": "LaPlasse",
+  "description": "L'excellence locale, à portée de clic.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FAFAFA",
+  "theme_color": "#0f172a",
+  "lang": "fr",
+  "categories": ["shopping", "food", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Marketplace",
+      "url": "/marketplace",
+      "description": "Parcourir les produits"
+    },
+    {
+      "name": "Recherche",
+      "url": "/search",
+      "description": "Trouver un établissement"
+    }
+  ]
+}

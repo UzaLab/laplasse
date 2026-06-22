@@ -16,6 +16,11 @@ import { AuditService } from '../audit/audit.service'
 import { CreateBookingDto, UpdateBookingStatusDto, UpdateMyBookingDto } from './dto/booking.dto'
 import { phoneMatchTail } from '../common/phone-match'
 import { BookingStatus, BookingType } from '../../generated/prisma/client'
+import {
+  computeBookingBaseAmount,
+  computeDepositAmount,
+  generatePaymentReference,
+} from './booking-payment.util'
 
 @Injectable()
 export class BookingsService {
@@ -284,7 +289,37 @@ export class BookingsService {
       staffId: dto.staff_id,
     })
 
-    const autoConfirm = merchant.booking_settings?.auto_confirm && limits.advancedBooking
+    let serviceForPayment = null as Awaited<
+      ReturnType<typeof this.prisma.merchantService.findFirst>
+    > | null
+    if (dto.service_id) {
+      serviceForPayment = await this.prisma.merchantService.findFirst({
+        where: { id: dto.service_id, merchant_id: merchantId, is_active: true },
+      })
+    }
+
+    const settings = merchant.booking_settings
+    const baseAmount = computeBookingBaseAmount(
+      bookingType,
+      serviceForPayment,
+      bookedAt,
+      checkOutAt,
+    )
+    const depositPercent = settings?.deposit_percent ?? 100
+    const paymentAmount = settings?.require_payment
+      ? computeDepositAmount(baseAmount, depositPercent)
+      : 0
+
+    if (paymentAmount > 0 && !userId) {
+      throw new BadRequestException(
+        'Connectez-vous pour finaliser le paiement de votre réservation.',
+      )
+    }
+
+    const autoConfirm =
+      paymentAmount === 0
+      && settings?.auto_confirm
+      && limits.advancedBooking
     const status: BookingStatus = autoConfirm ? 'CONFIRMED' : 'PENDING'
 
     const booking = await this.prisma.booking.create({
@@ -309,6 +344,42 @@ export class BookingsService {
       },
     })
 
+    let paymentPayload: {
+      id: string
+      reference: string
+      amount: number
+      currency: string
+      provider: string
+      instructions: string
+    } | null = null
+
+    if (paymentAmount > 0 && userId) {
+      const payment = await this.prisma.paymentTransaction.create({
+        data: {
+          user_id: userId,
+          merchant_id: merchantId,
+          purpose: 'BOOKING',
+          booking_id: booking.id,
+          amount: paymentAmount,
+          reference: generatePaymentReference(),
+          metadata: {
+            simulator: true,
+            booking_id: booking.id,
+            base_amount: baseAmount,
+            deposit_percent: depositPercent,
+          },
+        },
+      })
+      paymentPayload = {
+        id: payment.id,
+        reference: payment.reference,
+        amount: payment.amount,
+        currency: payment.currency,
+        provider: 'SIMULATOR',
+        instructions: 'Confirmez avec simulateResult success ou failure.',
+      }
+    }
+
     await this.audit.log({
       userId,
       action: 'CREATE',
@@ -329,11 +400,17 @@ export class BookingsService {
       await this.notificationQueue.enqueuePush({
         userId,
         type: 'booking_confirmed',
-        title: status === 'CONFIRMED' ? 'Réservation confirmée' : 'Demande envoyée',
-        body: status === 'CONFIRMED'
-          ? `Votre réservation chez ${merchant.business_name} est confirmée.`
-          : `Votre demande chez ${merchant.business_name} est en attente.`,
-        data: { booking_id: booking.id },
+        title: paymentPayload
+          ? 'Paiement requis'
+          : status === 'CONFIRMED'
+            ? 'Réservation confirmée'
+            : 'Demande envoyée',
+        body: paymentPayload
+          ? `Finalisez le paiement pour confirmer votre réservation chez ${merchant.business_name}.`
+          : status === 'CONFIRMED'
+            ? `Votre réservation chez ${merchant.business_name} est confirmée.`
+            : `Votre demande chez ${merchant.business_name} est en attente.`,
+        data: { booking_id: booking.id, payment_id: paymentPayload?.id },
       })
     }
 
@@ -350,7 +427,14 @@ export class BookingsService {
       })
     }
 
-    return booking
+    return {
+      ...booking,
+      payment_required: Boolean(paymentPayload),
+      payment: paymentPayload,
+      pricing: baseAmount > 0
+        ? { base_amount: baseAmount, deposit_percent: depositPercent, due_now: paymentAmount }
+        : null,
+    }
   }
 
   async listMerchantBookings(userId: string, merchantId?: string, status?: BookingStatus) {

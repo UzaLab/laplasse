@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator'
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator'
 import { ServiceKind } from '../../../generated/prisma/client'
 
 export class UpdateBookingSettingsDto {
@@ -33,6 +33,16 @@ export class UpdateBookingSettingsDto {
   @IsOptional()
   @IsString()
   no_show_policy?: string
+
+  @IsOptional()
+  @IsBoolean()
+  require_payment?: boolean
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  deposit_percent?: number
 }
 
 export class CreateAvailabilityBlockDto {

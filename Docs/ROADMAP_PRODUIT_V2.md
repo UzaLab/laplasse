@@ -1511,7 +1511,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | **Copy marque multipays** | ✅ | `lib/brandCopy.ts` — « excellence locale », plus de focus CI/Abidjan en UI globale |
 | **Profil dashboard — prochaine résa** | ✅ | Snippet `/profile` via `getBookingWhenDisplay`, `getBookingCardMeta`, `getBookingPricing` |
 | **Calendrier visuel marchand bookings** | ✅ | `MerchantBookingAgenda` — toggle Liste/Agenda sur `/merchant/bookings` |
-| **Paiement à la réservation** | ⏳ | Bloqué intégration MM (§5 P0 #1) |
+| **Paiement à la réservation** | ✅ simulateur | Acompte via `PaymentPurpose.BOOKING` — MM réel ⏳ |
 
 ### Phase 9 — Dettes techniques, M1 sous-domaines & profondeur marketplace (juin 2026)
 
@@ -1570,7 +1570,8 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 |---------|--------|
 | **Paiement** | Remboursement automatique MM (après P0 #1) |
 | **Delivery** | GPS livreur temps réel · Partenaires logistiques |
-| **Discovery** | Recommandations · Recently viewed · Fidélité achats |
+| **Discovery** | Recommandations · Recently viewed · Fidélité achats | ✅ Sprint 17 |
+| **UX transverse** | i18n FR/EN · PWA offline-lite | ✅ MVP Sprint 17 |
 | **Ops** | ~~Export CSV commandes~~ ✅ · Multi-langue FR/EN · PWA offline-lite |
 | **Pharmacie** | Upload ordonnance · Catalogue OTC |
 | **Admin** | `/admin/delivery` stats zones · `/admin/countries` |
@@ -1582,26 +1583,27 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 
 ---
 
+### Phase 17 — Paiement résa simulateur, discovery, i18n & PWA (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Paiement réservation (simulateur)** | ✅ | `BOOKING` PaymentPurpose, `booking_id`, settings `require_payment`/`deposit_percent`, `/bookings/pay`, `BookingForm` redirect |
+| **Recommandations produits** | ✅ | `ProductDiscoveryService`, `GET /marketplace/recommendations`, `ProductRecommendations` |
+| **Recently viewed** | ✅ | `ProductView`, track view API, `RecentlyViewedProducts`, guest key + compte |
+| **Fidélité achats** | ✅ | `purchase` + `booking_payment` points dynamiques (montant / 1000 FCFA) |
+| **i18n FR/EN** | ✅ MVP | `src/i18n/`, `LocaleProvider`, `LanguageSwitcher`, nav + PWA + booking |
+| **PWA offline-lite** | ✅ | `manifest.webmanifest`, `sw.js`, `PwaRegister`, `PwaInstallPrompt`, `/offline.html` |
+
 ### Journal — Prochains sprints (backlog ordonné)
 
 | Sprint | Slice | Priorité | Description |
 |--------|-------|----------|-------------|
-| **10** | Modificateurs menu | ✅ | `MenuModifierGroup/Option`, sheet client, panier + commande |
-| **10** | ETA préparation food | ✅ | `food_prep_minutes` marchand, `estimated_prep_minutes` panier/checkout |
-| **11** | Analytics ecommerce marchand | ✅ | `GET /orders/merchant/analytics`, `/merchant/shop/analytics` |
-| **11** | Critères Burkina ready | ✅ | Geo Ouaga/Bobo enrichi, `scripts/smoke-burkina-ready.sh` |
-| **12** | Order again | ✅ | `POST /orders/:id/reorder`, bouton profil + liste |
-| **12** | Split livraison multi-boutiques | ✅ | `shop_deliveries` checkout, `ShopSplitDeliveryForm` |
-| **13** | Réservations invité → compte | ✅ | `linkGuestBookingsByPhone`, `POST /bookings/mine/claim`, auto à la connexion |
-| **13** | Rappels booking WhatsApp/SMS | ✅ | `processDueBookingReminders`, cron `POST /internal/cron/booking-reminders` |
-| **13** | Funnels PostHog checkout | ✅ | `captureCheckoutStep`, events `/cart` → confirmation |
-| **13** | Politique annulation hôtel | ✅ | `cancellation_policy` settings, affichage `MerchantHotelTab` |
-| **14** | Notifications livraison push | ✅ | `delivery.service` + libellés FR statuts commande |
-| **14** | Export CSV commandes marchand | ✅ | `GET /orders/merchant/export`, bouton `ShopOrdersPanel` |
-| **14** | Politique no-show booking | ✅ | `no_show_policy`, formulaire + fiche publique |
-| **15** | Wizard inscription établissement | ✅ | Catégories API, geo multi-pays, modules par vertical, `country_code` |
-| **15** | Largeurs pages publiques desktop | ✅ | `PUBLIC_NARROW` / `PUBLIC_CONTENT` / `PublicPageHeader` |
-| — | P0 Mobile Money réel | Reporté | Simulation conservée — prérequis prod UEMOA |
+| **17** | Paiement résa simulateur | ✅ | Acompte hôtel 30 %, confirm API, page `/bookings/pay` |
+| **17** | Discovery produits | ✅ | Recommandations + recently viewed |
+| **17** | Fidélité achats | ✅ | Points commande + réservation payée |
+| **17** | i18n FR/EN | ✅ MVP | Cookie `lp_locale`, switcher navbar |
+| **17** | PWA offline-lite | ✅ | SW cache navigation + API marketplace |
+| — | P0 Mobile Money réel | Reporté | Remplacer simulateur — prérequis prod UEMOA |
 | — | Paiement réservation hôtel/RDV | P1 | Après MM réel |
 | — | Remboursement paiement réel | P2 | Après intégration MM |
 | — | GPS livreur | P2 | Carte suivi live |

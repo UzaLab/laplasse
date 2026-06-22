@@ -11,8 +11,11 @@ import { MobileNav } from './MobileNav'
 import { CartDrawer } from './CartDrawer'
 import { CartSync } from './CartSync'
 import { CountrySwitcher } from './CountrySwitcher'
+import { LanguageSwitcher } from './LanguageSwitcher'
+import { useT } from '@/providers/LocaleProvider'
 
 export function Navbar() {
+  const t = useT()
   const [scrolled, setScrolled] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -70,13 +73,13 @@ export function Navbar() {
         {/* Links desktop */}
         <div className="hidden md:flex items-center gap-8 font-semibold text-sm text-slate-500">
           <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            Découvrir
+            {t('nav.discover')}
           </Link>
           <Link href="/marketplace" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            Marketplace
+            {t('nav.marketplace')}
           </Link>
           <Link href="/search" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            Recherche
+            {t('nav.search')}
           </Link>
           <Link href="/merchant/signup" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
             Mon établissement
@@ -85,7 +88,8 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-4">
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-3">
+            <LanguageSwitcher />
             <CountrySwitcher />
           </div>
           <Link

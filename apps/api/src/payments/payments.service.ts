@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
+import { LoyaltyService } from '../loyalty/loyalty.service'
 import { PLAN_PRICES } from '../common/plan-limits'
 import { SubscriptionPlan } from '../../generated/prisma/client'
+import { generatePaymentReference } from '../bookings/booking-payment.util'
 
 const PLAN_ORDER: SubscriptionPlan[] = ['FREE', 'STARTER', 'GROWTH', 'PREMIUM']
 
@@ -16,6 +18,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationQueue: NotificationQueueService,
+    private readonly loyalty: LoyaltyService,
   ) {}
 
   private async resolveMerchant(userId: string, merchantId?: string) {
@@ -27,7 +30,7 @@ export class PaymentsService {
   }
 
   private generateReference() {
-    return `LP-SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    return generatePaymentReference()
   }
 
   async initSubscription(userId: string, plan: SubscriptionPlan, merchantId?: string) {
@@ -160,5 +163,122 @@ export class PaymentsService {
         paid_at: true,
       },
     })
+  }
+
+  async getBookingPayment(userId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findFirst({
+      where: { id: bookingId, user_id: userId },
+      include: {
+        merchant: { select: { business_name: true } },
+        payment: true,
+      },
+    })
+    if (!booking) throw new NotFoundException('Réservation introuvable')
+    if (!booking.payment) {
+      return { payment_required: false, booking_id: booking.id }
+    }
+    if (booking.payment.status !== 'PENDING') {
+      throw new BadRequestException('Aucun paiement en attente pour cette réservation')
+    }
+    return {
+      payment_required: true,
+      booking_id: booking.id,
+      merchant_name: booking.merchant.business_name,
+      payment: {
+        id: booking.payment.id,
+        reference: booking.payment.reference,
+        amount: booking.payment.amount,
+        currency: booking.payment.currency,
+        provider: 'SIMULATOR',
+        instructions: 'Confirmez avec simulateResult success ou failure.',
+      },
+    }
+  }
+
+  async confirmBookingPayment(
+    userId: string,
+    bookingId: string,
+    paymentId: string,
+    simulateResult: 'success' | 'failure',
+  ) {
+    const payment = await this.prisma.paymentTransaction.findFirst({
+      where: {
+        id: paymentId,
+        user_id: userId,
+        purpose: 'BOOKING',
+        booking_id: bookingId,
+      },
+      include: {
+        booking: {
+          include: {
+            merchant: { select: { id: true, business_name: true, owner_id: true } },
+          },
+        },
+      },
+    })
+    if (!payment?.booking) throw new NotFoundException('Paiement introuvable')
+    if (payment.status !== 'PENDING') {
+      throw new BadRequestException('Ce paiement a déjà été traité')
+    }
+
+    if (simulateResult === 'failure') {
+      await this.prisma.paymentTransaction.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            ...(payment.metadata as object ?? {}),
+            failed_reason: 'simulator_declined',
+          },
+        },
+      })
+      return { status: 'FAILED', message: 'Paiement refusé par le simulateur.' }
+    }
+
+    const now = new Date()
+    const booking = payment.booking
+    const shouldConfirm = booking.status === 'PENDING'
+
+    await this.prisma.$transaction([
+      this.prisma.paymentTransaction.update({
+        where: { id: payment.id },
+        data: { status: 'SUCCESS', paid_at: now },
+      }),
+      ...(shouldConfirm
+        ? [
+            this.prisma.booking.update({
+              where: { id: booking.id },
+              data: { status: 'CONFIRMED' },
+            }),
+          ]
+        : []),
+    ])
+
+    await this.loyalty.earnPoints(userId, 'booking_payment', {
+      booking_id: booking.id,
+      amount: payment.amount,
+    }).catch(() => {})
+
+    await this.notificationQueue.enqueuePush({
+      userId: booking.merchant.owner_id,
+      type: 'booking_paid',
+      title: 'Réservation payée',
+      body: `${booking.guest_name} — ${payment.amount.toLocaleString('fr-CI')} FCFA reçus (simulateur).`,
+      data: { booking_id: booking.id, payment_id: payment.id },
+    })
+
+    await this.notificationQueue.enqueuePush({
+      userId,
+      type: 'booking_payment_success',
+      title: 'Paiement confirmé',
+      body: `Votre réservation chez ${booking.merchant.business_name} est confirmée.`,
+      data: { booking_id: booking.id, payment_id: payment.id },
+    })
+
+    return {
+      status: 'SUCCESS',
+      booking_id: booking.id,
+      message: 'Paiement simulé avec succès. Votre réservation est confirmée.',
+    }
   }
 }

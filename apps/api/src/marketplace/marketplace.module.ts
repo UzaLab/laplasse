@@ -13,11 +13,13 @@ import { ShopCollectionsModule } from '../shop-collections/shop-collections.modu
 import { ShopMenuModule } from '../shop-menu/shop-menu.module'
 import { ProductReviewsModule } from '../product-reviews/product-reviews.module'
 import { DeliveryModule } from '../delivery/delivery.module'
+import { LoyaltyModule } from '../loyalty/loyalty.module'
+import { ProductDiscoveryService } from './product-discovery.service'
 
 @Module({
-  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule],
+  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule, LoyaltyModule],
   controllers: [MarketplaceController],
-  providers: [MarketplaceService, ProductCategoriesService],
-  exports: [MarketplaceService, ProductCategoriesService],
+  providers: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],
+  exports: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],
 })
 export class MarketplaceModule {}

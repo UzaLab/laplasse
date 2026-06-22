@@ -61,7 +61,11 @@ const PHARMACY_SERVICES: Record<string, Array<{ name: string; duration: number; 
   ],
 }
 
-async function upsertBookingSettings(prisma: PrismaClient, merchantId: string) {
+async function upsertBookingSettings(
+  prisma: PrismaClient,
+  merchantId: string,
+  opts?: { require_payment?: boolean; deposit_percent?: number },
+) {
   await prisma.merchantBookingSettings.upsert({
     where: { merchant_id: merchantId },
     create: {
@@ -70,8 +74,13 @@ async function upsertBookingSettings(prisma: PrismaClient, merchantId: string) {
       buffer_min: 15,
       max_capacity: 20,
       booking_window_days: 30,
+      require_payment: opts?.require_payment ?? false,
+      deposit_percent: opts?.deposit_percent ?? 100,
     },
-    update: {},
+    update: {
+      ...(opts?.require_payment != null ? { require_payment: opts.require_payment } : {}),
+      ...(opts?.deposit_percent != null ? { deposit_percent: opts.deposit_percent } : {}),
+    },
   })
 }
 
@@ -160,7 +169,7 @@ async function seedHotelRooms(prisma: PrismaClient, merchantMap: Record<string, 
         },
       })
     }
-    await upsertBookingSettings(prisma, merchantId)
+    await upsertBookingSettings(prisma, merchantId, { require_payment: true, deposit_percent: 30 })
   }
   await seedLodgingHours(prisma, merchantMap)
 }

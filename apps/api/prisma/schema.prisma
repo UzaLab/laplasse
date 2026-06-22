@@ -131,6 +131,7 @@ model User {
   shops            Shop[]
   promotion_redemptions PromotionRedemption[]
   addresses        UserAddress[]
+  product_views    ProductView[]
 
   @@index([email])
   @@index([phone])
@@ -818,6 +819,7 @@ enum PaymentPurpose {
   SUBSCRIPTION
   AD_CAMPAIGN
   ORDER
+  BOOKING
 }
 
 model PaymentTransaction {
@@ -829,6 +831,7 @@ model PaymentTransaction {
   provider    PaymentProvider    @default(SIMULATOR)
   plan        SubscriptionPlan?
   order_id    String?            @unique
+  booking_id  String?            @unique
   amount      Int
   currency    String             @default("XOF")
   status      PaymentStatus      @default(PENDING)
@@ -841,6 +844,7 @@ model PaymentTransaction {
   merchant Merchant? @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
   shop     Shop?     @relation(fields: [shop_id], references: [id], onDelete: SetNull)
   order    Order?    @relation(fields: [order_id], references: [id], onDelete: SetNull)
+  booking  Booking?  @relation(fields: [booking_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
   @@index([merchant_id])
@@ -881,6 +885,8 @@ model MerchantBookingSettings {
   buffer_min            Int     @default(15)
   booking_window_days   Int     @default(30)
   auto_confirm          Boolean @default(false)
+  require_payment       Boolean @default(false)
+  deposit_percent       Int     @default(100)
   cancellation_policy   String?
   no_show_policy        String?
 
@@ -982,6 +988,7 @@ model Booking {
   user     User?            @relation(fields: [user_id], references: [id], onDelete: SetNull)
   service  MerchantService? @relation(fields: [service_id], references: [id], onDelete: SetNull)
   staff    MerchantStaff?   @relation(fields: [staff_id], references: [id], onDelete: SetNull)
+  payment  PaymentTransaction?
 
   @@index([merchant_id])
   @@index([user_id])
@@ -1246,10 +1253,27 @@ model Product {
   favorites   ProductFavorite[]
   collections ProductCollection[]
   reviews     ProductReview[]
+  views       ProductView[]
 
   @@unique([shop_id, slug])
   @@index([shop_id, status])
   @@index([category_id])
+}
+
+model ProductView {
+  id         String   @id @default(cuid())
+  product_id String
+  user_id    String?
+  guest_key  String?
+  country    String   @default("CI")
+  viewed_at  DateTime @default(now())
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, viewed_at])
+  @@index([guest_key, viewed_at])
+  @@index([product_id])
 }
 
 model ProductImage {

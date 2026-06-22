@@ -26,6 +26,8 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { useCartStore } from '@/stores/cartStore'
 import { ProductCard } from './ProductCard'
 import { SpotlightShopsCarousel } from './SpotlightShopsCarousel'
+import { ProductRecommendations } from './ProductRecommendations'
+import { RecentlyViewedProducts } from './RecentlyViewedProducts'
 import { BRAND_MARKETPLACE_INTRO } from '@/lib/brandCopy'
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
@@ -349,6 +351,10 @@ export function MarketplacePageClient() {
       </header>
 
       <main className={`${PAGE_CONTAINER} py-8 md:py-12 pb-28 lg:pb-12`}>
+        <div className="space-y-10 mb-10">
+          <RecentlyViewedProducts />
+          <ProductRecommendations limit={8} />
+        </div>
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-28">
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">

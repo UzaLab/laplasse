@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import { Outfit } from 'next/font/google'
 import { QueryProvider } from '@/providers/QueryProvider'
 import { PostHogProvider } from '@/providers/PostHogProvider'
+import { LocaleProvider } from '@/providers/LocaleProvider'
 import { AuthBootstrap } from '@/components/AuthBootstrap'
 import { AppToaster } from '@/components/ui/AppToaster'
+import { PwaRegister } from '@/components/PwaRegister'
+import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
 import './globals.css'
 import {
   BRAND_DESCRIPTION,
@@ -52,6 +55,12 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true },
   },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: BRAND_NAME,
+    statusBarStyle: 'default',
+  },
 }
 
 export default function RootLayout({
@@ -59,12 +68,19 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr" className={outfit.variable}>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon.svg" />
+      </head>
       <body>
         <PostHogProvider>
           <QueryProvider>
-            <AuthBootstrap />
-            <AppToaster />
-            {children}
+            <LocaleProvider>
+              <PwaRegister />
+              <AuthBootstrap />
+              <AppToaster />
+              {children}
+              <PwaInstallPrompt />
+            </LocaleProvider>
           </QueryProvider>
         </PostHogProvider>
       </body>
