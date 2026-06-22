@@ -230,14 +230,6 @@ function RegisterContent() {
   )
 }
 
-function RegisterContent() {
-  return (
-    <Suspense fallback={null}>
-      <RegisterContent />
-    </Suspense>
-  )
-}
-
 export default function RegisterPage() {
   return (
     <SearchParamsWrapper>

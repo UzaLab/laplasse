@@ -439,7 +439,7 @@ function MerchantDashboard() {
   )
 }
 
-export default function MerchantDashboard() {
+export default function MerchantDashboardPage() {
   return (
     <SearchParamsWrapper>
       <MerchantDashboard />

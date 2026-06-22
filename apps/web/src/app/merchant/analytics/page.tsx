@@ -225,20 +225,6 @@ function MerchantAnalyticsContent() {
   )
 }
 
-function MerchantAnalyticsContent() {
-  return (
-    <Suspense fallback={
-      <MerchantShell>
-        <div className="flex items-center justify-center py-24">
-          <Loader2 size={28} className="animate-spin text-slate-300" />
-        </div>
-      </MerchantShell>
-    }>
-      <MerchantAnalyticsContent />
-    </Suspense>
-  )
-}
-
 export default function MerchantAnalyticsPage() {
   return (
     <SearchParamsWrapper>
