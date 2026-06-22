@@ -4,17 +4,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { getCheckoutConfirmation, getCheckoutSession } from '@/lib/checkoutSession'
+import { useT } from '@/providers/LocaleProvider'
 
 interface CheckoutStepsProps {
   current: 1 | 2 | 3 | 4
 }
-
-const STEPS = [
-  { n: 1 as const, label: 'Panier', href: '/cart' },
-  { n: 2 as const, label: 'Livraison', href: '/checkout' },
-  { n: 3 as const, label: 'Paiement', href: '/checkout/payment' },
-  { n: 4 as const, label: 'Confirmation', href: '/checkout/confirmation' },
-]
 
 function canNavigateToStep(step: number, current: number): boolean {
   if (step <= 2) return step <= current
@@ -23,20 +17,28 @@ function canNavigateToStep(step: number, current: number): boolean {
   return false
 }
 
-function stepHref(step: typeof STEPS[number], current: number): string {
-  if (step.n === 4) {
-    const conf = getCheckoutConfirmation()
-    if (conf) {
-      const ids = conf.orderIds.join(',')
-      return `/checkout/confirmation?status=${conf.status}&orderIds=${ids}`
+export function CheckoutSteps({ current }: CheckoutStepsProps) {
+  const router = useRouter()
+  const t = useT()
+
+  const STEPS = [
+    { n: 1 as const, label: t('checkout.stepCart'), href: '/cart' },
+    { n: 2 as const, label: t('checkout.stepDelivery'), href: '/checkout' },
+    { n: 3 as const, label: t('checkout.stepPayment'), href: '/checkout/payment' },
+    { n: 4 as const, label: t('checkout.stepConfirmation'), href: '/checkout/confirmation' },
+  ]
+
+  function stepHref(step: typeof STEPS[number], cur: number): string {
+    if (step.n === 4) {
+      const conf = getCheckoutConfirmation()
+      if (conf) {
+        const ids = conf.orderIds.join(',')
+        return `/checkout/confirmation?status=${conf.status}&orderIds=${ids}`
+      }
+      return step.href
     }
     return step.href
   }
-  return step.href
-}
-
-export function CheckoutSteps({ current }: CheckoutStepsProps) {
-  const router = useRouter()
 
   return (
     <div className="pt-28 pb-8 bg-white border-b border-slate-100">

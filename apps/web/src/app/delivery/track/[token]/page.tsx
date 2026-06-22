@@ -6,6 +6,7 @@ import { Loader2, MapPin, Truck, Package, CheckCircle2 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { fetchPublicJson } from '@/lib/marketplaceApi'
+import { DeliveryMapPanel } from '@/features/delivery/components/DeliveryMapPanel'
 
 interface TrackingData {
   tracking_token: string
@@ -16,6 +17,8 @@ interface TrackingData {
   assigned_at: string | null
   picked_up_at: string | null
   delivered_at: string | null
+  courier_latitude: number | null
+  courier_longitude: number | null
   courier: { full_name: string; phone: string | null; vehicle: string | null } | null
   order: {
     id: string
@@ -116,6 +119,14 @@ export default function DeliveryTrackPage() {
                 )}
               </div>
             </div>
+
+            {data.courier_latitude != null && data.courier_longitude != null && (
+              <DeliveryMapPanel
+                latitude={data.courier_latitude}
+                longitude={data.courier_longitude}
+                status={data.status}
+              />
+            )}
 
             {data.status === 'DELIVERED' && (
               <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">

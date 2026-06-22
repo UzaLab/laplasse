@@ -28,6 +28,7 @@ import { ProductCard } from './ProductCard'
 import { SpotlightShopsCarousel } from './SpotlightShopsCarousel'
 import { ProductRecommendations } from './ProductRecommendations'
 import { RecentlyViewedProducts } from './RecentlyViewedProducts'
+import { useT } from '@/providers/LocaleProvider'
 import { BRAND_MARKETPLACE_INTRO } from '@/lib/brandCopy'
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc'
@@ -54,6 +55,7 @@ function MarketplaceFiltersPanel({
   priceFilter,
   onPriceFilterChange,
   priceCeiling,
+  t,
 }: {
   search: string
   onSearchChange: (v: string) => void
@@ -66,6 +68,7 @@ function MarketplaceFiltersPanel({
   priceFilter: number
   onPriceFilterChange: (v: number) => void
   priceCeiling: number
+  t: (key: string) => string
 }) {
   const flatCategories = flattenCategories(categories)
 
@@ -73,13 +76,13 @@ function MarketplaceFiltersPanel({
     <>
       <div className="mb-8">
         <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
-          Recherche
+          {t('marketplace.searchLabel')}
         </h4>
         <input
           type="text"
           value={search}
           onChange={e => onSearchChange(e.target.value)}
-          placeholder="Produit, marque…"
+          placeholder={t('marketplace.searchPlaceholder')}
           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
         />
       </div>
@@ -89,7 +92,7 @@ function MarketplaceFiltersPanel({
           <div className="h-px w-full bg-slate-100 mb-8" />
           <div className="mb-8">
             <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
-              Catégories
+              {t('marketplace.categories')}
             </h4>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               <label className="flex items-center gap-3 cursor-pointer group">
@@ -103,7 +106,7 @@ function MarketplaceFiltersPanel({
                   }`}
                 />
                 <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
-                  Toutes
+                  {t('marketplace.allCategories')}
                 </span>
               </label>
               {flatCategories.map(cat => (
@@ -136,7 +139,7 @@ function MarketplaceFiltersPanel({
           <div className="h-px w-full bg-slate-100 mb-8" />
           <div className="mb-8">
             <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
-              Boutiques
+              {t('marketplace.shops')}
             </h4>
             <div className="space-y-3 max-h-48 overflow-y-auto">
               {merchants.map(m => {
@@ -172,7 +175,7 @@ function MarketplaceFiltersPanel({
 
       <div>
         <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
-          Fourchette de prix
+          {t('marketplace.maxPrice')}
         </h4>
         <div className="mb-4">
           <input
@@ -200,6 +203,7 @@ function MarketplaceFiltersPanel({
 
 export function MarketplacePageClient() {
   const router = useRouter()
+  const t = useT()
   const { isAuthenticated } = useAuthReady()
   const addItem = useCartStore(s => s.addItem)
   const [products, setProducts] = useState<MarketplaceCatalogProduct[]>([])
@@ -328,10 +332,10 @@ export function MarketplacePageClient() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-10">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 text-brand-600 text-xs font-bold uppercase tracking-widest mb-4 border border-brand-100">
-                <ShoppingBag size={14} /> Click & Collect ou Livraison
+                <ShoppingBag size={14} /> {t('marketplace.badge')}
               </div>
               <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
-                La Marketplace LaPlasse
+                {t('marketplace.title')}
               </h1>
               <p className="text-lg text-slate-500">
                 {BRAND_MARKETPLACE_INTRO}
@@ -342,7 +346,7 @@ export function MarketplacePageClient() {
           {spotlight.length > 0 && (
             <div className="mb-2">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
-                Boutiques à la une
+                {t('marketplace.spotlight')}
               </h3>
               <SpotlightShopsCarousel shops={spotlight} />
             </div>
@@ -353,21 +357,21 @@ export function MarketplacePageClient() {
       <main className={`${PAGE_CONTAINER} py-8 md:py-12 pb-28 lg:pb-12`}>
         <div className="space-y-10 mb-10">
           <RecentlyViewedProducts />
-          <ProductRecommendations limit={8} />
+          <ProductRecommendations />
         </div>
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-28">
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                  <SlidersHorizontal size={20} className="text-brand-500" /> Filtres
+                  <SlidersHorizontal size={20} className="text-brand-500" /> {t('marketplace.filters')}
                 </h3>
                 <button
                   type="button"
                   onClick={clearFilters}
                   className="text-xs font-bold text-slate-400 hover:text-slate-900"
                 >
-                  Effacer
+                  {t('marketplace.clearFilters')}
                 </button>
               </div>
               <MarketplaceFiltersPanel
@@ -382,6 +386,7 @@ export function MarketplacePageClient() {
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
                 priceCeiling={priceCeiling}
+                t={t}
               />
             </div>
           </aside>
@@ -398,15 +403,15 @@ export function MarketplacePageClient() {
 
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-end items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
               <div className="flex items-center justify-between sm:justify-end gap-3 text-sm w-full sm:w-auto">
-                <span className="text-slate-400 font-medium shrink-0">Trier par :</span>
+                <span className="text-slate-400 font-medium shrink-0">{t('marketplace.sortBy')}</span>
                 <select
                   value={sort}
                   onChange={e => setSort(e.target.value as SortOption)}
                   className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400"
                 >
-                  <option value="newest">Nouveautés</option>
-                  <option value="price_asc">Prix croissant</option>
-                  <option value="price_desc">Prix décroissant</option>
+                  <option value="newest">{t('marketplace.sortNewest')}</option>
+                  <option value="price_asc">{t('marketplace.sortPriceAsc')}</option>
+                  <option value="price_desc">{t('marketplace.sortPriceDesc')}</option>
                 </select>
               </div>
             </div>
@@ -423,10 +428,10 @@ export function MarketplacePageClient() {
                       <Store size={28} className="text-slate-400" />
                     </div>
                     <h3 className="text-lg font-extrabold text-slate-900 mb-2">
-                      Catalogue en cours d&apos;enrichissement
+                      {t('marketplace.emptyCatalogTitle')}
                     </h3>
                     <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
-                      Aucun produit disponible dans votre pays pour le moment. Explorez les établissements ou devenez vendeur.
+                      {t('marketplace.emptyCatalogBody')}
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                       <Link
@@ -434,28 +439,28 @@ export function MarketplacePageClient() {
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-full text-sm font-bold hover:bg-slate-800"
                         style={{ textDecoration: 'none' }}
                       >
-                        <Search size={16} /> Explorer les établissements
+                        <Search size={16} /> {t('marketplace.exploreMerchants')}
                       </Link>
                       <Link
                         href="/merchant/signup"
                         className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-800 rounded-full text-sm font-bold hover:bg-slate-50"
                         style={{ textDecoration: 'none' }}
                       >
-                        <Store size={16} /> Devenir vendeur
+                        <Store size={16} /> {t('marketplace.becomeSeller')}
                       </Link>
                     </div>
                   </>
                 ) : (
                   <>
                     <p className="text-slate-500 font-medium mb-4">
-                      Aucun produit ne correspond à vos filtres.
+                      {t('marketplace.noFilterMatch')}
                     </p>
                     <button
                       type="button"
                       onClick={clearFilters}
                       className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-50 text-brand-700 rounded-full text-sm font-bold hover:bg-brand-100 border border-brand-100"
                     >
-                      <RotateCcw size={16} /> Réinitialiser les filtres
+                      <RotateCcw size={16} /> {t('marketplace.resetFilters')}
                     </button>
                   </>
                 )}
@@ -487,7 +492,7 @@ export function MarketplacePageClient() {
             className="pointer-events-auto w-full flex items-center justify-center gap-2.5 bg-slate-900 text-white py-4 rounded-full text-sm font-extrabold shadow-xl shadow-slate-900/25 hover:bg-slate-800 active:scale-[0.98] transition-all"
           >
             <SlidersHorizontal size={18} />
-            Filtres
+            {t('marketplace.filters')}
             {activeFilterCount > 0 && (
               <span className="bg-brand-500 text-white text-xs font-bold min-w-[1.25rem] h-5 px-1.5 rounded-full flex items-center justify-center">
                 {activeFilterCount}
@@ -512,13 +517,13 @@ export function MarketplacePageClient() {
           >
             <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
               <h2 id="marketplace-filters-title" className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                <SlidersHorizontal size={20} className="text-brand-500" /> Filtres
+                <SlidersHorizontal size={20} className="text-brand-500" /> {t('marketplace.filters')}
               </h2>
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
                 className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-                aria-label="Fermer"
+                aria-label={t('common.close')}
               >
                 <X size={18} />
               </button>
@@ -537,6 +542,7 @@ export function MarketplacePageClient() {
                 priceFilter={priceFilter}
                 onPriceFilterChange={setPriceFilter}
                 priceCeiling={priceCeiling}
+                t={t}
               />
 
               <button

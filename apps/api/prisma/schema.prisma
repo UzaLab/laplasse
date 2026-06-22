@@ -981,6 +981,7 @@ model Booking {
   metadata         Json?
   status           BookingStatus @default(PENDING)
   reminder_sent_at DateTime?
+  checkout_reminder_sent_at DateTime?
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
 
@@ -1473,6 +1474,8 @@ model DeliveryJob {
   picked_up_at    DateTime?
   delivered_at    DateTime?
   eta_minutes     Int?
+  courier_latitude  Float?
+  courier_longitude Float?
   notes           String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt

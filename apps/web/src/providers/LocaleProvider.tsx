@@ -6,7 +6,7 @@ import { DEFAULT_LOCALE, LOCALE_COOKIE, type Locale, translate } from '@/i18n'
 interface LocaleContextValue {
   locale: Locale
   setLocale: (locale: Locale) => void
-  t: (key: string) => string
+  t: (key: string, vars?: Record<string, string>) => string
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
@@ -30,7 +30,10 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = next
   }, [])
 
-  const t = useCallback((key: string) => translate(locale, key), [locale])
+  const t = useCallback(
+    (key: string, vars?: Record<string, string>) => translate(locale, key, vars),
+    [locale],
+  )
 
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t])
 
@@ -43,7 +46,7 @@ export function useLocale() {
     return {
       locale: DEFAULT_LOCALE as Locale,
       setLocale: () => {},
-      t: (key: string) => translate(DEFAULT_LOCALE, key),
+      t: (key: string, vars?: Record<string, string>) => translate(DEFAULT_LOCALE, key, vars),
     }
   }
   return ctx

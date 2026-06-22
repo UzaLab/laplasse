@@ -18,6 +18,7 @@ export interface BookingReminderJob {
   merchantName: string
   userId?: string
   guestPhone?: string
+  reminderKind?: 'checkin' | 'checkout'
 }
 
 type QueueJob = PushNotificationJob | BookingReminderJob
@@ -105,7 +106,10 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   /** Rattrapage si Redis indisponible ou job perdu — appelé par cron externe. */
   async processDueBookingReminders(): Promise<{ processed: number; skipped: number }> {
     const now = new Date()
-    const bookings = await this.prisma.booking.findMany({
+    let processed = 0
+    let skipped = 0
+
+    const checkInBookings = await this.prisma.booking.findMany({
       where: {
         reminder_sent_at: null,
         status: { in: ['PENDING', 'CONFIRMED'] },
@@ -118,10 +122,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       take: 200,
     })
 
-    let processed = 0
-    let skipped = 0
-
-    for (const booking of bookings) {
+    for (const booking of checkInBookings) {
       const remindAt = new Date(booking.booked_at.getTime() - REMINDER_LEAD_MS)
       if (remindAt > now) {
         skipped++
@@ -129,16 +130,52 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       }
 
       const merchantName = booking.merchant.business_name
-      const title = 'Rappel de réservation'
-      const body = `Rappel : votre réservation chez ${merchantName} approche.`
-
+      const isRoom = booking.booking_type === 'ROOM'
       await this.processReminder({
         bookingId: booking.id,
         userId: booking.user_id ?? undefined,
         guestPhone: booking.user_id ? undefined : booking.guest_phone,
-        title,
-        body,
+        title: isRoom ? 'Rappel d\'arrivée' : 'Rappel de réservation',
+        body: isRoom
+          ? `Rappel : votre arrivée chez ${merchantName} approche.`
+          : `Rappel : votre réservation chez ${merchantName} approche.`,
         merchantName,
+        reminderKind: 'checkin',
+      })
+      processed++
+    }
+
+    const checkoutBookings = await this.prisma.booking.findMany({
+      where: {
+        booking_type: 'ROOM',
+        checkout_reminder_sent_at: null,
+        check_out_at: { gt: now },
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+      include: {
+        merchant: { select: { business_name: true } },
+        user: { select: { id: true, phone: true } },
+      },
+      take: 200,
+    })
+
+    for (const booking of checkoutBookings) {
+      if (!booking.check_out_at) continue
+      const remindAt = new Date(booking.check_out_at.getTime() - REMINDER_LEAD_MS)
+      if (remindAt > now) {
+        skipped++
+        continue
+      }
+
+      const merchantName = booking.merchant.business_name
+      await this.processReminder({
+        bookingId: booking.id,
+        userId: booking.user_id ?? undefined,
+        guestPhone: booking.user_id ? undefined : booking.guest_phone,
+        title: 'Rappel de départ',
+        body: `Rappel : votre départ de ${merchantName} approche.`,
+        merchantName,
+        reminderKind: 'checkout',
       })
       processed++
     }
@@ -192,40 +229,58 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processReminder(payload: BookingReminderJob) {
+    const kind = payload.reminderKind ?? 'checkin'
     const booking = await this.prisma.booking.findUnique({
       where: { id: payload.bookingId },
-      select: { status: true, reminder_sent_at: true, booked_at: true },
+      select: {
+        status: true,
+        reminder_sent_at: true,
+        checkout_reminder_sent_at: true,
+        booked_at: true,
+        check_out_at: true,
+        guest_phone: true,
+        user_id: true,
+      },
     })
-    if (!booking || booking.reminder_sent_at) return
+    if (!booking) return
     if (booking.status !== 'CONFIRMED' && booking.status !== 'PENDING') return
+    if (kind === 'checkout') {
+      if (booking.checkout_reminder_sent_at || !booking.check_out_at) return
+    } else if (booking.reminder_sent_at) {
+      return
+    }
 
-    if (payload.userId) {
+    const userId = payload.userId ?? booking.user_id ?? undefined
+    const guestPhone = payload.guestPhone ?? (userId ? undefined : booking.guest_phone)
+
+    if (userId) {
       await this.processPush({
-        userId: payload.userId,
-        type: 'booking_reminder',
+        userId,
+        type: kind === 'checkout' ? 'booking_checkout_reminder' : 'booking_reminder',
         title: payload.title,
         body: payload.body,
         data: { booking_id: payload.bookingId },
       })
     }
 
-    const when = booking.booked_at.toLocaleString('fr-FR', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    })
-    const reminderText = `${payload.body} Rendez-vous le ${when}.`
+    const when = kind === 'checkout' && booking.check_out_at
+      ? booking.check_out_at.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+      : booking.booked_at.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+    const reminderText = `${payload.body} ${kind === 'checkout' ? 'Départ le' : 'Rendez-vous le'} ${when}.`
 
-    if (payload.guestPhone) {
-      const waUrl = this.buildWhatsAppReminderUrl(payload.guestPhone, reminderText)
+    if (guestPhone) {
+      const waUrl = this.buildWhatsAppReminderUrl(guestPhone, reminderText)
       this.logger.log(
-        `WhatsApp rappel booking ${payload.bookingId} → ${payload.guestPhone} (${waUrl})`,
+        `WhatsApp rappel ${kind} booking ${payload.bookingId} → ${guestPhone} (${waUrl})`,
       )
-      this.logger.log(`SMS simulé [booking_reminder] → ${payload.guestPhone}: ${reminderText}`)
+      this.logger.log(`SMS simulé [booking_${kind}_reminder] → ${guestPhone}: ${reminderText}`)
     }
 
     await this.prisma.booking.update({
       where: { id: payload.bookingId },
-      data: { reminder_sent_at: new Date() },
+      data: kind === 'checkout'
+        ? { checkout_reminder_sent_at: new Date() }
+        : { reminder_sent_at: new Date() },
     })
   }
 

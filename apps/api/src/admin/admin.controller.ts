@@ -452,4 +452,142 @@ export class AdminController {
   ) {
     return this.geo.updateCommune(id, body)
   }
+
+  // ── Livraison (stats ops) ────────────────────────────────────────────────────
+
+  @Get('delivery/stats')
+  async getDeliveryStats(@Query('country') country?: string) {
+    const countryCode = (country ?? 'CI').toUpperCase()
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+    const [
+      jobsByStatus,
+      activeCouriers,
+      activeZones,
+      recentDeliveries,
+      cities,
+      zoneRules,
+    ] = await Promise.all([
+      this.prisma.deliveryJob.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+        where: {
+          created_at: { gte: since },
+          order: { shop: { country: countryCode } },
+        },
+      }),
+      this.prisma.deliveryCourier.count({ where: { country: countryCode, is_active: true } }),
+      this.prisma.shopDeliveryZone.count({
+        where: { is_active: true, shop: { country: countryCode, is_active: true } },
+      }),
+      this.prisma.deliveryJob.count({
+        where: {
+          status: 'DELIVERED',
+          delivered_at: { gte: since },
+          order: { shop: { country: countryCode } },
+        },
+      }),
+      this.prisma.geoCity.findMany({
+        where: { country: countryCode, is_active: true },
+        select: {
+          id: true,
+          name: true,
+          communes: { where: { is_active: true }, select: { id: true, name: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.shopDeliveryZoneRule.findMany({
+        where: {
+          zone: { is_active: true, shop: { country: countryCode, is_active: true } },
+          city: { country: countryCode },
+        },
+        select: { city_id: true, all_communes: true, communes: { select: { commune_id: true } } },
+      }),
+    ])
+
+    const coveredCommuneIds = new Set<string>()
+    for (const rule of zoneRules) {
+      if (rule.all_communes) {
+        const city = cities.find(c => c.id === rule.city_id)
+        city?.communes.forEach(c => coveredCommuneIds.add(c.id))
+      } else {
+        rule.communes.forEach(zc => coveredCommuneIds.add(zc.commune_id))
+      }
+    }
+
+    const uncoveredCommunes = cities.flatMap(city =>
+      city.communes
+        .filter(c => !coveredCommuneIds.has(c.id))
+        .map(c => ({ city: city.name, commune: c.name, commune_id: c.id })),
+    )
+
+    return {
+      country: countryCode,
+      period_days: 30,
+      jobs_by_status: jobsByStatus.map(r => ({
+        status: r.status,
+        count: r._count._all,
+      })),
+      couriers_active: activeCouriers,
+      zones_active: activeZones,
+      deliveries_last_30d: recentDeliveries,
+      uncovered_communes: uncoveredCommunes.slice(0, 100),
+      uncovered_total: uncoveredCommunes.length,
+      communes_total: cities.reduce((n, c) => n + c.communes.length, 0),
+      communes_covered: coveredCommuneIds.size,
+    }
+  }
+
+  // ── Pays (overview multi-pays) ───────────────────────────────────────────────
+
+  @Get('countries/overview')
+  async getCountriesOverview() {
+    const supported = (process.env.SUPPORTED_COUNTRIES ?? 'CI,BF,SN')
+      .split(',')
+      .map(c => c.trim().toUpperCase())
+      .filter(Boolean)
+
+    const countries = await Promise.all(
+      supported.map(async code => {
+        const [
+          merchants,
+          shops,
+          orders,
+          cities,
+          communes,
+          couriers,
+          deliveryJobs,
+          productCategories,
+        ] = await Promise.all([
+          this.prisma.merchant.count({
+            where: { is_active: true, location: { country: code } },
+          }),
+          this.prisma.shop.count({ where: { country: code, is_active: true } }),
+          this.prisma.order.count({ where: { shop: { country: code } } }),
+          this.prisma.geoCity.count({ where: { country: code, is_active: true } }),
+          this.prisma.geoCommune.count({
+            where: { city: { country: code }, is_active: true },
+          }),
+          this.prisma.deliveryCourier.count({ where: { country: code, is_active: true } }),
+          this.prisma.deliveryJob.count({ where: { courier: { country: code } } }),
+          this.prisma.productCategoryCountry.count({ where: { country_code: code } }),
+        ])
+
+        return {
+          code,
+          active: true,
+          merchants,
+          shops,
+          orders,
+          cities,
+          communes,
+          couriers,
+          delivery_jobs: deliveryJobs,
+          product_categories: productCategories,
+        }
+      }),
+    )
+
+    return { countries }
+  }
 }

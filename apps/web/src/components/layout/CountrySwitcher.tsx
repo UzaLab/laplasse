@@ -8,8 +8,10 @@ import {
   setClientCountry,
   SUPPORTED_COUNTRIES,
 } from '@/lib/country'
+import { useT } from '@/providers/LocaleProvider'
 
 export function CountrySwitcher() {
+  const t = useT()
   const [code, setCode] = useState(() => getCountryCode())
 
   const handleChange = (next: string) => {
@@ -31,7 +33,7 @@ export function CountrySwitcher() {
         value={code}
         onChange={e => handleChange(e.target.value)}
         className="bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer pr-1"
-        aria-label="Pays"
+        aria-label={t('geo.country')}
       >
         {SUPPORTED_COUNTRIES.map(c => (
           <option key={c.code} value={c.code}>

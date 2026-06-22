@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
+import { coordsFromCityName, courierCoordsForStatus } from './delivery-gps.util'
 import { DeliveryJobStatus, OrderStatus } from '../../generated/prisma/client'
 
 const DELIVERY_JOB_MESSAGES: Partial<Record<DeliveryJobStatus, string>> = {
@@ -88,12 +89,17 @@ export class DeliveryService {
     })
     if (!courier) throw new NotFoundException('Coursier introuvable')
 
+    const base = coordsFromCityName(courier.city, courier.country)
+    const coords = courierCoordsForStatus(base, 'ASSIGNED')
+
     const updated = await this.prisma.deliveryJob.update({
       where: { id: jobId },
       data: {
         courier_id: courierId,
         status: 'ASSIGNED',
         assigned_at: new Date(),
+        courier_latitude: coords.lat,
+        courier_longitude: coords.lng,
       },
       include: {
         courier: true,
@@ -117,6 +123,8 @@ export class DeliveryService {
       status: DeliveryJobStatus
       picked_up_at?: Date
       delivered_at?: Date
+      courier_latitude?: number
+      courier_longitude?: number
     } = { status }
 
     if (status === 'PICKED_UP' || status === 'IN_TRANSIT') {
@@ -125,6 +133,14 @@ export class DeliveryService {
     if (status === 'DELIVERED') {
       data.delivered_at = now
     }
+
+    const courier = job.courier_id
+      ? await this.prisma.deliveryCourier.findUnique({ where: { id: job.courier_id } })
+      : null
+    const base = coordsFromCityName(courier?.city, courier?.country)
+    const coords = courierCoordsForStatus(base, status)
+    data.courier_latitude = coords.lat
+    data.courier_longitude = coords.lng
 
     const updated = await this.prisma.deliveryJob.update({
       where: { id: jobId },
@@ -178,7 +194,7 @@ export class DeliveryService {
     const job = await this.prisma.deliveryJob.findFirst({
       where: { tracking_token: token },
       include: {
-        courier: { select: { full_name: true, phone: true, vehicle: true } },
+        courier: { select: { full_name: true, phone: true, vehicle: true, city: true, country: true } },
         order: {
           select: {
             id: true,
@@ -191,6 +207,16 @@ export class DeliveryService {
       },
     })
     if (!job) throw new NotFoundException('Suivi introuvable')
+
+    let lat = job.courier_latitude
+    let lng = job.courier_longitude
+    if (lat == null || lng == null) {
+      const base = coordsFromCityName(job.courier?.city, job.courier?.country)
+      const coords = courierCoordsForStatus(base, job.status)
+      lat = coords.lat
+      lng = coords.lng
+    }
+
     return {
       tracking_token: job.tracking_token,
       status: job.status,
@@ -200,6 +226,8 @@ export class DeliveryService {
       assigned_at: job.assigned_at,
       picked_up_at: job.picked_up_at,
       delivered_at: job.delivered_at,
+      courier_latitude: lat,
+      courier_longitude: lng,
       courier: job.courier,
       order: job.order,
     }

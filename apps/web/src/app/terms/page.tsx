@@ -1,60 +1,30 @@
-import Link from 'next/link'
-import { PublicPageHeader } from '@/components/layout/PublicPageHeader'
-import { PUBLIC_CONTENT } from '@/lib/pageLayout'
+import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { LegalDocumentView } from '@/components/legal/LegalDocumentView'
+import { getTermsContent } from '@/lib/legalContent'
+import { COUNTRY_COOKIE, resolveCountryCode } from '@/lib/seoCountry'
+import { buildHreflangLanguages, countrySiteUrl } from '@/lib/seoCountry'
 
-export const metadata = {
-  title: 'Conditions Générales d\'Utilisation — LaPlasse',
+export async function generateMetadata(): Promise<Metadata> {
+  const cookieStore = await cookies()
+  const country = resolveCountryCode(cookieStore.get(COUNTRY_COOKIE)?.value)
+  const doc = getTermsContent(country)
+  const url = countrySiteUrl(country, '/terms')
+
+  return {
+    title: `${doc.title} — LaPlasse`,
+    description: `Conditions d'utilisation LaPlasse en ${doc.jurisdiction}.`,
+    alternates: {
+      canonical: url,
+      languages: buildHreflangLanguages('/terms'),
+    },
+  }
 }
 
-export default function TermsPage() {
-  return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      <PublicPageHeader title="CGU" backHref="/" />
+export default async function TermsPage() {
+  const cookieStore = await cookies()
+  const country = resolveCountryCode(cookieStore.get(COUNTRY_COOKIE)?.value)
+  const doc = getTermsContent(country)
 
-      <article className={`${PUBLIC_CONTENT} py-12 prose prose-slate max-w-none`}>
-        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Conditions Générales d&apos;Utilisation</h1>
-        <p className="text-slate-500 text-sm mb-8">Dernière mise à jour : juin 2026</p>
-
-        <section className="space-y-4 text-slate-700 leading-relaxed">
-          <h2 className="text-xl font-bold text-slate-900">1. Objet</h2>
-          <p>
-            LaPlasse est une plateforme de découverte, de réservation et d&apos;achat auprès
-            de commerces locaux premium. Les présentes CGU régissent l&apos;accès et
-            l&apos;utilisation du site et des services associés par les consommateurs et les
-            marchands partenaires.
-          </p>
-
-          <h2 className="text-xl font-bold text-slate-900">2. Inscription et compte</h2>
-          <p>
-            L&apos;utilisateur s&apos;engage à fournir des informations exactes lors de la création
-            de son compte. Il est responsable de la confidentialité de ses identifiants.
-          </p>
-
-          <h2 className="text-xl font-bold text-slate-900">3. Contenus et avis</h2>
-          <p>
-            Les avis publiés sont soumis à modération. Tout contenu illicite, diffamatoire ou trompeur
-            peut être supprimé. LaPlasse se réserve le droit de suspendre un compte en cas de violation.
-          </p>
-
-          <h2 className="text-xl font-bold text-slate-900">4. Marchands</h2>
-          <p>
-            Les établissements inscrits garantissent l&apos;exactitude des informations publiées
-            (horaires, coordonnées, description). La vérification par LaPlasse ne constitue pas une
-            garantie commerciale.
-          </p>
-
-          <h2 className="text-xl font-bold text-slate-900">5. Limitation de responsabilité</h2>
-          <p>
-            LaPlasse met en relation utilisateurs et commerces. Les transactions, réservations ou
-            prestations réalisées hors plateforme relèvent de la responsabilité des parties concernées.
-          </p>
-
-          <h2 className="text-xl font-bold text-slate-900">6. Contact</h2>
-          <p>
-            Pour toute question : <Link href="/contact" className="text-brand-600 font-semibold">page contact</Link>.
-          </p>
-        </section>
-      </article>
-    </div>
-  )
+  return <LegalDocumentView doc={doc} country={country} headerTitle="CGU" />
 }

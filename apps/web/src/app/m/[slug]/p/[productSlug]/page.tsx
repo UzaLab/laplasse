@@ -25,12 +25,13 @@ import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
   fetchMerchantProducts,
   fetchProductDetail,
+  fetchPublicJson,
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
   type MarketplaceProduct,
   type ProductVariant,
 } from '@/lib/marketplaceApi'
-import { ProductCard } from '@/features/marketplace/components/ProductCard'
+import { ProductCarousel } from '@/features/marketplace/components/ProductCarousel'
 import { ProductFavoriteButton } from '@/features/marketplace/components/ProductFavoriteButton'
 import { ProductReviewsSection } from '@/features/marketplace/components/ProductReviewsSection'
 import { ProductRecommendations } from '@/features/marketplace/components/ProductRecommendations'
@@ -39,6 +40,7 @@ import { recordProductView } from '@/lib/discoveryApi'
 import { ProductHtmlContent } from '@/components/ui/ProductHtmlContent'
 import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
 import { notify } from '@/lib/notify'
+import { useT } from '@/providers/LocaleProvider'
 
 type TabId = 'description' | 'composition' | 'reviews'
 
@@ -70,6 +72,7 @@ function StarRating({ rating }: { rating: number }) {
 export default function ProductDetailPage() {
   const params = useParams<{ slug: string; productSlug: string }>()
   const router = useRouter()
+  const t = useT()
   const { isAuthenticated } = useAuthReady()
   const addItem = useCartStore(s => s.addItem)
   const [product, setProduct] = useState<MarketplaceProduct | null>(null)
@@ -83,6 +86,8 @@ export default function ProductDetailPage() {
   const [addingRelatedId, setAddingRelatedId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('description')
   const [selectedImage, setSelectedImage] = useState('')
+  const [productAvgRating, setProductAvgRating] = useState<number | null>(null)
+  const [productReviewCount, setProductReviewCount] = useState(0)
 
   const slug = params.slug
   const productSlug = params.productSlug
@@ -96,8 +101,11 @@ export default function ProductDetailPage() {
       fetchProductDetail(slug, productSlug),
       api.merchants.bySlug(slug).catch(() => null),
       fetchMerchantProducts(slug).catch(() => [] as MarketplaceProduct[]),
+      fetchPublicJson<{ average_rating: number | null; reviews: unknown[] }>(
+        `/product-reviews/products/${productSlug}?shop=${encodeURIComponent(slug)}`,
+      ),
     ])
-      .then(([productData, merchantData, allProducts]) => {
+      .then(([productData, merchantData, allProducts, reviewsResult]) => {
         if (cancelled) return
         if (productData) {
           setProduct(productData)
@@ -108,8 +116,15 @@ export default function ProductDetailPage() {
         }
         setMerchantDetail(merchantData)
         setRelatedProducts(
-          (allProducts ?? []).filter(p => p.slug !== productSlug).slice(0, 4),
+          (allProducts ?? []).filter(p => p.slug !== productSlug).slice(0, 10),
         )
+        if (reviewsResult.ok) {
+          setProductAvgRating(reviewsResult.data.average_rating)
+          setProductReviewCount(reviewsResult.data.reviews.length)
+        } else {
+          setProductAvgRating(null)
+          setProductReviewCount(0)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -212,11 +227,14 @@ export default function ProductDetailPage() {
   const categoryName = merchant?.category?.name ?? merchantDetail?.category.name ?? 'Marketplace'
   const categorySlug = merchant?.category?.slug ?? merchantDetail?.category.slug
   const merchantLogo = merchantDetail?.logo
-  const avgRating = merchantDetail?.avg_rating
-  const reviewCount = merchantDetail?.review_count ?? 0
   const locationLabel = merchantDetail?.location
     ? [merchantDetail.location.district, merchantDetail.location.city].filter(Boolean).join(', ')
     : ''
+
+  const scrollToReviews = () => {
+    setActiveTab('reviews')
+    document.getElementById('product-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -330,30 +348,25 @@ export default function ProductDetailPage() {
               </h1>
 
               <div className="flex items-center gap-4 mb-6 flex-wrap">
-                {avgRating != null && reviewCount > 0 && (
-                  <>
-                    <div className="flex items-center gap-1">
-                      <StarRating rating={avgRating} />
-                      <span className="text-sm font-bold text-slate-900 ml-1">{avgRating}</span>
-                      <Link
-                        href={`/m/${slug}#avis`}
-                        className="text-sm text-slate-400 underline ml-1 hover:text-slate-600"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        ({reviewCount} avis)
-                      </Link>
-                    </div>
-                    <div className="w-1 h-1 rounded-full bg-slate-300" />
-                  </>
+                {productAvgRating != null && productReviewCount > 0 && (
+                  <div className="flex items-center gap-1">
+                    <StarRating rating={productAvgRating} />
+                    <span className="text-sm font-bold text-slate-900 ml-1">{productAvgRating}</span>
+                    <button
+                      type="button"
+                      onClick={scrollToReviews}
+                      className="text-sm text-slate-400 underline ml-1 hover:text-slate-600"
+                    >
+                      ({productReviewCount} {t('product.reviewsCount')})
+                    </button>
+                  </div>
                 )}
-                <span
-                  className={`text-sm font-bold flex items-center gap-1 ${
-                    outOfStock ? 'text-red-500' : 'text-green-600'
-                  }`}
-                >
-                  <CheckCircle2 size={16} />
-                  {outOfStock ? 'Rupture de stock' : `En stock (${displayStock})`}
-                </span>
+                {outOfStock && (
+                  <span className="text-sm font-bold flex items-center gap-1 text-red-500">
+                    <CheckCircle2 size={16} />
+                    {t('product.outOfStock')}
+                  </span>
+                )}
               </div>
 
               <div className="mb-8">
@@ -366,7 +379,7 @@ export default function ProductDetailPage() {
                   )}
                 </div>
                 <p className="text-sm text-slate-500 mt-1">
-                  Taxes incluses. Frais de livraison calculés à l&apos;étape suivante.
+                  {t('product.taxesNote')}
                 </p>
               </div>
 
@@ -379,12 +392,16 @@ export default function ProductDetailPage() {
 
               <div className="h-px w-full bg-slate-100 mb-8" />
 
-              {!outOfStock && (
+              {outOfStock ? (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {t('product.unavailable')}
+                </div>
+              ) : (
                 <div className="space-y-6">
                   {hasVariants && (
                     <div>
                       <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
-                        Variante
+                        {t('product.variant')}
                       </label>
                       <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                         {variants.map(variant => {
@@ -419,7 +436,7 @@ export default function ProductDetailPage() {
 
                   <div>
                     <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider lg:sr-only">
-                      Quantité
+                      {t('product.quantity')}
                     </label>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
                       <div className="inline-flex items-center p-1 bg-slate-50 border border-slate-200 rounded-full sm:rounded-xl shrink-0">
@@ -452,8 +469,8 @@ export default function ProductDetailPage() {
                           ) : (
                             <ShoppingBag size={18} className="group-hover:-translate-y-0.5 transition-transform" />
                           )}
-                          <span className="lg:hidden">{adding ? 'Ajout…' : 'Ajouter au panier'}</span>
-                          <span className="hidden lg:inline">{adding ? 'Ajout…' : 'Ajouter'}</span>
+                          <span className="lg:hidden">{adding ? '…' : t('product.addToCart')}</span>
+                          <span className="hidden lg:inline">{adding ? '…' : t('product.add')}</span>
                         </button>
                         <button
                           type="button"
@@ -462,8 +479,8 @@ export default function ProductDetailPage() {
                           className="w-full lg:flex-1 bg-brand-50 border-2 border-brand-200 text-brand-700 min-h-[48px] py-3.5 lg:py-0 lg:h-11 rounded-full lg:rounded-xl text-sm font-bold hover:bg-brand-100 hover:border-brand-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           {buyingNow && <Loader2 size={18} className="animate-spin" />}
-                          <span className="lg:hidden">Acheter maintenant</span>
-                          <span className="hidden lg:inline">Acheter</span>
+                          <span className="lg:hidden">{t('product.buyNow')}</span>
+                          <span className="hidden lg:inline">{t('product.buy')}</span>
                         </button>
                       </div>
                     </div>
@@ -509,7 +526,7 @@ export default function ProductDetailPage() {
       </main>
 
       {/* Onglets description */}
-      <section className="border-t border-slate-100 bg-[#FAFAFA] py-16">
+      <section id="product-tabs" className="border-t border-slate-100 bg-[#FAFAFA] py-16 scroll-mt-28">
         <div className={PAGE_CONTAINER}>
           <div className="max-w-3xl mx-auto">
             <div className="flex items-center justify-start sm:justify-center gap-5 sm:gap-8 border-b border-slate-200 mb-8 overflow-x-auto no-scrollbar px-1">
@@ -522,7 +539,7 @@ export default function ProductDetailPage() {
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                Description détaillée
+                {t('product.tabDescription')}
               </button>
               <button
                 type="button"
@@ -533,7 +550,7 @@ export default function ProductDetailPage() {
                     : 'text-slate-500 hover:text-slate-800 font-medium'
                 }`}
               >
-                Composition & Origine
+                {t('product.tabComposition')}
               </button>
               <button
                 type="button"
@@ -544,7 +561,7 @@ export default function ProductDetailPage() {
                     : 'text-slate-500 hover:text-slate-800 font-medium'
                 }`}
               >
-                Avis clients{reviewCount > 0 ? ` (${reviewCount})` : ''}
+                {t('product.tabReviews')}{productReviewCount > 0 ? ` (${productReviewCount})` : ''}
               </button>
             </div>
 
@@ -590,31 +607,27 @@ export default function ProductDetailPage() {
       {relatedProducts.length > 0 && (
         <section className="py-16 bg-white border-t border-slate-100">
           <div className={PAGE_CONTAINER}>
-            <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-              <h2 className="text-2xl font-extrabold text-slate-900">Dans la même boutique</h2>
-              <Link
-                href={`/m/${slug}/boutique`}
-                className="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
-                style={{ textDecoration: 'none' }}
-              >
-                Voir la boutique {merchant?.business_name} <ArrowRight size={16} />
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {relatedProducts.map(related => (
-                <ProductCard
-                  key={related.id}
-                  product={related}
-                  merchantSlug={slug}
-                  merchantName={merchant?.business_name}
-                  variant="related"
-                  showAddButton
-                  onAdd={() => handleRelatedAdd(related)}
-                  adding={addingRelatedId === related.id}
-                />
-              ))}
-            </div>
+            <ProductCarousel
+              products={relatedProducts}
+              title={t('product.sameShop')}
+              maxItems={10}
+              headerAction={
+                <Link
+                  href={`/m/${slug}/boutique`}
+                  className="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                  style={{ textDecoration: 'none' }}
+                >
+                  {t('product.viewShop')} {merchant?.business_name} <ArrowRight size={16} />
+                </Link>
+              }
+              getCardProps={related => ({
+                merchantSlug: slug,
+                merchantName: merchant?.business_name,
+                showAddButton: true,
+                onAdd: () => handleRelatedAdd(related),
+                adding: addingRelatedId === related.id,
+              })}
+            />
           </div>
         </section>
       )}

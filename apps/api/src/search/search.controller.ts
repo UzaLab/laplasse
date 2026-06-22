@@ -56,10 +56,16 @@ export class SearchController {
 
   @Get('autocomplete')
   async autocomplete(
+    @Req() req: RequestWithCountry,
     @Query('q') q?: string,
     @Query('limit') limit?: string,
+    @Query('country') country?: string,
   ) {
-    return this.searchService.autocomplete(q ?? '', limit ? Number(limit) : 6)
+    return this.searchService.autocomplete(
+      q ?? '',
+      limit ? Number(limit) : 6,
+      country ?? req.countryCode ?? DEFAULT_COUNTRY,
+    )
   }
 
   @Get('trending')

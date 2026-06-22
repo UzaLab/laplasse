@@ -414,17 +414,38 @@ export class BookingsService {
       })
     }
 
-    const remindAt = new Date(bookedAt.getTime() - 24 * 60 * 60 * 1000)
-    if (remindAt.getTime() > Date.now()) {
+    const checkInRemindAt = new Date(bookedAt.getTime() - 24 * 60 * 60 * 1000)
+    if (checkInRemindAt.getTime() > Date.now()) {
+      const isRoom = bookingType === 'ROOM'
       await this.notificationQueue.scheduleBookingReminder({
         bookingId: booking.id,
         userId: userId ?? undefined,
         guestPhone: userId ? undefined : dto.guest_phone,
-        remindAt,
-        title: 'Rappel de réservation',
-        body: `Rappel : réservation demain chez ${merchant.business_name}.`,
+        remindAt: checkInRemindAt,
+        title: isRoom ? 'Rappel d\'arrivée' : 'Rappel de réservation',
+        body: isRoom
+          ? `Rappel : votre arrivée chez ${merchant.business_name} demain.`
+          : `Rappel : réservation demain chez ${merchant.business_name}.`,
         merchantName: merchant.business_name,
+        reminderKind: 'checkin',
       })
+    }
+
+    if (bookingType === 'ROOM' && checkOutAt) {
+      const nights = Math.ceil((checkOutAt.getTime() - bookedAt.getTime()) / (24 * 60 * 60 * 1000))
+      const checkoutRemindAt = new Date(checkOutAt.getTime() - 24 * 60 * 60 * 1000)
+      if (nights > 1 && checkoutRemindAt.getTime() > Date.now()) {
+        await this.notificationQueue.scheduleBookingReminder({
+          bookingId: booking.id,
+          userId: userId ?? undefined,
+          guestPhone: userId ? undefined : dto.guest_phone,
+          remindAt: checkoutRemindAt,
+          title: 'Rappel de départ',
+          body: `Rappel : votre départ de ${merchant.business_name} demain.`,
+          merchantName: merchant.business_name,
+          reminderKind: 'checkout',
+        })
+      }
     }
 
     return {

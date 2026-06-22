@@ -360,14 +360,17 @@ export class SearchService implements OnModuleInit {
 
   // ─── Autocomplete ──────────────────────────────────────────────────────────
 
-  async autocomplete(q: string, limit = 6) {
+  async autocomplete(q: string, limit = 6, country?: string) {
     if (!q || q.length < 2) return []
 
     try {
+      const filterParts = ['is_active = true']
+      if (country) filterParts.push(`country = "${country.toUpperCase()}"`)
+
       const result = await this.meiliRequest('POST', `/indexes/${this.INDEX_NAME}/search`, {
         q,
         limit,
-        filter: 'is_active = true',
+        filter: filterParts.join(' AND '),
         attributesToRetrieve: ['id', 'business_name', 'slug', 'category_name', 'category_slug', 'district', 'verification_status'],
         attributesToHighlight: ['business_name'],
         highlightPreTag: '<mark>',
@@ -387,15 +390,16 @@ export class SearchService implements OnModuleInit {
       }))
     } catch (error) {
       if (this.isMeiliRequired()) this.failMeiliRequired(error)
-      return this.autocompleteMerchantsFallback(q, limit)
+      return this.autocompleteMerchantsFallback(q, limit, country)
     }
   }
 
-  private async autocompleteMerchantsFallback(q: string, limit: number) {
+  private async autocompleteMerchantsFallback(q: string, limit: number, country?: string) {
     const merchants = await this.prisma.merchant.findMany({
       where: {
         is_active: true,
         business_name: { contains: q, mode: 'insensitive' },
+        ...(country ? { location: { country: country.toUpperCase() } } : {}),
       },
       select: {
         id: true, business_name: true, slug: true,
@@ -512,7 +516,7 @@ export class SearchService implements OnModuleInit {
     const productLimit = Math.floor(limit / 2)
 
     const [merchants, products] = await Promise.all([
-      this.autocomplete(q, merchantLimit),
+      this.autocomplete(q, merchantLimit, country),
       this.autocompleteProducts(q, productLimit, country),
     ])
 

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Store, Star, AlertTriangle, Users, Tags,
   Menu, X, ChevronRight, Bell, Settings, MapPin, ChevronUp, TrendingUp,
+  Truck, Globe,
 } from 'lucide-react'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
@@ -67,6 +68,8 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
     },
     { href: '/admin/product-categories', label: 'Catégories produits', icon: <Tags size={18} /> },
     { href: '/admin/geo', label: 'Villes & communes', icon: <MapPin size={18} /> },
+    { href: '/admin/countries', label: 'Pays', icon: <Globe size={18} /> },
+    { href: '/admin/delivery', label: 'Livraison', icon: <Truck size={18} /> },
   ]
 
   const opsNav: NavItem[] = [

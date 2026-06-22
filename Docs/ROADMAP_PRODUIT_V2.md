@@ -3,8 +3,8 @@
 > Audit du parcours web (juin 2026) — marketplace, flux, UX, modules verticaux.  
 > Complète `REGLES_DEVELOPPEMENT.md` (état livré) et les Tomes (vision long terme).
 
-**Version :** 2.1  
-**Date :** 19 juin 2026 (MAJ Phase 9 — 21 juin 2026)  
+**Version :** 2.2  
+**Date :** 22 juin 2026 (MAJ Phase 17 déployée + Phase 18 UX marketplace)  
 **Statut :** Document de référence produit — recommandations priorisées + journal d'exécution §14
 
 ---
@@ -36,7 +36,7 @@ LaPlasse n'est plus un simple annuaire local : c'est une **plateforme modulaire*
 |--------|----------|-------------|
 | **Discovery** | Mature | Recherche établissements, fiches, avis, favoris, WhatsApp |
 | **Marketplace retail** | V1.6 fonctionnelle | Shop, produits, panier multi-boutiques, checkout 4 étapes, commandes |
-| **Booking vertical** | Fonctionnel (sans paiement) | Table / chambre / RDV / consultation — parcours client + marchand bout-en-bout |
+| **Booking vertical** | Fonctionnel (paiement résa simulateur) | Table / chambre / RDV / consultation — parcours client + marchand bout-en-bout |
 
 Le tunnel **achat produit** est bout-en-bout (simulateur de paiement). Ce qui manque pour rivaliser avec de grandes plateformes e-commerce et des acteurs verticaux (Glovo, Airbnb, Planity…) n'est pas le squelette technique — c'est la **profondeur métier**, le **paiement réel**, la **logistique** et des **modules activables par vertical**.
 
@@ -63,6 +63,8 @@ Le tunnel **achat produit** est bout-en-bout (simulateur de paiement). Ce qui ma
 - Panier multi-boutiques, split commande + paiement par boutique
 - Checkout 4 URLs : `/cart` → `/checkout` → `/checkout/payment` → `/checkout/confirmation`
 - Marketplace spotlight, vitrines `/m/[slug]/boutique` et `/boutique/[slug]`
+- Recommandations produits + recently viewed (carrousels, CTA panier) ✅ Phase 17–18
+- Avis produits sur fiche (note/compteur dédiés) ✅ Phase 18
 
 **Limites actuelles :**
 - Paiement **simulateur** uniquement (`PaymentProvider.SIMULATOR`)
@@ -70,7 +72,7 @@ Le tunnel **achat produit** est bout-en-bout (simulateur de paiement). Ce qui ma
 - Avis **produits** ✅ + modération admin ✅
 - Remboursements transition `REFUNDED` côté marchand ✅ — pas de reversement Mobile Money
 
-### 2.3 Booking vertical (V1.0 → V1.8) — ✅ fonctionnel, ⚠️ sans paiement MM
+### 2.3 Booking vertical (V1.0 → V1.9) — ✅ fonctionnel, ⚠️ paiement MM réel en attente
 
 Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 
@@ -86,7 +88,7 @@ Mapping catégorie → type : `apps/api/src/common/booking-config.ts`
 
 **Parcours marchand :** `/merchant/bookings` — filtres statut/type/recherche, vue liste + agenda, fiche détail, actions (confirmer, refuser, terminer, absent, annuler), contact client, tarifs hôtel estimés.
 
-**Limites restantes :** pas de paiement à la réservation ; rappels SMS/WhatsApp simulés (logs + wa.me) en attendant provider ; enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
+**Limites restantes :** paiement réservation en **simulateur** uniquement (MM réel bloqué) ; rappels SMS/WhatsApp simulés (logs + wa.me) en attendant provider ; enrichissement tarif hôtel legacy via `room_type` si `service_id` absent (API ✅).
 
 ---
 
@@ -329,7 +331,7 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 | Tarification affichée | P0 | Prix/nuit × nuits = total avant confirmation | ✅ `BookingForm`, fiches profil/marchand |
 | Tarification dynamique | P0 | Prix par nuit, week-end, saison | ⏳ `nightly_rate` fixe par service |
 | Min stay / restrictions | P1 | Nuits minimum, jours check-in | ⏳ |
-| Paiement à la réservation | P0 | Acompte ou total via MM | ⏳ (bloqué MM) |
+| Paiement à la réservation | P0 | Acompte ou total via MM | ✅ simulateur · MM réel ⏳ |
 | Fiche hébergement riche | P1 | Équipements, règles, annulation, photos/chambre | ⏳ |
 | Gestion ménage | P2 | Statuts : disponible, occupée, nettoyage | ⏳ |
 | Channel manager | P3 | Sync iCal / OTAs | ⏳ |
@@ -385,7 +387,7 @@ Chaque module s'active selon `category.slug` + choix marchand (feature gating pl
 | Paiement MM | ✅ | ✅ | ✅ | ✅ | ❌ simulé |
 | Suivi livraison GPS | ✅ | — | — | ⚠️ | ⚠️ token only |
 | Calendrier tarifaire | — | ✅ | ✅ | — | ✅ mois + total |
-| Réservation + paiement | — | ✅ | ✅ | — | ⚠️ réservation ✅, paiement ⏳ |
+| Réservation + paiement | — | ✅ | ✅ | — | ✅ résa + simulateur |
 | Menu structuré food | ✅ | — | — | — | ✅ |
 | Avis produits | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Promotions checkout | ✅ | — | ✅ | ✅ | ✅ |
@@ -768,11 +770,11 @@ ci.laplasse.com/m/burger-republic-cocody
 |-------|--------|--------|
 | Sélecteur pays header | Redirect sous-domaine `ci\|bf\|sn.laplasse.tech` | ✅ `CountrySwitcher` + `buildCountrySwitchUrl` |
 | Middleware host | Cookie `lp_country` sync + redirect apex → `ci.` | ✅ `middleware.ts` |
-| GeoIP suggestion | « Vous semblez être au Burkina Faso » | ⏳ |
-| Pages légales par pays | `/terms`, `/privacy` contenu ou URL config | ⏳ |
-| Metadata dynamique | `generateMetadata` lit CountryContext | ⏳ |
-| Sitemap par pays | `bf.laplasse.tech/sitemap.xml` | ⏳ |
-| hreflang | `<link rel="alternate" hreflang="fr-BF" …>` | ⏳ |
+| GeoIP suggestion | « Vous semblez être au Burkina Faso » | ✅ `CountrySuggestionBanner` |
+| Pages légales par pays | `/terms`, `/privacy` contenu ou URL config | ✅ |
+| Metadata dynamique | `generateMetadata` lit CountryContext | ✅ |
+| Sitemap par pays | `bf.laplasse.tech/sitemap.xml` | ✅ |
+| hreflang | `<link rel="alternate" hreflang="fr-BF" …>` | ✅ |
 
 #### Slice M2 — Contenu BF (2–4 semaines)
 
@@ -781,7 +783,7 @@ ci.laplasse.com/m/burger-republic-cocody
 | `CountryCity` / districts Ouaga, Bobo | Remplacer listes Abidjan en dur — ✅ search + signup ; seed geo BF ⏳ |
 | Seed marchands BF | 20–50 établissements démo Ouagadougou |
 | Paiements BF | Orange Money BF simulateur → réel |
-| Admin pays | `/admin/countries` — activer, config, stats par pays |
+| Admin pays | `/admin/countries` — activer, config, stats par pays | ✅ |
 | Onboarding marchand | Pays verrouillé au host d'inscription |
 
 #### Slice M3 — Domaines locaux & ops
@@ -1525,7 +1527,7 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 | **M1 sous-domaines pays** | ✅ | `middleware.ts`, `country.ts` (`ROOT_DOMAIN`, `buildCountrySwitchUrl`), `CountrySwitcher` |
 | **Alertes stock bas marchand** | ✅ | `ShopProductsPanel` — badge + filtre « Stock bas » (seuil ≤ 5) |
 | **DNS prod laplasse.tech** | ⏳ | Domaine non acheté — middleware actif dès config DNS Coolify |
-| **Migration room_dynamic_pricing prod** | ⏳ | En attente déploiement explicite |
+| **Migration Sprint 17 prod** | ✅ | `20260622100000_sprint17_booking_pay_discovery` — déployée preprod + prod (juin 2026) |
 
 ### Phase 5–6 — Delivery V3.0 (complément long terme)
 
@@ -1541,14 +1543,16 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 
 ---
 
-## Reste à faire — synthèse priorités (post Phase 9)
+## Reste à faire — synthèse priorités (post Phase 18)
+
+> **Position actuelle (22 juin 2026)** : Phases **1 → 18** livrées et déployées. **Phase 19** livrée en local (non déployée). **Mobile Money réel reporté** (simulateur maintenu). Prochaine vague = déploiement Phase 19 + ops DNS.
 
 ### 🔴 P0 — Bloquant « marketplace / plateforme réelle »
 
 | # | Slice | Détail |
 |---|-------|--------|
-| 1 | **Mobile Money réel** | Wave / Orange Money / MTN — webhooks, remplacer `SIMULATOR` (§5 P0 #1) — *reporté volontairement* |
-| 2 | **Paiement à la réservation** | Acompte ou total séjour/RDV — dépend P0 #1 |
+| 1 | **Mobile Money réel** | Wave / Orange Money / MTN — *⏸ reporté volontairement (juin 2026)* |
+| 2 | **Paiement MM réservation** | ⏸ Bloqué par P0 #1 — simulateur ✅ suffit pour l'instant |
 | 3 | **DNS + déploiement laplasse.tech** | Sous-domaines code ✅ — config DNS Coolify + wildcard `*.laplasse.tech` |
 
 ### 🟠 P1 — Parité & profondeur métier (Sprint 10+)
@@ -1570,8 +1574,8 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 |---------|--------|
 | **Paiement** | Remboursement automatique MM (après P0 #1) |
 | **Delivery** | GPS livreur temps réel · Partenaires logistiques |
-| **Discovery** | Recommandations · Recently viewed · Fidélité achats | ✅ Sprint 17 |
-| **UX transverse** | i18n FR/EN · PWA offline-lite | ✅ MVP Sprint 17 |
+| **Discovery** | ~~Recommandations · Recently viewed · Fidélité achats~~ ✅ · Carrousels + CTA panier | ✅ Phase 17–18 |
+| **UX transverse** | ~~i18n FR/EN · PWA offline-lite~~ ✅ · Dropdown langue drapeaux | ✅ MVP Phase 17–18 |
 | **Ops** | ~~Export CSV commandes~~ ✅ · Multi-langue FR/EN · PWA offline-lite |
 | **Pharmacie** | Upload ordonnance · Catalogue OTC |
 | **Admin** | `/admin/delivery` stats zones · `/admin/countries` |
@@ -1579,7 +1583,40 @@ Adresses sauvegardées (P0 §5) : preset `{ city_id, commune_id, quartier, … }
 
 ### ✅ Déjà livré (ne pas replanifier)
 
-Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays) · **Phase 9 (dettes geo, M1 sous-domaines, filtres marchand, alertes stock, tarifs dynamiques)**.
+Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modération avis) · Phase 6 (onglets fiche) · Phase 7 (food checkout, calendrier hôtel, dispatch, Meilisearch pays) · Phase 8 (booking client/marchand complet, tarifs hôtel UI, copy multipays) · **Phase 9 (dettes geo, M1 sous-domaines, filtres marchand, alertes stock, tarifs dynamiques)** · **Phases 10–16 (restaurant, analytics, order again, booking invité, onboarding, SAV)** · **Phase 17 (paiement résa simulateur, discovery, i18n, PWA — déployée preprod + prod)** · **Phase 18 (carrousels reco, fiche produit, toggle paiement marchand)**.
+
+---
+
+### Phase 19 — Profondeur sans MM (juin 2026, ✅ livrée local)
+
+> MM réel et paiement résa MM **en pause**. Focus : multi-pays, SEO, i18n, hôtel, delivery V3 phase 2.
+
+| Slice | Statut | Description |
+|-------|--------|-------------|
+| **Autocomplete merchants par pays** | ✅ | Filtrer établissements comme les produits (`country` Meilisearch + Prisma) |
+| **SEO produit** | ✅ | `generateMetadata` + JSON-LD `Product` sur `/m/[slug]/p/[productSlug]` |
+| **Rappels séjour hôtel** | ✅ | Push/SMS J-1 arrivée + J-1 départ (séjours > 1 nuit), `checkout_reminder_sent_at` |
+| **i18n étendu v1** | ✅ | Marketplace, fiche produit, checkout steps, carrousel, geo |
+| **GeoIP suggestion** | ✅ | `/api/geo/country-hint` + `CountrySuggestionBanner` |
+| **Pages légales par pays** | ✅ | Contenu `/terms` / `/privacy` scopé CI/BF/SN |
+| **Metadata + sitemap + hreflang** | ✅ | Compléter M1 multi-pays |
+| **GPS livreur** | ✅ | Carte sur `/delivery/track/:token` |
+| **Admin delivery / countries** | ✅ | Dashboard ops zones et pays |
+
+---
+
+### Phase 18 — UX marketplace, fiche produit & polish (juin 2026)
+
+| Slice | Statut | Fichiers / notes |
+|-------|--------|------------------|
+| **Carrousel recommandations** | ✅ | `ProductCarousel` — 5 visibles desktop / 2 mobile, max 10, snap + flèches |
+| **CTA panier sur recommandations** | ✅ | `ProductRecommendations` — `showAddButton` variant boutique |
+| **Cartes reco style marketplace** | ✅ | Variant `boutique` sur marketplace + fiche produit (similaires, recently viewed) |
+| **Fiche produit — stock** | ✅ | Masqué en stock ; badge + message uniquement en rupture ; CTA masqués si OOS |
+| **Fiche produit — avis** | ✅ | Note/compteur depuis avis **produit** (`/product-reviews`), plus établissement |
+| **Toggle paiement résa marchand** | ✅ | `BookingPaymentSettingsFields`, `require_payment` + `deposit_percent`, offerings + chambres |
+| **Sélecteur langue dropdown** | ✅ | `LanguageSwitcher` — drapeaux 🇫🇷/🇬🇧, click outside |
+| **Fiche établissement mobile** | ✅ | Badges + barre d'actions (`49d839b`, prod) |
 
 ---
 
@@ -1587,26 +1624,38 @@ Phases 1–4 intégrales · Phase 5 (seeds verticals, M1, delivery MVP, modérat
 
 | Slice | Statut | Fichiers / notes |
 |-------|--------|------------------|
-| **Paiement réservation (simulateur)** | ✅ | `BOOKING` PaymentPurpose, `booking_id`, settings `require_payment`/`deposit_percent`, `/bookings/pay`, `BookingForm` redirect |
-| **Recommandations produits** | ✅ | `ProductDiscoveryService`, `GET /marketplace/recommendations`, `ProductRecommendations` |
-| **Recently viewed** | ✅ | `ProductView`, track view API, `RecentlyViewedProducts`, guest key + compte |
-| **Fidélité achats** | ✅ | `purchase` + `booking_payment` points dynamiques (montant / 1000 FCFA) |
-| **i18n FR/EN** | ✅ MVP | `src/i18n/`, `LocaleProvider`, `LanguageSwitcher`, nav + PWA + booking |
-| **PWA offline-lite** | ✅ | `manifest.webmanifest`, `sw.js`, `PwaRegister`, `PwaInstallPrompt`, `/offline.html` |
+| **Paiement réservation (simulateur)** | ✅ déployé | `BOOKING` PaymentPurpose, `booking_id`, settings `require_payment`/`deposit_percent`, `/bookings/pay`, `BookingForm` redirect |
+| **Recommandations produits** | ✅ déployé | `ProductDiscoveryService`, `GET /marketplace/recommendations`, `ProductRecommendations` |
+| **Recently viewed** | ✅ déployé | `ProductView`, track view API, `RecentlyViewedProducts`, guest key + compte |
+| **Fidélité achats** | ✅ déployé | `purchase` + `booking_payment` points dynamiques (montant / 1000 FCFA) |
+| **i18n FR/EN** | ✅ MVP déployé | `src/i18n/`, `LocaleProvider`, `LanguageSwitcher`, nav + PWA + booking |
+| **PWA offline-lite** | ✅ déployé | `manifest.webmanifest`, `sw.js`, `PwaRegister`, `PwaInstallPrompt`, `/offline.html` |
+| **Migration DB Sprint 17** | ✅ | `20260622100000_sprint17_booking_pay_discovery` — auto `migrate deploy` au redeploy API |
 
 ### Journal — Prochains sprints (backlog ordonné)
 
 | Sprint | Slice | Priorité | Description |
 |--------|-------|----------|-------------|
-| **17** | Paiement résa simulateur | ✅ | Acompte hôtel 30 %, confirm API, page `/bookings/pay` |
-| **17** | Discovery produits | ✅ | Recommandations + recently viewed |
-| **17** | Fidélité achats | ✅ | Points commande + réservation payée |
-| **17** | i18n FR/EN | ✅ MVP | Cookie `lp_locale`, switcher navbar |
-| **17** | PWA offline-lite | ✅ | SW cache navigation + API marketplace |
-| — | P0 Mobile Money réel | Reporté | Remplacer simulateur — prérequis prod UEMOA |
-| — | Paiement réservation hôtel/RDV | P1 | Après MM réel |
-| — | Remboursement paiement réel | P2 | Après intégration MM |
-| — | GPS livreur | P2 | Carte suivi live |
+| **17** | Paiement résa simulateur | ✅ déployé | Acompte hôtel 30 %, confirm API, page `/bookings/pay` |
+| **17** | Discovery produits | ✅ déployé | Recommandations + recently viewed |
+| **17** | Fidélité achats | ✅ déployé | Points commande + réservation payée |
+| **17** | i18n FR/EN + PWA | ✅ déployé | Cookie `lp_locale`, SW cache, install prompt |
+| **18** | Carrousels reco + CTA panier | ✅ | `ProductCarousel`, style boutique, max 10 |
+| **18** | Fiche produit polish | ✅ | Stock masqué sauf rupture, avis produit |
+| **18** | Toggle paiement marchand | ✅ | UI `require_payment` / `deposit_percent` |
+| **18** | Langue dropdown drapeaux | ✅ | `LanguageSwitcher` refonte |
+| **19** | Autocomplete merchants par pays | ✅ | Scope Meilisearch + fallback Prisma |
+| **19** | SEO produit (metadata + JSON-LD) | ✅ | `layout.tsx` fiche produit |
+| **19** | Rappels séjour hôtel enrichis | ✅ | Check-in J-1 + check-out J-1 (multi-nuits) |
+| **19** | i18n étendu v1 | ✅ | Marketplace, produit, checkout steps |
+| **19** | GeoIP suggestion pays | ✅ | Bannière switch pays via headers edge |
+| **19** | Pages légales / metadata par pays | ✅ | `/terms`, `/privacy`, hreflang |
+| **19** | GPS livreur (carte tracking) | ✅ | Phase 2 delivery V3 |
+| **19** | Admin `/admin/delivery` + `/admin/countries` | ✅ | Stats zones, gestion pays |
+| — | **P0 Mobile Money réel** | ⏸ Reporté | Reprendre quand partenaire UEMOA prêt |
+| — | Paiement réservation MM réel | ⏸ | Après MM |
+| — | Remboursement paiement réel | ⏸ | Après MM |
+| — | DNS laplasse.tech + wildcard | P0 ops | Domaine + Coolify |
 
 ### Journal — Slices clôturées Phase 9 (juin 2026)
 

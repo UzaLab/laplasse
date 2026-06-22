@@ -1,16 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ProductCard } from '@/features/marketplace/components/ProductCard'
+import { ProductCarousel } from '@/features/marketplace/components/ProductCarousel'
 import { fetchRecentlyViewed } from '@/lib/discoveryApi'
 import type { MarketplaceProduct } from '@/lib/marketplaceApi'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useT } from '@/providers/LocaleProvider'
 
+const CAROUSEL_LIMIT = 10
+
 export function RecentlyViewedProducts({
   excludeProductId,
   title,
-  limit = 8,
+  limit = CAROUSEL_LIMIT,
 }: {
   excludeProductId?: string
   title?: string
@@ -22,24 +24,17 @@ export function RecentlyViewedProducts({
 
   useEffect(() => {
     let cancelled = false
-    fetchRecentlyViewed(isAuthenticated, excludeProductId, limit)
+    fetchRecentlyViewed(isAuthenticated, excludeProductId, Math.min(limit, CAROUSEL_LIMIT))
       .then(data => { if (!cancelled) setItems(data) })
       .catch(() => { if (!cancelled) setItems([]) })
     return () => { cancelled = true }
   }, [isAuthenticated, excludeProductId, limit])
 
-  if (!items.length) return null
-
   return (
-    <section className="space-y-4">
-      <h2 className="text-2xl font-extrabold text-slate-900">
-        {title ?? t('discovery.recentlyViewed')}
-      </h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {items.map(product => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
-    </section>
+    <ProductCarousel
+      products={items}
+      title={title ?? t('discovery.recentlyViewed')}
+      maxItems={CAROUSEL_LIMIT}
+    />
   )
 }
