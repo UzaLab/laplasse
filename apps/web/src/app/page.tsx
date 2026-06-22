@@ -1,9 +1,11 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import { CountryHubModal } from '@/components/layout/CountryHubModal'
+import { HubCountriesSection } from '@/components/layout/HubCountriesSection'
 import { HeroSection } from '@/features/discovery/components/HeroSection'
 import { CategoryPills } from '@/features/discovery/components/CategoryPills'
 import { SpotCard } from '@/features/discovery/components/SpotCard'
@@ -12,11 +14,15 @@ import { MarketplaceSection } from '@/features/discovery/components/MarketplaceS
 import { B2BSection } from '@/features/discovery/components/B2BSection'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
-import { getDefaultCity, getCountryFromCookieStore, COUNTRY_COOKIE } from '@/lib/country'
+import {
+  getDefaultCity,
+  getCountryFromCookieStore,
+  COUNTRY_COOKIE,
+  isRootDomainHost,
+} from '@/lib/country'
 
 export const dynamic = 'force-dynamic'
 
-// Adapte ApiMerchant → shape SpotCard (qui inclut sub_category & featured_product)
 function toSpotMerchant(m: ApiMerchant) {
   return {
     ...m,
@@ -33,7 +39,26 @@ function toCategory(c: ApiCategory) {
   return { ...c, icon: c.icon ?? 'UtensilsCrossed' }
 }
 
+function HubHomePage() {
+  return (
+    <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
+      <Navbar />
+      <HeroSection mode="hub" />
+      <HubCountriesSection />
+      <B2BSection />
+      <Footer />
+      <MobileBottomNav />
+      <CountryHubModal />
+    </div>
+  )
+}
+
 export default async function HomePage() {
+  const headerStore = await headers()
+  if (isRootDomainHost(headerStore.get('host') ?? '')) {
+    return <HubHomePage />
+  }
+
   const cookieStore = await cookies()
   const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
   const defaultCity = getDefaultCity(country)
@@ -51,13 +76,10 @@ export default async function HomePage() {
     <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
       <Navbar />
 
-      {/* Hero */}
       <HeroSection />
 
-      {/* Catégories */}
       <CategoryPills categories={categories} />
 
-      {/* ══ SÉLECTION LAPLACE ══════════════════════════════════════════════════ */}
       <section className="py-24 bg-[#FAFAFA]">
         <div className="max-w-7xl mx-auto px-6">
 
@@ -88,10 +110,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ══ MARKETPLACE ════════════════════════════════════════════════════════ */}
       <MarketplaceSection />
 
-      {/* ══ À PROXIMITÉ ════════════════════════════════════════════════════════ */}
       {nearby.length > 0 && (
         <section className="py-24 bg-[#FAFAFA]">
           <div className="max-w-7xl mx-auto px-6">
@@ -120,7 +140,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ══ B2B CTA ════════════════════════════════════════════════════════════ */}
       <B2BSection />
 
       <Footer />

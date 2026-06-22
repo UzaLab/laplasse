@@ -3,10 +3,17 @@ import type { NextRequest } from 'next/server'
 import {
   COUNTRY_BY_SUBDOMAIN,
   COUNTRY_COOKIE,
-  DEFAULT_COUNTRY,
   getCountrySubdomain,
+  isRootDomainHost,
+  isSupportedCountryCode,
   ROOT_DOMAIN,
 } from '@/lib/country'
+
+function redirectToHost(request: NextRequest, hostname: string): NextResponse {
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+  const path = `${request.nextUrl.pathname}${request.nextUrl.search}`
+  return NextResponse.redirect(`${proto}://${hostname}${path}`)
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -18,20 +25,27 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const host = request.headers.get('host')?.split(':')[0]?.toLowerCase() ?? ''
+  const hostHeader = request.headers.get('host') ?? ''
+  const host = hostHeader.split(':')[0]?.toLowerCase() ?? ''
   const root = ROOT_DOMAIN.toLowerCase()
-  const isRootHost = host === root || host === `www.${root}`
+  const isRootHost = isRootDomainHost(hostHeader)
   const isCountryHost = host.endsWith(`.${root}`) && !isRootHost
 
   if (!isRootHost && !isCountryHost) {
     return NextResponse.next()
   }
 
+  if (host === `www.${root}`) {
+    return redirectToHost(request, root)
+  }
+
   if (isRootHost) {
-    const sub = getCountrySubdomain(DEFAULT_COUNTRY)
-    const url = request.nextUrl.clone()
-    url.hostname = `${sub}.${root}`
-    return NextResponse.redirect(url)
+    const savedCountry = request.cookies.get(COUNTRY_COOKIE)?.value?.trim().toUpperCase()
+    if (savedCountry && isSupportedCountryCode(savedCountry)) {
+      const sub = getCountrySubdomain(savedCountry)
+      return redirectToHost(request, `${sub}.${root}`)
+    }
+    return NextResponse.next()
   }
 
   const sub = host.slice(0, -(`.${root}`.length)).split('.').pop()

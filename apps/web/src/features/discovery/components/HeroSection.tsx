@@ -3,7 +3,16 @@
 import { SearchAutocomplete } from './SearchAutocomplete'
 import { BRAND_HERO_SUBTITLE, BRAND_TAGLINE_ACCENT, BRAND_TAGLINE_LEAD } from '@/lib/brandCopy'
 
-export function HeroSection() {
+const HUB_HERO_SUBTITLE =
+  'Restaurants, hôtels, salons et boutiques — réservez et commandez auprès des établissements premium en Côte d\'Ivoire, au Burkina Faso et au Sénégal.'
+
+type HeroSectionProps = {
+  mode?: 'default' | 'hub'
+}
+
+export function HeroSection({ mode = 'default' }: HeroSectionProps) {
+  const isHub = mode === 'hub'
+
   return (
     <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32">
       {/* Blob amber */}
@@ -27,17 +36,18 @@ export function HeroSection() {
 
           {/* Sous-titre */}
           <p className="text-lg text-slate-500 leading-relaxed mb-10 max-w-2xl mx-auto lg:mx-0">
-            {BRAND_HERO_SUBTITLE}
+            {isHub ? HUB_HERO_SUBTITLE : BRAND_HERO_SUBTITLE}
           </p>
 
-          {/* Barre de recherche avec autocomplete */}
-          <div className="max-w-2xl mx-auto lg:mx-0">
-            <SearchAutocomplete
-              placeholder="Établissements, produits, services…"
-              size="lg"
-              navigateTo="search"
-            />
-          </div>
+          {!isHub && (
+            <div className="max-w-2xl mx-auto lg:mx-0">
+              <SearchAutocomplete
+                placeholder="Établissements, produits, services…"
+                size="lg"
+                navigateTo="search"
+              />
+            </div>
+          )}
         </div>
 
         {/* Image droite — desktop uniquement */}

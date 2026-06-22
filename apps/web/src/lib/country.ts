@@ -68,6 +68,54 @@ export const SUPPORTED_COUNTRIES = [
   { code: 'SN', label: 'Sénégal' },
 ] as const
 
+export const COUNTRY_HUB_ENTRIES = [
+  {
+    code: 'CI',
+    label: "Côte d'Ivoire",
+    city: 'Abidjan',
+    flag: '🇨🇮',
+    tagline: 'Restaurants, hôtels et boutiques à Abidjan et ailleurs.',
+  },
+  {
+    code: 'BF',
+    label: 'Burkina Faso',
+    city: 'Ouagadougou',
+    flag: '🇧🇫',
+    tagline: 'Les adresses premium de Ouaga et du pays.',
+  },
+  {
+    code: 'SN',
+    label: 'Sénégal',
+    city: 'Dakar',
+    flag: '🇸🇳',
+    tagline: 'Découvrez le meilleur de Dakar et du Sénégal.',
+  },
+] as const
+
+export function isSupportedCountryCode(code: string): boolean {
+  return code.trim().toUpperCase() in SUBDOMAIN_BY_COUNTRY
+}
+
+export function isRootDomainHost(host: string): boolean {
+  const hostname = host.split(':')[0]?.toLowerCase() ?? ''
+  const root = ROOT_DOMAIN.toLowerCase()
+  return hostname === root || hostname === `www.${root}`
+}
+
+/** URL absolue vers un sous-domaine pays (sans port). */
+export function buildSubdomainUrl(
+  countryCode: string,
+  pathname = '/',
+  search = '',
+  protocol: 'http' | 'https' = 'https',
+): string | null {
+  const normalized = countryCode.trim().toUpperCase()
+  if (!isSupportedCountryCode(normalized)) return null
+  const sub = getCountrySubdomain(normalized)
+  const root = ROOT_DOMAIN.toLowerCase()
+  return `${protocol}://${sub}.${root}${pathname}${search}`
+}
+
 /** SSR : lit le cookie lp_country (Next.js cookies()) */
 export function getCountryFromCookieStore(
   cookieValue: string | undefined,
@@ -109,9 +157,9 @@ export function buildCountrySwitchUrl(
   search = '',
 ): string | null {
   if (typeof window === 'undefined') return null
-  const root = ROOT_DOMAIN.toLowerCase()
   const host = window.location.hostname.toLowerCase()
+  const root = ROOT_DOMAIN.toLowerCase()
   if (host !== root && host !== `www.${root}` && !host.endsWith(`.${root}`)) return null
-  const sub = getCountrySubdomain(countryCode)
-  return `${window.location.protocol}//${sub}.${root}${pathname}${search}`
+  const protocol = window.location.protocol.replace(':', '') as 'http' | 'https'
+  return buildSubdomainUrl(countryCode, pathname, search, protocol)
 }
