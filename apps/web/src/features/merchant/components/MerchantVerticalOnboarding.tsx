@@ -15,6 +15,8 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { fetchMyProducts } from '@/lib/marketplaceApi'
 import { getShopsForMerchant } from '@/lib/shopApi'
+import { shopApiFetch } from '@/lib/shopApi'
+import { getCategoryModuleHints } from '@/lib/merchantCategoryHints'
 import {
   dismissOnboarding,
   getVerticalOnboardingSteps,
@@ -51,12 +53,13 @@ export function MerchantVerticalOnboarding() {
     const linkedShops = getShopsForMerchant(user?.shops, merchantId)
     const shopId = linkedShops[0]?.id
 
-    const [profileRes, hoursRes, menuRes, servicesRes, staffRes] = await Promise.all([
+    const [profileRes, hoursRes, menuRes, servicesRes, staffRes, bookingConfigRes] = await Promise.all([
       merchantApiFetch('/merchants/me/profile', merchantId),
       merchantApiFetch('/merchants/me/hours', merchantId),
       merchantApiFetch('/merchants/me/menu', merchantId).catch(() => null),
       merchantApiFetch('/staff/services', merchantId).catch(() => null),
       merchantApiFetch('/staff/members', merchantId).catch(() => null),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/merchant/${merchantId}/config`).catch(() => null),
     ])
 
     const profile = profileRes.ok ? await profileRes.json() : null
@@ -64,7 +67,17 @@ export function MerchantVerticalOnboarding() {
     const menu = menuRes?.ok ? await menuRes.json() : null
     const services = servicesRes?.ok ? await servicesRes.json() : []
     const staff = staffRes?.ok ? await staffRes.json() : []
+    const bookingConfig = bookingConfigRes?.ok ? await bookingConfigRes.json() : null
     const products = shopId ? await fetchMyProducts(shopId) : []
+
+    let deliveryZonesDone = false
+    if (shopId) {
+      const zonesRes = await shopApiFetch(`/shops/${shopId}/delivery-zones`, shopId).catch(() => null)
+      if (zonesRes?.ok) {
+        const zones = await zonesRes.json() as unknown[]
+        deliveryZonesDone = Array.isArray(zones) && zones.length > 0
+      }
+    }
 
     const profileDone = !!(profile?.description && (profile?.cover_image || profile?.logo))
     const hoursDone = Array.isArray(hours) && hours.length > 0
@@ -74,7 +87,29 @@ export function MerchantVerticalOnboarding() {
     const servicesDone = Array.isArray(services) && services.length > 0
     const staffDone = Array.isArray(staff) && staff.length > 0
     const shopDone = linkedShops.length > 0
-    const productsDone = products.filter(p => p.status === 'ACTIVE').length >= 1
+    const productsDone = products.filter(p => p.status === 'ACTIVE').length >= 3
+
+    const roomServices = (bookingConfig?.room_services ?? []) as Array<{
+      image_urls?: string[]
+      nightly_rate?: number | null
+      price?: number | null
+    }>
+    const roomsDone = roomServices.some(
+      r => (r.image_urls?.length ?? 0) > 0 && (r.nightly_rate ?? r.price) != null,
+    )
+
+    const settings = bookingConfig?.booking_settings as {
+      auto_confirm?: boolean
+      require_payment?: boolean
+      cancellation_policy?: string | null
+      no_show_policy?: string | null
+    } | undefined
+    const bookingsDone = !!(
+      settings?.auto_confirm
+      || settings?.require_payment
+      || settings?.cancellation_policy?.trim()
+      || settings?.no_show_policy?.trim()
+    )
 
     const doneMap: Record<string, boolean> = {
       profile: profileDone,
@@ -84,9 +119,9 @@ export function MerchantVerticalOnboarding() {
       staff: staffDone,
       shop: shopDone,
       products: productsDone,
-      delivery: shopDone,
-      bookings: false,
-      rooms: servicesDone,
+      delivery: deliveryZonesDone,
+      bookings: bookingsDone,
+      rooms: roomsDone,
       offerings: servicesDone,
     }
 
@@ -132,6 +167,18 @@ export function MerchantVerticalOnboarding() {
                 Suivez ces étapes pour activer votre module{' '}
                 {categorySlug ? `(${categorySlug.replace(/-/g, ' ')})` : 'métier'}.
               </p>
+              {categorySlug && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {getCategoryModuleHints(categorySlug).map(hint => (
+                    <span
+                      key={hint}
+                      className="text-[10px] font-bold uppercase tracking-wide bg-brand-50 text-brand-700 px-2 py-1 rounded-full"
+                    >
+                      {hint}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               type="button"

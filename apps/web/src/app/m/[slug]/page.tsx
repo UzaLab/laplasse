@@ -260,7 +260,9 @@ export default async function MerchantPage({ params }: Props) {
               </div>
             </div>
 
-            <BookingForm merchantId={merchant.id} merchantName={merchant.business_name} />
+            <div id="reserver">
+              <BookingForm merchantId={merchant.id} merchantName={merchant.business_name} />
+            </div>
 
             {/* Trust score */}
             <div className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm">

@@ -146,6 +146,34 @@ export class BookingsService {
     }
   }
 
+  async getPublicRoomBySlug(slug: string, roomId: string) {
+    const merchant = await this.prisma.merchant.findFirst({
+      where: { slug, is_active: true },
+      select: {
+        id: true,
+        business_name: true,
+        slug: true,
+        cover_image: true,
+        category: { select: { slug: true, name: true } },
+      },
+    })
+    if (!merchant) throw new NotFoundException('Établissement introuvable')
+
+    const config = await this.getMerchantConfig(merchant.id)
+    const room =
+      config.room_services.find(s => s.id === roomId)
+      ?? config.services.find(s => s.id === roomId && s.service_kind === 'ROOM_TYPE')
+
+    if (!room) throw new NotFoundException('Chambre introuvable')
+
+    return {
+      merchant,
+      room,
+      booking_settings: config.booking_settings,
+      booking_enabled: config.enabled,
+    }
+  }
+
   async getAvailability(
     merchantId: string,
     date: string,

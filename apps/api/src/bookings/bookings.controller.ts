@@ -40,6 +40,15 @@ export class BookingsController {
   }
 
   @Public()
+  @Get('merchant-by-slug/:slug/rooms/:roomId')
+  getPublicRoom(
+    @Param('slug') slug: string,
+    @Param('roomId') roomId: string,
+  ) {
+    return this.bookingsService.getPublicRoomBySlug(slug, roomId)
+  }
+
+  @Public()
   @Get('merchant/:merchantId/availability')
   availability(
     @Param('merchantId') merchantId: string,

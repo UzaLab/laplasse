@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { BedDouble, Calendar, ChevronLeft, ChevronRight, Info, Loader2, ShieldCheck, Users } from 'lucide-react'
 import type { BookingConfig, MerchantServiceConfig } from '@/lib/bookingConfig'
@@ -23,6 +24,8 @@ interface DayCell {
 
 interface Props {
   merchantId: string
+  merchantSlug: string
+  merchantName: string
 }
 
 function monthRange(year: number, month: number) {
@@ -59,7 +62,7 @@ const MONTH_NAMES = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
-export function MerchantHotelTab({ merchantId }: Props) {
+export function MerchantHotelTab({ merchantId, merchantSlug, merchantName }: Props) {
   const [config, setConfig] = useState<BookingConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
@@ -227,6 +230,7 @@ export function MerchantHotelTab({ merchantId }: Props) {
             <RoomCard
               key={room.id}
               room={room}
+              merchantSlug={merchantSlug}
               selected={selectedRoomId === room.id}
               onSelect={() => setSelectedRoomId(room.id)}
               onDetails={() => setDetailRoomId(room.id)}
@@ -411,6 +415,8 @@ export function MerchantHotelTab({ merchantId }: Props) {
       {detailRoom && (
         <RoomDetailSheet
           room={detailRoom}
+          merchantName={merchantName}
+          merchantSlug={merchantSlug}
           open
           onClose={() => setDetailRoomId(null)}
           onSelect={() => setSelectedRoomId(detailRoom.id)}
@@ -423,11 +429,13 @@ export function MerchantHotelTab({ merchantId }: Props) {
 function RoomCard({
   room,
   selected,
+  merchantSlug,
   onSelect,
   onDetails,
 }: {
   room: MerchantServiceConfig
   selected: boolean
+  merchantSlug: string
   onSelect: () => void
   onDetails: () => void
 }) {
@@ -503,13 +511,22 @@ function RoomCard({
           )}
         </div>
         <div className="mt-3 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={onDetails}
-            className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700"
-          >
-            <Info size={12} /> Détails
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onDetails}
+              className="inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:text-brand-700"
+            >
+              <Info size={12} /> Détails
+            </button>
+            <Link
+              href={`/m/${merchantSlug}/chambres/${room.id}`}
+              className="text-xs font-bold text-slate-500 hover:text-slate-800"
+              style={{ textDecoration: 'none' }}
+            >
+              Fiche complète
+            </Link>
+          </div>
           {selected && (
             <span className="text-[10px] font-bold uppercase text-brand-600">Sélectionnée</span>
           )}

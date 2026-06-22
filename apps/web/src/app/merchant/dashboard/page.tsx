@@ -15,6 +15,7 @@ import { merchantApiFetch } from '@/lib/merchantApi'
 import { useMerchant } from '@/features/discovery/hooks/useDiscovery'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { AnalyticsChart } from '@/features/merchant/components/AnalyticsChart'
+import { isOnboardingDismissed } from '@/lib/merchantOnboarding'
 
 type MerchantData = {
   description?: string | null
@@ -141,6 +142,25 @@ function DashboardContent() {
             <h3 className="font-extrabold text-emerald-900 text-lg">Établissement créé !</h3>
             <p className="text-emerald-700 text-sm mt-0.5">Notre équipe valide votre dossier sous 24–48h. Complétez votre profil pour accélérer.</p>
           </div>
+        </div>
+      )}
+
+      {/* Onboarding vertical */}
+      {myProfile?.id && !isOnboardingDismissed(myProfile.id) && (
+        <div className="mb-8 bg-brand-50 border border-brand-200 rounded-[28px] p-6 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="font-extrabold text-brand-900">Configurez votre établissement</h3>
+            <p className="text-brand-700 text-sm mt-0.5">
+              Checklist personnalisée selon votre catégorie — menu, chambres, boutique…
+            </p>
+          </div>
+          <Link
+            href="/merchant/onboarding"
+            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm transition-colors shrink-0"
+            style={{ textDecoration: 'none' }}
+          >
+            Continuer →
+          </Link>
         </div>
       )}
 

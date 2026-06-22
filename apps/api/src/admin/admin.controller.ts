@@ -12,6 +12,7 @@ import { AuditService } from '../audit/audit.service'
 import { MarketplaceService } from '../marketplace/marketplace.service'
 import { ProductCategoriesService } from '../marketplace/product-categories.service'
 import { GeoService } from '../geo/geo.service'
+import { AdminSeedService } from './admin-seed.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -27,6 +28,7 @@ export class AdminController {
     private readonly marketplace: MarketplaceService,
     private readonly productCategories: ProductCategoriesService,
     private readonly geo: GeoService,
+    private readonly adminSeed: AdminSeedService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
@@ -263,6 +265,15 @@ export class AdminController {
   async seedMarketplace() {
     const result = await this.marketplace.seedDemoProducts()
     return { ok: true, ...result }
+  }
+
+  @Post('seed-multipays')
+  async seedMultipays(@Query('country') country?: string) {
+    const code = (country ?? 'ALL').toUpperCase()
+    if (code !== 'ALL' && code !== 'BF' && code !== 'SN') {
+      throw new BadRequestException('country doit être BF, SN ou ALL')
+    }
+    return this.adminSeed.seedMultipays(code as 'BF' | 'SN' | 'ALL')
   }
 
   // ── Trust Score ──────────────────────────────────────────────────────────────
