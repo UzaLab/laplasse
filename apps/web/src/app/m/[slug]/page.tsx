@@ -156,10 +156,25 @@ export default async function MerchantPage({ params }: Props) {
                   {merchant.category.name}
                 </span>
                 {merchant.verification_status === 'VERIFIED' && (
-                  <span className="flex items-center gap-1 bg-blue-500/80 backdrop-blur border border-blue-400/30 text-white text-[10px] md:text-xs font-bold px-3 py-1 rounded-full">
-                    <BadgeCheck size={12} /> Établissement vérifié
+                  <span
+                    className="flex items-center gap-1 bg-blue-500/80 backdrop-blur border border-blue-400/30 text-white text-[10px] md:text-xs font-bold px-2.5 md:px-3 py-1 rounded-full"
+                    title="Établissement vérifié"
+                    aria-label="Établissement vérifié"
+                  >
+                    <BadgeCheck size={14} className="shrink-0" />
+                    <span className="hidden md:inline">Établissement vérifié</span>
                   </span>
                 )}
+                <span
+                  className={`flex items-center gap-1 text-[10px] md:text-xs font-bold px-2.5 md:px-3 py-1 rounded-full border lg:hidden ${
+                    isOpen
+                      ? 'text-emerald-100 bg-emerald-500/80 border-emerald-400/40'
+                      : 'text-red-100 bg-red-500/80 border-red-400/40'
+                  }`}
+                >
+                  <Clock size={12} className="shrink-0" />
+                  {isOpen ? 'Ouvert' : 'Fermé'}
+                </span>
                 {merchant.review_count > 0 && merchant.avg_rating && (
                   <span className="bg-white/20 backdrop-blur border border-white/20 text-white text-[10px] md:text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
                     <Star size={11} className="fill-brand-400 text-brand-400" />
@@ -211,10 +226,9 @@ export default async function MerchantPage({ params }: Props) {
           {/* ── Sidebar sticky ────────────────────────────────────────────── */}
           <div className="order-2 lg:col-span-1 w-full space-y-5 lg:sticky lg:top-24">
 
-            {/* Status + Contact */}
-            <div className="bg-white border border-slate-200 p-6 rounded-[32px] shadow-xl shadow-slate-200/50">
-              {/* Open/closed */}
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold mb-5 border ${
+            {/* Status + Contact — desktop uniquement pour l'ouverture (mobile : hero + barre d'actions) */}
+            <div className="hidden lg:block bg-white border border-slate-200 p-6 rounded-[32px] shadow-xl shadow-slate-200/50">
+              <div className={`hidden lg:inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold mb-5 border ${
                 isOpen
                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
                   : 'text-red-600 bg-red-50 border-red-200'

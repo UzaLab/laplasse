@@ -24,6 +24,7 @@ interface ActionBtn {
   href?: string
   onClick?: () => void
   variant?: 'primary' | 'secondary'
+  iconOnly?: boolean
 }
 
 interface Props {
@@ -78,9 +79,10 @@ function buildActions(
   if (vertical === 'food') {
     const actions: ActionBtn[] = [{
       label: 'Commander',
-      icon: <ShoppingBag size={18} />,
+      icon: <ShoppingBag size={20} />,
       href: tabHref(merchantSlug, 'menu'),
       variant: 'primary',
+      iconOnly: true,
     }]
     if (bookingEnabled) {
       actions.unshift({
@@ -196,48 +198,61 @@ export function MerchantMobileActionBar({
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackContact(merchantId, 'WHATSAPP_CLICK')}
-            className={`${btnBase} max-w-[3rem] flex-none bg-emerald-500 text-white hover:bg-emerald-600`}
+            className={`${btnBase} w-14 shrink-0 flex-none bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm shadow-emerald-500/25`}
             aria-label="WhatsApp"
             style={{ textDecoration: 'none' }}
           >
-            <MessageCircle size={20} />
+            <MessageCircle size={22} />
           </a>
         )}
         {!whatsapp && phone && (
           <a
             href={`tel:${phone}`}
             onClick={() => trackContact(merchantId, 'CALL_CLICK')}
-            className={`${btnBase} max-w-[3rem] flex-none bg-slate-100 text-slate-800`}
+            className={`${btnBase} w-14 shrink-0 flex-none bg-slate-100 text-slate-800`}
             aria-label="Appeler"
             style={{ textDecoration: 'none' }}
           >
-            <Phone size={20} />
+            <Phone size={22} />
           </a>
         )}
 
         {actions.map(action => {
           const className = `${btnBase} ${
+            action.iconOnly ? 'w-14 shrink-0 flex-none' : ''
+          } ${
             action.variant === 'primary'
               ? 'bg-slate-900 text-white hover:bg-slate-800'
               : 'bg-white text-slate-900 border border-slate-200'
           }`
+          const content = (
+            <>
+              {action.icon}
+              {!action.iconOnly && <span className="truncate">{action.label}</span>}
+            </>
+          )
           if (action.href) {
             return (
               <Link
                 key={action.label}
                 href={action.href}
                 className={className}
+                aria-label={action.iconOnly ? action.label : undefined}
                 style={{ textDecoration: 'none' }}
               >
-                {action.icon}
-                <span className="truncate">{action.label}</span>
+                {content}
               </Link>
             )
           }
           return (
-            <button key={action.label} type="button" onClick={action.onClick} className={className}>
-              {action.icon}
-              <span className="truncate">{action.label}</span>
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className={className}
+              aria-label={action.iconOnly ? action.label : undefined}
+            >
+              {content}
             </button>
           )
         })}
