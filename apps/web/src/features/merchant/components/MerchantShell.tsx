@@ -5,12 +5,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
-  Crown, Menu, X, LogOut, Compass, Bell, ExternalLink, Users, UserCircle2,
+  Crown, Menu, X, LogOut, Compass, ExternalLink, Users, UserCircle2,
   ChevronDown, Plus, Building2, Network, Calendar, Megaphone,
   ShoppingBag, UtensilsCrossed, BedDouble, Sparkles, Dumbbell, Stethoscope,
 } from 'lucide-react'
 import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
+import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
@@ -461,9 +462,11 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="text-slate-400 hover:text-slate-700 transition-colors">
-              <Bell size={18} />
-            </button>
+            <NotificationBell
+              viewAllHref="/merchant/notifications"
+              refetchIntervalMs={20_000}
+              showPushPrompt
+            />
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">

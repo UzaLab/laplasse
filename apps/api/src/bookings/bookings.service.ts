@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
+import { merchantBookingNotificationData } from '../notifications/notification-links'
 import { getPlanLimits } from '../common/plan-limits'
 import { getCategoryBookingConfig } from '../common/booking-config'
 import { formatLocalDate } from '../common/date-local'
@@ -567,7 +568,7 @@ export class BookingsService {
       type: 'booking_created',
       title: 'Nouvelle réservation',
       body: `${dto.guest_name} — ${catConfig.cta} pour ${bookedAt.toLocaleString('fr-FR')}.`,
-      data: { booking_id: booking.id, merchant_id: merchantId },
+      data: merchantBookingNotificationData({ id: booking.id, merchant_id: merchantId }),
     })
 
     if (userId) {
@@ -901,7 +902,7 @@ export class BookingsService {
       type: 'booking_updated',
       title: 'Modification de réservation',
       body: `${updated.guest_name} a modifié sa demande pour ${bookedAt.toLocaleString('fr-FR')}. Validation requise.`,
-      data: { booking_id: bookingId, merchant_id: booking.merchant_id },
+      data: merchantBookingNotificationData({ id: bookingId, merchant_id: booking.merchant_id }),
     })
 
     await this.notificationQueue.enqueuePush({

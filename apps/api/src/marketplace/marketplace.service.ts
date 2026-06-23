@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
+import {
+  merchantOrderNotificationData,
+} from '../notifications/notification-links'
 import { getPlanLimits, isWithinLimit } from '../common/plan-limits'
 import {
   DeliveryType,
@@ -2015,7 +2018,7 @@ export class MarketplaceService {
         type: 'order_created',
         title: 'Nouvelle commande',
         body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
-        data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
+        data: merchantOrderNotificationData(order),
       })
     }
 
@@ -2108,7 +2111,7 @@ export class MarketplaceService {
           type: 'order_created',
           title: 'Nouvelle commande',
           body: `Commande confirmée — ${order.total.toLocaleString('fr-CI')} FCFA`,
-          data: { order_id: order.id, shop_id: order.shop_id, merchant_id: order.merchant_id },
+          data: merchantOrderNotificationData(order),
         })
       }
       await this.loyalty.earnPoints(userId, 'purchase', {

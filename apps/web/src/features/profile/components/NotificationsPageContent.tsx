@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Bell, BellRing, CheckCheck, ChevronLeft, ChevronRight, Loader2, Package,
   Inbox, Filter,
@@ -12,6 +13,35 @@ import { NotificationIcon } from '@/lib/icons'
 import { WebPushToggle } from '@/components/WebPushToggle'
 import { cn } from '@/lib/utils'
 import { fetchNotifications, type NotificationItem } from '@/lib/notificationsApi'
+import { resolveNotificationHref } from '@/lib/notificationLinks'
+
+export type NotificationsAudience = 'client' | 'merchant'
+
+const AUDIENCE_COPY: Record<NotificationsAudience, {
+  subtitle: string
+  pushDescription: string
+  emptyAll: string
+  emptyUnread: string
+  emptyCtaHref: string
+  emptyCtaLabel: string
+}> = {
+  client: {
+    subtitle: 'Commandes, livraisons, réservations et récompenses — tout au même endroit.',
+    pushDescription: 'Recevez les mises à jour de livraison, le statut de vos commandes et les rappels de réservation en temps réel — même lorsque l\'onglet est fermé.',
+    emptyAll: 'Vos commandes, livraisons et réservations s\'afficheront ici.',
+    emptyUnread: 'Vous êtes à jour. Les nouvelles alertes apparaîtront ici.',
+    emptyCtaHref: '/marketplace',
+    emptyCtaLabel: 'Explorer la marketplace',
+  },
+  merchant: {
+    subtitle: 'Nouvelles commandes, réservations et mises à jour boutique — suivi en temps réel.',
+    pushDescription: 'Soyez alerté instantanément des nouvelles commandes et réservations, même lorsque l\'application est fermée.',
+    emptyAll: 'Vos commandes et réservations clients apparaîtront ici.',
+    emptyUnread: 'Aucune alerte en attente. Les prochaines commandes s\'afficheront ici.',
+    emptyCtaHref: '/merchant/dashboard',
+    emptyCtaLabel: 'Retour au dashboard',
+  },
+}
 
 type FilterTab = 'all' | 'unread'
 
@@ -29,6 +59,11 @@ const TYPE_ACCENT: Record<string, { bg: string; ring: string; icon: string }> = 
   booking_created: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
   booking_confirmed: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
   booking_status: { bg: 'bg-blue-50', ring: 'ring-blue-200/80', icon: 'text-blue-600' },
+  booking_updated: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
+  order_created: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
+  order_status: { bg: 'bg-blue-50', ring: 'ring-blue-200/80', icon: 'text-blue-600' },
+  order_return: { bg: 'bg-orange-50', ring: 'ring-orange-200/80', icon: 'text-orange-600' },
+  delivery_status: { bg: 'bg-indigo-50', ring: 'ring-indigo-200/80', icon: 'text-indigo-600' },
   subscription_upgraded: { bg: 'bg-violet-50', ring: 'ring-violet-200/80', icon: 'text-violet-600' },
   welcome: { bg: 'bg-brand-50', ring: 'ring-brand-200/80', icon: 'text-brand-600' },
   default: { bg: 'bg-slate-100', ring: 'ring-slate-200/80', icon: 'text-slate-600' },
@@ -143,8 +178,10 @@ function NotificationsPagination({
   )
 }
 
-export function NotificationsPageContent() {
+export function NotificationsPageContent({ audience = 'client' }: { audience?: NotificationsAudience }) {
+  const router = useRouter()
   const qc = useQueryClient()
+  const copy = AUDIENCE_COPY[audience]
   const [filter, setFilter] = useState<FilterTab>('all')
   const [page, setPage] = useState(1)
 
@@ -201,7 +238,7 @@ export function NotificationsPageContent() {
               )}
             </h1>
             <p className="text-slate-400 mt-2 text-sm sm:text-base max-w-2xl">
-              Commandes, livraisons, réservations et récompenses — tout au même endroit.
+              {copy.subtitle}
             </p>
           </div>
           {unreadCount > 0 && (
@@ -240,7 +277,7 @@ export function NotificationsPageContent() {
 
       {/* Push PWA */}
       <section className="mb-8">
-        <WebPushToggle variant="featured" />
+        <WebPushToggle variant="featured" description={copy.pushDescription} />
       </section>
 
       {/* Filtres */}
@@ -282,9 +319,7 @@ export function NotificationsPageContent() {
               {filter === 'unread' ? 'Aucune notification non lue' : 'Aucune notification'}
             </p>
             <p className="text-sm text-slate-500 mt-2 max-w-xs mx-auto">
-              {filter === 'unread'
-                ? 'Vous êtes à jour. Les nouvelles alertes apparaîtront ici.'
-                : 'Vos commandes, livraisons et réservations s\'afficheront ici.'}
+              {filter === 'unread' ? copy.emptyUnread : copy.emptyAll}
             </p>
             {filter === 'unread' && totalAll > 0 && (
               <button
@@ -297,11 +332,12 @@ export function NotificationsPageContent() {
             )}
             {filter === 'all' && (
               <Link
-                href="/marketplace"
+                href={copy.emptyCtaHref}
                 className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
-                <Package size={16} /> Explorer la marketplace
+                {audience === 'merchant' ? null : <Package size={16} />}
+                {copy.emptyCtaLabel}
               </Link>
             )}
           </div>
@@ -328,7 +364,11 @@ export function NotificationsPageContent() {
                               ? 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'
                               : 'bg-white border-amber-200/60 shadow-sm ring-1 ring-amber-100/50 hover:shadow-md',
                           )}
-                          onClick={() => !n.read && markRead.mutate(n.id)}
+                          onClick={() => {
+                            if (!n.read) markRead.mutate(n.id)
+                            const href = resolveNotificationHref(n.data, n.type)
+                            if (href) router.push(href)
+                          }}
                         >
                           <div className={cn(
                             'w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ring-1',

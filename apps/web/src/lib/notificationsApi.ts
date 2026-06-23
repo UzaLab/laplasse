@@ -7,7 +7,14 @@ export interface NotificationItem {
   body: string
   read: boolean
   created_at: string
-  data?: { href?: string; job_id?: string; type?: string } | null
+  data?: {
+    href?: string
+    job_id?: string
+    order_id?: string
+    merchant_id?: string | null
+    booking_id?: string
+    type?: string
+  } | null
 }
 
 export interface NotificationsPageResult {

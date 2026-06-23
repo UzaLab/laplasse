@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'laplasse-v3'
+const CACHE_VERSION = 'laplasse-v4'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
 
@@ -37,35 +37,48 @@ function isRuntimeCacheable(url) {
 }
 
 self.addEventListener('push', event => {
-  let payload = { title: 'LaPlasse', body: 'Nouvelle notification', data: {} }
+  let payload = { title: 'LaPlasse', body: 'Nouvelle notification', type: 'default', data: {} }
   try {
     if (event.data) payload = { ...payload, ...event.data.json() }
   } catch {
     if (event.data) payload.body = event.data.text()
   }
 
-  const { title, body, data } = payload
+  const innerData = payload.data && typeof payload.data === 'object' ? payload.data : {}
+  const notifData = { ...innerData, type: payload.type ?? innerData.type }
+
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: data?.type ?? 'laplasse',
-      data,
+      tag: notifData.type ?? 'laplasse',
+      data: notifData,
       vibrate: [200, 100, 200],
     }),
   )
 })
 
+function resolveNotificationTarget(data) {
+  if (data.href) return data.href
+  if (data.type === 'delivery_job_offered' || data.job_id) {
+    return data.href || '/courier/missions'
+  }
+  if (data.type === 'order_created') {
+    if (data.merchant_id && data.order_id) return `/merchant/shop/orders/${data.order_id}`
+    if (data.order_id) return '/shop/manage/orders'
+  }
+  if (data.type === 'booking_created' || data.type === 'booking_updated') {
+    return data.merchant_id ? '/merchant/bookings' : '/profile/bookings'
+  }
+  if (data.order_id) return `/profile/orders/${data.order_id}`
+  return '/profile/notifications'
+}
+
 self.addEventListener('notificationclick', event => {
   event.notification.close()
   const data = event.notification.data ?? {}
-  let target = '/profile/notifications'
-  if (data.type === 'delivery_job_offered' || data.job_id) {
-    target = '/courier/missions'
-  } else if (data.order_id) {
-    target = `/profile/orders/${data.order_id}`
-  }
+  const target = resolveNotificationTarget(data)
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {

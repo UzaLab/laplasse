@@ -10,6 +10,9 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { NotificationIcon } from '@/lib/icons'
 
 import { fetchNotifications, fetchUnreadNotificationCount } from '@/lib/notificationsApi'
+import { resolveNotificationHref } from '@/lib/notificationLinks'
+import { WebPushToggle } from '@/components/WebPushToggle'
+import { isWebPushSupported } from '@/lib/webPush'
 
 interface Notif {
   id: string
@@ -18,7 +21,14 @@ interface Notif {
   body: string
   read: boolean
   created_at: string
-  data?: { href?: string; job_id?: string; type?: string } | null
+  data?: {
+    href?: string
+    job_id?: string
+    order_id?: string
+    merchant_id?: string | null
+    booking_id?: string
+    type?: string
+  } | null
 }
 
 interface NotificationBellProps {
@@ -26,11 +36,14 @@ interface NotificationBellProps {
   viewAllHref?: string
   /** Intervalle de rafraîchissement en ms */
   refetchIntervalMs?: number
+  /** Proposer l'activation push dans le panneau */
+  showPushPrompt?: boolean
 }
 
 export function NotificationBell({
   viewAllHref = '/profile/notifications',
   refetchIntervalMs = 60_000,
+  showPushPrompt = false,
 }: NotificationBellProps = {}) {
   const router = useRouter()
   const { ready: authReady } = useAuthReady()
@@ -92,6 +105,15 @@ export function NotificationBell({
   if (!authReady) return null
 
   const previewItems = preview.slice(0, 6)
+  const pushSupported = showPushPrompt && isWebPushSupported()
+  const pushGranted = pushSupported && typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
+  const openNotification = (n: Notif) => {
+    if (!n.read) markRead.mutate(n.id)
+    setOpen(false)
+    const href = resolveNotificationHref(n.data, n.type)
+    if (href) router.push(href)
+  }
 
   return (
     <>
@@ -151,12 +173,7 @@ export function NotificationBell({
                     className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${
                       !n.read ? 'bg-amber-50/40' : ''
                     }`}
-                    onClick={() => {
-                      if (!n.read) markRead.mutate(n.id)
-                      setOpen(false)
-                      const href = n.data?.href
-                      if (href) router.push(href)
-                    }}
+                    onClick={() => openNotification(n)}
                   >
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
                       <NotificationIcon type={n.type} size={15} />
@@ -182,6 +199,15 @@ export function NotificationBell({
                 ))
               )}
             </div>
+
+            {pushSupported && !pushGranted && (
+              <div className="px-4 py-3 border-t border-slate-50 bg-slate-50/80">
+                <p className="text-[11px] text-slate-500 mb-2 leading-snug">
+                  Activez le push pour être alerté des nouvelles commandes et réservations, même hors de l&apos;app.
+                </p>
+                <WebPushToggle compact />
+              </div>
+            )}
 
             <Link
               href={viewAllHref}

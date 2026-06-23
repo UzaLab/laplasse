@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils'
 interface Props {
   compact?: boolean
   variant?: 'default' | 'featured'
+  description?: string
 }
 
-export function WebPushToggle({ compact, variant = 'default' }: Props) {
+export function WebPushToggle({ compact, variant = 'default', description }: Props) {
   const [loading, setLoading] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default')
   const supported = isWebPushSupported()
@@ -106,8 +107,12 @@ export function WebPushToggle({ compact, variant = 'default' }: Props) {
                 </span>
               </div>
               <p className="text-sm text-slate-500 leading-relaxed max-w-xl">
-                Recevez les mises à jour de livraison, le statut de vos commandes et les rappels de réservation
-                en temps réel — même lorsque l&apos;onglet est fermé.
+                {description ?? (
+                  <>
+                    Recevez les mises à jour de livraison, le statut de vos commandes et les rappels de réservation
+                    en temps réel — même lorsque l&apos;onglet est fermé.
+                  </>
+                )}
               </p>
               {permission === 'denied' && (
                 <p className="text-xs text-red-600 font-medium mt-2">
@@ -147,7 +152,7 @@ export function WebPushToggle({ compact, variant = 'default' }: Props) {
         <div>
           <p className="font-bold text-slate-900">Notifications push (PWA)</p>
           <p className="text-sm text-slate-500 mt-0.5">
-            Recevez les mises à jour de livraison et commandes en temps réel, même hors de l&apos;app.
+            {description ?? 'Recevez les mises à jour de livraison et commandes en temps réel, même hors de l\'app.'}
           </p>
         </div>
       </div>

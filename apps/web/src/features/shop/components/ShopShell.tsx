@@ -13,6 +13,7 @@ import { getIndependentShops } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 import { cn } from '@/lib/utils'
+import { NotificationBell } from '@/features/profile/components/NotificationBell'
 
 interface ShopShellProps {
   children: React.ReactNode
@@ -306,6 +307,11 @@ export function ShopShell({ children }: ShopShellProps) {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell
+              viewAllHref="/shop/manage/notifications"
+              refetchIntervalMs={20_000}
+              showPushPrompt
+            />
             {activeShop?.slug && (
               <Link
                 href={`/boutique/${activeShop.slug}`}
