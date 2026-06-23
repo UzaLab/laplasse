@@ -1,18 +1,16 @@
-const CACHE_VERSION = 'laplasse-v2'
+const CACHE_VERSION = 'laplasse-v3'
 const STATIC_CACHE = `${CACHE_VERSION}-static`
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
 
-const PRECACHE = ['/', '/offline.html', '/marketplace', '/manifest.webmanifest']
+const PRECACHE = ['/', '/offline.html', '/marketplace', '/search', '/manifest.webmanifest']
 
-const RUNTIME_CACHEABLE = [
-  '/api/marketplace/product-categories',
-  '/api/marketplace/featured',
-  '/api/marketplace/recommendations',
-]
+const RUNTIME_PREFIXES = ['/_next/static/', '/icons/']
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()),
+    caches.open(STATIC_CACHE)
+      .then(cache => cache.addAll(PRECACHE))
+      .then(() => self.skipWaiting()),
   )
 })
 
@@ -28,11 +26,14 @@ self.addEventListener('activate', event => {
   )
 })
 
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
+
 function isRuntimeCacheable(url) {
-  if (url.pathname.startsWith('/_next/static/')) return true
-  if (url.pathname.startsWith('/icons/')) return true
-  return RUNTIME_CACHEABLE.some(path => url.pathname.endsWith(path.replace('/api', '')))
-    || RUNTIME_CACHEABLE.some(path => url.href.includes(path))
+  if (RUNTIME_PREFIXES.some(p => url.pathname.startsWith(p))) return true
+  if (url.pathname.includes('/api/marketplace/')) return true
+  return false
 }
 
 self.addEventListener('push', event => {
@@ -51,6 +52,7 @@ self.addEventListener('push', event => {
       badge: '/icons/icon-192.png',
       tag: data?.type ?? 'laplasse',
       data,
+      vibrate: [200, 100, 200],
     }),
   )
 })
@@ -61,8 +63,7 @@ self.addEventListener('notificationclick', event => {
   let target = '/profile/notifications'
   if (data.type === 'delivery_job_offered' || data.job_id) {
     target = '/courier/missions'
-  } else if (data.order_id) target = `/profile/orders/${data.order_id}`
-  else if (data.delivery_status && data.order_id) {
+  } else if (data.order_id) {
     target = `/profile/orders/${data.order_id}`
   }
 
@@ -84,30 +85,31 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return
 
   const url = new URL(request.url)
+  const sameOrigin = url.origin === self.location.origin
 
-  if (url.origin !== self.location.origin && !url.pathname.includes('/api/marketplace/')) {
-    return
-  }
+  if (!sameOrigin && !url.pathname.includes('/api/marketplace/')) return
 
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const copy = response.clone()
-          caches.open(RUNTIME_CACHE).then(cache => cache.put(request, copy))
+          if (response.ok) {
+            const copy = response.clone()
+            caches.open(RUNTIME_CACHE).then(cache => cache.put(request, copy))
+          }
           return response
         })
         .catch(async () => {
           const cached = await caches.match(request)
           if (cached) return cached
           const offline = await caches.match('/offline.html')
-          return offline ?? new Response('Hors ligne', { status: 503, headers: { 'Content-Type': 'text/plain' } })
+          return offline ?? new Response('Hors ligne', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
         }),
     )
     return
   }
 
-  if (isRuntimeCacheable(url) || url.pathname.includes('/api/marketplace/')) {
+  if (isRuntimeCacheable(url)) {
     event.respondWith(
       caches.open(RUNTIME_CACHE).then(async cache => {
         try {
@@ -117,7 +119,7 @@ self.addEventListener('fetch', event => {
         } catch {
           const cached = await cache.match(request)
           if (cached) return cached
-          throw new Error('offline')
+          return new Response('', { status: 503 })
         }
       }),
     )

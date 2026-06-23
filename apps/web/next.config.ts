@@ -39,7 +39,24 @@ const nextConfig: NextConfig = {
   // Évite les builds Docker bloqués sur le VPS (pages lentes / API indisponible)
   staticPageGenerationTimeout: 45,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          ...securityHeaders,
+        ],
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json" },
+          ...securityHeaders,
+        ],
+      },
+      { source: "/:path*", headers: securityHeaders },
+    ];
   },
   async redirects() {
     return [{ source: "/categories", destination: "/search", permanent: true }];

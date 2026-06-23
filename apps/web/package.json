@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:docker": "next build --webpack",
-    "start": "next start"
+    "start": "next start",
+    "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.56.0",
@@ -33,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "sharp": "^0.35.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

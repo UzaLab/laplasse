@@ -51,3 +51,7 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.safe-area-bottom {
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}

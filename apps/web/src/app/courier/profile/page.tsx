@@ -3,6 +3,7 @@
 import { Loader2 } from 'lucide-react'
 import { CourierShell } from '@/features/courier/components/CourierShell'
 import { useCourierSession } from '@/features/courier/hooks/useCourierSession'
+import { WebPushToggle } from '@/components/WebPushToggle'
 import {
   COURIER_STATUS_LABELS, COURIER_STATUS_STYLES, vehicleLabel, type CourierStatus,
 } from '@/lib/courierLabels'
@@ -52,6 +53,8 @@ export default function CourierProfilePage() {
             ))}
           </dl>
         </div>
+
+        <WebPushToggle variant="featured" />
       </div>
     </CourierShell>
   )

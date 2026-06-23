@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { cookies, headers } from 'next/headers'
 import { Outfit } from 'next/font/google'
 import { QueryProvider } from '@/providers/QueryProvider'
@@ -6,8 +6,7 @@ import { PostHogProvider } from '@/providers/PostHogProvider'
 import { LocaleProvider } from '@/providers/LocaleProvider'
 import { AuthBootstrap } from '@/components/AuthBootstrap'
 import { AppToaster } from '@/components/ui/AppToaster'
-import { PwaRegister } from '@/components/PwaRegister'
-import { WebPushManager } from '@/components/WebPushManager'
+import { PwaProvider } from '@/components/PwaProvider'
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
 import { CountrySuggestionBanner } from '@/components/layout/CountrySuggestionBanner'
 import './globals.css'
@@ -36,6 +35,13 @@ const outfit = Outfit({
 })
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
+
+export const viewport: Viewport = {
+  themeColor: '#0f172a',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const cookieStore = await cookies()
@@ -84,7 +90,10 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: {
       capable: true,
       title: BRAND_NAME,
-      statusBarStyle: 'default',
+      statusBarStyle: 'black-translucent',
+    },
+    other: {
+      'mobile-web-app-capable': 'yes',
     },
   }
 }
@@ -99,14 +108,14 @@ export default async function RootLayout({
   return (
     <html lang={initialLocale} className={outfit.variable} suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon.svg" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180" />
+        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
       </head>
       <body suppressHydrationWarning>
         <PostHogProvider>
           <QueryProvider>
             <LocaleProvider initialLocale={initialLocale}>
-              <PwaRegister />
-              <WebPushManager />
+              <PwaProvider />
               <AuthBootstrap />
               <AppToaster />
               {children}

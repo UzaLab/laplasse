@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, BarChart3, Building2, FileText, Loader2, Package, Truck, Users } from 'lucide-react'
 import { LogisticsShell } from '@/features/logistics/components/LogisticsShell'
 import { useLogisticsSession } from '@/features/logistics/hooks/useLogisticsSession'
+import { WebPushToggle } from '@/components/WebPushToggle'
 import { fetchPartnerJobs, fetchPartnerStats } from '@/lib/deliveryStakeholdersApi'
 import {
   PARTNER_VERIFICATION_LABELS,
@@ -169,6 +170,10 @@ export default function LogisticsDashboardPage() {
             </>
           )}
         </div>
+
+        {verification === 'VERIFIED' && (
+          <WebPushToggle variant="featured" />
+        )}
       </div>
     </LogisticsShell>
   )

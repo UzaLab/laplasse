@@ -28,6 +28,7 @@ export const messages = {
     pwa: {
       installTitle: 'Installer LaPlasse',
       installBody: 'Accès rapide, mode hors ligne léger et expérience application.',
+      iosBody: 'Appuyez sur Partager puis « Sur l\'écran d\'accueil » pour installer l\'app.',
       install: 'Installer',
       later: 'Plus tard',
     },
@@ -134,6 +135,7 @@ export const messages = {
     pwa: {
       installTitle: 'Install LaPlasse',
       installBody: 'Quick access, lightweight offline mode, and app-like experience.',
+      iosBody: 'Tap Share, then "Add to Home Screen" to install the app.',
       install: 'Install',
       later: 'Later',
     },
