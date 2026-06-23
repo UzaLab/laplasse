@@ -6,9 +6,16 @@ import { Copy, ExternalLink, Loader2, Truck, User } from 'lucide-react'
 import {
   deliveryTrackingPath,
   dispatchDeliveryOrder,
-  fetchDeliveryCouriers,
   type DeliveryJobSummary,
 } from '@/lib/deliveryApi'
+import {
+  fetchShopCourierStaff,
+  fetchShopDeliveryContracts,
+  type DeliveryFulfilmentMode,
+  type ShopCourierStaff,
+  type DeliveryPartnerContract,
+} from '@/lib/deliveryStakeholdersApi'
+import { shopApiFetch } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
 const JOB_STATUS_LABELS: Record<string, string> = {
@@ -21,54 +28,87 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Annulée',
 }
 
+const MODE_LABELS: Record<DeliveryFulfilmentMode, string> = {
+  PLATFORM_RIDER: 'Réseau LaPlasse',
+  MERCHANT_OWN: 'Flotte interne',
+  LOGISTICS_PARTNER: 'Partenaire logistique',
+}
+
 interface DeliveryDispatchPanelProps {
   orderId: string
+  shopId: string
   deliveryJob?: DeliveryJobSummary | null
-  country?: string | null
-  city?: string | null
   onDispatched: () => void
 }
 
 export function DeliveryDispatchPanel({
   orderId,
+  shopId,
   deliveryJob,
-  country,
-  city,
   onDispatched,
 }: DeliveryDispatchPanelProps) {
-  const [couriers, setCouriers] = useState<{ id: string; full_name: string; phone: string | null; vehicle: string | null }[]>([])
-  const [loadingCouriers, setLoadingCouriers] = useState(true)
-  const [selectedCourier, setSelectedCourier] = useState('')
+  const [defaultMode, setDefaultMode] = useState<DeliveryFulfilmentMode>('PLATFORM_RIDER')
+  const [mode, setMode] = useState<DeliveryFulfilmentMode>('PLATFORM_RIDER')
+  const [staff, setStaff] = useState<ShopCourierStaff[]>([])
+  const [contracts, setContracts] = useState<DeliveryPartnerContract[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedStaffId, setSelectedStaffId] = useState('')
+  const [selectedPartnerId, setSelectedPartnerId] = useState('')
   const [dispatching, setDispatching] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setLoadingCouriers(true)
-    fetchDeliveryCouriers(country ?? undefined, city ?? undefined)
-      .then(list => {
-        if (!cancelled) setCouriers(list)
-      })
-      .catch(() => {
-        if (!cancelled) setCouriers([])
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingCouriers(false)
-      })
+    setLoading(true)
+    void (async () => {
+      const [shopRes, staffList, contractList] = await Promise.all([
+        shopApiFetch(`/shops/${shopId}/manage`, shopId),
+        fetchShopCourierStaff(shopId),
+        fetchShopDeliveryContracts(shopId),
+      ])
+      if (cancelled) return
+      let shopMode: DeliveryFulfilmentMode = 'PLATFORM_RIDER'
+      if (shopRes.ok) {
+        const shop = await shopRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
+        shopMode = shop.delivery_fulfilment_default ?? 'PLATFORM_RIDER'
+      }
+      setDefaultMode(shopMode)
+      setMode(shopMode)
+      setStaff(staffList)
+      setContracts(contractList.filter(c => c.status === 'ACTIVE'))
+      const firstPartner = contractList.find(c => c.status === 'ACTIVE')
+      if (firstPartner) setSelectedPartnerId(firstPartner.partner.id)
+      setLoading(false)
+    })()
     return () => { cancelled = true }
-  }, [country, city])
+  }, [shopId])
 
   const handleDispatch = async () => {
+    if (mode === 'MERCHANT_OWN' && !selectedStaffId) {
+      notify.error('Sélectionnez un livreur interne')
+      return
+    }
+    if (mode === 'LOGISTICS_PARTNER' && !selectedPartnerId && contracts.length === 0) {
+      notify.error('Aucun contrat partenaire actif — configurez-en un dans Livraison')
+      return
+    }
+
     setDispatching(true)
-    const { job, error } = await dispatchDeliveryOrder(
-      orderId,
-      selectedCourier || undefined,
-    )
+    const { job, error } = await dispatchDeliveryOrder(orderId, {
+      fulfilment_mode: mode,
+      courier_profile_id: mode === 'MERCHANT_OWN' ? selectedStaffId : undefined,
+      logistics_partner_id: mode === 'LOGISTICS_PARTNER' ? selectedPartnerId : undefined,
+    })
     setDispatching(false)
     if (error) {
       notify.error(error)
       return
     }
-    notify.success(job?.courier ? 'Coursier assigné — livraison en cours' : 'Course créée')
+    const msg = mode === 'PLATFORM_RIDER' || mode === 'LOGISTICS_PARTNER'
+      ? 'Course créée — offre envoyée aux livreurs'
+      : job?.courier
+        ? 'Livreur interne assigné'
+        : 'Course créée'
+    notify.success(msg)
     onDispatched()
   }
 
@@ -133,39 +173,104 @@ export function DeliveryDispatchPanel({
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-200 p-4 space-y-3">
-          {loadingCouriers ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 p-4 space-y-4">
+          {loading ? (
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <Loader2 size={16} className="animate-spin" />
-              Chargement des coursiers…
+              Chargement des options…
             </div>
           ) : (
             <>
-              <select
-                value={selectedCourier}
-                onChange={e => setSelectedCourier(e.target.value)}
-                className="w-full min-h-[44px] border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white"
-              >
-                <option value="">Coursier (optionnel)</option>
-                {couriers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name}
-                    {c.vehicle ? ` · ${c.vehicle}` : ''}
-                  </option>
-                ))}
-              </select>
-              {couriers.length === 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Mode de dispatch
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(['PLATFORM_RIDER', 'MERCHANT_OWN', 'LOGISTICS_PARTNER'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMode(m)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                        mode === m
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {MODE_LABELS[m]}
+                      {m === defaultMode && mode !== m && (
+                        <span className="ml-1 opacity-60">(défaut)</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {mode === 'MERCHANT_OWN' && (
+                <div className="space-y-2">
+                  <select
+                    value={selectedStaffId}
+                    onChange={e => setSelectedStaffId(e.target.value)}
+                    className="w-full min-h-[44px] border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white"
+                  >
+                    <option value="">Choisir un livreur interne</option>
+                    {staff.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.user.full_name ?? c.user.email}
+                        {c.is_online ? ' · en ligne' : ''}
+                        {c.vehicle ? ` · ${c.vehicle}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {staff.length === 0 && (
+                    <p className="text-xs text-slate-500">
+                      Aucun livreur rattaché.{' '}
+                      <Link href="/merchant/shop/delivery-zones?tab=team" className="text-amber-700 font-bold">
+                        Gérer la flotte interne
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {mode === 'LOGISTICS_PARTNER' && (
+                <div className="space-y-2">
+                  {contracts.length > 0 ? (
+                    <select
+                      value={selectedPartnerId}
+                      onChange={e => setSelectedPartnerId(e.target.value)}
+                      className="w-full min-h-[44px] border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white"
+                    >
+                      {contracts.map(c => (
+                        <option key={c.partner.id} value={c.partner.id}>
+                          {c.partner.trade_name ?? c.partner.legal_name} · {c.partner.city}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Aucun contrat actif.{' '}
+                      <Link href="/merchant/shop/delivery-zones?tab=partners" className="text-amber-700 font-bold">
+                        Demander un partenaire
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {mode === 'PLATFORM_RIDER' && (
                 <p className="text-xs text-slate-500">
-                  Aucun coursier actif pour cette zone — la course sera créée sans assignation.
+                  La course sera proposée aux livreurs indépendants en ligne dans la zone.
                 </p>
               )}
+
               <button
                 type="button"
-                disabled={dispatching}
+                disabled={dispatching || (mode === 'LOGISTICS_PARTNER' && contracts.length === 0)}
                 onClick={() => void handleDispatch()}
                 className="w-full min-h-[44px] text-sm font-bold px-4 py-3 rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
               >
-                {dispatching ? 'Envoi…' : selectedCourier ? 'Assigner et expédier' : 'Créer la course'}
+                {dispatching ? 'Envoi…' : 'Expédier la commande'}
               </button>
             </>
           )}

@@ -26,6 +26,69 @@ export interface AuthSessionResult {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name)
 
+  private readonly logisticsPartnerSelect = {
+    id: true,
+    legal_name: true,
+    trade_name: true,
+    slug: true,
+    city: true,
+    country: true,
+    phone: true,
+    verification: true,
+    is_active: true,
+    _count: { select: { couriers: true, contracts: true } },
+  } as const
+
+  private readonly authUserSelect = {
+    id: true,
+    email: true,
+    full_name: true,
+    avatar: true,
+    phone: true,
+    role: true,
+    created_at: true,
+    merchants: {
+      select: {
+        id: true, business_name: true, slug: true,
+        verification_status: true, subscription_plan: true, organization_id: true,
+      },
+    },
+    shops: {
+      select: {
+        id: true, name: true, slug: true, status: true, merchant_id: true,
+      },
+    },
+    organization: {
+      select: { id: true, name: true, type: true, logo: true },
+    },
+    courier_profile: {
+      select: {
+        id: true, status: true, city: true, country: true,
+        vehicle: true, is_online: true, rating_avg: true, rating_count: true,
+        current_latitude: true, current_longitude: true, last_location_at: true,
+        phone: true, plate_number: true, completed_jobs: true,
+      },
+    },
+    logistics_partner: { select: this.logisticsPartnerSelect },
+    logistics_partner_staff: {
+      select: {
+        role: true,
+        partner: { select: this.logisticsPartnerSelect },
+      },
+    },
+  } as const
+
+  private mapAuthUser<T extends {
+    logistics_partner?: unknown
+    logistics_partner_staff?: { partner: unknown } | null
+  }>(user: T) {
+    const { logistics_partner_staff, logistics_partner, ...rest } = user
+    const partner = logistics_partner
+      ?? logistics_partner_staff?.partner
+      ?? null
+    return { ...rest, logistics_partner: partner }
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -93,37 +156,20 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthSessionResult> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email, is_active: true },
-      select: {
-        id: true, email: true, full_name: true, avatar: true, phone: true,
-        role: true, password_hash: true, created_at: true,
-        merchants: {
-          select: {
-            id: true, business_name: true, slug: true,
-            verification_status: true, subscription_plan: true, organization_id: true,
-          },
-        },
-        shops: {
-          select: {
-            id: true, name: true, slug: true, status: true, merchant_id: true,
-          },
-        },
-        organization: {
-          select: { id: true, name: true, type: true, logo: true },
-        },
-      },
+      select: { ...this.authUserSelect, password_hash: true },
     })
 
-    if (!user || !user.password_hash) throw new UnauthorizedException('Invalid credentials')
+    if (!user?.password_hash) throw new UnauthorizedException('Invalid credentials')
 
     const valid = await compare(dto.password, user.password_hash)
     if (!valid) throw new UnauthorizedException('Invalid credentials')
 
-    const { password_hash: _, ...safeUser } = user
+    const { password_hash: _, logistics_partner_staff: __, ...safeUser } = user
     const tokens = await this.issueTokenPair(user.id, user.email, user.role)
 
     this.afterAuthLinkBookings(user.id, user.phone)
 
-    return { user: safeUser, ...tokens }
+    return { user: this.mapAuthUser(safeUser), ...tokens }
   }
 
   async refresh(userId: string) {
@@ -147,27 +193,12 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true, email: true, full_name: true, avatar: true,
-        phone: true, role: true, created_at: true,
-        merchants: {
-          select: {
-            id: true, business_name: true, slug: true,
-            verification_status: true, subscription_plan: true, organization_id: true,
-          },
-        },
-        shops: {
-          select: {
-            id: true, name: true, slug: true, status: true, merchant_id: true,
-          },
-        },
-        organization: {
-          select: { id: true, name: true, type: true, logo: true },
-        },
-      },
+      select: this.authUserSelect,
     })
+    if (!user) return null
+    return this.mapAuthUser(user)
   }
 
   async sendPhoneOtp(phone: string) {

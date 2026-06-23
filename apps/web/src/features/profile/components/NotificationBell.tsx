@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Bell, Loader2 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { NotificationIcon } from '@/lib/icons'
+
+import { fetchNotifications, fetchUnreadNotificationCount } from '@/lib/notificationsApi'
 
 interface Notif {
   id: string
@@ -15,25 +18,42 @@ interface Notif {
   body: string
   read: boolean
   created_at: string
+  data?: { href?: string; job_id?: string; type?: string } | null
 }
 
-export function NotificationBell() {
+interface NotificationBellProps {
+  /** Lien « Voir toutes » (défaut : espace client) */
+  viewAllHref?: string
+  /** Intervalle de rafraîchissement en ms */
+  refetchIntervalMs?: number
+}
+
+export function NotificationBell({
+  viewAllHref = '/profile/notifications',
+  refetchIntervalMs = 60_000,
+}: NotificationBellProps = {}) {
+  const router = useRouter()
   const { ready: authReady } = useAuthReady()
   const [open, setOpen] = useState(false)
   const [panelPos, setPanelPos] = useState({ top: 0, right: 16 })
   const btnRef = useRef<HTMLButtonElement>(null)
   const qc = useQueryClient()
 
-  const { data: notifications = [], isLoading } = useQuery<Notif[]>({
-    queryKey: ['notifications'],
-    queryFn: async () => {
-      const res = await authApiFetch('/notifications')
-      if (!res.ok) return []
-      return res.json()
-    },
+  const { data: previewData, isLoading } = useQuery({
+    queryKey: ['notifications', 'preview'],
+    queryFn: () => fetchNotifications({ page: 1, limit: 6 }),
     enabled: authReady,
-    refetchInterval: 60_000,
+    refetchInterval: refetchIntervalMs,
   })
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: fetchUnreadNotificationCount,
+    enabled: authReady,
+    refetchInterval: refetchIntervalMs,
+  })
+
+  const preview: Notif[] = previewData?.items ?? []
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
@@ -71,8 +91,7 @@ export function NotificationBell() {
 
   if (!authReady) return null
 
-  const unreadCount = notifications.filter(n => !n.read).length
-  const preview = notifications.slice(0, 6)
+  const previewItems = preview.slice(0, 6)
 
   return (
     <>
@@ -119,13 +138,13 @@ export function NotificationBell() {
                 <div className="flex justify-center py-8">
                   <Loader2 size={20} className="animate-spin text-slate-300" />
                 </div>
-              ) : preview.length === 0 ? (
+              ) : previewItems.length === 0 ? (
                 <div className="py-10 px-4 text-center">
                   <Bell size={28} className="mx-auto mb-2 text-slate-200" />
                   <p className="text-sm font-semibold text-slate-500">Aucune notification</p>
                 </div>
               ) : (
-                preview.map(n => (
+                previewItems.map(n => (
                   <button
                     key={n.id}
                     type="button"
@@ -135,6 +154,8 @@ export function NotificationBell() {
                     onClick={() => {
                       if (!n.read) markRead.mutate(n.id)
                       setOpen(false)
+                      const href = n.data?.href
+                      if (href) router.push(href)
                     }}
                   >
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
@@ -163,7 +184,7 @@ export function NotificationBell() {
             </div>
 
             <Link
-              href="/profile/notifications"
+              href={viewAllHref}
               onClick={() => setOpen(false)}
               className="block text-center text-xs font-bold text-amber-600 hover:text-amber-700 py-3 border-t border-slate-50 bg-slate-50/50"
               style={{ textDecoration: 'none' }}

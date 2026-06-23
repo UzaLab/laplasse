@@ -1,7 +1,7 @@
 import {
   UtensilsCrossed, Wine, Gem, Sparkles, Scissors, Dumbbell, Coffee, BedDouble, Pill,
   Utensils, ShoppingBag, Wrench, Store, Globe, MapPin, Star, Trophy, Heart, Share2,
-  Gift, Bell, Hand, Search, Link as LinkIcon, ArrowUp, ArrowDown, CircleDot,
+  Gift, Bell, Hand, Search, Link as LinkIcon, ArrowUp, ArrowDown, CircleDot, Package,
   CheckCircle, XCircle, Clock, LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -91,6 +91,7 @@ export const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
   booking_confirmed: CheckCircle,
   booking_status: Clock,
   booking_reminder: Bell,
+  delivery_job_offered: Package,
   subscription_upgraded: Trophy,
   default: Bell,
 }

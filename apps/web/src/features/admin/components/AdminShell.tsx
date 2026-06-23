@@ -16,6 +16,8 @@ interface AdminStats {
   users: number
   reviews: { total: number; pending: number }
   product_reviews?: { pending: number }
+  courier_reviews?: { pending: number }
+  couriers?: { pending_kyc: number }
   complaints?: { open: number }
 }
 
@@ -70,6 +72,12 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
     { href: '/admin/geo', label: 'Villes & communes', icon: <MapPin size={18} /> },
     { href: '/admin/countries', label: 'Pays', icon: <Globe size={18} /> },
     { href: '/admin/delivery', label: 'Livraison', icon: <Truck size={18} /> },
+    {
+      href: '/admin/delivery/couriers',
+      label: 'Livreurs KYC',
+      icon: <Truck size={18} />,
+      badge: stats?.couriers?.pending_kyc,
+    },
   ]
 
   const opsNav: NavItem[] = [
@@ -84,6 +92,22 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
       label: 'Avis produits',
       icon: <Star size={18} />,
       badge: stats?.product_reviews?.pending,
+    },
+    {
+      href: '/admin/courier-reviews',
+      label: 'Avis livreurs',
+      icon: <Star size={18} />,
+      badge: stats?.courier_reviews?.pending,
+    },
+    {
+      href: '/admin/delivery/disputes',
+      label: 'Litiges livraison',
+      icon: <Truck size={18} />,
+    },
+    {
+      href: '/admin/delivery/assignments',
+      label: 'Assignations',
+      icon: <Truck size={18} />,
     },
     {
       href: '/admin/complaints',

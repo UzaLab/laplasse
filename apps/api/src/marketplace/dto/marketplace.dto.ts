@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
@@ -242,6 +243,14 @@ export class ShopCheckoutDeliveryDto {
   @IsString()
   @MaxLength(500)
   delivery_address?: string
+
+  @IsOptional()
+  @IsNumber()
+  delivery_latitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  delivery_longitude?: number
 }
 
 export class CheckoutDto {
@@ -271,6 +280,14 @@ export class CheckoutDto {
   @IsString()
   @MaxLength(300)
   delivery_address_detail?: string
+
+  @IsOptional()
+  @IsNumber()
+  delivery_latitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  delivery_longitude?: number
 
   @IsOptional()
   @IsString()

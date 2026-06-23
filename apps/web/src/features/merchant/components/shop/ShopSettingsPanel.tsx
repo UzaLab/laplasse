@@ -1,11 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Loader2, Save, UploadCloud } from 'lucide-react'
+import { Building2, Image as ImageIcon, Link2, Loader2, Save, UploadCloud } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import {
   fetchShopBySlug,
+  linkShopToMerchant,
   updateShop,
   type ShopStatus,
 } from '@/lib/shopApi'
@@ -17,12 +20,18 @@ const INPUT =
 const LABEL = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2'
 
 export function ShopSettingsPanel() {
-  const { activeShopId, activeMerchantId, user, updateUser } = useAuthStore()
+  const router = useRouter()
+  const { activeShopId, activeMerchantId, user, updateUser, setActiveMerchant } = useAuthStore()
   const defaultCity = getDefaultCity(getCountryCode())
   const activeShop = user?.shops?.find(s => s.id === activeShopId)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [linking, setLinking] = useState(false)
+  const [selectedMerchantId, setSelectedMerchantId] = useState('')
   const [uploading, setUploading] = useState<'logo' | 'cover' | null>(null)
+
+  const merchants = user?.merchants ?? []
+  const isIndependentShop = !activeShop?.merchant_id
   const logoInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
@@ -127,6 +136,7 @@ export function ShopSettingsPanel() {
   }
 
   return (
+    <div className="space-y-6">
     <form onSubmit={handleSave} className="space-y-6">
       <div>
         <h2 className="text-lg font-extrabold text-slate-900">Paramètres de la boutique</h2>
@@ -288,5 +298,81 @@ export function ShopSettingsPanel() {
         Enregistrer les modifications
       </button>
     </form>
+
+    {/* Lier à un établissement — uniquement pour les boutiques indépendantes */}
+    {isIndependentShop && (
+      <div className="bg-amber-50 border border-amber-100 rounded-[28px] p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+            <Link2 size={16} className="text-amber-600" />
+          </div>
+          <div>
+            <p className="font-extrabold text-slate-900 text-sm">Lier à un établissement</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              En liant votre boutique à un établissement marchand, vous débloquez les promotions, les
+              statistiques avancées et le retrait sur place.
+            </p>
+          </div>
+        </div>
+
+        {merchants.length > 0 ? (
+          <div className="space-y-3">
+            <select
+              value={selectedMerchantId}
+              onChange={e => setSelectedMerchantId(e.target.value)}
+              className="w-full border border-amber-200 bg-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400"
+            >
+              <option value="">Choisir un établissement…</option>
+              {merchants.map(m => (
+                <option key={m.id} value={m.id}>{m.business_name}</option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!selectedMerchantId || !activeShopId) return
+                  setLinking(true)
+                  const { shop, error } = await linkShopToMerchant(activeShopId, selectedMerchantId)
+                  if (error || !shop) {
+                    notify.error(error ?? 'Impossible de lier la boutique')
+                  } else {
+                    updateUser({
+                      shops: (user?.shops ?? []).map(s =>
+                        s.id === activeShopId ? { ...s, merchant_id: selectedMerchantId } : s,
+                      ),
+                    })
+                    setActiveMerchant(selectedMerchantId)
+                    notify.success('Boutique liée à l\'établissement !')
+                    router.push('/merchant/shop')
+                  }
+                  setLinking(false)
+                }}
+                disabled={!selectedMerchantId || linking}
+                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50"
+              >
+                {linking ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                Lier la boutique
+              </button>
+              <Link
+                href="/merchant/signup"
+                className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 hover:text-amber-800 px-4 py-2.5 rounded-xl border border-amber-200 hover:bg-amber-100 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <Building2 size={14} /> Créer un établissement
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <Link
+            href="/merchant/signup"
+            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            <Building2 size={14} /> Créer un établissement
+          </Link>
+        )}
+      </div>
+    )}
+    </div>
   )
 }

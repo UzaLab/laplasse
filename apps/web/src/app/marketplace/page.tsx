@@ -1,5 +1,6 @@
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { MarketplacePageClient } from '@/features/marketplace/components/MarketplacePageClient'
 import { BRAND_MARKETPLACE_INTRO } from '@/lib/brandCopy'
 
@@ -14,6 +15,7 @@ export default function MarketplacePage() {
       <Navbar />
       <MarketplacePageClient />
       <Footer />
+      <MobileBottomNav />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { CartDrawer } from './CartDrawer'
 import { CartSync } from './CartSync'
 import { CountrySwitcher } from './CountrySwitcher'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { GLOBAL_NAV_ITEMS } from './navConfig'
 import { useT } from '@/providers/LocaleProvider'
 
 export function Navbar() {
@@ -72,18 +73,16 @@ export function Navbar() {
 
         {/* Links desktop */}
         <div className="hidden md:flex items-center gap-8 font-semibold text-sm text-slate-500">
-          <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            {t('nav.discover')}
-          </Link>
-          <Link href="/marketplace" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            {t('nav.marketplace')}
-          </Link>
-          <Link href="/search" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            {t('nav.search')}
-          </Link>
-          <Link href="/merchant/signup" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
-            Mon établissement
-          </Link>
+          {GLOBAL_NAV_ITEMS.map(({ href, labelKey }) => (
+            <Link
+              key={href}
+              href={href}
+              className="hover:text-slate-900 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              {t(labelKey)}
+            </Link>
+          ))}
         </div>
 
         {/* Actions */}
@@ -95,7 +94,7 @@ export function Navbar() {
           <Link
             href="/search"
             className="text-slate-600 hover:text-brand-600 transition-colors hidden md:block"
-            aria-label="Recherche"
+            aria-label={t('nav.search')}
             style={{ textDecoration: 'none' }}
           >
             <Search size={20} />
@@ -105,7 +104,7 @@ export function Navbar() {
             type="button"
             onClick={handleCartClick}
             className="relative text-slate-600 hover:text-brand-600 transition-colors p-1"
-            aria-label="Ouvrir le panier"
+            aria-label={t('nav.openCart')}
           >
             <ShoppingBag size={20} />
             {itemCount > 0 && (
@@ -145,7 +144,15 @@ export function Navbar() {
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
-                    <UserCircle2 size={15} /> Mon profil
+                    <UserCircle2 size={15} /> {t('nav.myProfile')}
+                  </Link>
+                  <Link
+                    href="/favoris"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Heart size={15} /> {t('nav.myFavorites')}
                   </Link>
                   {(user.role === 'MERCHANT' || (user.merchants?.length ?? 0) > 0) && (
                     <Link
@@ -154,7 +161,17 @@ export function Navbar() {
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
-                      <LayoutDashboard size={15} /> Mon tableau de bord
+                      <LayoutDashboard size={15} /> {t('nav.dashboard')}
+                    </Link>
+                  )}
+                  {(user.role === 'COURIER' || user.courier_profile) && (
+                    <Link
+                      href="/courier/dashboard"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <LayoutDashboard size={15} /> Espace livreur
                     </Link>
                   )}
                   {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
@@ -164,22 +181,14 @@ export function Navbar() {
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
-                      <LayoutDashboard size={15} /> Admin
+                      <LayoutDashboard size={15} /> {t('nav.admin')}
                     </Link>
                   )}
-                  <Link
-                    href="/favoris"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <Heart size={15} /> Mes favoris
-                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors w-full text-left"
                   >
-                    <LogOut size={15} /> Déconnexion
+                    <LogOut size={15} /> {t('nav.logout')}
                   </button>
                 </div>
               )}
@@ -191,7 +200,7 @@ export function Navbar() {
               style={{ textDecoration: 'none' }}
             >
               <User size={16} />
-              Connexion
+              {t('nav.login')}
             </Link>
           )}
 
@@ -199,7 +208,7 @@ export function Navbar() {
             type="button"
             onClick={() => setMobileOpen(true)}
             className="md:hidden text-slate-900 p-1 -mr-1"
-            aria-label="Ouvrir le menu"
+            aria-label={t('nav.openMenu')}
             aria-expanded={mobileOpen}
           >
             <Menu size={24} />

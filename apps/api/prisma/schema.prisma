@@ -15,6 +15,7 @@ datasource db {
 enum Role {
   USER
   MERCHANT
+  COURIER
   MODERATOR
   ADMIN
   SUPER_ADMIN
@@ -132,6 +133,11 @@ model User {
   promotion_redemptions PromotionRedemption[]
   addresses        UserAddress[]
   product_views    ProductView[]
+  courier_profile  CourierProfile?
+  courier_reviews  CourierReview[]
+  delivery_disputes DeliveryDispute[]
+  logistics_partner LogisticsPartner? @relation("LogisticsPartnerOwner")
+  logistics_partner_staff LogisticsPartnerStaff?
 
   @@index([email])
   @@index([phone])
@@ -199,6 +205,7 @@ model Merchant {
   orders           Order[]
   menu_sections    MenuSection[]
   menu_items       MenuItem[]
+  staff_couriers   CourierProfile[]
 
   @@index([slug])
   @@index([category_id])
@@ -243,11 +250,23 @@ model MerchantLocation {
 
 // ─── GÉOGRAPHIE (référentiel pays › ville › commune) ───────────────────────────
 
+model GeoCountry {
+  code       String   @id // ISO 3166-1 alpha-2 : CI, BF, SN
+  name       String
+  latitude   Float?
+  longitude  Float?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
 model GeoCity {
   id         String   @id @default(cuid())
   country    String   // ISO 3166-1 alpha-2 : CI, BF
   name       String
   slug       String
+  latitude   Float?
+  longitude  Float?
   is_default Boolean  @default(false)
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
@@ -255,6 +274,7 @@ model GeoCity {
   communes GeoCommune[]
   zone_rules ShopDeliveryZoneRule[]
   user_addresses UserAddress[]
+  courier_service_zones CourierServiceZone[]
 
   @@unique([country, slug])
   @@index([country, is_active])
@@ -265,12 +285,15 @@ model GeoCommune {
   city_id    String
   name       String
   slug       String
+  latitude   Float?
+  longitude  Float?
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
 
   city GeoCity @relation(fields: [city_id], references: [id], onDelete: Cascade)
   zone_communes ShopDeliveryZoneCommune[]
   user_addresses UserAddress[]
+  courier_zone_links CourierServiceZoneCommune[]
 
   @@unique([city_id, slug])
   @@index([city_id, is_active])
@@ -284,6 +307,8 @@ model UserAddress {
   commune_id      String
   district        String
   address_detail  String?
+  latitude        Float?
+  longitude       Float?
   is_default      Boolean  @default(false)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -1106,11 +1131,12 @@ model FraudSignal {
 }
 
 model DeviceToken {
-  id         String   @id @default(cuid())
-  user_id    String
-  token      String   @unique
-  platform   String   @default("web")
-  created_at DateTime @default(now())
+  id                String   @id @default(cuid())
+  user_id           String
+  token             String   @unique
+  platform          String   @default("web")
+  push_subscription Json?
+  created_at        DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
@@ -1152,6 +1178,7 @@ model Shop {
   is_active   Boolean    @default(true)
   marketplace_featured Boolean @default(false)
   enabled_modules      String[] @default(["catalog"])
+  delivery_fulfilment_default DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   created_at  DateTime   @default(now())
   updated_at  DateTime   @updatedAt
 
@@ -1167,6 +1194,8 @@ model Shop {
   menu_sections    MenuSection[]
   menu_items       MenuItem[]
   order_returns    OrderReturn[]
+  delivery_contracts DeliveryPartnerContract[]
+  staff_couriers   CourierProfile[] @relation("ShopStaffCouriers")
 
   @@index([owner_id])
   @@index([slug])
@@ -1197,6 +1226,12 @@ enum OrderStatus {
 enum DeliveryType {
   PICKUP
   DELIVERY
+}
+
+enum DeliveryFulfilmentMode {
+  PLATFORM_RIDER
+  MERCHANT_OWN
+  LOGISTICS_PARTNER
 }
 
 model ShopDeliveryZone {
@@ -1402,10 +1437,14 @@ model Order {
   promotion_id        String?
   status              OrderStatus  @default(PENDING)
   delivery_type       DeliveryType @default(PICKUP)
+  delivery_fulfilment_mode DeliveryFulfilmentMode @default(PLATFORM_RIDER)
+  logistics_partner_id     String?
   delivery_address    String?
   delivery_city_id    String?
   delivery_commune_id String?
   delivery_district   String?
+  delivery_latitude   Float?
+  delivery_longitude  Float?
   customer_note       String?
   customer_phone      String?
   subtotal            Int
@@ -1425,12 +1464,17 @@ model Order {
   redemption  PromotionRedemption?
   delivery_job DeliveryJob?
   return_request OrderReturn?
+  courier_review CourierReview?
+  delivery_dispute DeliveryDispute?
+
+  logistics_partner LogisticsPartner? @relation(fields: [logistics_partner_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
   @@index([shop_id, status])
   @@index([merchant_id, status])
   @@index([created_at])
   @@index([promotion_id])
+  @@index([logistics_partner_id])
 }
 
 model OrderItem {
@@ -1457,6 +1501,90 @@ model OrderItem {
 
 // ─── DELIVERY ENGINE V3.0 ─────────────────────────────────────────────────────
 
+enum CourierStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  SUSPENDED
+  OFFLINE
+}
+
+enum CourierKind {
+  INDEPENDENT
+  MERCHANT_STAFF
+  PARTNER_FLEET
+}
+
+model CourierProfile {
+  id                   String          @id @default(cuid())
+  user_id              String          @unique
+  kind                 CourierKind     @default(INDEPENDENT)
+  logistics_partner_id String?
+  merchant_id          String?
+  shop_id              String?
+  country              String          @default("CI")
+  city                 String
+  phone                String
+  vehicle              DeliveryVehicle @default(MOTO)
+  plate_number         String?
+  status               CourierStatus   @default(PENDING_REVIEW)
+  is_online            Boolean         @default(false)
+  rating_avg           Float           @default(0)
+  rating_count         Int             @default(0)
+  completed_jobs       Int             @default(0)
+  cancellation_rate    Float           @default(0)
+  current_latitude     Float?
+  current_longitude    Float?
+  last_location_at     DateTime?
+  created_at           DateTime        @default(now())
+  updated_at           DateTime        @updatedAt
+
+  user User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop Shop?         @relation("ShopStaffCouriers", fields: [shop_id], references: [id], onDelete: SetNull)
+  merchant Merchant? @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
+  logistics_partner LogisticsPartner? @relation(fields: [logistics_partner_id], references: [id], onDelete: SetNull)
+  jobs DeliveryJob[] @relation("JobCourierProfile")
+  offered_jobs DeliveryJob[] @relation("JobOfferedTo")
+  service_zones CourierServiceZone[]
+  wallet CourierWallet?
+  offer_rejections DeliveryJobOfferRejection[]
+  reviews CourierReview[]
+
+  @@index([country, city, status])
+  @@index([is_online, status])
+  @@index([shop_id, kind])
+  @@index([logistics_partner_id, kind])
+  @@index([merchant_id])
+}
+
+model CourierServiceZone {
+  id           String   @id @default(cuid())
+  courier_id   String
+  city_id      String
+  all_communes Boolean  @default(false)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  courier  CourierProfile              @relation(fields: [courier_id], references: [id], onDelete: Cascade)
+  city     GeoCity                     @relation(fields: [city_id], references: [id], onDelete: Cascade)
+  communes CourierServiceZoneCommune[]
+
+  @@unique([courier_id, city_id])
+  @@index([courier_id, is_active])
+}
+
+model CourierServiceZoneCommune {
+  zone_id    String
+  commune_id String
+
+  zone    CourierServiceZone @relation(fields: [zone_id], references: [id], onDelete: Cascade)
+  commune GeoCommune         @relation(fields: [commune_id], references: [id], onDelete: Cascade)
+
+  @@id([zone_id, commune_id])
+  @@index([commune_id])
+}
+
 enum DeliveryJobStatus {
   PENDING
   ASSIGNED
@@ -1482,30 +1610,228 @@ model DeliveryCourier {
   @@index([country, city, is_active])
 }
 
+// ─── LOGISTICS PARTNERS (DN-3) ────────────────────────────────────────────────
+
+enum PartnerVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DeliveryContractStatus {
+  DRAFT
+  PENDING_PARTNER
+  PENDING_MERCHANT
+  ACTIVE
+  PAUSED
+  TERMINATED
+}
+
+model LogisticsPartner {
+  id              String                    @id @default(cuid())
+  owner_user_id   String                    @unique
+  legal_name      String
+  trade_name      String?
+  slug            String                    @unique
+  country         String                    @default("CI")
+  city            String
+  phone           String
+  email           String?
+  logo            String?
+  verification    PartnerVerificationStatus @default(UNVERIFIED)
+  commission_rate Float                     @default(0.15)
+  is_active       Boolean                   @default(true)
+  rating_avg      Float                     @default(0)
+  rating_count    Int                       @default(0)
+  created_at      DateTime                  @default(now())
+  updated_at      DateTime                  @updatedAt
+
+  owner     User                      @relation("LogisticsPartnerOwner", fields: [owner_user_id], references: [id], onDelete: Cascade)
+  staff     LogisticsPartnerStaff[]
+  couriers  CourierProfile[]
+  contracts DeliveryPartnerContract[]
+  orders    Order[]
+  jobs      DeliveryJob[]
+
+  @@index([country, city, is_active])
+  @@index([verification])
+}
+
+model LogisticsPartnerStaff {
+  id                   String   @id @default(cuid())
+  logistics_partner_id String
+  user_id              String   @unique
+  role                 String   @default("DISPATCHER")
+  created_at           DateTime @default(now())
+
+  partner LogisticsPartner @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
+  user    User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([logistics_partner_id])
+}
+
+model DeliveryPartnerContract {
+  id                   String                 @id @default(cuid())
+  shop_id              String
+  logistics_partner_id String
+  status               DeliveryContractStatus @default(DRAFT)
+  fee_override         Int?
+  sla_eta_max_minutes  Int?
+  auto_dispatch        Boolean                @default(true)
+  signed_at            DateTime?
+  created_at           DateTime               @default(now())
+  updated_at           DateTime               @updatedAt
+
+  shop    Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  partner LogisticsPartner @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, logistics_partner_id])
+  @@index([shop_id, status])
+  @@index([logistics_partner_id, status])
+}
+
 model DeliveryJob {
   id              String            @id @default(cuid())
   order_id        String            @unique
   courier_id      String?
+  courier_profile_id String?
+  fulfilment_mode   DeliveryFulfilmentMode @default(PLATFORM_RIDER)
+  logistics_partner_id String?
   status          DeliveryJobStatus @default(PENDING)
   tracking_token  String            @unique @default(cuid())
   pickup_address  String?
   dropoff_address String?
+  dropoff_latitude  Float?
+  dropoff_longitude Float?
   assigned_at     DateTime?
   picked_up_at    DateTime?
   delivered_at    DateTime?
+  offered_to_profile_id String?
+  offered_at      DateTime?
+  offer_expires_at DateTime?
+  accepted_at     DateTime?
+  rejected_count  Int               @default(0)
   eta_minutes     Int?
   courier_latitude  Float?
   courier_longitude Float?
   notes           String?
+  proof_otp       String?
+  proof_otp_expires_at DateTime?
+  proof_confirmed_at DateTime?
+  proof_photo_url    String?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
 
   order   Order            @relation(fields: [order_id], references: [id], onDelete: Cascade)
   courier DeliveryCourier? @relation(fields: [courier_id], references: [id], onDelete: SetNull)
+  courier_profile CourierProfile? @relation("JobCourierProfile", fields: [courier_profile_id], references: [id], onDelete: SetNull)
+  offered_to CourierProfile? @relation("JobOfferedTo", fields: [offered_to_profile_id], references: [id], onDelete: SetNull)
+  offer_rejections DeliveryJobOfferRejection[]
+  wallet_entry CourierWalletEntry?
+  delivery_dispute DeliveryDispute?
+  logistics_partner LogisticsPartner? @relation(fields: [logistics_partner_id], references: [id], onDelete: SetNull)
 
   @@index([status])
+  @@index([logistics_partner_id])
   @@index([courier_id])
+  @@index([courier_profile_id])
+  @@index([offered_to_profile_id])
+  @@index([offer_expires_at])
   @@index([tracking_token])
+}
+
+enum DeliveryDisputeStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model DeliveryDispute {
+  id          String                @id @default(cuid())
+  order_id    String                @unique
+  job_id      String?               @unique
+  user_id     String
+  reason      String
+  description String?
+  status      DeliveryDisputeStatus @default(OPEN)
+  admin_note  String?
+  created_at  DateTime              @default(now())
+  resolved_at DateTime?
+
+  order Order        @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  job   DeliveryJob? @relation(fields: [job_id], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([user_id])
+}
+
+model CourierReview {
+  id                 String       @id @default(cuid())
+  courier_profile_id String
+  order_id           String       @unique
+  user_id            String
+  rating             Int
+  comment            String?
+  tags               String[]     @default([])
+  status             ReviewStatus @default(PENDING)
+  created_at         DateTime     @default(now())
+
+  courier_profile CourierProfile @relation(fields: [courier_profile_id], references: [id], onDelete: Cascade)
+  order           Order          @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([courier_profile_id])
+  @@index([user_id])
+  @@index([status])
+}
+
+model DeliveryJobOfferRejection {
+  id                 String   @id @default(cuid())
+  job_id             String
+  courier_profile_id String
+  reason             String   @default("rejected")
+  created_at         DateTime @default(now())
+
+  job     DeliveryJob    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  courier CourierProfile @relation(fields: [courier_profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([job_id, courier_profile_id])
+  @@index([job_id])
+}
+
+enum CourierWalletEntryType {
+  EARNING
+  BONUS
+  PENALTY
+  PAYOUT
+}
+
+model CourierWallet {
+  id         String   @id @default(cuid())
+  courier_id String   @unique
+  balance    Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  courier CourierProfile       @relation(fields: [courier_id], references: [id], onDelete: Cascade)
+  entries CourierWalletEntry[]
+}
+
+model CourierWalletEntry {
+  id         String                 @id @default(cuid())
+  wallet_id  String
+  job_id     String?                @unique
+  amount     Int
+  type       CourierWalletEntryType
+  label      String?
+  created_at DateTime               @default(now())
+
+  wallet CourierWallet @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+  job    DeliveryJob?  @relation(fields: [job_id], references: [id], onDelete: SetNull)
+
+  @@index([wallet_id])
 }
 
 model ShopCollection {

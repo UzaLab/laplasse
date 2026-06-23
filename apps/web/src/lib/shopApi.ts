@@ -28,6 +28,7 @@ export interface ShopSummary {
   merchant_id?: string | null
   logo?: string | null
   description?: string | null
+  delivery_fulfilment_default?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
 }
 
 export interface ShopDetails extends ShopSummary {
@@ -47,6 +48,16 @@ export function getShopsForMerchant(
 ): ShopSummary[] {
   if (!merchantId) return []
   return (shops ?? []).filter(s => s.merchant_id === merchantId)
+}
+
+/** Boutiques sans établissement lié (créées directement par l'utilisateur). */
+export function getIndependentShops(shops: ShopSummary[] | undefined): ShopSummary[] {
+  return (shops ?? []).filter(s => !s.merchant_id)
+}
+
+/** Retourne l'URL de gestion d'une boutique (espace marchand si liée, sinon /shop/manage). */
+export function getShopManageHref(shop: ShopSummary | null | undefined): string {
+  return shop?.merchant_id ? '/merchant/shop' : '/shop/manage'
 }
 
 export interface CreateShopInput {
@@ -99,6 +110,7 @@ export async function updateShop(
     status?: ShopStatus
     logo?: string
     cover_image?: string
+    delivery_fulfilment_default?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
   },
 ): Promise<{ shop: ShopSummary | null; error?: string }> {
   const res = await shopApiFetch(`/shops/${shopId}`, shopId, {

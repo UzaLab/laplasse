@@ -9,7 +9,7 @@ export const ORDER_FILTER_TABS: { id: OrderFilterTab; label: string }[] = [
   { id: 'cancelled', label: 'Annulées' },
 ]
 
-const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED']
+const ACTIVE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY']
 const CANCELLED_STATUSES: OrderStatus[] = ['CANCELLED', 'REFUNDED']
 
 export function filterOrdersByTab(orders: Order[], tab: OrderFilterTab): Order[] {
@@ -47,6 +47,26 @@ export function getOrderDisplayStatus(status: OrderStatus): OrderDisplayStatus {
   if (status === 'COMPLETED' || status === 'DELIVERED') return 'delivered'
   if (CANCELLED_STATUSES.includes(status)) return 'cancelled'
   return 'other'
+}
+
+/** Statut effectif : fallback sur delivery_job si la commande n'est pas encore synchronisée. */
+export function resolveOrderStatus(order: {
+  status: OrderStatus
+  delivery_job?: { status: string } | null
+}): OrderStatus {
+  const jobStatus = order.delivery_job?.status
+  if (jobStatus === 'DELIVERED' && order.status !== 'DELIVERED' && order.status !== 'COMPLETED') {
+    return 'DELIVERED'
+  }
+  if (
+    (jobStatus === 'PICKED_UP' || jobStatus === 'IN_TRANSIT')
+    && order.status !== 'OUT_FOR_DELIVERY'
+    && order.status !== 'DELIVERED'
+    && order.status !== 'COMPLETED'
+  ) {
+    return 'OUT_FOR_DELIVERY'
+  }
+  return order.status
 }
 
 export const ORDER_DISPLAY_LABELS: Record<OrderDisplayStatus, string> = {

@@ -12,6 +12,8 @@ export interface CheckoutDraft {
   deliveryCommuneId?: string
   deliveryDistrict?: string
   deliveryAddressDetail?: string
+  deliveryLatitude?: number
+  deliveryLongitude?: number
   customerPhone?: string
   customerNote?: string
   selectedAddressId?: string

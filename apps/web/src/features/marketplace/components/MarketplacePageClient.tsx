@@ -485,7 +485,7 @@ export function MarketplacePageClient() {
       </main>
 
       {!filtersOpen && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none">
+        <div className="lg:hidden fixed bottom-16 inset-x-0 z-30 p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none">
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}

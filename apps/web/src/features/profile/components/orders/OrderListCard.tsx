@@ -8,11 +8,13 @@ import {
   formatOrderTitle,
   getOrderDisplayStatus,
   orderThumbnail,
+  resolveOrderStatus,
 } from '@/features/profile/components/orders/orderUtils'
 
 export function OrderListCard({ order }: { order: Order }) {
   const dt = new Date(order.created_at)
-  const cancelled = getOrderDisplayStatus(order.status) === 'cancelled'
+  const effectiveStatus = resolveOrderStatus(order)
+  const cancelled = getOrderDisplayStatus(effectiveStatus) === 'cancelled'
   const pendingPayment =
     order.status === 'PENDING' && order.payment?.status === 'PENDING'
   const thumb = orderThumbnail(order, PLACEHOLDER_PRODUCT_IMAGE)
@@ -43,7 +45,7 @@ export function OrderListCard({ order }: { order: Order }) {
         <p className="text-xs text-slate-400 mb-2 line-clamp-1">
           {order.merchant?.business_name ?? 'Boutique'}
         </p>
-        <OrderStatusBadge status={order.status} />
+        <OrderStatusBadge status={effectiveStatus} />
       </div>
 
       <div className="flex flex-col items-end gap-2 shrink-0">

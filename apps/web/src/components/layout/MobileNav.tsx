@@ -1,12 +1,17 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import {
   X, User, LogOut, LayoutDashboard, UserCircle2, Heart, MapPin, ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AuthUser } from '@/stores/authStore'
+import { useT } from '@/providers/LocaleProvider'
+import { LanguageSwitcher } from './LanguageSwitcher'
+import { CountrySwitcher } from './CountrySwitcher'
+import { MOBILE_DRAWER_NAV_ITEMS } from './navConfig'
 
 interface MobileNavProps {
   open: boolean
@@ -18,16 +23,12 @@ interface MobileNavProps {
   onCartClick?: () => void
 }
 
-const NAV_LINKS = [
-  { href: '/', label: 'Découvrir' },
-  { href: '/marketplace', label: 'Marketplace' },
-  { href: '/search', label: 'Recherche' },
-  { href: '/merchant/signup', label: 'Mon établissement' },
-]
-
 export function MobileNav({
   open, onClose, isAuthenticated, user, onLogout, cartCount = 0, onCartClick,
 }: MobileNavProps) {
+  const t = useT()
+  const pathname = usePathname()
+
   useEffect(() => {
     if (!open) return
     const prev = document.body.style.overflow
@@ -44,7 +45,6 @@ export function MobileNav({
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className={cn(
           'fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300 md:hidden',
@@ -54,7 +54,6 @@ export function MobileNav({
         aria-hidden={!open}
       />
 
-      {/* Panel */}
       <aside
         className={cn(
           'fixed top-0 right-0 z-[70] h-full w-[min(100%,320px)] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out md:hidden',
@@ -63,9 +62,8 @@ export function MobileNav({
         aria-hidden={!open}
         role="dialog"
         aria-modal="true"
-        aria-label="Menu de navigation"
+        aria-label={t('nav.openMenu')}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100">
           <Link
             href="/"
@@ -82,13 +80,12 @@ export function MobileNav({
             type="button"
             onClick={onClose}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-            aria-label="Fermer le menu"
+            aria-label={t('nav.closeMenu')}
           >
             <X size={22} />
           </button>
         </div>
 
-        {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-4 py-6">
           {onCartClick && (
             <button
@@ -97,7 +94,7 @@ export function MobileNav({
               className="flex items-center justify-between w-full px-4 py-3.5 mb-4 rounded-xl bg-brand-50 border border-brand-100 text-brand-700 font-bold text-base"
             >
               <span className="flex items-center gap-3">
-                <ShoppingBag size={18} /> Mon panier
+                <ShoppingBag size={18} /> {t('nav.myCart')}
               </span>
               {cartCount > 0 && (
                 <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -108,18 +105,28 @@ export function MobileNav({
           )}
 
           <ul className="space-y-1">
-            {NAV_LINKS.map(({ href, label }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  onClick={onClose}
-                  className="block px-4 py-3.5 rounded-xl text-base font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                  style={{ textDecoration: 'none' }}
-                >
-                  {label}
-                </Link>
-              </li>
-            ))}
+            {MOBILE_DRAWER_NAV_ITEMS.map(({ href, labelKey, icon: Icon, match }) => {
+              const active = match(pathname)
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={onClose}
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-semibold transition-colors',
+                      active
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900',
+                    )}
+                    style={{ textDecoration: 'none' }}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    <Icon size={18} strokeWidth={active ? 2.25 : 2} />
+                    {t(labelKey)}
+                  </Link>
+                </li>
+              )
+            })}
           </ul>
 
           {isAuthenticated && user && (
@@ -133,20 +140,30 @@ export function MobileNav({
                   <Link
                     href="/profile"
                     onClick={onClose}
-                    className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium transition-colors',
+                      pathname === '/profile' || pathname.startsWith('/profile/')
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'text-slate-700 hover:bg-slate-50',
+                    )}
                     style={{ textDecoration: 'none' }}
                   >
-                    <UserCircle2 size={18} /> Mon profil
+                    <UserCircle2 size={18} /> {t('nav.myProfile')}
                   </Link>
                 </li>
                 <li>
                   <Link
                     href="/favoris"
                     onClick={onClose}
-                    className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                    className={cn(
+                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium transition-colors',
+                      pathname === '/favoris'
+                        ? 'bg-slate-100 text-slate-900'
+                        : 'text-slate-700 hover:bg-slate-50',
+                    )}
                     style={{ textDecoration: 'none' }}
                   >
-                    <Heart size={18} className="text-slate-600" /> Mes favoris
+                    <Heart size={18} className="text-slate-600" /> {t('nav.myFavorites')}
                   </Link>
                 </li>
                 {(user.role === 'MERCHANT' || (user.merchants?.length ?? 0) > 0) && (
@@ -157,7 +174,19 @@ export function MobileNav({
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
-                      <LayoutDashboard size={18} /> Mon tableau de bord
+                      <LayoutDashboard size={18} /> {t('nav.dashboard')}
+                    </Link>
+                  </li>
+                )}
+                {(user.role === 'COURIER' || user.courier_profile) && (
+                  <li>
+                    <Link
+                      href="/courier/dashboard"
+                      onClick={onClose}
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <LayoutDashboard size={18} /> Espace livreur
                     </Link>
                   </li>
                 )}
@@ -169,16 +198,25 @@ export function MobileNav({
                       className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
-                      <LayoutDashboard size={18} /> Admin
+                      <LayoutDashboard size={18} /> {t('nav.admin')}
                     </Link>
                   </li>
                 )}
               </ul>
             </div>
           )}
+
+          <div className="mt-6 pt-6 border-t border-slate-100 px-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">
+              {t('nav.preferences')}
+            </p>
+            <div className="flex flex-col gap-3">
+              <LanguageSwitcher compact />
+              <CountrySwitcher />
+            </div>
+          </div>
         </nav>
 
-        {/* Footer auth */}
         <div className="px-4 py-6 border-t border-slate-100">
           {isAuthenticated && user ? (
             <button
@@ -186,7 +224,7 @@ export function MobileNav({
               onClick={() => { onLogout(); onClose() }}
               className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
             >
-              <LogOut size={16} /> Déconnexion
+              <LogOut size={16} /> {t('nav.logout')}
             </button>
           ) : (
             <Link
@@ -195,7 +233,7 @@ export function MobileNav({
               className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
               style={{ textDecoration: 'none' }}
             >
-              <User size={16} /> Connexion
+              <User size={16} /> {t('nav.login')}
             </Link>
           )}
         </div>

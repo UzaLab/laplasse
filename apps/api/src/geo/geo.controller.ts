@@ -24,4 +24,9 @@ export class GeoController {
       citySlug,
     )
   }
+
+  @Get('countries')
+  findCountries() {
+    return this.geoService.findCountriesPublic()
+  }
 }

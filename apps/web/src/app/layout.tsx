@@ -7,6 +7,7 @@ import { LocaleProvider } from '@/providers/LocaleProvider'
 import { AuthBootstrap } from '@/components/AuthBootstrap'
 import { AppToaster } from '@/components/ui/AppToaster'
 import { PwaRegister } from '@/components/PwaRegister'
+import { WebPushManager } from '@/components/WebPushManager'
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
 import { CountrySuggestionBanner } from '@/components/layout/CountrySuggestionBanner'
 import './globals.css'
@@ -105,6 +106,7 @@ export default async function RootLayout({
           <QueryProvider>
             <LocaleProvider initialLocale={initialLocale}>
               <PwaRegister />
+              <WebPushManager />
               <AuthBootstrap />
               <AppToaster />
               {children}

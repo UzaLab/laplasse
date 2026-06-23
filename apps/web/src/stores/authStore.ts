@@ -21,6 +21,36 @@ export interface OrganizationSummary {
   logo?: string | null
 }
 
+export interface CourierSummary {
+  id: string
+  status: string
+  city: string
+  country: string
+  phone?: string
+  vehicle: string
+  plate_number?: string | null
+  is_online?: boolean
+  current_latitude?: number | null
+  current_longitude?: number | null
+  last_location_at?: string | null
+  rating_avg?: number
+  rating_count?: number
+  completed_jobs?: number
+}
+
+export interface LogisticsPartnerSummary {
+  id: string
+  legal_name: string
+  trade_name: string | null
+  slug: string
+  city: string
+  country: string
+  phone: string
+  verification: string
+  is_active: boolean
+  _count?: { couriers: number; contracts: number }
+}
+
 export interface AuthUser {
   id: string
   email: string
@@ -31,6 +61,8 @@ export interface AuthUser {
   merchants?: MerchantSummary[]
   shops?: ShopSummary[]
   organization?: OrganizationSummary | null
+  courier_profile?: CourierSummary | null
+  logistics_partner?: LogisticsPartnerSummary | null
 }
 
 interface AuthState {
@@ -63,12 +95,15 @@ export const useAuthStore = create<AuthState>()(
           const activeMerchantId =
             user.merchants?.[0]?.id ?? state.activeMerchantId ?? null
           const linkedShops = getShopsForMerchant(user.shops, activeMerchantId)
+          const independentShops = (user.shops ?? []).filter(s => !s.merchant_id)
+          // Prioritise merchant-linked shop; fall back to independent shop
+          const firstShop = linkedShops[0] ?? independentShops[0] ?? null
           return {
             user,
             isAuthenticated: true,
             sessionStatus: 'authenticated',
             activeMerchantId,
-            activeShopId: linkedShops[0]?.id ?? null,
+            activeShopId: firstShop?.id ?? state.activeShopId ?? null,
           }
         }),
 

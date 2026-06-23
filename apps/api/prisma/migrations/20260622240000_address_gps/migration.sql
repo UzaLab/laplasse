@@ -1,0 +1,8 @@
+ALTER TABLE "UserAddress" ADD COLUMN "latitude" DOUBLE PRECISION;
+ALTER TABLE "UserAddress" ADD COLUMN "longitude" DOUBLE PRECISION;
+
+ALTER TABLE "Order" ADD COLUMN "delivery_latitude" DOUBLE PRECISION;
+ALTER TABLE "Order" ADD COLUMN "delivery_longitude" DOUBLE PRECISION;
+
+ALTER TABLE "DeliveryJob" ADD COLUMN "dropoff_latitude" DOUBLE PRECISION;
+ALTER TABLE "DeliveryJob" ADD COLUMN "dropoff_longitude" DOUBLE PRECISION;

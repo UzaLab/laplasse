@@ -1,7 +1,9 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Queue, Worker, Job } from 'bullmq'
+import type { PushSubscription } from 'web-push'
 import { PrismaService } from '../prisma/prisma.service'
+import { WebPushService } from '../push/web-push.service'
 
 export interface PushNotificationJob {
   userId: string
@@ -35,6 +37,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly webPush: WebPushService,
   ) {}
 
   async onModuleInit() {
@@ -197,14 +200,44 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       },
     })
 
-    const fcmKey = this.config.get<string>('FCM_SERVER_KEY')
-    const tokens = await this.prisma.deviceToken.findMany({
+    const devices = await this.prisma.deviceToken.findMany({
       where: { user_id: payload.userId },
-      select: { token: true },
     })
 
-    if (fcmKey && tokens.length > 0) {
-      for (const { token } of tokens) {
+    let delivered = 0
+
+    if (this.webPush.isConfigured()) {
+      for (const device of devices) {
+        if (!device.push_subscription) continue
+        try {
+          await this.webPush.send(
+            device.push_subscription as unknown as PushSubscription,
+            {
+              title: payload.title,
+              body: payload.body,
+              type: payload.type,
+              data: payload.data ?? undefined,
+            },
+          )
+          delivered++
+          this.logger.log(`Web Push [${payload.type}] → ${device.token.slice(0, 48)}…`)
+        } catch (err) {
+          const statusCode = (err as { statusCode?: number }).statusCode
+          if (statusCode === 404 || statusCode === 410) {
+            await this.prisma.deviceToken.delete({ where: { id: device.id } }).catch(() => {})
+            this.logger.warn(`Subscription expirée supprimée (${device.token.slice(0, 32)}…)`)
+          } else {
+            this.logger.warn(`Web Push échec: ${(err as Error).message}`)
+          }
+        }
+      }
+    }
+
+    const fcmKey = this.config.get<string>('FCM_SERVER_KEY')
+    const fcmTokens = devices.filter(d => !d.push_subscription && d.platform !== 'web_push')
+
+    if (fcmKey && fcmTokens.length > 0) {
+      for (const { token } of fcmTokens) {
         try {
           await fetch('https://fcm.googleapis.com/fcm/send', {
             method: 'POST',
@@ -218,13 +251,18 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
               data: payload.data ?? {},
             }),
           })
+          delivered++
           this.logger.log(`FCM envoyé [${payload.type}] → ${token.slice(0, 12)}…`)
         } catch (err) {
           this.logger.warn(`FCM échec: ${(err as Error).message}`)
         }
       }
-    } else {
-      this.logger.log(`Push simulé [${payload.type}] → user:${payload.userId}`)
+    }
+
+    if (delivered === 0) {
+      this.logger.log(
+        `Push in-app seulement [${payload.type}] → user:${payload.userId} (aucun appareil Web Push / FCM actif)`,
+      )
     }
   }
 

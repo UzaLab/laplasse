@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { WebPushService } from '../push/web-push.service'
 
 export type NotificationType =
   | 'review_approved'
@@ -19,7 +20,10 @@ export type NotificationType =
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webPush: WebPushService,
+  ) {}
 
   async send(
     userId: string,
@@ -48,12 +52,38 @@ export class NotificationsService {
     })
   }
 
-  async getAll(userId: string) {
-    return this.prisma.notification.findMany({
-      where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
-      take: 50,
-    })
+  async getPage(
+    userId: string,
+    opts: { page: number; limit: number; unreadOnly?: boolean },
+  ) {
+    const page = Math.max(1, opts.page)
+    const limit = Math.min(50, Math.max(1, opts.limit))
+    const where = {
+      user_id: userId,
+      ...(opts.unreadOnly ? { read: false } : {}),
+    }
+
+    const [items, total, totalAll, unreadCount] = await Promise.all([
+      this.prisma.notification.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.count({ where: { user_id: userId } }),
+      this.prisma.notification.count({ where: { user_id: userId, read: false } }),
+    ])
+
+    return {
+      items,
+      total,
+      totalAll,
+      page,
+      pageSize: limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      unreadCount,
+    }
   }
 
   async markRead(userId: string, notificationId: string) {
@@ -72,6 +102,49 @@ export class NotificationsService {
 
   async unreadCount(userId: string): Promise<number> {
     return this.prisma.notification.count({ where: { user_id: userId, read: false } })
+  }
+
+  getWebPushPublicKey(): string | null {
+    return this.webPush.getPublicKey()
+  }
+
+  async registerWebPushSubscription(
+    userId: string,
+    subscription: Record<string, unknown>,
+  ) {
+    const endpoint = typeof subscription.endpoint === 'string' ? subscription.endpoint : null
+    if (!endpoint) throw new BadRequestException('Subscription invalide')
+
+    await this.prisma.deviceToken.upsert({
+      where: { token: endpoint },
+      update: {
+        user_id: userId,
+        platform: 'web_push',
+        push_subscription: subscription as never,
+      },
+      create: {
+        user_id: userId,
+        token: endpoint,
+        platform: 'web_push',
+        push_subscription: subscription as never,
+      },
+    })
+
+    this.logger.log(`Web Push enregistré → user:${userId}`)
+    return { ok: true }
+  }
+
+  async unregisterWebPushSubscription(userId: string, endpoint?: string) {
+    if (endpoint) {
+      await this.prisma.deviceToken.deleteMany({
+        where: { user_id: userId, token: endpoint },
+      })
+    } else {
+      await this.prisma.deviceToken.deleteMany({
+        where: { user_id: userId, platform: 'web_push' },
+      })
+    }
+    return { ok: true }
   }
 
   // ─── Helpers métier ───────────────────────────────────────────────────────

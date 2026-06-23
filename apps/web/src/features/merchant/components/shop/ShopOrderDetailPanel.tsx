@@ -182,11 +182,17 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         <h2 className="text-lg font-extrabold text-slate-900 mb-6">Suivi & gestion</h2>
         <OrderTimeline status={order.status} deliveryType={order.delivery_type} />
 
-        {order.delivery_type === 'DELIVERY' && (
+        {allowedTargets.length === 0 && (
+          <p className="mt-4 text-sm text-slate-500 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+            Commande en lecture seule — consultez le détail ci-dessous. Aucune action disponible pour ce statut.
+          </p>
+        )}
+
+        {order.delivery_type === 'DELIVERY' && activeShopId && (
           <DeliveryDispatchPanel
             orderId={order.id}
+            shopId={activeShopId}
             deliveryJob={order.delivery_job}
-            city={order.delivery_city?.name ?? undefined}
             onDispatched={() => void refetch()}
           />
         )}

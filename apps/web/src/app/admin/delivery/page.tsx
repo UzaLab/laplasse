@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, Truck, MapPin, AlertCircle } from 'lucide-react'
+import { Loader2, Truck, MapPin, AlertCircle, Users, Star, Building2 } from 'lucide-react'
+import Link from 'next/link'
 import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
@@ -15,6 +16,8 @@ interface DeliveryStats {
   jobs_by_status: Array<{ status: string; count: number }>
   couriers_active: number
   zones_active: number
+  courier_service_zones: number
+  couriers_pending_kyc: number
   deliveries_last_30d: number
   uncovered_communes: Array<{ city: string; commune: string; commune_id: string }>
   uncovered_total: number
@@ -84,15 +87,81 @@ function AdminDeliveryPageContent() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: 'Livraisons (30j)', value: data.deliveries_last_30d },
-                { label: 'Coursiers actifs', value: data.couriers_active },
-                { label: 'Zones actives', value: data.zones_active },
-                { label: 'Couverture communes', value: `${coveragePct}%` },
+                { label: 'Livreurs actifs', value: data.couriers_active },
+                { label: 'Zones livreurs', value: data.courier_service_zones },
+                { label: 'KYC en attente', value: data.couriers_pending_kyc },
               ].map(card => (
                 <div key={card.label} className="bg-white rounded-2xl border border-slate-100 p-5">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">{card.label}</p>
                   <p className="text-2xl font-extrabold text-slate-900 mt-1">{card.value}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Link
+                href="/admin/delivery/couriers"
+                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <Users size={22} className="text-brand-500 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-900">Validation livreurs</p>
+                  <p className="text-sm text-slate-500">{data.couriers_pending_kyc} profil(s) en attente KYC</p>
+                </div>
+              </Link>
+              <Link
+                href="/admin/delivery/assignments"
+                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <Truck size={22} className="text-brand-500 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-900">Assignations</p>
+                  <p className="text-sm text-slate-500">Réassignation manuelle des courses actives</p>
+                </div>
+              </Link>
+              <Link
+                href="/admin/delivery/disputes"
+                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <AlertCircle size={22} className="text-amber-500 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-900">Litiges livraison</p>
+                  <p className="text-sm text-slate-500">Signalements clients et photos preuve</p>
+                </div>
+              </Link>
+              <Link
+                href="/admin/delivery/partners"
+                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <Building2 size={22} className="text-indigo-500 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-900">Partenaires logistiques</p>
+                  <p className="text-sm text-slate-500">Validation des structures de livraison</p>
+                </div>
+              </Link>
+              <Link
+                href="/admin/courier-reviews"
+                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                <Star size={22} className="text-brand-500 shrink-0" />
+                <div>
+                  <p className="font-bold text-slate-900">Avis livreurs</p>
+                  <p className="text-sm text-slate-500">Modération et recalcul des notes</p>
+                </div>
+              </Link>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 p-5 text-sm text-slate-600">
+              <p>
+                <span className="font-bold text-slate-800">Zones boutiques actives :</span> {data.zones_active}
+                {' · '}
+                <span className="font-bold text-slate-800">Couverture communes :</span> {coveragePct}%
+              </p>
             </div>
 
             <section className="bg-white rounded-2xl border border-slate-100 p-6">

@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 
 export class CreateUserAddressDto {
   @IsOptional()
@@ -25,6 +25,14 @@ export class CreateUserAddressDto {
   @IsOptional()
   @IsBoolean()
   is_default?: boolean
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number | null
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number | null
 }
 
 export class UpdateUserAddressDto {
@@ -55,4 +63,12 @@ export class UpdateUserAddressDto {
   @IsOptional()
   @IsBoolean()
   is_default?: boolean
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number | null
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number | null
 }

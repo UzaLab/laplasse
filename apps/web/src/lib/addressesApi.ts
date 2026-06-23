@@ -7,9 +7,11 @@ export interface UserAddress {
   commune_id: string
   district: string
   address_detail: string | null
+  latitude: number | null
+  longitude: number | null
   is_default: boolean
-  city: { id: string; name: string; slug: string; country: string }
-  commune: { id: string; name: string; slug: string }
+  city: { id: string; name: string; slug: string; country: string; latitude?: number | null; longitude?: number | null }
+  commune: { id: string; name: string; slug: string; latitude?: number | null; longitude?: number | null }
 }
 
 export interface CreateUserAddressInput {
@@ -18,6 +20,8 @@ export interface CreateUserAddressInput {
   commune_id: string
   district: string
   address_detail?: string
+  latitude?: number | null
+  longitude?: number | null
   is_default?: boolean
 }
 

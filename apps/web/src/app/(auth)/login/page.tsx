@@ -6,7 +6,7 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, MapPin, Smartphone } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, type AuthUser } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_AUTH_SUBTITLE } from '@/lib/brandCopy'
 import { PUBLIC_AUTH } from '@/lib/pageLayout'
@@ -30,14 +30,28 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const redirectAfterLogin = (user: { role: string }) => {
+  const redirectAfterLogin = (user: AuthUser) => {
     if (redirectTo && !redirectTo.startsWith('//')) {
       router.push(redirectTo)
       return
     }
-    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') router.push('/admin')
-    else if (user.role === 'MERCHANT') router.push('/merchant/dashboard')
-    else router.push('/')
+    if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      router.push('/admin')
+      return
+    }
+    if (user.logistics_partner) {
+      router.push('/logistics')
+      return
+    }
+    if (user.role === 'COURIER' || user.courier_profile) {
+      router.push('/courier/dashboard')
+      return
+    }
+    if (user.role === 'MERCHANT') {
+      router.push('/merchant/dashboard')
+      return
+    }
+    router.push('/')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

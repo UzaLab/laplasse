@@ -51,6 +51,7 @@ import {
   fetchMyAddresses,
   type UserAddress,
 } from '@/lib/addressesApi'
+import { AddressLocationPickerLazy } from '@/features/addresses/components/AddressLocationPickerLazy'
 
 import {
   getDeliveryVehicleLabel,
@@ -97,6 +98,8 @@ function CheckoutPageContent() {
   const [deliveryCommuneId, setDeliveryCommuneId] = useState('')
   const [deliveryDistrict, setDeliveryDistrict] = useState('')
   const [deliveryAddressDetail, setDeliveryAddressDetail] = useState('')
+  const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null)
+  const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null)
   const [customerNote, setCustomerNote] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
 
@@ -200,6 +203,8 @@ function CheckoutPageContent() {
     setDeliveryCommuneId(saved.deliveryCommuneId ?? '')
     setDeliveryDistrict(saved.deliveryDistrict ?? '')
     setDeliveryAddressDetail(saved.deliveryAddressDetail ?? '')
+    setDeliveryLatitude(saved.deliveryLatitude ?? null)
+    setDeliveryLongitude(saved.deliveryLongitude ?? null)
     setCustomerNote(saved.customerNote ?? '')
     if (saved.customerPhone?.trim()) setCustomerPhone(saved.customerPhone)
     setSelectedAddressId(saved.selectedAddressId ?? null)
@@ -223,6 +228,8 @@ function CheckoutPageContent() {
     setDeliveryCommuneId(addr.commune_id)
     setDeliveryDistrict(addr.district)
     setDeliveryAddressDetail(addr.address_detail ?? '')
+    setDeliveryLatitude(addr.latitude)
+    setDeliveryLongitude(addr.longitude)
     setSaveNewAddress(false)
   }, [])
 
@@ -253,6 +260,8 @@ function CheckoutPageContent() {
       deliveryCommuneId: deliveryCommuneId || undefined,
       deliveryDistrict: deliveryDistrict || undefined,
       deliveryAddressDetail: deliveryAddressDetail || undefined,
+      deliveryLatitude: deliveryLatitude ?? undefined,
+      deliveryLongitude: deliveryLongitude ?? undefined,
       customerNote: customerNote || undefined,
       customerPhone: customerPhone || undefined,
       selectedAddressId: selectedAddressId ?? undefined,
@@ -267,6 +276,8 @@ function CheckoutPageContent() {
     deliveryCommuneId,
     deliveryDistrict,
     deliveryAddressDetail,
+    deliveryLatitude,
+    deliveryLongitude,
     customerNote,
     customerPhone,
     selectedAddressId,
@@ -484,6 +495,8 @@ function CheckoutPageContent() {
           commune_id: deliveryCommuneId,
           district: deliveryDistrict.trim(),
           address_detail: deliveryAddressDetail.trim() || undefined,
+          latitude: deliveryLatitude ?? undefined,
+          longitude: deliveryLongitude ?? undefined,
           is_default: savedAddresses.length === 0,
         })
         if (addrErr) {
@@ -530,6 +543,10 @@ function CheckoutPageContent() {
       delivery_district: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryDistrict : undefined,
       delivery_address_detail:
         !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryAddressDetail : undefined,
+      delivery_latitude:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryLatitude ?? undefined : undefined,
+      delivery_longitude:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryLongitude ?? undefined : undefined,
       delivery_address: !useSplitDelivery && deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
       customer_note: customerNote || undefined,
       customer_phone: phone,
@@ -775,6 +792,8 @@ function CheckoutPageContent() {
                                 setDeliveryCommuneId('')
                                 setDeliveryDistrict('')
                                 setDeliveryAddressDetail('')
+                                setDeliveryLatitude(null)
+                                setDeliveryLongitude(null)
                               }}
                               className="text-xs font-bold text-brand-600 hover:text-brand-700"
                             >
@@ -794,6 +813,8 @@ function CheckoutPageContent() {
                             clearAddressSelection()
                             setDeliveryCityId(e.target.value)
                             setDeliveryCommuneId('')
+                            setDeliveryLatitude(null)
+                            setDeliveryLongitude(null)
                           }}
                           className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                         >
@@ -810,6 +831,8 @@ function CheckoutPageContent() {
                           onChange={e => {
                             clearAddressSelection()
                             setDeliveryCommuneId(e.target.value)
+                            setDeliveryLatitude(null)
+                            setDeliveryLongitude(null)
                           }}
                           disabled={!deliveryCityId}
                           className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400 disabled:opacity-50"
@@ -877,6 +900,19 @@ function CheckoutPageContent() {
                         </div>
                       )}
                         </>
+                      )}
+
+                      {deliveryCityId && deliveryCommuneId && (
+                        <AddressLocationPickerLazy
+                          latitude={deliveryLatitude}
+                          longitude={deliveryLongitude}
+                          onChange={coords => {
+                            setDeliveryLatitude(coords?.latitude ?? null)
+                            setDeliveryLongitude(coords?.longitude ?? null)
+                          }}
+                          city={selectedCity}
+                          commune={communes.find(c => c.id === deliveryCommuneId)}
+                        />
                       )}
                     </div>
 
@@ -960,7 +996,7 @@ function CheckoutPageContent() {
             )}
           </div>
 
-          <div className="w-full lg:w-[400px] shrink-0">
+          <div className="w-full lg:w-[400px] shrink-0 lg:sticky lg:top-24 lg:self-start space-y-4">
             <CheckoutOrderSummary
               cart={cart}
               total={checkoutTotal}
@@ -972,13 +1008,12 @@ function CheckoutPageContent() {
               deliveryFee={hasAnyDelivery ? deliveryFee : 0}
               deliveryQuotes={hasAnyDelivery ? deliveryQuotes : undefined}
               freeDeliveryShopIds={isFoodFlow ? [] : [...freeDeliveryShopIds]}
-              className="lg:sticky lg:top-28"
             />
             {!submitting && (
               <button
                 type="button"
                 onClick={handleCheckout}
-                className="hidden lg:flex w-full h-14 mt-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 items-center justify-center gap-2 group"
+                className="hidden lg:flex w-full h-14 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 items-center justify-center gap-2 group"
               >
                 Continuer vers le paiement
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

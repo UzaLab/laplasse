@@ -39,6 +39,8 @@ import { CreateUserAddressDto, UpdateUserAddressDto } from '../addresses/dto/use
 import { ShopMenuService } from '../shop-menu/shop-menu.service'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 import { ProductDiscoveryService } from './product-discovery.service'
+import { CreateCourierReviewDto } from '../couriers/dto/create-courier-review.dto'
+import { CreateDeliveryDisputeDto } from '../delivery/dto/create-delivery-dispute.dto'
 
 @Controller()
 export class MarketplaceController {
@@ -429,6 +431,26 @@ export class MarketplaceController {
     @Body() dto: CreateOrderReturnDto,
   ) {
     return this.svc.createOrderReturn(userId, orderId, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('orders/:id/courier-review')
+  createCourierReview(
+    @CurrentUser('id') userId: string,
+    @Param('id') orderId: string,
+    @Body() dto: CreateCourierReviewDto,
+  ) {
+    return this.svc.createCourierReview(userId, orderId, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('orders/:id/delivery-dispute')
+  createDeliveryDispute(
+    @CurrentUser('id') userId: string,
+    @Param('id') orderId: string,
+    @Body() dto: CreateDeliveryDisputeDto,
+  ) {
+    return this.svc.createDeliveryDispute(userId, orderId, dto)
   }
 
   @UseGuards(JwtAuthGuard)

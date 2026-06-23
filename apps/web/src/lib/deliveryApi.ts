@@ -55,11 +55,23 @@ export async function fetchDeliveryCouriers(
 
 export async function dispatchDeliveryOrder(
   orderId: string,
-  courierId?: string,
+  options: {
+    fulfilment_mode?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
+    courier_profile_id?: string
+    logistics_partner_id?: string
+    /** @deprecated legacy DeliveryCourier id */
+    courier_id?: string
+  } = {},
 ): Promise<{ job: DeliveryJobSummary | null; error?: string }> {
+  const body: Record<string, string> = {}
+  if (options.fulfilment_mode) body.fulfilment_mode = options.fulfilment_mode
+  if (options.courier_profile_id) body.courier_profile_id = options.courier_profile_id
+  if (options.logistics_partner_id) body.logistics_partner_id = options.logistics_partner_id
+  if (options.courier_id) body.courier_id = options.courier_id
+
   const res = await authApiFetch(`/delivery/orders/${orderId}/dispatch`, {
     method: 'POST',
-    body: JSON.stringify(courierId ? { courier_id: courierId } : {}),
+    body: JSON.stringify(body),
   })
   if (!res.ok) return { job: null, error: await parseError(res) }
   const job = await res.json() as DeliveryJobSummary

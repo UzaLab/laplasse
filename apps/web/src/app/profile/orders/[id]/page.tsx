@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
+import { useState } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   CreditCard,
   Download,
@@ -10,6 +12,8 @@ import {
   Loader2,
   MapPin,
   Package,
+  PackageX,
+  Shield,
   ShoppingCart,
   Truck,
 } from 'lucide-react'
@@ -21,6 +25,7 @@ import {
   formatOrderRef,
   getOrderDisplayStatus,
   ORDER_DETAIL_STATUS_LABELS,
+  resolveOrderStatus,
 } from '@/features/profile/components/orders/orderUtils'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import {
@@ -31,7 +36,9 @@ import {
 } from '@/lib/marketplaceApi'
 import { deliveryTrackingPath } from '@/lib/deliveryApi'
 import { OrderAgainButton } from '@/features/profile/components/orders/OrderAgainButton'
-import { OrderReturnRequestForm } from '@/features/profile/components/orders/OrderReturnRequestForm'
+import { OrderReturnRequestForm, isOrderReturnEligible } from '@/features/profile/components/orders/OrderReturnRequestForm'
+import { CourierReviewPrompt } from '@/features/profile/components/orders/CourierReviewPrompt'
+import { DeliveryDisputeForm, isDeliveryDisputeEligible } from '@/features/profile/components/orders/DeliveryDisputeForm'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 function whatsAppSupportUrl(phone: string, message: string): string | undefined {
@@ -45,11 +52,22 @@ export default function ProfileOrderDetailPage() {
   const router = useRouter()
   const orderId = params.id as string
   const { ready, hydrated, isAuthenticated, user } = useRequireAuth('/profile/orders')
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const [returnOpen, setReturnOpen] = useState(false)
 
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['my-order', user?.id, orderId],
     queryFn: () => fetchOrder(orderId),
     enabled: ready && !!orderId,
+    refetchInterval: (query) => {
+      const o = query.state.data
+      if (!o) return false
+      const status = resolveOrderStatus(o)
+      if (o.delivery_type !== 'DELIVERY') return false
+      if (['DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED'].includes(status)) return false
+      if (o.delivery_job?.status === 'DELIVERED') return false
+      return 12_000
+    },
   })
 
   if (!hydrated) {
@@ -92,9 +110,10 @@ export default function ProfileOrderDetailPage() {
   }
 
   const dt = new Date(order.created_at)
-  const displayStatus = getOrderDisplayStatus(order.status)
+  const effectiveStatus = resolveOrderStatus(order)
+  const displayStatus = getOrderDisplayStatus(effectiveStatus)
   const statusDetail =
-    ORDER_DETAIL_STATUS_LABELS[order.status] ?? ORDER_STATUS_LABELS[order.status]
+    ORDER_DETAIL_STATUS_LABELS[effectiveStatus] ?? ORDER_STATUS_LABELS[effectiveStatus]
   const merchantName = order.merchant?.business_name ?? 'Boutique'
   const supportPhone = order.merchant?.whatsapp ?? order.merchant?.phone
   const supportHref = supportPhone
@@ -106,12 +125,19 @@ export default function ProfileOrderDetailPage() {
   const showTrack =
     displayStatus === 'active' &&
     order.delivery_type === 'DELIVERY' &&
-    !!order.delivery_job?.tracking_token
+    !!order.delivery_job?.tracking_token &&
+    order.delivery_job.status !== 'DELIVERED'
   const trackingHref = order.delivery_job?.tracking_token
     ? deliveryTrackingPath(order.delivery_job.tracking_token)
     : null
   const pendingPayment =
     order.status === 'PENDING' && order.payment?.status === 'PENDING'
+
+  const subtleActionBtn =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 rounded-full hover:bg-slate-50 hover:text-slate-700 transition-colors whitespace-nowrap'
+
+  const canDispute = isDeliveryDisputeEligible(order, effectiveStatus)
+  const canReturn = isOrderReturnEligible({ ...order, status: effectiveStatus })
 
   return (
     <ProfileShell>
@@ -126,25 +152,25 @@ export default function ProfileOrderDetailPage() {
             <ArrowLeft size={18} />
             Retour aux commandes
           </button>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {pendingPayment && (
               <Link
                 href={`/checkout/payment?orderIds=${order.id}`}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors text-sm font-bold shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors text-xs font-bold shadow-sm"
                 style={{ textDecoration: 'none' }}
               >
-                <CreditCard size={16} />
-                Payer maintenant
+                <CreditCard size={14} />
+                Payer
               </Link>
             )}
             {!pendingPayment && <OrderAgainButton order={order} variant="detail" />}
             <Link
               href={`/profile/orders/${order.id}/receipt`}
               target="_blank"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+              className={subtleActionBtn}
               style={{ textDecoration: 'none' }}
             >
-              <Download size={16} />
+              <Download size={14} />
               Facture
             </Link>
             {supportHref ? (
@@ -152,20 +178,28 @@ export default function ProfileOrderDetailPage() {
                 href={supportHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors text-sm font-semibold text-slate-700"
+                className={subtleActionBtn}
                 style={{ textDecoration: 'none' }}
               >
-                <Headphones size={16} />
+                <Headphones size={14} />
                 Support
               </a>
             ) : (
-              <button
-                type="button"
-                disabled
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-full text-sm font-semibold text-slate-400 cursor-not-allowed"
-              >
-                <Headphones size={16} />
+              <button type="button" disabled className={`${subtleActionBtn} opacity-50 cursor-not-allowed`}>
+                <Headphones size={14} />
                 Support
+              </button>
+            )}
+            {canDispute && (
+              <button type="button" onClick={() => setDisputeOpen(true)} className={subtleActionBtn}>
+                <AlertTriangle size={14} />
+                Litige
+              </button>
+            )}
+            {canReturn && (
+              <button type="button" onClick={() => setReturnOpen(true)} className={subtleActionBtn}>
+                <PackageX size={14} />
+                SAV
               </button>
             )}
           </div>
@@ -174,9 +208,9 @@ export default function ProfileOrderDetailPage() {
         {/* Header card */}
         <div className="relative overflow-hidden bg-white/80 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
           <div className="absolute top-0 right-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="relative z-10 flex flex-col gap-5">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 mb-1">
                 Commande {formatOrderRef(order.id)}
               </h1>
               <p className="text-sm text-slate-500">
@@ -190,51 +224,103 @@ export default function ProfileOrderDetailPage() {
               </p>
               <p className="text-sm font-medium text-slate-400 mt-1">{merchantName}</p>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="px-4 py-2 bg-amber-50 text-amber-900 rounded-full text-sm font-semibold flex items-center gap-2 border border-amber-100">
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-900 rounded-full text-xs sm:text-sm font-semibold border border-amber-100 w-fit max-w-full">
                 {displayStatus === 'active' && (
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
                 )}
-                {statusDetail}
+                <span className="truncate">{statusDetail}</span>
               </div>
-              {pendingPayment && (
-                <Link
-                  href={`/checkout/payment?orderIds=${order.id}`}
-                  className="px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm flex items-center gap-2"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <CreditCard size={16} />
-                  Payer maintenant
-                </Link>
-              )}
-              {showTrack && trackingHref && (
-                <Link
-                  href={trackingHref}
-                  className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
-                  style={{ textDecoration: 'none' }}
-                >
-                  Suivre la livraison
-                </Link>
-              )}
-              {order.merchant?.slug && (
-                <Link
-                  href={`/m/${order.merchant.slug}`}
-                  className="px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors"
-                  style={{ textDecoration: 'none' }}
-                >
-                  Voir la boutique
-                </Link>
-              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {pendingPayment && (
+                  <Link
+                    href={`/checkout/payment?orderIds=${order.id}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <CreditCard size={15} />
+                    Payer
+                  </Link>
+                )}
+                {showTrack && trackingHref && (
+                  <Link
+                    href={trackingHref}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Suivre
+                  </Link>
+                )}
+                {order.merchant?.slug && (
+                  <Link
+                    href={`/m/${order.merchant.slug}`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    Voir la boutique
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <OrderReturnRequestForm order={order} />
+        {(order.delivery_dispute || order.return_request) && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            {order.delivery_dispute && (
+              <DeliveryDisputeForm order={order} effectiveStatus={effectiveStatus} />
+            )}
+            {order.return_request && (
+              <OrderReturnRequestForm order={{ ...order, status: effectiveStatus }} />
+            )}
+          </div>
+        )}
+
+        <CourierReviewPrompt order={order} effectiveStatus={effectiveStatus} />
+
+        {canDispute && (
+          <DeliveryDisputeForm
+            order={order}
+            effectiveStatus={effectiveStatus}
+            dialogOnly
+            open={disputeOpen}
+            onOpenChange={setDisputeOpen}
+          />
+        )}
+        {canReturn && (
+          <OrderReturnRequestForm
+            order={{ ...order, status: effectiveStatus }}
+            dialogOnly
+            open={returnOpen}
+            onOpenChange={setReturnOpen}
+          />
+        )}
+
+        {order.delivery_job?.delivery_code && order.delivery_job.status === 'IN_TRANSIT' && (
+          <div className="rounded-3xl border border-slate-900 bg-slate-900 text-white p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-emerald-300 flex items-center gap-2">
+                  <Shield size={14} />
+                  Code de livraison
+                </p>
+                <p className="text-sm text-slate-300 mt-2">
+                  Donnez ce code au livreur à son arrivée pour confirmer la réception.
+                </p>
+              </div>
+              <p className="text-4xl font-black tracking-[0.35em] tabular-nums shrink-0">
+                {order.delivery_job.delivery_code}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Timeline */}
         <div className="bg-white/80 backdrop-blur-xl border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
           <h2 className="text-lg font-extrabold text-slate-900 mb-6">Suivi de commande</h2>
-          <OrderTimeline status={order.status} deliveryType={order.delivery_type} />
+          <OrderTimeline status={effectiveStatus} deliveryType={order.delivery_type} />
         </div>
 
         {/* Bento grid */}
@@ -328,6 +414,16 @@ export default function ProfileOrderDetailPage() {
                               Coursier : {order.delivery_job.courier.full_name}
                             </p>
                           )}
+                          {!order.delivery_job.courier && order.delivery_job.courier_profile && (
+                            <p className="text-sm text-slate-700">
+                              Livreur : {order.delivery_job.courier_profile.user.full_name ?? 'Livreur LaPlasse'}
+                              {order.delivery_job.courier_profile.rating_avg > 0 && (
+                                <span className="text-amber-600 font-semibold ml-1">
+                                  · {order.delivery_job.courier_profile.rating_avg.toFixed(1)}/5
+                                </span>
+                              )}
+                            </p>
+                          )}
                           {trackingHref && (
                             <Link
                               href={trackingHref}
@@ -382,7 +478,7 @@ export default function ProfileOrderDetailPage() {
                   </div>
                 )}
                 <div className="pt-2">
-                  <OrderStatusBadge status={order.status} />
+                  <OrderStatusBadge status={effectiveStatus} />
                 </div>
               </div>
             </div>

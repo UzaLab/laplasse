@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { UseGuards } from '@nestjs/common'
 import { DeliveryService } from './delivery.service'
 import { DeliveryJobStatus } from '../../generated/prisma/client'
+import { DispatchDeliveryDto } from './dto/delivery-stakeholders.dto'
 
 @Controller('delivery')
 export class DeliveryController {
@@ -28,9 +29,9 @@ export class DeliveryController {
   @Post('orders/:orderId/dispatch')
   dispatch(
     @Param('orderId') orderId: string,
-    @Body() body: { courier_id?: string },
+    @Body() body: DispatchDeliveryDto,
   ) {
-    return this.svc.dispatchOrder(orderId, body.courier_id)
+    return this.svc.dispatchOrder(orderId, body)
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

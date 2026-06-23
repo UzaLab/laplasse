@@ -273,12 +273,34 @@ export interface Order {
     assigned_at: string | null
     picked_up_at: string | null
     delivered_at: string | null
+    delivery_code?: string | null
     courier: {
       id?: string
       full_name: string
       phone: string | null
       vehicle: string | null
     } | null
+    courier_profile?: {
+      phone: string
+      vehicle: string
+      rating_avg: number
+      user: { full_name: string | null }
+    } | null
+  } | null
+  courier_review?: {
+    id: string
+    rating: number
+    comment: string | null
+    status: string
+    created_at: string
+  } | null
+  delivery_dispute?: {
+    id: string
+    reason: string
+    description: string | null
+    status: 'OPEN' | 'RESOLVED' | 'DISMISSED'
+    created_at: string
+    admin_note?: string | null
   } | null
   return_request?: OrderReturnRequest | null
 }
@@ -375,6 +397,8 @@ export interface ShopCheckoutDeliveryInput {
   delivery_district?: string
   delivery_address_detail?: string
   delivery_address?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
 }
 
 export interface CheckoutInput {
@@ -384,6 +408,8 @@ export interface CheckoutInput {
   delivery_commune_id?: string
   delivery_district?: string
   delivery_address_detail?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
   customer_note?: string
   customer_phone: string
   applied_promotions?: AppliedPromotionInput[]
@@ -792,6 +818,46 @@ export async function createOrderReturn(
   })
   if (!res.ok) return { result: null, error: await parseError(res) }
   const result = await res.json() as OrderReturnRequest
+  return { result }
+}
+
+export async function createCourierReview(
+  orderId: string,
+  input: { rating: number; comment?: string },
+): Promise<{ result: Order['courier_review'] | null; error?: string }> {
+  const res = await authApiFetch(`/orders/${orderId}/courier-review`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as NonNullable<Order['courier_review']>
+  return { result }
+}
+
+export const DELIVERY_DISPUTE_REASONS = [
+  { value: 'non_recu', label: 'Colis non reçu' },
+  { value: 'endommage', label: 'Colis endommagé' },
+  { value: 'mauvais_colis', label: 'Mauvais colis livré' },
+  { value: 'comportement', label: 'Problème avec le livreur' },
+  { value: 'autre', label: 'Autre' },
+] as const
+
+export const DELIVERY_DISPUTE_STATUS_LABELS: Record<NonNullable<Order['delivery_dispute']>['status'], string> = {
+  OPEN: 'En cours d\'examen',
+  RESOLVED: 'Résolu',
+  DISMISSED: 'Classé sans suite',
+}
+
+export async function createDeliveryDispute(
+  orderId: string,
+  input: { reason: string; description?: string },
+): Promise<{ result: Order['delivery_dispute'] | null; error?: string }> {
+  const res = await authApiFetch(`/orders/${orderId}/delivery-dispute`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const result = await res.json() as NonNullable<Order['delivery_dispute']>
   return { result }
 }
 

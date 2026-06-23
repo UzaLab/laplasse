@@ -4,12 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck,
+  LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck, Building2,
   LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar, ShoppingBag,
 } from 'lucide-react'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
+import { getIndependentShops, getShopManageHref } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 
@@ -56,16 +57,29 @@ export function ProfileShell({ children }: ProfileShellProps) {
   ]
 
   const isMerchant = user?.role === 'MERCHANT' || (user?.merchants?.length ?? 0) > 0
+  const hasLogisticsPartner = !!user?.logistics_partner
 
-  const hasShop = (user?.shops?.length ?? 0) > 0
+  const allShops = user?.shops ?? []
+  const independentShops = getIndependentShops(allShops)
+  const merchantLinkedShops = allShops.filter(s => !!s.merchant_id)
+  const hasShop = allShops.length > 0
+
+  // Pick the first available shop to determine the manage URL
+  const firstShop = merchantLinkedShops[0] ?? independentShops[0] ?? null
+  const shopManageHref = firstShop ? getShopManageHref(firstShop) : '/shop/create'
+
   const extraNav: NavItem[] = [
+    ...(hasLogisticsPartner
+      ? [{ href: '/logistics', label: 'Espace logistique', icon: <Building2 size={17} /> }]
+      : []),
     ...(isMerchant
       ? [{ href: '/merchant/dashboard', label: 'Dashboard marchand', icon: <Store size={17} /> }]
       : [{ href: '/merchant/signup', label: 'Inscrire mon commerce', icon: <Store size={17} /> }]
     ),
-    ...(!hasShop
-      ? [{ href: '/shop/create', label: 'Créer ma boutique', icon: <ShoppingBag size={17} /> }]
-      : []),
+    ...(hasShop
+      ? [{ href: shopManageHref, label: 'Ma boutique', icon: <ShoppingBag size={17} /> }]
+      : [{ href: '/shop/create', label: 'Créer ma boutique', icon: <ShoppingBag size={17} /> }]
+    ),
     ...(isAdmin ? [{ href: '/admin', label: 'Administration', icon: <ShieldCheck size={17} /> }] : []),
     { href: '/search', label: exploreLabel, icon: <Compass size={17} /> },
   ]

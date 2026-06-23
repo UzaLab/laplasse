@@ -2,25 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Compass, Search, ShoppingBag, Store, User } from 'lucide-react'
+import { ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCartStore, useCartItemCount } from '@/stores/cartStore'
-
-const LINK_ITEMS = [
-  { href: '/', label: 'Découvrir', icon: Compass, match: (p: string) => p === '/' },
-  { href: '/search', label: 'Recherche', icon: Search, match: (p: string) => p === '/search' || p.startsWith('/search/') },
-  { href: '/marketplace', label: 'Shop', icon: Store, match: (p: string) => p === '/marketplace' || p.startsWith('/marketplace/') || p.startsWith('/boutique/') || p.includes('/boutique') || p.includes('/p/') },
-  { href: '/profile', label: 'Profil', icon: User, match: (p: string) => p === '/profile' || p.startsWith('/profile/') || p === '/favoris' },
-] as const
+import { useT } from '@/providers/LocaleProvider'
+import { MOBILE_BOTTOM_NAV_ITEMS } from './navConfig'
 
 export function MobileBottomNav() {
   const pathname = usePathname()
   const openDrawer = useCartStore(s => s.openDrawer)
   const itemCount = useCartItemCount()
+  const t = useT()
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40 safe-area-bottom">
-      {LINK_ITEMS.map(({ href, label, icon: Icon, match }) => {
+      {MOBILE_BOTTOM_NAV_ITEMS.map(({ href, labelKey, icon: Icon, match }) => {
         const active = match(pathname)
 
         return (
@@ -32,9 +28,10 @@ export function MobileBottomNav() {
               active ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700',
             )}
             style={{ textDecoration: 'none' }}
+            aria-current={active ? 'page' : undefined}
           >
             <Icon size={20} strokeWidth={active ? 2.25 : 2} />
-            <span className="text-[10px] font-semibold">{label}</span>
+            <span className="text-[10px] font-semibold">{t(labelKey)}</span>
           </Link>
         )
       })}
@@ -46,7 +43,7 @@ export function MobileBottomNav() {
           'relative flex flex-col items-center gap-0.5 transition-colors min-w-[56px]',
           pathname === '/cart' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700',
         )}
-        aria-label="Ouvrir le panier"
+        aria-label={t('nav.openCart')}
       >
         <ShoppingBag size={20} strokeWidth={pathname === '/cart' ? 2.25 : 2} />
         {itemCount > 0 && (
@@ -54,7 +51,7 @@ export function MobileBottomNav() {
             {itemCount > 9 ? '9+' : itemCount}
           </span>
         )}
-        <span className="text-[10px] font-semibold">Panier</span>
+        <span className="text-[10px] font-semibold">{t('nav.cart')}</span>
       </button>
     </nav>
   )

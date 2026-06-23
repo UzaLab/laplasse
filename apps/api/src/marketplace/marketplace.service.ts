@@ -41,6 +41,10 @@ import { ShopCollectionsService } from '../shop-collections/shop-collections.ser
 import { DeliveryService } from '../delivery/delivery.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
 import { LoyaltyService } from '../loyalty/loyalty.service'
+import { CourierReviewsService } from '../couriers/courier-reviews.service'
+import { DeliveryProofService } from '../delivery/delivery-proof.service'
+import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
+import { CreateDeliveryDisputeDto } from '../delivery/dto/create-delivery-dispute.dto'
 
 @Injectable()
 export class MarketplaceService {
@@ -54,6 +58,9 @@ export class MarketplaceService {
     private readonly shopCollections: ShopCollectionsService,
     private readonly deliveryService: DeliveryService,
     private readonly loyalty: LoyaltyService,
+    private readonly courierReviews: CourierReviewsService,
+    private readonly deliveryProof: DeliveryProofService,
+    private readonly deliveryDisputes: DeliveryDisputesService,
   ) {}
 
   private shopPublicSelect = {
@@ -1313,6 +1320,8 @@ export class MarketplaceService {
             delivery_address_detail:
               specific?.delivery_address_detail ?? dto.delivery_address_detail,
             delivery_address: specific?.delivery_address ?? dto.delivery_address,
+            delivery_latitude: specific?.delivery_latitude ?? dto.delivery_latitude,
+            delivery_longitude: specific?.delivery_longitude ?? dto.delivery_longitude,
             city_name: undefined as string | undefined,
             commune_name: undefined as string | undefined,
             formatted_address: undefined as string | undefined,
@@ -1572,10 +1581,18 @@ export class MarketplaceService {
             promotion_id: promotionId,
             status: 'PENDING',
             delivery_type: plan.delivery_type,
+            delivery_fulfilment_mode: isShopDelivery
+              ? ((await tx.shop.findUnique({
+                where: { id: groupShopId },
+                select: { delivery_fulfilment_default: true },
+              }))?.delivery_fulfilment_default ?? 'PLATFORM_RIDER')
+              : 'PLATFORM_RIDER',
             delivery_address: isShopDelivery ? plan.formatted_address : undefined,
             delivery_city_id: isShopDelivery ? plan.delivery_city_id : undefined,
             delivery_commune_id: isShopDelivery ? plan.delivery_commune_id : undefined,
             delivery_district: isShopDelivery ? plan.delivery_district : undefined,
+            delivery_latitude: isShopDelivery ? plan.delivery_latitude : undefined,
+            delivery_longitude: isShopDelivery ? plan.delivery_longitude : undefined,
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
             subtotal,
@@ -1780,10 +1797,13 @@ export class MarketplaceService {
             order_source: 'FOOD',
             status: 'PENDING',
             delivery_type: dto.delivery_type,
+            delivery_fulfilment_mode: 'PLATFORM_RIDER',
             delivery_address: deliveryAddress,
             delivery_city_id: dto.delivery_city_id,
             delivery_commune_id: dto.delivery_commune_id,
             delivery_district: dto.delivery_district,
+            delivery_latitude: dto.delivery_latitude,
+            delivery_longitude: dto.delivery_longitude,
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
             subtotal,
@@ -2219,9 +2239,22 @@ export class MarketplaceService {
         shop: { select: { name: true, slug: true, logo: true } },
         merchant: { select: { business_name: true, slug: true, logo: true } },
         payment: { select: { id: true, status: true, reference: true, paid_at: true } },
+        delivery_job: { select: { status: true } },
       },
       take: 50,
     })
+  }
+
+  async createCourierReview(
+    userId: string,
+    orderId: string,
+    dto: { rating: number; comment?: string },
+  ) {
+    return this.courierReviews.createForOrder(userId, orderId, dto)
+  }
+
+  async createDeliveryDispute(userId: string, orderId: string, dto: CreateDeliveryDisputeDto) {
+    return this.deliveryDisputes.createForOrder(userId, orderId, dto)
   }
 
   async getMyOrder(userId: string, orderId: string) {
@@ -2241,14 +2274,41 @@ export class MarketplaceService {
             assigned_at: true,
             picked_up_at: true,
             delivered_at: true,
+            proof_otp: true,
+            proof_otp_expires_at: true,
+            proof_confirmed_at: true,
             courier: { select: { full_name: true, phone: true, vehicle: true } },
+            courier_profile: {
+              select: {
+                phone: true,
+                vehicle: true,
+                rating_avg: true,
+                user: { select: { full_name: true } },
+              },
+            },
           },
+        },
+        courier_review: {
+          select: { id: true, rating: true, comment: true, status: true, created_at: true },
+        },
+        delivery_dispute: {
+          select: { id: true, reason: true, description: true, status: true, created_at: true, admin_note: true },
         },
         return_request: true,
       },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
-    return order
+
+    const deliveryCode = order.delivery_job
+      ? this.deliveryProof.clientDeliveryCode(order.delivery_job)
+      : null
+
+    return {
+      ...order,
+      delivery_job: order.delivery_job
+        ? { ...order.delivery_job, delivery_code: deliveryCode }
+        : null,
+    }
   }
 
   async getMerchantOrder(userId: string, orderId: string, shopId?: string) {
@@ -2322,7 +2382,7 @@ export class MarketplaceService {
         user: { select: { full_name: true, email: true, phone: true } },
         payment: { select: { status: true, reference: true } },
       },
-      take: 100,
+      take: 500,
     })
   }
 
@@ -3023,7 +3083,7 @@ export class MarketplaceService {
           },
         },
       },
-      take: 100,
+      take: 500,
     })
   }
 

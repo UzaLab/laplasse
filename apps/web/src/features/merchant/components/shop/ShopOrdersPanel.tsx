@@ -26,6 +26,17 @@ const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: str
   READY: [{ status: 'COMPLETED', label: 'Terminer' }],
 }
 
+function orderActions(order: Order): { status: OrderStatus; label: string }[] {
+  const base = NEXT_STATUS[order.status] ?? []
+  if (order.status === 'READY' && order.delivery_type === 'DELIVERY') {
+    return [
+      { status: 'OUT_FOR_DELIVERY', label: 'Expédier (livraison)' },
+      { status: 'COMPLETED', label: 'Terminer (retrait)' },
+    ]
+  }
+  return base
+}
+
 const ORDER_STATUS_FILTERS: Array<OrderStatus | 'all'> = [
   'all',
   'PENDING',
@@ -245,32 +256,32 @@ export function ShopOrdersPanel() {
                 </span>
               </div>
 
-              {NEXT_STATUS[order.status] && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <Link
-                    href={`/merchant/shop/orders/${order.id}`}
-                    className="text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50"
-                    style={{ textDecoration: 'none' }}
+              <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
+                <Link
+                  href={`/merchant/shop/orders/${order.id}`}
+                  className="text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 min-h-[44px] inline-flex items-center"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Voir le détail
+                </Link>
+                {orderActions(order).map(action => (
+                  <button
+                    key={action.status}
+                    type="button"
+                    disabled={processingId === order.id}
+                    onClick={() => handleStatus(order.id, action.status)}
+                    className={`text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 min-h-[44px] ${
+                      action.status === 'CANCELLED'
+                        ? 'text-red-600 border border-red-100 bg-red-50 hover:bg-red-100'
+                        : action.status === 'OUT_FOR_DELIVERY'
+                          ? 'text-white bg-amber-500 hover:bg-amber-600'
+                        : 'text-white bg-slate-900 hover:bg-slate-800'
+                    }`}
                   >
-                    Voir le détail
-                  </Link>
-                  {NEXT_STATUS[order.status]!.map(action => (
-                    <button
-                      key={action.status}
-                      type="button"
-                      disabled={processingId === order.id}
-                      onClick={() => handleStatus(order.id, action.status)}
-                      className={`text-sm font-bold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 ${
-                        action.status === 'CANCELLED'
-                          ? 'text-red-600 border border-red-100 bg-red-50 hover:bg-red-100'
-                          : 'text-white bg-slate-900 hover:bg-slate-800'
-                      }`}
-                    >
-                      {processingId === order.id ? '…' : action.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+                    {processingId === order.id ? '…' : action.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
         </div>

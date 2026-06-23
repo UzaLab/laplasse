@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, MapPin, Plus, Trash2, Truck } from 'lucide-react'
+import { Loader2, MapPin, Plus, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { parseApiError } from '@/lib/marketplaceApi'
 import { shopApiFetch } from '@/lib/shopApi'
@@ -54,8 +54,8 @@ export function ShopDeliveryZonesPanel() {
   const load = async () => {
     if (!activeShopId) return
     setLoading(true)
-    const res = await shopApiFetch(`/shops/${activeShopId}/delivery-zones`, activeShopId)
-    if (res.ok) setZones(await res.json())
+    const zonesRes = await shopApiFetch(`/shops/${activeShopId}/delivery-zones`, activeShopId)
+    if (zonesRes.ok) setZones(await zonesRes.json())
     setLoading(false)
   }
 
@@ -147,20 +147,20 @@ export function ShopDeliveryZonesPanel() {
     }
   }
 
+  const currentSelection = selectedByCity.get(selectedCityId) ?? new Set<string>()
+
   if (!activeShopId) {
     return <p className="text-slate-500 text-sm">Aucune boutique active.</p>
   }
-
-  const currentSelection = selectedByCity.get(selectedCityId) ?? new Set<string>()
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-          <Truck size={22} /> Zones de livraison
+          <MapPin size={22} className="text-brand-500" /> Zones & tarifs
         </h2>
         <p className="text-slate-500 text-sm mt-1">
-          Définissez vos tarifs par ville et commune. Les frais s&apos;affichent au checkout client.
+          Définissez où vous livrez et vos tarifs. Les clients voient ces frais au checkout.
         </p>
       </div>
 

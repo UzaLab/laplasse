@@ -5,10 +5,11 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import type { CreateUserAddressDto, UpdateUserAddressDto } from './dto/user-address.dto'
+import { parseCoord } from '../geo/geo-coords.util'
 
 const ADDRESS_INCLUDE = {
-  city: { select: { id: true, name: true, slug: true, country: true } },
-  commune: { select: { id: true, name: true, slug: true } },
+  city: { select: { id: true, name: true, slug: true, country: true, latitude: true, longitude: true } },
+  commune: { select: { id: true, name: true, slug: true, latitude: true, longitude: true } },
 } as const
 
 const MAX_ADDRESSES = 10
@@ -34,6 +35,7 @@ export class AddressesService {
     }
 
     const makeDefault = dto.is_default ?? count === 0
+    const coords = this.parseCoords(dto.latitude, dto.longitude)
 
     return this.prisma.$transaction(async tx => {
       if (makeDefault) {
@@ -51,6 +53,8 @@ export class AddressesService {
           commune_id: dto.commune_id,
           district: dto.district.trim(),
           address_detail: dto.address_detail?.trim() || null,
+          latitude: coords?.latitude ?? null,
+          longitude: coords?.longitude ?? null,
           is_default: makeDefault,
         },
         include: ADDRESS_INCLUDE,
@@ -66,6 +70,10 @@ export class AddressesService {
     if (dto.city_id || dto.commune_id) {
       await this.assertCommuneInCity(cityId, communeId)
     }
+
+    const coords = dto.latitude !== undefined || dto.longitude !== undefined
+      ? this.parseCoords(dto.latitude, dto.longitude)
+      : undefined
 
     return this.prisma.$transaction(async tx => {
       if (dto.is_default) {
@@ -86,6 +94,9 @@ export class AddressesService {
             ? { address_detail: dto.address_detail?.trim() || null }
             : {}),
           ...(dto.is_default !== undefined ? { is_default: dto.is_default } : {}),
+          ...(coords !== undefined
+            ? { latitude: coords?.latitude ?? null, longitude: coords?.longitude ?? null }
+            : {}),
         },
         include: ADDRESS_INCLUDE,
       })
@@ -150,6 +161,18 @@ export class AddressesService {
     })
     if (!city) {
       throw new BadRequestException('Ville invalide')
+    }
+  }
+
+  private parseCoords(latitude?: number | null, longitude?: number | null) {
+    if (latitude === undefined && longitude === undefined) return undefined
+    try {
+      const lat = parseCoord(latitude, 'lat')
+      const lng = parseCoord(longitude, 'lng')
+      if (lat == null || lng == null) return null
+      return { latitude: lat, longitude: lng }
+    } catch (e) {
+      throw new BadRequestException(e instanceof Error ? e.message : 'Coordonnées invalides')
     }
   }
 }

@@ -61,8 +61,13 @@ export default function CreateShopPage() {
 
     updateUser({ shops: [...(user?.shops ?? []), shop] })
     setActiveShop(shop.id)
-    notify.success('Boutique créée')
-    router.push('/merchant/shop/products/new')
+    notify.success('Boutique créée !')
+    // If linked to a merchant → go to merchant shop flow; otherwise → standalone shop manage
+    if (form.merchant_id) {
+      router.push('/merchant/shop/products/new')
+    } else {
+      router.push('/shop/manage/products/new')
+    }
   }
 
   if (!hydrated || !isAuthenticated) return null
@@ -93,7 +98,8 @@ export default function CreateShopPage() {
           <h1 className="text-3xl font-extrabold text-slate-900">Créer ma boutique</h1>
         </div>
         <p className="text-slate-500 mb-8">
-          Vendez en ligne sans établissement physique, ou liez votre boutique à un commerce déjà inscrit sur LaPlasse.
+          Vendez en ligne sans établissement physique — vous aurez votre propre espace boutique pour gérer produits et commandes.
+          Vous pouvez aussi lier la boutique à un établissement déjà inscrit sur LaPlasse.
         </p>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-5 shadow-sm">

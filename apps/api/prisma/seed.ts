@@ -38,15 +38,29 @@ async function main() {
 
   // ─── GÉOGRAPHIE CI (Abidjan) ────────────────────────────────────────────────
 
+  for (const row of [
+    { code: 'CI', name: "Côte d'Ivoire", latitude: 5.3599517, longitude: -4.0082563 },
+    { code: 'BF', name: 'Burkina Faso', latitude: 12.3714277, longitude: -1.5196603 },
+    { code: 'SN', name: 'Sénégal', latitude: 14.716677, longitude: -17.467686 },
+  ]) {
+    await prisma.geoCountry.upsert({
+      where: { code: row.code },
+      update: { name: row.name, latitude: row.latitude, longitude: row.longitude, is_active: true },
+      create: { ...row, is_active: true },
+    })
+  }
+
   const abidjan = await prisma.geoCity.upsert({
     where: { country_slug: { country: 'CI', slug: 'abidjan' } },
-    update: { is_default: true, is_active: true },
+    update: { is_default: true, is_active: true, latitude: 5.3599517, longitude: -4.0082563 },
     create: {
       country: 'CI',
       name: 'Abidjan',
       slug: 'abidjan',
       is_default: true,
       is_active: true,
+      latitude: 5.3599517,
+      longitude: -4.0082563,
     },
   })
 
@@ -74,13 +88,15 @@ async function main() {
 
   const ouaga = await prisma.geoCity.upsert({
     where: { country_slug: { country: 'BF', slug: 'ouagadougou' } },
-    update: { is_default: true, is_active: true },
+    update: { is_default: true, is_active: true, latitude: 12.3714277, longitude: -1.5196603 },
     create: {
       country: 'BF',
       name: 'Ouagadougou',
       slug: 'ouagadougou',
       is_default: true,
       is_active: true,
+      latitude: 12.3714277,
+      longitude: -1.5196603,
     },
   })
 
@@ -97,13 +113,15 @@ async function main() {
 
   const dakar = await prisma.geoCity.upsert({
     where: { country_slug: { country: 'SN', slug: 'dakar' } },
-    update: { is_default: true, is_active: true },
+    update: { is_default: true, is_active: true, latitude: 14.716677, longitude: -17.467686 },
     create: {
       country: 'SN',
       name: 'Dakar',
       slug: 'dakar',
       is_default: true,
       is_active: true,
+      latitude: 14.716677,
+      longitude: -17.467686,
     },
   })
 

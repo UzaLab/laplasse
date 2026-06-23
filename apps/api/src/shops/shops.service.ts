@@ -27,6 +27,7 @@ const SHOP_PUBLIC_SELECT = {
   status: true,
   is_active: true,
   enabled_modules: true,
+  delivery_fulfilment_default: true,
   created_at: true,
   merchant: {
     select: {
@@ -179,6 +180,7 @@ export class ShopsService {
         address: dto.address,
         status: dto.status,
         enabled_modules: dto.enabled_modules,
+        delivery_fulfilment_default: dto.delivery_fulfilment_default,
       },
       select: SHOP_PUBLIC_SELECT,
     })
@@ -218,6 +220,14 @@ export class ShopsService {
   ) {
     const shop = await this.resolveOwnerShop(userId, shopId)
     return fn(shop)
+  }
+
+  async getForOwner(userId: string, shopId: string) {
+    await this.resolveOwnerShop(userId, shopId)
+    return this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: SHOP_PUBLIC_SELECT,
+    })
   }
 
   async getShopProductCategorySelection(userId: string, shopId: string, country = 'CI') {

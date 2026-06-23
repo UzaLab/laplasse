@@ -14,10 +14,11 @@ import { ShopMenuModule } from '../shop-menu/shop-menu.module'
 import { ProductReviewsModule } from '../product-reviews/product-reviews.module'
 import { DeliveryModule } from '../delivery/delivery.module'
 import { LoyaltyModule } from '../loyalty/loyalty.module'
+import { CouriersModule } from '../couriers/couriers.module'
 import { ProductDiscoveryService } from './product-discovery.service'
 
 @Module({
-  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule, LoyaltyModule],
+  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule, LoyaltyModule, CouriersModule],
   controllers: [MarketplaceController],
   providers: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],
   exports: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],

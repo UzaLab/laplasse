@@ -6,6 +6,8 @@ export interface GeoCity {
   name: string
   slug: string
   is_default?: boolean
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface GeoCommune {
@@ -13,6 +15,15 @@ export interface GeoCommune {
   name: string
   slug: string
   city_id: string
+  latitude?: number | null
+  longitude?: number | null
+}
+
+export interface GeoCountry {
+  code: string
+  name: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export async function fetchGeoCities(country = getCountryCode()) {
@@ -23,6 +34,10 @@ export async function fetchGeoCommunes(citySlug: string, country = getCountryCod
   return fetchPublicJson<{ city: GeoCity; communes: GeoCommune[] }>(
     `/geo/cities/${encodeURIComponent(citySlug)}/communes?country=${encodeURIComponent(country)}`,
   )
+}
+
+export async function fetchGeoCountries() {
+  return fetchPublicJson<GeoCountry[]>('/geo/countries')
 }
 
 export interface DeliveryQuoteItem {

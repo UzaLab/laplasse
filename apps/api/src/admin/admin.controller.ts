@@ -13,6 +13,11 @@ import { MarketplaceService } from '../marketplace/marketplace.service'
 import { ProductCategoriesService } from '../marketplace/product-categories.service'
 import { GeoService } from '../geo/geo.service'
 import { AdminSeedService } from './admin-seed.service'
+import { CourierReviewsService } from '../couriers/courier-reviews.service'
+import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
+import { DeliveryService } from '../delivery/delivery.service'
+import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
+import { CourierStatus, DeliveryDisputeStatus } from '../../generated/prisma/client'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -29,13 +34,17 @@ export class AdminController {
     private readonly productCategories: ProductCategoriesService,
     private readonly geo: GeoService,
     private readonly adminSeed: AdminSeedService,
+    private readonly courierReviews: CourierReviewsService,
+    private readonly deliveryDisputes: DeliveryDisputesService,
+    private readonly deliveryService: DeliveryService,
+    private readonly logisticsPartners: LogisticsPartnersService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
 
   @Get('stats')
   async getStats() {
-    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, productReviewPending, complaintOpen] =
+    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, productReviewPending, complaintOpen, courierReviewPending, courierPendingKyc] =
       await Promise.all([
         this.prisma.merchant.count(),
         this.prisma.merchant.count({ where: { verification_status: 'PENDING' } }),
@@ -45,6 +54,8 @@ export class AdminController {
         this.prisma.review.count({ where: { status: 'PENDING' } }),
         this.prisma.productReview.count({ where: { status: 'PENDING' } }),
         this.prisma.complaint.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
+        this.prisma.courierReview.count({ where: { status: 'PENDING' } }),
+        this.prisma.courierProfile.count({ where: { status: 'PENDING_REVIEW' } }),
       ])
 
     return {
@@ -52,6 +63,8 @@ export class AdminController {
       users,
       reviews: { total: reviewTotal, pending: reviewPending },
       product_reviews: { pending: productReviewPending },
+      courier_reviews: { pending: courierReviewPending },
+      couriers: { pending_kyc: courierPendingKyc },
       complaints: { open: complaintOpen },
     }
   }
@@ -422,9 +435,29 @@ export class AdminController {
     return this.geo.listCitiesAdmin(country ?? 'CI')
   }
 
+  @Get('geo/countries')
+  listGeoCountries() {
+    return this.geo.listCountriesAdmin()
+  }
+
+  @Patch('geo/countries/:code')
+  updateGeoCountry(
+    @Param('code') code: string,
+    @Body() body: { name?: string; latitude?: number | null; longitude?: number | null; is_active?: boolean },
+  ) {
+    return this.geo.updateCountry(code, body)
+  }
+
   @Post('geo/cities')
   createGeoCity(
-    @Body() body: { country?: string; name: string; slug?: string; is_default?: boolean },
+    @Body() body: {
+      country?: string
+      name: string
+      slug?: string
+      is_default?: boolean
+      latitude?: number | null
+      longitude?: number | null
+    },
   ) {
     if (!body.name?.trim()) throw new BadRequestException('Nom requis')
     return this.geo.createCity({
@@ -432,13 +465,22 @@ export class AdminController {
       name: body.name,
       slug: body.slug,
       is_default: body.is_default,
+      latitude: body.latitude,
+      longitude: body.longitude,
     })
   }
 
   @Patch('geo/cities/:id')
   updateGeoCity(
     @Param('id') id: string,
-    @Body() body: { name?: string; slug?: string; is_active?: boolean; is_default?: boolean },
+    @Body() body: {
+      name?: string
+      slug?: string
+      is_active?: boolean
+      is_default?: boolean
+      latitude?: number | null
+      longitude?: number | null
+    },
   ) {
     return this.geo.updateCity(id, body)
   }
@@ -449,7 +491,13 @@ export class AdminController {
   }
 
   @Post('geo/communes')
-  createGeoCommune(@Body() body: { city_id: string; name: string; slug?: string }) {
+  createGeoCommune(@Body() body: {
+    city_id: string
+    name: string
+    slug?: string
+    latitude?: number | null
+    longitude?: number | null
+  }) {
     if (!body.city_id || !body.name?.trim()) {
       throw new BadRequestException('Ville et nom requis')
     }
@@ -459,12 +507,151 @@ export class AdminController {
   @Patch('geo/communes/:id')
   updateGeoCommune(
     @Param('id') id: string,
-    @Body() body: { name?: string; slug?: string; is_active?: boolean },
+    @Body() body: {
+      name?: string
+      slug?: string
+      is_active?: boolean
+      latitude?: number | null
+      longitude?: number | null
+    },
   ) {
     return this.geo.updateCommune(id, body)
   }
 
   // ── Livraison (stats ops) ────────────────────────────────────────────────────
+
+  @Get('courier-reviews')
+  getCourierReviews(@Query('filter') filter?: string) {
+    return this.courierReviews.listForAdmin(filter)
+  }
+
+  @Patch('courier-reviews/:id/moderate')
+  moderateCourierReview(
+    @Param('id') id: string,
+    @Body() body: { action: 'approve' | 'reject' | 'delete' },
+  ) {
+    return this.courierReviews.moderate(id, body.action)
+  }
+
+  @Get('delivery/disputes')
+  getDeliveryDisputes(@Query('filter') filter?: string) {
+    return this.deliveryDisputes.listForAdmin(filter)
+  }
+
+  @Get('delivery/jobs')
+  getDeliveryJobs(@Query('filter') filter?: string) {
+    return this.deliveryService.listJobsForAdmin(filter)
+  }
+
+  @Patch('delivery/jobs/:id/reassign')
+  reassignDeliveryJob(
+    @Param('id') id: string,
+    @Body() body: { courier_profile_id: string },
+  ) {
+    return this.deliveryService.reassignJobToCourierProfile(id, body.courier_profile_id)
+  }
+
+  @Get('delivery/partners')
+  getLogisticsPartners(@Query('filter') filter?: string) {
+    return this.logisticsPartners.listForAdmin(filter)
+  }
+
+  @Patch('delivery/partners/:id/verify')
+  verifyLogisticsPartner(
+    @Param('id') id: string,
+    @Body() body: { status: 'VERIFIED' | 'REJECTED' },
+  ) {
+    return this.logisticsPartners.verifyPartner(id, body.status)
+  }
+
+  @Patch('delivery/disputes/:id')
+  resolveDeliveryDispute(
+    @Param('id') id: string,
+    @Body() body: { status: DeliveryDisputeStatus; admin_note?: string },
+  ) {
+    return this.deliveryDisputes.resolve(id, body.status, body.admin_note)
+  }
+
+  @Get('couriers')
+  getCouriers(
+    @Query('filter') filter?: string,
+    @Query('country') country?: string,
+  ) {
+    const countryCode = country?.toUpperCase()
+    const where = {
+      ...(filter === 'pending' ? { status: 'PENDING_REVIEW' as const } : {}),
+      ...(filter === 'suspended' ? { status: 'SUSPENDED' as const } : {}),
+      ...(filter === 'active' ? { status: 'ACTIVE' as const } : {}),
+      ...(countryCode ? { country: countryCode } : {}),
+    }
+    return this.prisma.courierProfile.findMany({
+      where,
+      select: {
+        id: true,
+        kind: true,
+        country: true,
+        city: true,
+        phone: true,
+        vehicle: true,
+        plate_number: true,
+        status: true,
+        is_online: true,
+        rating_avg: true,
+        rating_count: true,
+        completed_jobs: true,
+        created_at: true,
+        user: { select: { id: true, email: true, full_name: true, phone: true } },
+        service_zones: {
+          where: { is_active: true },
+          select: {
+            all_communes: true,
+            city: { select: { name: true } },
+            communes: { select: { commune: { select: { name: true } } } },
+          },
+        },
+        _count: { select: { jobs: true, reviews: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    })
+  }
+
+  @Patch('couriers/:id/status')
+  async updateCourierStatus(
+    @Param('id') id: string,
+    @Body() body: { status: CourierStatus },
+  ) {
+    const allowed: CourierStatus[] = ['ACTIVE', 'SUSPENDED', 'PENDING_REVIEW']
+    if (!allowed.includes(body.status)) {
+      throw new BadRequestException('Statut non autorisé')
+    }
+
+    const profile = await this.prisma.courierProfile.findUnique({ where: { id } })
+    if (!profile) throw new NotFoundException('Livreur introuvable')
+
+    const updated = await this.prisma.courierProfile.update({
+      where: { id },
+      data: {
+        status: body.status,
+        is_online: body.status === 'ACTIVE' ? profile.is_online : false,
+      },
+      select: {
+        id: true,
+        status: true,
+        is_online: true,
+        user: { select: { email: true, full_name: true } },
+      },
+    })
+
+    await this.audit.log({
+      action: 'STATUS_CHANGE',
+      entityType: 'courier_profile',
+      entityId: id,
+      payload: { from: profile.status, to: body.status },
+    })
+
+    return updated
+  }
 
   @Get('delivery/stats')
   async getDeliveryStats(@Query('country') country?: string) {
@@ -474,10 +661,12 @@ export class AdminController {
     const [
       jobsByStatus,
       activeCouriers,
-      activeZones,
+      shopZonesActive,
+      courierServiceZones,
       recentDeliveries,
       cities,
       zoneRules,
+      couriersPendingKyc,
     ] = await Promise.all([
       this.prisma.deliveryJob.groupBy({
         by: ['status'],
@@ -487,9 +676,14 @@ export class AdminController {
           order: { shop: { country: countryCode } },
         },
       }),
-      this.prisma.deliveryCourier.count({ where: { country: countryCode, is_active: true } }),
+      this.prisma.courierProfile.count({
+        where: { country: countryCode, status: 'ACTIVE' },
+      }),
       this.prisma.shopDeliveryZone.count({
         where: { is_active: true, shop: { country: countryCode, is_active: true } },
+      }),
+      this.prisma.courierServiceZone.count({
+        where: { is_active: true, courier: { country: countryCode, status: 'ACTIVE' } },
       }),
       this.prisma.deliveryJob.count({
         where: {
@@ -513,6 +707,9 @@ export class AdminController {
           city: { country: countryCode },
         },
         select: { city_id: true, all_communes: true, communes: { select: { commune_id: true } } },
+      }),
+      this.prisma.courierProfile.count({
+        where: { country: countryCode, status: 'PENDING_REVIEW' },
       }),
     ])
 
@@ -540,7 +737,9 @@ export class AdminController {
         count: r._count._all,
       })),
       couriers_active: activeCouriers,
-      zones_active: activeZones,
+      zones_active: shopZonesActive,
+      courier_service_zones: courierServiceZones,
+      couriers_pending_kyc: couriersPendingKyc,
       deliveries_last_30d: recentDeliveries,
       uncovered_communes: uncoveredCommunes.slice(0, 100),
       uncovered_total: uncoveredCommunes.length,

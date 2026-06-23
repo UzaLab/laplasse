@@ -1,17 +1,15 @@
-import { BottomNav } from '@/components/layout/BottomNav'
+import { Navbar } from '@/components/layout/Navbar'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 
 export default function ActivitePage() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: 'var(--background)' }}>
-      <div className="mx-auto flex w-full flex-col" style={{ maxWidth: '480px', minHeight: '100vh' }}>
-        <main className="flex-1 pb-24">
-          <div style={{ padding: '48px 24px' }}>
-            <h1 className="font-bold text-2xl mb-2" style={{ color: 'var(--text-main)' }}>Activité</h1>
-            <p style={{ color: 'var(--text-muted)' }}>— À implémenter (V0.5)</p>
-          </div>
-        </main>
-        <div className="md:hidden"><BottomNav /></div>
-      </div>
+    <div className="min-h-screen bg-[#FAFAFA]">
+      <Navbar />
+      <main className="pt-28 pb-24 px-6 max-w-lg mx-auto">
+        <h1 className="font-extrabold text-2xl text-slate-900 mb-2">Activité</h1>
+        <p className="text-slate-500">Historique unifié — réservations, commandes et livraisons (à venir).</p>
+      </main>
+      <MobileBottomNav />
     </div>
   )
 }

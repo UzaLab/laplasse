@@ -37,24 +37,41 @@ export function Footer() {
           {[
             {
               title: 'Explorer',
-              links: ['Restaurants', 'Bars & Lounges', 'Spas & Bien-être', 'Concept Stores', 'Marketplace'],
+              links: [
+                { label: 'Restaurants', href: '#' },
+                { label: 'Bars & Lounges', href: '#' },
+                { label: 'Spas & Bien-être', href: '#' },
+                { label: 'Concept Stores', href: '#' },
+                { label: 'Marketplace', href: '/marketplace' },
+              ],
             },
             {
               title: 'Business',
-              links: ["Inscrire son lieu", "Accès Partenaire", "Solutions de paiement", "Tarifs Pro"],
+              links: [
+                { label: 'Inscrire son lieu', href: '#' },
+                { label: 'Devenir livreur', href: '/courier/signup' },
+                { label: 'Accès Partenaire', href: '#' },
+                { label: 'Solutions de paiement', href: '#' },
+                { label: 'Tarifs Pro', href: '#' },
+              ],
             },
             {
               title: 'Aide & Contact',
-              links: ["FAQ Utilisateurs", "Nous contacter", "Conditions Générales", "Confidentialité"],
+              links: [
+                { label: 'FAQ Utilisateurs', href: '#' },
+                { label: 'Nous contacter', href: '#' },
+                { label: 'Conditions Générales', href: '#' },
+                { label: 'Confidentialité', href: '#' },
+              ],
             },
           ].map((col) => (
             <div key={col.title}>
               <h4 className="font-extrabold text-slate-900 mb-6">{col.title}</h4>
               <ul className="space-y-4">
-                {col.links.map((label) => (
+                {col.links.map(({ label, href }) => (
                   <li key={label}>
                     <Link
-                      href="#"
+                      href={href}
                       className="text-sm font-medium text-slate-500 hover:text-brand-600 transition-colors"
                     >
                       {label}

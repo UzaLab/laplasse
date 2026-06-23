@@ -111,6 +111,10 @@ export class UpdateShopDto {
   @IsArray()
   @IsString({ each: true })
   enabled_modules?: string[]
+
+  @IsOptional()
+  @IsIn(['PLATFORM_RIDER', 'MERCHANT_OWN', 'LOGISTICS_PARTNER'])
+  delivery_fulfilment_default?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
 }
 
 export class LinkShopMerchantDto {

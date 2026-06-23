@@ -14,7 +14,7 @@ import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
-import { getShopsForMerchant } from '@/lib/shopApi'
+import { getShopsForMerchant, getIndependentShops } from '@/lib/shopApi'
 import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
@@ -127,6 +127,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)
   const canOfferings = PLAN_LIMITS[activeMerchantPlan]?.offeringsManagement ?? false
   const hasLinkedShop = linkedShops.length > 0
+  const independentShops = getIndependentShops(shops)
   const categorySlug = activeMerchant?.category_slug
   const verticalNav = getVerticalNavItems(categorySlug)
   const hasVerticalModule = verticalNav.length > 0
@@ -380,6 +381,16 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </div>
         <div className="h-px bg-slate-100 mx-2" />
         <div className="space-y-0.5">
+          {independentShops.length > 0 && (
+            <Link
+              href="/shop/manage"
+              onClick={() => setSidebarOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all"
+              style={{ textDecoration: 'none' }}
+            >
+              <ShoppingBag size={16} /> Ma boutique standalone
+            </Link>
+          )}
           <Link
             href="/profile"
             onClick={() => setSidebarOpen(false)}

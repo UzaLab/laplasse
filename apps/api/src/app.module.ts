@@ -31,6 +31,8 @@ import { ShopsModule } from './shops/shops.module'
 import { GeoModule } from './geo/geo.module'
 import { CountryModule } from './common/country/country.module'
 import { DeliveryModule } from './delivery/delivery.module'
+import { CouriersModule } from './couriers/couriers.module'
+import { LogisticsModule } from './logistics/logistics.module'
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { DeliveryModule } from './delivery/delivery.module'
     GeoModule,
     CountryModule,
     DeliveryModule,
+    CouriersModule,
+    LogisticsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
