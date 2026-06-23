@@ -9,6 +9,8 @@ import { DeliveryService } from '../delivery/delivery.service'
 import { DeliveryOfferService } from '../delivery/delivery-offer.service'
 import { CourierWalletService } from './courier-wallet.service'
 import { DeliveryProofService } from '../delivery/delivery-proof.service'
+import { DeliveryFeeSplitService } from '../delivery/delivery-fee-split.service'
+import { DeliveryEtaService } from '../delivery/delivery-eta.service'
 import { StorageService } from '../storage/storage.service'
 import { DeliveryJobStatus } from '../../generated/prisma/client'
 import { COURIER_ADVANCE_STATUSES } from './dto/update-courier-job-status.dto'
@@ -53,6 +55,8 @@ export class CourierJobsService {
     private readonly wallet: CourierWalletService,
     private readonly proof: DeliveryProofService,
     private readonly storage: StorageService,
+    private readonly feeSplit: DeliveryFeeSplitService,
+    private readonly etaService: DeliveryEtaService,
   ) {}
 
   private async requireOnlineCourier(userId: string) {
@@ -251,6 +255,7 @@ export class CourierJobsService {
 
     await this.offerService.clearOfferOnAccept(jobId)
     const updated = await this.delivery.assignCourierProfile(jobId, profile.id)
+    void this.etaService.refreshOrderEta(updated.order.id).catch(() => {})
     return this.serializeJob(updated, profile.id)
   }
 
@@ -286,6 +291,9 @@ export class CourierJobsService {
 
     if (status === 'DELIVERED') {
       await this.wallet.creditForDeliveredJob(jobId, profile.id)
+      await this.feeSplit.persistForJob(jobId).catch(() => {})
+    } else {
+      void this.etaService.refreshOrderEta(updated.order.id).catch(() => {})
     }
 
     return this.serializeJob(updated, profile.id)

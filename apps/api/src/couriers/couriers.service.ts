@@ -12,6 +12,8 @@ import { UpdateCourierLocationDto } from './dto/update-courier-location.dto'
 import { parseCoord } from '../geo/geo-coords.util'
 import { DeliveryVehicle, Role } from '../../generated/prisma/client'
 import { DeliveryOfferService } from '../delivery/delivery-offer.service'
+import { DeliveryEtaService } from '../delivery/delivery-eta.service'
+import { haversineDistanceKm } from '../delivery/delivery-geo.util'
 
 const COURIER_PROFILE_SELECT = {
   id: true,
@@ -38,6 +40,7 @@ export class CouriersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly offerService: DeliveryOfferService,
+    private readonly etaService: DeliveryEtaService,
   ) {}
 
   async getMyProfile(userId: string) {
@@ -132,6 +135,7 @@ export class CouriersService {
   async updateLocation(userId: string, dto: UpdateCourierLocationDto) {
     const profile = await this.prisma.courierProfile.findUnique({
       where: { user_id: userId },
+      select: COURIER_PROFILE_SELECT,
     })
     if (!profile) throw new NotFoundException('Profil livreur introuvable')
     if (profile.status !== 'ACTIVE') {
@@ -147,7 +151,15 @@ export class CouriersService {
       throw new BadRequestException(e instanceof Error ? e.message : 'Coordonnées invalides')
     }
 
-    return this.prisma.courierProfile.update({
+    if (
+      profile.current_latitude != null
+      && profile.current_longitude != null
+      && haversineDistanceKm(profile.current_latitude, profile.current_longitude, latitude, longitude) < 0.1
+    ) {
+      return profile
+    }
+
+    const updated = await this.prisma.courierProfile.update({
       where: { user_id: userId },
       data: {
         current_latitude: latitude,
@@ -156,6 +168,9 @@ export class CouriersService {
       },
       select: COURIER_PROFILE_SELECT,
     })
+
+    void this.etaService.refreshOnCourierLocation(profile.id).catch(() => {})
+    return updated
   }
 
   private async requireProfile(userId: string) {

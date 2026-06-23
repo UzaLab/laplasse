@@ -13,6 +13,12 @@ export class DeliveryController {
   constructor(private readonly svc: DeliveryService) {}
 
   @Public()
+  @Get('track/:token/eta')
+  trackEta(@Param('token') token: string) {
+    return this.svc.getTrackEta(token)
+  }
+
+  @Public()
   @Get('track/:token')
   track(@Param('token') token: string) {
     return this.svc.trackByToken(token)

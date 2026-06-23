@@ -7,6 +7,7 @@ import {
   LayoutDashboard, MapPin, UserCircle2, LogOut, Menu, X, Bell, Compass, Package, Wallet,
 } from 'lucide-react'
 import { CourierMobileNav } from '@/features/courier/components/CourierMobileNav'
+import { useCourierLocationSync } from '@/features/courier/hooks/useCourierLocationSync'
 import { useAuthStore } from '@/stores/authStore'
 import { authApiFetch } from '@/lib/authFetch'
 import { COURIER_STATUS_LABELS, COURIER_STATUS_STYLES, type CourierStatus } from '@/lib/courierLabels'
@@ -43,6 +44,10 @@ export function CourierShell({ children }: CourierShellProps) {
 
   const profile = user?.courier_profile
   const status = (profile?.status ?? 'PENDING_REVIEW') as CourierStatus
+  const canGoOnline = status === 'ACTIVE'
+  const isOnline = profile?.is_online ?? false
+
+  useCourierLocationSync(!!profile && canGoOnline && isOnline)
 
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 

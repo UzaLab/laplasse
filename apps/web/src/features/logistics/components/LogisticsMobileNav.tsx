@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, LayoutDashboard, Package, Truck, Users } from 'lucide-react'
+import { BarChart3, LayoutDashboard, Package, Truck, Users, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const ITEMS = [
@@ -10,6 +10,7 @@ const ITEMS = [
   { href: '/logistics/orders', label: 'Commandes', icon: Package, match: (p: string) => p.startsWith('/logistics/orders') },
   { href: '/logistics/dispatch', label: 'Dispatch', icon: Truck, match: (p: string) => p.startsWith('/logistics/dispatch') },
   { href: '/logistics/fleet', label: 'Flotte', icon: Users, match: (p: string) => p.startsWith('/logistics/fleet') },
+  { href: '/logistics/finances', label: 'Finances', icon: Wallet, match: (p: string) => p.startsWith('/logistics/finances') },
   { href: '/logistics/stats', label: 'Stats', icon: BarChart3, match: (p: string) => p.startsWith('/logistics/stats') },
 ] as const
 

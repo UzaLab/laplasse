@@ -48,6 +48,7 @@ export interface LogisticsPartnerSummary {
   phone: string
   verification: string
   is_active: boolean
+  logo?: string | null
   _count?: { couriers: number; contracts: number }
 }
 

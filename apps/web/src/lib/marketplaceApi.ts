@@ -709,6 +709,30 @@ export async function fetchOrder(orderId: string): Promise<Order | null> {
   return parseJson<Order>(res)
 }
 
+export interface OrderEtaSnapshot {
+  prep_remaining_minutes: number
+  travel_minutes: number
+  eta_minutes: number
+  eta_arrival_at: string | null
+  eta_updated_at: string
+}
+
+export async function fetchOrderEta(orderId: string): Promise<OrderEtaSnapshot | null> {
+  const res = await authApiFetch(`/orders/${orderId}/eta`)
+  if (!res.ok) return null
+  return res.json() as Promise<OrderEtaSnapshot>
+}
+
+export async function fetchMerchantOrderEta(
+  orderId: string,
+  shopId?: string | null,
+): Promise<OrderEtaSnapshot | null> {
+  const qs = shopId ? `?shopId=${encodeURIComponent(shopId)}` : ''
+  const res = await authApiFetch(`/orders/merchant/${orderId}/eta${qs}`)
+  if (!res.ok) return null
+  return res.json() as Promise<OrderEtaSnapshot>
+}
+
 export async function reorderFromOrder(
   orderId: string,
 ): Promise<{ result: ReorderResult | null; error?: string }> {

@@ -487,6 +487,23 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('orders/:id/eta')
+  orderEta(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.svc.getOrderEta(userId, id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/:orderId/eta')
+  merchantOrderEta(
+    @CurrentUser('id') userId: string,
+    @Param('orderId') orderId: string,
+    @Query('shopId') shopId?: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.getMerchantOrderEta(userId, orderId, shopId ?? merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/:id')
   myOrder(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.svc.getMyOrder(userId, id)

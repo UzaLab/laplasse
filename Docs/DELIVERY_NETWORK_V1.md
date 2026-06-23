@@ -47,15 +47,21 @@ Principe directeur (aligné `REGLES_DEVELOPPEMENT.md`) :
 | **Wallet livreur (DN-1.4)** | `CourierWallet` + crédit 75 % frais livraison + `/courier/earnings` |
 | **Adresses GPS client** | Pin carte profil/checkout → `Order.delivery_latitude/longitude` |
 | **Nav publique livreur** | Lien « Devenir livreur » → `/courier/signup` |
+| **Notation livreur (DN-2)** | `CourierReview`, modal client, modération admin, note sur suivi |
+| **Preuve livraison (DN-5)** | OTP + photo + `DeliveryDispute`, admin `/admin/delivery/disputes` |
+| **Fulfilment & orchestration (DN-4)** | `DeliveryFulfilmentMode`, routing platform / partner / merchant |
+| **Partenaires logistiques (DN-3)** | API `/logistics/*`, contrats, flotte, dispatch |
+| **Admin ops livraison** | `/admin/delivery`, KYC, assignments, KPI ETA |
+| **ETA dynamique (DN-6)** | `DeliveryEtaService`, bandeaux, notifs retard, GPS 15s |
+| **Portail logistique B2B (DN-7 partiel)** | Dispatch carte, finances, paramètres, qualité |
 
 ### ❌ Manques structurants (reste)
 
-- Pas de **notation livreur** ni trust score livreur (DN-2)
-- ~~Pas de **structure logistique** (entreprise, flotte, contrats)~~ → **DN-3 livré** (juin 2026)
-- Pas d’**assignation auto multi-candidats** (score distance) — v1 = offre séquentielle
-- Pas de **preuve de livraison** (OTP, photo) (DN-5)
-- Pas de **payout automatique** Mobile Money — ledger + payout manuel admin seulement
-- KYC livreur : upload OK, **validation admin UI** à compléter (DN-4.3)
+- **Landing B2B (DN-7.1)** — page publique + simulateur gains
+- **Wizard onboarding pro (DN-7.2)** — KYC 4 étapes + zones service
+- Pas d’**assignation auto multi-candidats** plateforme (score distance) — v1 = offre séquentielle
+- Pas de **payout automatique** Mobile Money — ledger + payout manuel admin
+- **DN-7.5 / 7.9** en pause (équipe multi-users, API enterprise)
 
 ---
 
@@ -662,15 +668,25 @@ Découpage vertical pour intégration progressive dans LaPlasse :
 
 ### Phase DN-6 — ETA dynamique (2–3 sem.)
 
+| ID | Slice | Livrable | Statut |
+|----|-------|----------|--------|
+| DN-6.1 | Timer prep au statut `PREPARING` | `Order.prep_*`, UI marchand/client | ✅ |
+| DN-6.2 | ETA travel GPS (Haversine + véhicule) | Recalcul position livreur | ✅ |
+| DN-6.3 | Surfaces UI + API `/orders/:id/eta`, track | Bandeaux client / suivi | ✅ |
+| DN-6.4 | Schema Prisma `eta_arrival_at`, migrations | Order + DeliveryJob | ✅ |
+| DN-6.5 | Alertes retard + KPI admin « % à l'heure » | Notifs + ops | ✅ |
+
+**Baseline actuelle (code git) :** `DeliveryJob.eta_minutes` fixe à la création ; scoring SLA partner dans `logistics-partner-scoring.service.ts` ; pas de champs `Order.eta_*` ni service `DeliveryEtaService`.
+
 ### Phase DN-7 — Portail logistique B2B — acquisition partenaires (8–16 sem.)
 
 > Objectif : faire du portail `/logistics/*` une **plateforme de revenus B2B** qui convainc de vraies structures de livraison de s'inscrire et d'y opérer quotidiennement — pas seulement un outil de démo interne. Voir §20 pour le détail complet.
 
-| Tier | Slices | Durée |
-|------|--------|-------|
-| **Tier 1** — Conviction | DN-7.1 Landing B2B, DN-7.2 Onboarding KYC/zones, DN-7.3 Dispatch carte, DN-7.4 Finances ledger | 4–6 sem. |
-| **Tier 2** — Scalabilité | DN-7.5 Équipe multi-users, DN-7.6 Flotte avancée, DN-7.7 Contrats + prospects | 6–8 sem. |
-| **Tier 3** — Enterprise | DN-7.8 Qualité/incidents, DN-7.9 API + webhooks | 8–12 sem. |
+| Tier | Slices | Durée | Statut (juin 2026) |
+|------|--------|-------|---------------------|
+| **Tier 1** — Conviction | DN-7.1 Landing B2B, DN-7.2 Onboarding KYC/zones, DN-7.3 Dispatch carte, DN-7.4 Finances ledger | 4–6 sem. | ⏳ partiel — **DN-7.3/7.4 ✅** (dispatch carte, finances) · landing B2B ⏳ |
+| **Tier 2** — Scalabilité | DN-7.5 Équipe multi-users, DN-7.6 Flotte avancée, DN-7.7 Contrats + prospects | 6–8 sem. | ⏸ en pause |
+| **Tier 3** — Enterprise | DN-7.8 Qualité/incidents, DN-7.9 API + webhooks | 8–12 sem. | **DN-7.8 ✅** · DN-7.9 ⏸ |
 
 ---
 
@@ -753,11 +769,11 @@ model DeliveryJob {
 
 #### DN-6.5 — Critères d'acceptation
 
-- [ ] Restaurant : timer prep démarre au statut `PREPARING`, décompte visible client sans rechargement
-- [ ] Livreur en route : ETA client recalculé ≤ 30 s après mouvement GPS significatif (> 100 m)
-- [ ] Heure d'arrivée affichée sur suivi + détail commande pour **toutes** les commandes `DELIVERY` actives
-- [ ] Retard > 10 min vs ETA initial → notification client + flag ops admin
-- [ ] KPI « % livraisons à l'heure » alimenté par comparaison `delivered_at` vs `eta_arrival_at` (§16)
+- [x] Restaurant : timer prep démarre au statut `PREPARING`, décompte visible client sans rechargement
+- [x] Livreur en route : ETA client recalculé ≤ 30 s après mouvement GPS significatif (> 100 m)
+- [x] Heure d'arrivée affichée sur suivi + détail commande pour **toutes** les commandes `DELIVERY` actives
+- [x] Retard > 10 min vs ETA initial → notification client + flag ops admin
+- [x] KPI « % livraisons à l'heure » alimenté par comparaison `delivered_at` vs `eta_arrival_at` (§16)
 
 **Dépendances :** DN-0.4 (GPS livreur), DN-5.3 (polling suivi), adresses GPS checkout (baseline juin 2026).
 
@@ -864,7 +880,26 @@ PostHog : events `courier_online`, `delivery_offer_received`, `delivery_accepted
 
 **Comptes démo stakeholders :** `logistique@laplasse.ci` / `Logistique2026!` — seed : `npx tsx scripts/seed-delivery-stakeholders.ts`
 
-**Prochaine slice recommandée :** Phase DN-7 Tier 1 (landing B2B + onboarding pro + dispatch map + finances), puis DN-6 (ETA dynamique), E2E scénarios A–D automatisés, commissions partner
+**Prochaine slice recommandée :** **DN-6** (ETA dynamique) ou **DN-7 Tier 1** (landing B2B + finances + carte dispatch). Script API scénarios A–D (`e2e-delivery-network.ts`) optionnel — **sans Playwright** (retiré, instabilité WSL).
+
+---
+
+### §19.1 — Restauration post-crash WSL (23/06/2026)
+
+> Travail session perdu au `git restore` — **réimplémenté le 23/06/2026** (sans Playwright).
+
+| Slice | Statut |
+|-------|--------|
+| DN-6.5 ETA dynamique | ✅ `delivery-eta.service.ts`, migrations, bandeaux, GPS 15s/100m |
+| DN-7.3 Dispatch carte + release | ✅ `/logistics/dispatch`, Leaflet, `PATCH …/release` |
+| DN-7.4 Finances | ✅ `/logistics/finances`, payouts, export CSV |
+| Paramètres partner | ✅ `/logistics/settings`, logo, KYC |
+| DN-7.8 Qualité | ✅ `/logistics/quality`, alertes |
+| E2E API A–D | ✅ `scripts/e2e-delivery-network.ts` (HTTP, pas navigateur) |
+
+**Migrations :** `20260623180000_delivery_split_eta`, `20260623200000_logistics_payouts`, `20260624120000_order_eta_delay`
+
+**Prochaine slice :** DN-7.1 landing B2B, DN-7.2 wizard onboarding, DN-7.5 équipe (en pause)
 
 ---
 
@@ -1268,8 +1303,8 @@ model LogisticsPartnerWebhook {
 
 ---
 
-**Prochaine slice recommandée :** Phase DN-7 (ETA dynamique), E2E scénarios A–D automatisés, commissions partner
+**Prochaine slice recommandée :** **DN-6.1–6.5** (ETA dynamique) puis **DN-7.1 / 7.4** (landing B2B + finances). Voir §19.1 pour restaurer le travail session perdu.
 
 ---
 
-*Document rédigé pour LaPlasse — juin 2026. Version 1.2 — Phase DN-7 portail logistique B2B + analyse acquisition partenaires.*
+*Document rédigé pour LaPlasse — juin 2026. Version 1.3 — resync code git post-restore WSL (23/06/2026).*

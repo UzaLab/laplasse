@@ -35,6 +35,7 @@ import {
   type OrderStatus,
 } from '@/lib/marketplaceApi'
 import { DeliveryDispatchPanel } from '@/features/merchant/components/shop/DeliveryDispatchPanel'
+import { OrderDeliveryEtaBanner } from '@/features/profile/components/orders/OrderDeliveryEtaBanner'
 import { notify } from '@/lib/notify'
 
 const MERCHANT_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -177,6 +178,19 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
           </div>
         </div>
       </div>
+
+      {(order.status === 'PREPARING' || (
+        order.delivery_type === 'DELIVERY'
+        && ['CONFIRMED', 'READY', 'OUT_FOR_DELIVERY'].includes(order.status)
+      )) && (
+        <OrderDeliveryEtaBanner
+          orderId={order.id}
+          enabled
+          variant="merchant"
+          shopId={activeShopId}
+          showPrepOnly={order.status === 'PREPARING'}
+        />
+      )}
 
       <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
         <h2 className="text-lg font-extrabold text-slate-900 mb-6">Suivi & gestion</h2>

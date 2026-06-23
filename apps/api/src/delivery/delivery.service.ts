@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
 import { DeliveryOfferService } from './delivery-offer.service'
 import { DeliveryProofService } from './delivery-proof.service'
+import { DeliveryEtaService } from './delivery-eta.service'
+import { DeliveryFeeSplitService } from './delivery-fee-split.service'
+import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
 import { coordsFromCityName, courierCoordsForStatus } from './delivery-gps.util'
 import { DeliveryJobStatus, OrderStatus } from '../../generated/prisma/client'
@@ -23,6 +26,10 @@ export class DeliveryService {
     private readonly notificationQueue: NotificationQueueService,
     private readonly offerService: DeliveryOfferService,
     private readonly proofService: DeliveryProofService,
+    private readonly etaService: DeliveryEtaService,
+    private readonly feeSplit: DeliveryFeeSplitService,
+    @Inject(forwardRef(() => LogisticsPartnersService))
+    private readonly logisticsPartners: LogisticsPartnersService,
   ) {}
 
   async listCouriers(country?: string, city?: string) {
@@ -40,11 +47,11 @@ export class DeliveryService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        shop: { select: { address: true, district: true, city: true, name: true, delivery_fulfilment_default: true } },
+        shop: { select: { address: true, district: true, city: true, country: true, name: true, delivery_fulfilment_default: true } },
         merchant: {
           select: {
             business_name: true,
-            location: { select: { address: true, district: true, city: true } },
+            location: { select: { address: true, district: true, city: true, latitude: true, longitude: true } },
           },
         },
       },
@@ -61,12 +68,21 @@ export class DeliveryService {
     const existing = await this.prisma.deliveryJob.findUnique({ where: { order_id: orderId } })
     if (existing) {
       if (existing.status === 'PENDING' && !existing.courier_profile_id) {
-      if (fulfilmentMode === 'PLATFORM_RIDER' || fulfilmentMode === 'LOGISTICS_PARTNER') {
-        await this.offerService.startOffering(existing.id).catch(err => {
-          this.logger.warn(`Re-offer failed for job ${existing.id}: ${(err as Error).message}`)
-        })
+        if (fulfilmentMode === 'PLATFORM_RIDER' || fulfilmentMode === 'LOGISTICS_PARTNER') {
+          if (fulfilmentMode === 'LOGISTICS_PARTNER') {
+            const autoAssigned = await this.logisticsPartners.autoDispatchJobIfEnabled(existing.id).catch(() => false)
+            if (!autoAssigned) {
+              await this.offerService.startOffering(existing.id).catch(err => {
+                this.logger.warn(`Re-offer failed for job ${existing.id}: ${(err as Error).message}`)
+              })
+            }
+          } else {
+            await this.offerService.startOffering(existing.id).catch(err => {
+              this.logger.warn(`Re-offer failed for job ${existing.id}: ${(err as Error).message}`)
+            })
+          }
+        }
       }
-    }
       return existing
     }
 
@@ -106,12 +122,21 @@ export class DeliveryService {
       pickup = ''
     }
 
+    const pickupCoords = this.etaService.resolvePickupCoords({
+      shopCity: order.shop?.city,
+      shopCountry: order.shop?.country,
+      merchantLat: order.merchant?.location?.latitude,
+      merchantLng: order.merchant?.location?.longitude,
+    })
+
     const job = await this.prisma.deliveryJob.create({
       data: {
         order_id: orderId,
         fulfilment_mode: fulfilmentMode,
         logistics_partner_id: order.logistics_partner_id ?? undefined,
         pickup_address: pickup || undefined,
+        pickup_latitude: pickupCoords.lat,
+        pickup_longitude: pickupCoords.lng,
         dropoff_address: order.delivery_address ?? undefined,
         dropoff_latitude: dropoffLat ?? undefined,
         dropoff_longitude: dropoffLng ?? undefined,
@@ -119,10 +144,21 @@ export class DeliveryService {
       },
     })
 
+    void this.etaService.refreshOrderEta(orderId).catch(() => {})
+
     if (fulfilmentMode === 'PLATFORM_RIDER' || fulfilmentMode === 'LOGISTICS_PARTNER') {
-      await this.offerService.startOffering(job.id).catch(err => {
-        this.logger.warn(`Offer start failed for job ${job.id}: ${(err as Error).message}`)
-      })
+      if (fulfilmentMode === 'LOGISTICS_PARTNER') {
+        const autoAssigned = await this.logisticsPartners.autoDispatchJobIfEnabled(job.id).catch(() => false)
+        if (!autoAssigned) {
+          await this.offerService.startOffering(job.id).catch(err => {
+            this.logger.warn(`Offer start failed for job ${job.id}: ${(err as Error).message}`)
+          })
+        }
+      } else {
+        await this.offerService.startOffering(job.id).catch(err => {
+          this.logger.warn(`Offer start failed for job ${job.id}: ${(err as Error).message}`)
+        })
+      }
     }
     return job
   }
@@ -155,6 +191,7 @@ export class DeliveryService {
     })
 
     await this.notifyDeliveryUpdate(updated.order.user_id, updated.order.id, 'ASSIGNED')
+    void this.etaService.refreshOrderEta(updated.order.id).catch(() => {})
     return updated
   }
 
@@ -223,6 +260,7 @@ export class DeliveryService {
     })
 
     await this.notifyDeliveryUpdate(job.order.user_id, updated.order.id, 'ASSIGNED')
+    void this.etaService.refreshOrderEta(job.order.id).catch(() => {})
     return updated
   }
 
@@ -326,6 +364,11 @@ export class DeliveryService {
         where: { id: profile.id },
         data: { completed_jobs: { increment: 1 } },
       })
+      await this.feeSplit.persistForJob(jobId).catch(() => {})
+    }
+
+    if (status !== 'DELIVERED') {
+      void this.etaService.refreshOrderEta(job.order_id).catch(() => {})
     }
 
     if (status === 'IN_TRANSIT') {
@@ -389,6 +432,12 @@ export class DeliveryService {
       await this.notifyDeliveryUpdate(job.order.user_id, job.order_id, status)
     }
 
+    if (status === 'DELIVERED') {
+      await this.feeSplit.persistForJob(jobId).catch(() => {})
+    } else {
+      void this.etaService.refreshOrderEta(job.order_id).catch(() => {})
+    }
+
     return updated
   }
 
@@ -447,6 +496,10 @@ export class DeliveryService {
     )
   }
 
+  async getTrackEta(token: string) {
+    return this.etaService.getTrackEta(token)
+  }
+
   async trackByToken(token: string) {
     const job = await this.prisma.deliveryJob.findFirst({
       where: { tracking_token: token },
@@ -496,10 +549,15 @@ export class DeliveryService {
     let dropoffLat = job.dropoff_latitude ?? job.order.delivery_latitude
     let dropoffLng = job.dropoff_longitude ?? job.order.delivery_longitude
 
+    const eta = await this.etaService.getTrackEta(token)
+
     return {
       tracking_token: job.tracking_token,
       status: job.status,
-      eta_minutes: job.eta_minutes,
+      eta_minutes: eta?.eta_minutes ?? job.eta_minutes,
+      eta_arrival_at: eta?.eta_arrival_at ?? job.eta_arrival_at?.toISOString() ?? null,
+      prep_remaining_minutes: eta?.prep_remaining_minutes ?? 0,
+      travel_minutes: eta?.travel_minutes ?? job.eta_travel_minutes,
       pickup_address: job.pickup_address,
       dropoff_address: job.dropoff_address,
       dropoff_latitude: dropoffLat,
@@ -605,7 +663,14 @@ export class DeliveryService {
       await this.assignCourierProfile(job.id, dto.courier_profile_id)
       await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
     } else if (mode === 'PLATFORM_RIDER' || mode === 'LOGISTICS_PARTNER') {
-      await this.offerService.startOffering(job.id)
+      if (mode === 'LOGISTICS_PARTNER') {
+        const autoAssigned = await this.logisticsPartners.autoDispatchJobIfEnabled(job.id).catch(() => false)
+        if (!autoAssigned) {
+          await this.offerService.startOffering(job.id)
+        }
+      } else {
+        await this.offerService.startOffering(job.id)
+      }
       await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
       if (mode === 'LOGISTICS_PARTNER' && partnerId) {
         await this.notifyLogisticsPartnerStaff(
@@ -729,6 +794,8 @@ export class DeliveryService {
       'ASSIGNED',
       'OUT_FOR_DELIVERY',
     )
+
+    void this.etaService.refreshOrderEta(job.order_id).catch(() => {})
 
     return updated
   }

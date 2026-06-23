@@ -42,6 +42,7 @@ import { PromotionsService } from '../promotions/promotions.service'
 import { SearchService } from '../search/search.service'
 import { ShopCollectionsService } from '../shop-collections/shop-collections.service'
 import { DeliveryService } from '../delivery/delivery.service'
+import { DeliveryEtaService } from '../delivery/delivery-eta.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CourierReviewsService } from '../couriers/courier-reviews.service'
@@ -60,6 +61,7 @@ export class MarketplaceService {
     private readonly searchService: SearchService,
     private readonly shopCollections: ShopCollectionsService,
     private readonly deliveryService: DeliveryService,
+    private readonly deliveryEta: DeliveryEtaService,
     private readonly loyalty: LoyaltyService,
     private readonly courierReviews: CourierReviewsService,
     private readonly deliveryProof: DeliveryProofService,
@@ -2606,7 +2608,10 @@ export class MarketplaceService {
     const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, ...this.merchantOrderScope(shop) },
-      include: { user: { select: { id: true } } },
+      include: {
+        user: { select: { id: true } },
+        merchant: { select: { food_prep_minutes: true } },
+      },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
 
@@ -2634,6 +2639,13 @@ export class MarketplaceService {
       data: { status: dto.status },
     })
 
+    if (dto.status === 'PREPARING') {
+      const prepMinutes = order.merchant?.food_prep_minutes ?? 25
+      await this.deliveryEta.startPrepTimer(orderId, prepMinutes).catch(() => {})
+    } else if (['READY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(dto.status)) {
+      void this.deliveryEta.refreshOrderEta(orderId).catch(() => {})
+    }
+
     await this.notificationQueue.enqueuePush({
       userId: order.user.id,
       type: 'order_status',
@@ -2643,6 +2655,20 @@ export class MarketplaceService {
     })
 
     return updated
+  }
+
+  async getOrderEta(userId: string, orderId: string) {
+    return this.deliveryEta.getOrderEta(orderId, userId)
+  }
+
+  async getMerchantOrderEta(userId: string, orderId: string, shopId?: string) {
+    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, ...this.merchantOrderScope(shop) },
+      select: { id: true },
+    })
+    if (!order) return null
+    return this.deliveryEta.getOrderEta(orderId)
   }
 
   async getFeaturedProducts(limit = 8) {

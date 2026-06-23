@@ -39,6 +39,7 @@ import { OrderAgainButton } from '@/features/profile/components/orders/OrderAgai
 import { OrderReturnRequestForm, isOrderReturnEligible } from '@/features/profile/components/orders/OrderReturnRequestForm'
 import { CourierReviewPrompt } from '@/features/profile/components/orders/CourierReviewPrompt'
 import { DeliveryDisputeForm, isDeliveryDisputeEligible } from '@/features/profile/components/orders/DeliveryDisputeForm'
+import { OrderDeliveryEtaBanner } from '@/features/profile/components/orders/OrderDeliveryEtaBanner'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 function whatsAppSupportUrl(phone: string, message: string): string | undefined {
@@ -138,6 +139,10 @@ export default function ProfileOrderDetailPage() {
 
   const canDispute = isDeliveryDisputeEligible(order, effectiveStatus)
   const canReturn = isOrderReturnEligible({ ...order, status: effectiveStatus })
+  const showEta =
+    order.delivery_type === 'DELIVERY'
+    && displayStatus === 'active'
+    && order.delivery_job?.status !== 'DELIVERED'
 
   return (
     <ProfileShell>
@@ -266,6 +271,10 @@ export default function ProfileOrderDetailPage() {
             </div>
           </div>
         </div>
+
+        {showEta && (
+          <OrderDeliveryEtaBanner orderId={order.id} enabled={showEta} />
+        )}
 
         {(order.delivery_dispute || order.return_request) && (
           <div className="flex flex-col sm:flex-row gap-2">

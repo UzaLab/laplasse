@@ -19,6 +19,9 @@ interface DeliveryStats {
   courier_service_zones: number
   couriers_pending_kyc: number
   deliveries_last_30d: number
+  on_time_pct: number | null
+  eta_delayed_count: number
+  eta_sample_size: number
   uncovered_communes: Array<{ city: string; commune: string; commune_id: string }>
   uncovered_total: number
   communes_total: number
@@ -97,6 +100,23 @@ function AdminDeliveryPageContent() {
                 </div>
               ))}
             </div>
+
+            {(data.eta_sample_size > 0 || data.on_time_pct != null) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl border border-slate-100 p-5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">À l&apos;heure (30j)</p>
+                  <p className="text-2xl font-extrabold text-emerald-700 mt-1">
+                    {data.on_time_pct != null ? `${Math.round(data.on_time_pct)}%` : '—'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">{data.eta_sample_size} livraison(s) avec ETA</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-100 p-5">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Retards ETA (30j)</p>
+                  <p className="text-2xl font-extrabold text-amber-700 mt-1">{data.eta_delayed_count}</p>
+                  <p className="text-xs text-slate-500 mt-1">Commandes marquées en retard</p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link

@@ -5,15 +5,22 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../storage/storage.service'
 import { slugify } from '../marketplace/marketplace.util'
 import { RegisterLogisticsPartnerDto } from '../delivery/dto/delivery-stakeholders.dto'
+import { UpdateLogisticsSettingsDto } from './dto/logistics-settings.dto'
 import { LogisticsPartnerScoringService } from './logistics-partner-scoring.service'
+import { resolveJobPickupCoords, scoreFleetCouriersForJob } from './logistics-partner-dispatch.util'
+
+const ALLOWED_DOC_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+const ALLOWED_LOGO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 @Injectable()
 export class LogisticsPartnersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scoring: LogisticsPartnerScoringService,
+    private readonly storage: StorageService,
   ) {}
 
   async register(userId: string, dto: RegisterLogisticsPartnerDto) {
@@ -290,10 +297,14 @@ export class LogisticsPartnersService {
 
   async assignJob(userId: string, jobId: string, courierProfileId: string) {
     const staff = await this.requirePartnerStaff(userId)
+    return this.assignJobToCourier(staff.logistics_partner_id, jobId, courierProfileId)
+  }
+
+  async assignJobToCourier(partnerId: string, jobId: string, courierProfileId: string) {
     const job = await this.prisma.deliveryJob.findFirst({
       where: {
         id: jobId,
-        logistics_partner_id: staff.logistics_partner_id,
+        logistics_partner_id: partnerId,
         status: 'PENDING',
       },
     })
@@ -302,7 +313,7 @@ export class LogisticsPartnersService {
     const courier = await this.prisma.courierProfile.findFirst({
       where: {
         id: courierProfileId,
-        logistics_partner_id: staff.logistics_partner_id,
+        logistics_partner_id: partnerId,
         kind: 'PARTNER_FLEET',
         status: 'ACTIVE',
       },
@@ -319,7 +330,264 @@ export class LogisticsPartnersService {
         offered_to_profile_id: null,
         offered_at: null,
         offer_expires_at: null,
+        courier_latitude: courier.current_latitude ?? undefined,
+        courier_longitude: courier.current_longitude ?? undefined,
       },
+    })
+  }
+
+  async autoDispatchJobIfEnabled(jobId: string): Promise<boolean> {
+    const job = await this.prisma.deliveryJob.findUnique({
+      where: { id: jobId },
+      select: {
+        id: true,
+        status: true,
+        logistics_partner_id: true,
+        pickup_latitude: true,
+        pickup_longitude: true,
+        dropoff_latitude: true,
+        dropoff_longitude: true,
+      },
+    })
+    if (!job?.logistics_partner_id || job.status !== 'PENDING') return false
+
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: job.logistics_partner_id },
+      select: { auto_dispatch_default: true },
+    })
+    if (!partner?.auto_dispatch_default) return false
+
+    const couriers = await this.prisma.courierProfile.findMany({
+      where: {
+        logistics_partner_id: job.logistics_partner_id,
+        kind: 'PARTNER_FLEET',
+        status: 'ACTIVE',
+        is_online: true,
+      },
+      select: {
+        id: true,
+        is_online: true,
+        status: true,
+        rating_avg: true,
+        current_latitude: true,
+        current_longitude: true,
+        _count: {
+          select: {
+            jobs: { where: { status: { in: ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT'] } } },
+          },
+        },
+      },
+    })
+
+    const pickup = resolveJobPickupCoords(job)
+    const ranked = scoreFleetCouriersForJob(
+      couriers.map(c => ({
+        id: c.id,
+        is_online: c.is_online,
+        status: c.status,
+        rating_avg: c.rating_avg,
+        current_latitude: c.current_latitude,
+        current_longitude: c.current_longitude,
+        active_jobs: c._count.jobs,
+      })),
+      pickup,
+    )
+    const best = ranked[0]
+    if (!best) return false
+
+    await this.assignJobToCourier(job.logistics_partner_id, jobId, best.id)
+    return true
+  }
+
+  async getSettings(userId: string) {
+    return this.getPartnerSettings(userId)
+  }
+
+  async getPartnerSettings(userId: string) {
+    const staff = await this.requirePartnerStaff(userId)
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+      include: {
+        service_areas: {
+          include: {
+            commune: { select: { id: true, name: true, city: { select: { name: true, slug: true } } } },
+          },
+        },
+      },
+    })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+
+    return {
+      id: partner.id,
+      legal_name: partner.legal_name,
+      trade_name: partner.trade_name,
+      slug: partner.slug,
+      country: partner.country,
+      city: partner.city,
+      phone: partner.phone,
+      email: partner.email,
+      logo: partner.logo,
+      verification: partner.verification,
+      rccm_number: partner.rccm_number,
+      kyc_document_url: partner.kyc_document_url,
+      fleet_size_range: partner.fleet_size_range,
+      vehicle_types: partner.vehicle_types,
+      sla_eta_default_minutes: partner.sla_eta_default_minutes,
+      auto_dispatch_default: partner.auto_dispatch_default,
+      payout_method: partner.payout_method,
+      payout_number: partner.payout_number,
+      commission_rate: partner.commission_rate,
+      commune_ids: partner.service_areas.map(a => a.commune_id),
+      communes: partner.service_areas.map(a => ({
+        id: a.commune.id,
+        name: a.commune.name,
+        city: a.commune.city.name,
+        city_slug: a.commune.city.slug,
+      })),
+    }
+  }
+
+  async updateSettings(userId: string, dto: UpdateLogisticsSettingsDto) {
+    return this.updatePartnerSettings(userId, dto)
+  }
+
+  async updatePartnerSettings(userId: string, dto: UpdateLogisticsSettingsDto) {
+    const staff = await this.requirePartnerStaff(userId)
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+    })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+
+    const communeIds = dto.commune_ids
+    let validCommuneIds: string[] | undefined
+
+    if (communeIds !== undefined) {
+      if (communeIds.length === 0) {
+        throw new BadRequestException('Sélectionnez au moins une commune')
+      }
+      const validCommunes = await this.prisma.geoCommune.findMany({
+        where: { id: { in: communeIds }, is_active: true, city: { country: partner.country } },
+        select: { id: true },
+      })
+      if (validCommunes.length !== communeIds.length) {
+        throw new BadRequestException('Une ou plusieurs communes sont invalides')
+      }
+      validCommuneIds = validCommunes.map(c => c.id)
+    }
+
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.logisticsPartner.update({
+        where: { id: partner.id },
+        data: {
+          ...(dto.legal_name !== undefined ? { legal_name: dto.legal_name.trim() } : {}),
+          ...(dto.trade_name !== undefined ? { trade_name: dto.trade_name.trim() || null } : {}),
+          ...(dto.rccm_number !== undefined ? { rccm_number: dto.rccm_number.trim() || null } : {}),
+          ...(dto.city !== undefined ? { city: dto.city.trim() } : {}),
+          ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+          ...(dto.email !== undefined ? { email: dto.email.trim().toLowerCase() || null } : {}),
+          ...(dto.fleet_size_range !== undefined ? { fleet_size_range: dto.fleet_size_range } : {}),
+          ...(dto.vehicle_types !== undefined ? { vehicle_types: dto.vehicle_types } : {}),
+          ...(dto.sla_eta_default_minutes !== undefined
+            ? { sla_eta_default_minutes: dto.sla_eta_default_minutes }
+            : {}),
+          ...(dto.auto_dispatch_default !== undefined
+            ? { auto_dispatch_default: dto.auto_dispatch_default }
+            : {}),
+          ...(dto.payout_method !== undefined ? { payout_method: dto.payout_method } : {}),
+          ...(dto.payout_number !== undefined
+            ? { payout_number: dto.payout_number.trim() || null }
+            : {}),
+        },
+      })
+
+      if (validCommuneIds) {
+        await tx.logisticsPartnerServiceArea.deleteMany({
+          where: { logistics_partner_id: partner.id },
+        })
+        await tx.logisticsPartnerServiceArea.createMany({
+          data: validCommuneIds.map(commune_id => ({
+            logistics_partner_id: partner.id,
+            commune_id,
+          })),
+          skipDuplicates: true,
+        })
+      }
+
+      return updated
+    })
+  }
+
+  async uploadLogo(userId: string, file: Express.Multer.File) {
+    if (!file?.buffer?.length) throw new BadRequestException('Fichier requis')
+    if (!ALLOWED_LOGO_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Format accepté : JPEG, PNG ou WebP')
+    }
+    if (file.size > 2 * 1024 * 1024) throw new BadRequestException('Taille maximale : 2 Mo')
+
+    const staff = await this.requirePartnerStaff(userId)
+    const url = await this.storage.upload(
+      file.buffer,
+      file.mimetype,
+      `logistics-logo/${staff.logistics_partner_id}`,
+    )
+
+    return this.prisma.logisticsPartner.update({
+      where: { id: staff.logistics_partner_id },
+      data: { logo: url },
+      select: { id: true, logo: true },
+    })
+  }
+
+  async uploadKycDocument(userId: string, file: Express.Multer.File) {
+    if (!file?.buffer?.length) throw new BadRequestException('Fichier requis')
+    if (!ALLOWED_DOC_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Format accepté : JPEG, PNG, WebP ou PDF')
+    }
+    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Taille maximale : 5 Mo')
+
+    const staff = await this.requirePartnerStaff(userId)
+    const url = await this.storage.upload(
+      file.buffer,
+      file.mimetype,
+      `logistics-kyc/${staff.logistics_partner_id}`,
+    )
+
+    return this.prisma.logisticsPartner.update({
+      where: { id: staff.logistics_partner_id },
+      data: { kyc_document_url: url },
+    })
+  }
+
+  createPartnerPayout(
+    partnerId: string,
+    body: {
+      period_start: string
+      period_end: string
+      amount: number
+      status?: 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED'
+      reference?: string
+      note?: string
+    },
+  ) {
+    return this.prisma.logisticsPartnerPayout.create({
+      data: {
+        logistics_partner_id: partnerId,
+        period_start: new Date(body.period_start),
+        period_end: new Date(body.period_end),
+        amount: body.amount,
+        status: body.status ?? 'PENDING',
+        reference: body.reference,
+        note: body.note,
+        paid_at: body.status === 'PAID' ? new Date() : undefined,
+      },
+    })
+  }
+
+  listPartnerPayouts(partnerId: string, take = 10) {
+    return this.prisma.logisticsPartnerPayout.findMany({
+      where: { logistics_partner_id: partnerId },
+      orderBy: { created_at: 'desc' },
+      take,
     })
   }
 

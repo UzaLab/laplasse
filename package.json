@@ -16,6 +16,7 @@
     "db:studio": "pnpm --filter api prisma studio",
     "test": "pnpm --filter api test",
     "test:cov": "pnpm --filter api test:cov",
+    "test:e2e:delivery": "pnpm --filter api test:e2e:delivery",
     "load-test": "node scripts/load-test.mjs",
     "backup": "bash scripts/backup.sh"
   },

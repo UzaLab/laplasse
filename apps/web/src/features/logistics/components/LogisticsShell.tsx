@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Building2, Compass, FileText, LayoutDashboard, LogOut, Menu, Package, BarChart3, Truck, Users, X,
+  Wallet, AlertTriangle, Settings,
 } from 'lucide-react'
 import { LogisticsMobileNav } from '@/features/logistics/components/LogisticsMobileNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
@@ -60,6 +61,8 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
     { href: '/logistics/dispatch', label: 'Dispatch', icon: <Truck size={17} /> },
     { href: '/logistics/fleet', label: 'Flotte', icon: <Users size={17} /> },
     { href: '/logistics/stats', label: 'Statistiques', icon: <BarChart3 size={17} /> },
+    { href: '/logistics/quality', label: 'Qualité', icon: <AlertTriangle size={17} /> },
+    { href: '/logistics/finances', label: 'Finances', icon: <Wallet size={17} /> },
     { href: '/logistics/contracts', label: 'Contrats', icon: <FileText size={17} /> },
   ]
 
@@ -67,6 +70,9 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
     if (href === '/logistics') return pathname === '/logistics'
     if (href === '/logistics/fleet') return pathname.startsWith('/logistics/fleet')
     if (href === '/logistics/orders') return pathname.startsWith('/logistics/orders')
+    if (href === '/logistics/finances') return pathname.startsWith('/logistics/finances')
+    if (href === '/logistics/quality') return pathname.startsWith('/logistics/quality')
+    if (href === '/logistics/settings') return pathname.startsWith('/logistics/settings')
     return pathname.startsWith(href)
   }
 
@@ -117,13 +123,25 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
       {partner && (
         <div className="mx-3 mt-4 px-3 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl">
           <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider mb-1">Structure</p>
-          <span className={`inline-flex text-xs font-bold px-2.5 py-1 rounded-full border ${PARTNER_VERIFICATION_STYLES[verification] ?? PARTNER_VERIFICATION_STYLES.PENDING}`}>
+          <div className="flex items-center gap-2.5 mt-1">
+            {partner.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={partner.logo} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-slate-900 text-indigo-400 flex items-center justify-center text-xs font-black shrink-0">
+                LP
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-slate-900 truncate">
+                {partner.trade_name ?? partner.legal_name}
+              </p>
+              <p className="text-xs text-slate-500 truncate">{partner.city}</p>
+            </div>
+          </div>
+          <span className={`inline-flex mt-2 text-xs font-bold px-2.5 py-1 rounded-full border ${PARTNER_VERIFICATION_STYLES[verification] ?? PARTNER_VERIFICATION_STYLES.PENDING}`}>
             {PARTNER_VERIFICATION_LABELS[verification] ?? verification}
           </span>
-          <p className="text-sm font-extrabold text-slate-900 mt-2 truncate">
-            {partner.trade_name ?? partner.legal_name}
-          </p>
-          <p className="text-xs text-slate-500 truncate">{partner.city}</p>
         </div>
       )}
 
@@ -133,6 +151,13 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
             Opérations
           </p>
           <div className="space-y-0.5">{mainNav.map(navLink)}</div>
+        </div>
+        <div className="h-px bg-slate-100 mx-2" />
+        <div>
+          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+            Compte
+          </p>
+          <div className="space-y-0.5">{navLink({ href: '/logistics/settings', label: 'Paramètres', icon: <Settings size={17} /> })}</div>
         </div>
         <div className="h-px bg-slate-100 mx-2" />
         <div className="space-y-0.5">

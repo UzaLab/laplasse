@@ -3,12 +3,17 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { LogisticsPartnersService } from './logistics-partners.service'
@@ -17,6 +22,7 @@ import {
   LinkPartnerCourierDto,
   RegisterLogisticsPartnerDto,
 } from '../delivery/dto/delivery-stakeholders.dto'
+import { UpdateLogisticsSettingsDto } from './dto/logistics-settings.dto'
 
 @Controller('logistics')
 @UseGuards(JwtAuthGuard)
@@ -46,6 +52,48 @@ export class LogisticsController {
     return this.partners.listPublic(country, city)
   }
 
+  @Get('me/settings')
+  getSettings(@CurrentUser('id') userId: string) {
+    return this.partners.getPartnerSettings(userId)
+  }
+
+  @Patch('me/settings')
+  updateSettingsProfile(
+    @CurrentUser('id') userId: string,
+    @Body() body: UpdateLogisticsSettingsDto,
+  ) {
+    return this.partners.updatePartnerSettings(userId, body)
+  }
+
+  @Post('me/logo')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
+  }))
+  uploadLogo(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.partners.uploadLogo(userId, file)
+  }
+
+  @Post('me/kyc-document')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+  }))
+  uploadKycDocument(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.partners.uploadKycDocument(userId, file)
+  }
+
+  @Get('me/dispatch-board')
+  getDispatchBoard(@CurrentUser('id') userId: string) {
+    return this.ops.getDispatchBoard(userId)
+  }
+
   @Get('me/fleet')
   listFleet(@CurrentUser('id') userId: string) {
     return this.ops.listFleetWithStats(userId)
@@ -57,6 +105,15 @@ export class LogisticsController {
     @Param('courierId') courierId: string,
   ) {
     return this.ops.getFleetCourierDetail(userId, courierId)
+  }
+
+  @Patch('me/fleet/:courierId/status')
+  updateFleetCourierStatus(
+    @CurrentUser('id') userId: string,
+    @Param('courierId') courierId: string,
+    @Body() body: { status: 'ACTIVE' | 'SUSPENDED' },
+  ) {
+    return this.ops.updateFleetCourierStatus(userId, courierId, body.status)
   }
 
   @Delete('me/fleet/:courierId')
@@ -101,9 +158,48 @@ export class LogisticsController {
     return this.ops.getJob(userId, jobId)
   }
 
+  @Get('me/jobs/:jobId/suggest-courier')
+  suggestCourier(
+    @CurrentUser('id') userId: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.ops.suggestCourierForJob(userId, jobId)
+  }
+
+  @Patch('me/jobs/:jobId/release')
+  releaseJob(
+    @CurrentUser('id') userId: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.ops.releasePartnerJob(userId, jobId)
+  }
+
   @Get('me/stats')
   getStats(@CurrentUser('id') userId: string) {
     return this.ops.getPartnerStats(userId)
+  }
+
+  @Get('me/quality')
+  getQuality(@CurrentUser('id') userId: string) {
+    return this.ops.getPartnerQuality(userId)
+  }
+
+  @Get('me/finances')
+  getFinances(
+    @CurrentUser('id') userId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.ops.getFinances(userId, month)
+  }
+
+  @Get('me/finances/export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="finances.csv"')
+  async exportFinances(
+    @CurrentUser('id') userId: string,
+    @Query('month') month?: string,
+  ) {
+    return this.ops.exportFinancesCsv(userId, month)
   }
 
   @Patch('me/jobs/:jobId/assign')

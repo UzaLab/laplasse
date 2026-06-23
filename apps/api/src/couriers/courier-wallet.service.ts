@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { COURIER_EARNING_RATE } from '../delivery/delivery-fee-split.service'
 
-/** Part livreur sur les frais de livraison (v1 — sans split partner). */
-export const COURIER_EARNING_RATE = 0.75
+export { COURIER_EARNING_RATE }
 
 @Injectable()
 export class CourierWalletService {

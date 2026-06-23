@@ -564,6 +564,26 @@ export class AdminController {
     return this.logisticsPartners.verifyPartner(id, body.status)
   }
 
+  @Post('logistics/payouts/:partnerId')
+  createLogisticsPayout(
+    @Param('partnerId') partnerId: string,
+    @Body() body: {
+      period_start: string
+      period_end: string
+      amount: number
+      status?: 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED'
+      reference?: string
+      note?: string
+    },
+  ) {
+    return this.logisticsPartners.createPartnerPayout(partnerId, body)
+  }
+
+  @Get('logistics/payouts/:partnerId')
+  listLogisticsPayouts(@Param('partnerId') partnerId: string) {
+    return this.logisticsPartners.listPartnerPayouts(partnerId)
+  }
+
   @Patch('delivery/disputes/:id')
   resolveDeliveryDispute(
     @Param('id') id: string,
@@ -667,6 +687,8 @@ export class AdminController {
       cities,
       zoneRules,
       couriersPendingKyc,
+      deliveredWithEta,
+      etaDelayedCount,
     ] = await Promise.all([
       this.prisma.deliveryJob.groupBy({
         by: ['status'],
@@ -711,6 +733,26 @@ export class AdminController {
       this.prisma.courierProfile.count({
         where: { country: countryCode, status: 'PENDING_REVIEW' },
       }),
+      this.prisma.deliveryJob.findMany({
+        where: {
+          status: 'DELIVERED',
+          delivered_at: { gte: since },
+          order: { shop: { country: countryCode }, eta_initial_arrival_at: { not: null } },
+        },
+        select: {
+          delivered_at: true,
+          order: { select: { eta_initial_arrival_at: true } },
+        },
+        take: 500,
+      }),
+      this.prisma.order.count({
+        where: {
+          eta_delayed: true,
+          updated_at: { gte: since },
+          shop: { country: countryCode },
+          delivery_type: 'DELIVERY',
+        },
+      }),
     ])
 
     const coveredCommuneIds = new Set<string>()
@@ -729,6 +771,15 @@ export class AdminController {
         .map(c => ({ city: city.name, commune: c.name, commune_id: c.id })),
     )
 
+    const onTime = deliveredWithEta.filter(j =>
+      j.delivered_at
+      && j.order.eta_initial_arrival_at
+      && j.delivered_at.getTime() <= j.order.eta_initial_arrival_at.getTime(),
+    ).length
+    const onTimePct = deliveredWithEta.length
+      ? Math.round((onTime / deliveredWithEta.length) * 100)
+      : null
+
     return {
       country: countryCode,
       period_days: 30,
@@ -741,6 +792,9 @@ export class AdminController {
       courier_service_zones: courierServiceZones,
       couriers_pending_kyc: couriersPendingKyc,
       deliveries_last_30d: recentDeliveries,
+      on_time_pct: onTimePct,
+      eta_delayed_count: etaDelayedCount,
+      eta_sample_size: deliveredWithEta.length,
       uncovered_communes: uncoveredCommunes.slice(0, 100),
       uncovered_total: uncoveredCommunes.length,
       communes_total: cities.reduce((n, c) => n + c.communes.length, 0),

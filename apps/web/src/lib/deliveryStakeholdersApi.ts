@@ -417,3 +417,243 @@ export async function unlinkPartnerFleetCourier(
   if (!res.ok) return { ok: false, error: await parseError(res) }
   return { ok: true }
 }
+
+export async function updateFleetCourierStatus(
+  courierId: string,
+  status: 'ACTIVE' | 'SUSPENDED',
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await authApiFetch(`/logistics/me/fleet/${courierId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
+}
+
+export interface LogisticsPartnerSettings {
+  id: string
+  legal_name: string
+  trade_name: string | null
+  slug: string
+  country: string
+  city: string
+  phone: string
+  email: string | null
+  logo: string | null
+  verification: string
+  rccm_number: string | null
+  kyc_document_url: string | null
+  fleet_size_range: string | null
+  vehicle_types: string[]
+  sla_eta_default_minutes: number | null
+  auto_dispatch_default: boolean
+  payout_method: string | null
+  payout_number: string | null
+  commission_rate: number
+  commune_ids: string[]
+  communes: Array<{ id: string; name: string; city: string; city_slug: string }>
+}
+
+export async function fetchLogisticsPartnerSettings(): Promise<LogisticsPartnerSettings | null> {
+  const res = await authApiFetch('/logistics/me/settings')
+  if (!res.ok) return null
+  return res.json() as Promise<LogisticsPartnerSettings>
+}
+
+export async function updatePartnerSettings(
+  input: Partial<LogisticsPartnerSettings>,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await authApiFetch('/logistics/me/settings', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
+}
+
+export async function uploadLogisticsPartnerLogo(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await authApiFetch('/logistics/me/logo', { method: 'POST', body: form })
+  if (!res.ok) return { error: await parseError(res) }
+  return { partner: await res.json() as { id: string; logo: string } }
+}
+
+export async function uploadLogisticsKycDocument(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await authApiFetch('/logistics/me/kyc-document', { method: 'POST', body: form })
+  if (!res.ok) return { error: await parseError(res) }
+  return { partner: await res.json() }
+}
+
+export interface DispatchBoardCourier {
+  id: string
+  label: string
+  is_online: boolean
+  status: string
+  rating_avg: number
+  active_jobs: number
+  lat: number | null
+  lng: number | null
+  vehicle: string | null
+}
+
+export interface DispatchBoardJob extends PartnerDeliveryJob {
+  pickup_lat?: number | null
+  pickup_lng?: number | null
+  dropoff_lat?: number | null
+  dropoff_lng?: number | null
+  pending_minutes?: number
+  is_urgent?: boolean
+  suggested_courier_id?: string | null
+  suggested_courier_name?: string | null
+}
+
+export interface PartnerDispatchBoard {
+  auto_dispatch_default: boolean
+  sla_pending_threshold_minutes: number
+  fleet: DispatchBoardCourier[]
+  jobs: DispatchBoardJob[]
+}
+
+export async function fetchPartnerDispatchBoard(): Promise<PartnerDispatchBoard | null> {
+  const res = await authApiFetch('/logistics/me/dispatch-board')
+  if (!res.ok) return null
+  return res.json() as Promise<PartnerDispatchBoard>
+}
+
+export async function releasePartnerJob(jobId: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await authApiFetch(`/logistics/me/jobs/${jobId}/release`, { method: 'PATCH' })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
+}
+
+export interface PartnerFinancesPayout {
+  id: string
+  period_start: string
+  period_end: string
+  amount: number
+  status: string
+  reference: string | null
+  paid_at: string | null
+  created_at: string
+}
+
+export interface PartnerFinances {
+  month: string
+  summary: {
+    total_jobs: number
+    delivery_fees_total: number
+    partner_commission: number
+    courier_payouts: number
+    platform_share: number
+    commission_rate: number
+  }
+  by_shop: Array<{ shop_id: string; shop_name: string; jobs: number; fees: number; commission: number }>
+  by_courier: Array<{ courier_id: string; name: string; jobs: number; earnings: number }>
+  ledger: Array<{
+    job_id: string
+    delivered_at: string | null
+    shop_name: string
+    courier_name: string | null
+    delivery_fee: number
+    partner_commission: number
+    courier_payout: number
+    platform_share: number
+  }>
+  payouts: PartnerFinancesPayout[]
+}
+
+export async function fetchPartnerFinances(month?: string): Promise<PartnerFinances | null> {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : ''
+  const res = await authApiFetch(`/logistics/me/finances${qs}`)
+  if (!res.ok) return null
+  return res.json() as Promise<PartnerFinances>
+}
+
+export async function downloadPartnerFinancesCsv(
+  month?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const qs = month ? `?month=${encodeURIComponent(month)}` : ''
+  const res = await authApiFetch(`/logistics/me/finances/export${qs}`)
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  const blob = await res.blob()
+  const stamp = month ?? new Date().toISOString().slice(0, 7)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `finances-${stamp}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  return { ok: true }
+}
+
+export interface PartnerQuality {
+  summary: {
+    open_disputes: number
+    sla_breach_rate_30d: number
+    sla_breach_alert: boolean
+    underperforming_couriers: number
+    resolved_disputes_30d: number
+  }
+  disputes: {
+    open: Array<{
+      id: string
+      reason: string
+      description: string | null
+      status: string
+      created_at: string
+      client_name: string
+      shop_name: string | null
+      order_id: string
+      job_id: string | null
+      courier_id: string | null
+      courier_name: string | null
+      proof_photo_url: string | null
+    }>
+    resolved: Array<{
+      id: string
+      reason: string
+      status: string
+      admin_note: string | null
+      created_at: string
+      resolved_at: string | null
+      shop_name: string | null
+      order_id: string
+      job_id: string | null
+      courier_name: string | null
+    }>
+  }
+  sla: {
+    breach_rate_30d: number
+    threshold_exceeded: boolean
+    delivered_count_30d: number
+    breaches: Array<{
+      job_id: string
+      shop_name: string
+      courier_name: string | null
+      sla_minutes: number
+      delay_minutes: number
+      delivered_at: string
+    }>
+  }
+  underperforming_couriers: Array<{
+    id: string
+    name: string
+    status: string
+    rating_avg: number
+    rating_count: number
+    cancellation_rate: number
+    issues: string[]
+    severity: 'alert' | 'incident'
+  }>
+}
+
+export async function fetchPartnerQuality(): Promise<PartnerQuality | null> {
+  const res = await authApiFetch('/logistics/me/quality')
+  if (!res.ok) return null
+  return res.json() as Promise<PartnerQuality>
+}

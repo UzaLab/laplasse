@@ -9,6 +9,7 @@ import {
   MapPin,
   Package,
   Phone,
+  Sparkles,
   Store,
   User,
 } from 'lucide-react'
@@ -17,13 +18,22 @@ import { formatFcfa, JOB_STATUS_LABELS, JOB_STATUS_STYLES } from '@/lib/courierJ
 import type { DeliveryJobStatus } from '@/lib/courierJobsApi'
 
 interface LogisticsDispatchJobCardProps {
-  job: PartnerDeliveryJob
+  job: PartnerDeliveryJob & {
+    is_urgent?: boolean
+    pending_minutes?: number
+    suggested_courier_id?: string | null
+    suggested_courier_name?: string | null
+  }
   fleet: PartnerFleetCourier[]
   assigning: boolean
   selectedCourierId: string
   onSelectCourier: (courierId: string) => void
   onAssign: () => void
+  onAssignNearest?: () => void
+  onRelease?: () => void
+  releasing?: boolean
   isNew?: boolean
+  isHighlighted?: boolean
 }
 
 export function LogisticsDispatchJobCard({
@@ -33,27 +43,43 @@ export function LogisticsDispatchJobCard({
   selectedCourierId,
   onSelectCourier,
   onAssign,
+  onAssignNearest,
+  onRelease,
+  releasing,
   isNew,
+  isHighlighted,
 }: LogisticsDispatchJobCardProps) {
   const statusLabel = JOB_STATUS_LABELS[job.status as DeliveryJobStatus] ?? job.status
   const statusStyle = JOB_STATUS_STYLES[job.status as DeliveryJobStatus] ?? 'bg-slate-100 text-slate-600'
   const address = job.dropoff_address ?? job.order.delivery_address ?? '—'
   const isPending = job.status === 'PENDING' && !job.courier_profile
+  const canRelease = job.status === 'ASSIGNED' && !!job.courier_profile
 
   return (
     <article
       className={`bg-white rounded-[24px] border p-5 sm:p-6 shadow-sm transition-all ${
-        isNew
-          ? 'border-indigo-300 ring-2 ring-indigo-100'
-          : isPending
-            ? 'border-amber-200 shadow-amber-100/50'
-            : 'border-slate-100'
+        isHighlighted
+          ? 'border-indigo-400 ring-2 ring-indigo-100'
+          : isNew
+            ? 'border-indigo-300 ring-2 ring-indigo-100'
+            : job.is_urgent && isPending
+              ? 'border-red-300 ring-2 ring-red-100'
+              : isPending
+                ? 'border-amber-200 shadow-amber-100/50'
+                : 'border-slate-100'
       }`}
     >
       {isNew && (
         <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600 mb-3 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
           Nouvelle course
+        </p>
+      )}
+
+      {job.is_urgent && isPending && (
+        <p className="text-[10px] font-black uppercase tracking-wider text-red-600 mb-3 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          Urgent · en attente {job.pending_minutes != null ? `${job.pending_minutes} min` : '>5 min'}
         </p>
       )}
 
@@ -112,6 +138,13 @@ export function LogisticsDispatchJobCard({
               </Link>
             </p>
           )}
+
+          {isPending && job.suggested_courier_name && (
+            <p className="text-xs text-indigo-700 font-semibold flex items-center gap-1.5">
+              <Sparkles size={13} />
+              Suggestion : {job.suggested_courier_name}
+            </p>
+          )}
         </div>
 
         <div className="lg:w-52 shrink-0 flex flex-col items-start lg:items-end gap-2">
@@ -159,6 +192,17 @@ export function LogisticsDispatchJobCard({
                 </option>
               ))}
             </select>
+            {onAssignNearest && job.suggested_courier_id && (
+              <button
+                type="button"
+                disabled={assigning}
+                onClick={onAssignNearest}
+                className="min-h-[44px] px-4 py-2.5 rounded-xl text-sm font-bold border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 inline-flex items-center justify-center gap-2 shrink-0"
+              >
+                {assigning ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                Plus proche
+              </button>
+            )}
             <button
               type="button"
               disabled={assigning || !selectedCourierId}
@@ -177,6 +221,23 @@ export function LogisticsDispatchJobCard({
               </Link>
             </p>
           )}
+        </div>
+      )}
+
+      {canRelease && onRelease && (
+        <div className="mt-5 pt-5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">
+            Livreur indisponible ? Libérez la course pour la réassigner.
+          </p>
+          <button
+            type="button"
+            disabled={releasing}
+            onClick={onRelease}
+            className="min-h-[40px] px-4 py-2 rounded-xl text-sm font-bold border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            {releasing ? <Loader2 size={16} className="animate-spin" /> : null}
+            Libérer & réassigner
+          </button>
         </div>
       )}
     </article>
