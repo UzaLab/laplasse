@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Building2, Compass, FileText, LayoutDashboard, LogOut, Menu, Package, BarChart3, Truck, Users, X,
-  Wallet, AlertTriangle, Settings,
+  Wallet, AlertTriangle, Settings, Target,
 } from 'lucide-react'
 import { LogisticsMobileNav } from '@/features/logistics/components/LogisticsMobileNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
@@ -64,6 +64,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
     { href: '/logistics/quality', label: 'Qualité', icon: <AlertTriangle size={17} /> },
     { href: '/logistics/finances', label: 'Finances', icon: <Wallet size={17} /> },
     { href: '/logistics/contracts', label: 'Contrats', icon: <FileText size={17} /> },
+    { href: '/logistics/prospects', label: 'Prospects', icon: <Target size={17} /> },
   ]
 
   const isActive = (href: string) => {
@@ -217,7 +218,11 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <NotificationBell refetchIntervalMs={20_000} />
+            <NotificationBell
+              refetchIntervalMs={20_000}
+              showPushPrompt
+              viewAllHref="/logistics/notifications"
+            />
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">

@@ -36,6 +36,12 @@ export function useLogisticsSession() {
         return
       }
 
+      const onboardingStep = validatedUser.logistics_partner.onboarding_step ?? 4
+      if (onboardingStep < 4 && !window.location.pathname.startsWith('/logistics/onboarding')) {
+        router.push('/logistics/onboarding')
+        return
+      }
+
       setSessionValid(true)
     })
 

@@ -61,14 +61,40 @@ self.addEventListener('push', event => {
 
 function resolveNotificationTarget(data) {
   if (data.href) return data.href
-  if (data.type === 'delivery_job_offered' || data.job_id) {
-    return data.href || '/courier/missions'
+
+  const type = data.type
+
+  if (type === 'logistics_sla_breach' || type === 'logistics_dispatch') {
+    if (data.job_id) return `/logistics/orders/${data.job_id}`
+    return '/logistics/dispatch'
   }
-  if (data.type === 'order_created') {
+  if (type === 'logistics_courier_underperforming') {
+    if (data.courier_id) return `/logistics/fleet/${data.courier_id}`
+    return '/logistics/quality'
+  }
+  if (type === 'logistics_onboarding_complete') return '/logistics'
+  if (type === 'delivery_dispute_open') {
+    if (data.logistics_partner_id) return '/logistics/quality'
+    if (data.order_id) return `/profile/orders/${data.order_id}`
+  }
+  if (type === 'delivery_contract_proposal') {
+    return '/merchant/shop/delivery-zones?tab=partners'
+  }
+  if (type === 'logistics_contract_request') {
+    if (data.contract_id) return `/logistics/contracts/${data.contract_id}`
+    return '/logistics/contracts'
+  }
+  if (type === 'delivery_job_offered') {
+    return data.logistics_partner_id ? '/logistics/dispatch' : '/courier/missions'
+  }
+  if (data.job_id && data.logistics_partner_id) {
+    return `/logistics/orders/${data.job_id}`
+  }
+  if (type === 'order_created') {
     if (data.merchant_id && data.order_id) return `/merchant/shop/orders/${data.order_id}`
     if (data.order_id) return '/shop/manage/orders'
   }
-  if (data.type === 'booking_created' || data.type === 'booking_updated') {
+  if (type === 'booking_created' || type === 'booking_updated') {
     return data.merchant_id ? '/merchant/bookings' : '/profile/bookings'
   }
   if (data.order_id) return `/profile/orders/${data.order_id}`

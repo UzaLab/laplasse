@@ -18,6 +18,7 @@ const CONTRACT_STATUS: Record<string, string> = {
   PENDING_PARTNER: 'En attente partenaire',
   PENDING_MERCHANT: 'À valider par vous',
   ACTIVE: 'Actif',
+  PAUSED: 'En pause',
   TERMINATED: 'Terminé',
 }
 

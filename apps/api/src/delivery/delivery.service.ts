@@ -487,10 +487,10 @@ export class DeliveryService {
       [...userIds].map(userId =>
         this.notificationQueue.enqueuePush({
           userId,
-          type: 'delivery_job_offered',
+          type: 'logistics_dispatch',
           title: 'Nouvelle course à dispatcher',
           body: `${shopName} — assignez un livreur depuis le dispatch`,
-          data: { job_id: jobId, type: 'logistics_dispatch', href: '/logistics/dispatch' },
+          data: { job_id: jobId, logistics_partner_id: partnerId, href: '/logistics/dispatch' },
         }),
       ),
     )

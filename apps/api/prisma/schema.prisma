@@ -1665,9 +1665,11 @@ model LogisticsPartner {
   kyc_document_url       String?
   payout_method          String?
   payout_number          String?
+  address                String?
   onboarding_step        Int                 @default(0)
   auto_dispatch_default  Boolean             @default(false)
   sla_eta_default_minutes Int?
+  dispatch_pending_alert_minutes Int          @default(5)
   created_at      DateTime                  @default(now())
   updated_at      DateTime                  @updatedAt
 

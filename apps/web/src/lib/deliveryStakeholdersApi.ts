@@ -93,6 +93,8 @@ export interface PartnerFleetCourier {
   cancellation_rate: number
   city: string
   last_location_at: string | null
+  current_latitude?: number | null
+  current_longitude?: number | null
   wallet_balance: number
   stats_90d: {
     total_jobs: number
@@ -350,18 +352,86 @@ export async function assignPartnerJob(
   return { ok: true }
 }
 
-export async function fetchPartnerContracts(): Promise<Array<{
+export interface PartnerContractSummary {
   id: string
   status: string
-  shop: { id: string; name: string; slug: string }
-}>> {
+  fee_override: number | null
+  sla_eta_max_minutes: number | null
+  auto_dispatch: boolean
+  signed_at: string | null
+  updated_at: string
+  shop: { id: string; name: string; slug: string; city: string; logo: string | null }
+}
+
+export interface PartnerContractDetail extends PartnerContractSummary {
+  created_at: string
+  stats: {
+    jobs_30d: number
+    revenue_30d: number
+    sla_rate: number | null
+    last_delivery_at: string | null
+  }
+}
+
+export interface PartnerProspect {
+  id: string
+  name: string
+  slug: string
+  city: string
+  district: string | null
+  logo: string | null
+  delivery_fulfilment_default: DeliveryFulfilmentMode
+  estimated_deliveries_30d: number
+  matched_communes: string[]
+  latitude: number | null
+  longitude: number | null
+}
+
+export async function fetchPartnerContracts(): Promise<PartnerContractSummary[]> {
   const res = await authApiFetch('/logistics/me/contracts')
   if (!res.ok) return []
-  return res.json() as Promise<Array<{
-    id: string
-    status: string
-    shop: { id: string; name: string; slug: string }
-  }>>
+  return res.json() as Promise<PartnerContractSummary[]>
+}
+
+export async function fetchPartnerContract(contractId: string): Promise<PartnerContractDetail | null> {
+  const res = await authApiFetch(`/logistics/me/contracts/${contractId}`)
+  if (!res.ok) return null
+  return res.json() as Promise<PartnerContractDetail>
+}
+
+export async function updatePartnerContract(
+  contractId: string,
+  body: {
+    sla_eta_max_minutes?: number
+    fee_override?: number | null
+    auto_dispatch?: boolean
+    pause?: boolean
+  },
+): Promise<{ contract: PartnerContractDetail | null; error?: string }> {
+  const res = await authApiFetch(`/logistics/me/contracts/${contractId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return { contract: null, error: await parseError(res) }
+  return { contract: await res.json() as PartnerContractDetail }
+}
+
+export async function fetchPartnerProspects(): Promise<{
+  prospects: PartnerProspect[]
+  communes_configured: boolean
+}> {
+  const res = await authApiFetch('/logistics/me/prospects')
+  if (!res.ok) return { prospects: [], communes_configured: true }
+  return res.json() as Promise<{ prospects: PartnerProspect[]; communes_configured: boolean }>
+}
+
+export async function proposePartnerProspect(
+  shopId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await authApiFetch(`/logistics/me/prospects/${shopId}/propose`, { method: 'POST' })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
 }
 
 export async function respondPartnerContract(
@@ -451,6 +521,9 @@ export interface LogisticsPartnerSettings {
   payout_method: string | null
   payout_number: string | null
   commission_rate: number
+  onboarding_step: number
+  address: string | null
+  dispatch_pending_alert_minutes: number
   commune_ids: string[]
   communes: Array<{ id: string; name: string; city: string; city_slug: string }>
 }
@@ -481,12 +554,12 @@ export async function uploadLogisticsPartnerLogo(file: File) {
   return { partner: await res.json() as { id: string; logo: string } }
 }
 
-export async function uploadLogisticsKycDocument(file: File) {
+export async function uploadLogisticsKycDocument(file: File): Promise<{ partner?: { kyc_document_url?: string | null }; error?: string }> {
   const form = new FormData()
   form.append('file', file)
   const res = await authApiFetch('/logistics/me/kyc-document', { method: 'POST', body: form })
   if (!res.ok) return { error: await parseError(res) }
-  return { partner: await res.json() }
+  return { partner: await res.json() as { kyc_document_url?: string | null } }
 }
 
 export interface DispatchBoardCourier {
@@ -510,17 +583,68 @@ export interface DispatchBoardJob extends PartnerDeliveryJob {
   is_urgent?: boolean
   suggested_courier_id?: string | null
   suggested_courier_name?: string | null
+  suggested_couriers?: Array<{
+    courier_profile_id: string
+    label: string
+    dispatch_score: number
+  }>
 }
 
 export interface PartnerDispatchBoard {
   auto_dispatch_default: boolean
   sla_pending_threshold_minutes: number
+  commune_options: Array<{ id: string; name: string }>
+  offline_couriers: Array<{
+    id: string
+    label: string
+    active_jobs: number
+    is_online: boolean
+    last_location_at: string | null
+  }>
   fleet: DispatchBoardCourier[]
   jobs: DispatchBoardJob[]
 }
 
-export async function fetchPartnerDispatchBoard(): Promise<PartnerDispatchBoard | null> {
-  const res = await authApiFetch('/logistics/me/dispatch-board')
+export async function saveLogisticsOnboarding(input: {
+  step: number
+  legal_name?: string
+  trade_name?: string
+  rccm_number?: string
+  address?: string
+  city?: string
+  country?: string
+  phone?: string
+  email?: string
+  fleet_size_range?: string
+  vehicle_types?: string[]
+  commune_ids?: string[]
+  sla_eta_default_minutes?: number
+  auto_dispatch_default?: boolean
+  payout_method?: string
+  payout_number?: string
+}): Promise<{ settings: LogisticsPartnerSettings | null; error?: string }> {
+  const res = await authApiFetch('/logistics/me/onboarding', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { settings: null, error: await parseError(res) }
+  return { settings: await res.json() as LogisticsPartnerSettings }
+}
+
+export async function fetchFleetInviteLink(): Promise<{
+  url: string
+  slug: string
+  partner_name: string
+} | null> {
+  const res = await authApiFetch('/logistics/me/fleet/invite-link')
+  if (!res.ok) return null
+  return res.json() as Promise<{ url: string; slug: string; partner_name: string }>
+}
+
+export async function fetchPartnerDispatchBoard(communeId?: string): Promise<PartnerDispatchBoard | null> {
+  const qs = communeId ? `?commune_id=${encodeURIComponent(communeId)}` : ''
+  const res = await authApiFetch(`/logistics/me/dispatch-board${qs}`)
   if (!res.ok) return null
   return res.json() as Promise<PartnerDispatchBoard>
 }

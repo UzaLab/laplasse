@@ -19,7 +19,7 @@ import {
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import { useAuthReady } from '@/hooks/useAuthReady'
-import { useCartStore } from '@/stores/cartStore'
+import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { api, type ApiMerchantDetail } from '@/lib/api'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
@@ -73,8 +73,7 @@ export default function ProductDetailPage() {
   const params = useParams<{ slug: string; productSlug: string }>()
   const router = useRouter()
   const t = useT()
-  const { isAuthenticated } = useAuthReady()
-  const addItem = useCartStore(s => s.addItem)
+  const { addToCart, isAuthenticated } = useMarketplaceAddToCart()
   const [product, setProduct] = useState<MarketplaceProduct | null>(null)
   const [merchantDetail, setMerchantDetail] = useState<ApiMerchantDetail | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<MarketplaceProduct[]>([])
@@ -138,11 +137,7 @@ export default function ProductDetailPage() {
     void recordProductView(product.id, isAuthenticated)
   }, [product?.id, isAuthenticated])
 
-  const addToCart = async (redirectToCheckout = false) => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}/p/${productSlug}`)}`)
-      return false
-    }
+  const addToCartHandler = async (redirectToCheckout = false) => {
     if (!product) return false
 
     const variants = product.variants ?? []
@@ -157,7 +152,7 @@ export default function ProductDetailPage() {
     if (redirectToCheckout) setBuyingNow(true)
     else setAdding(true)
 
-    const { error: err } = await addItem(product.id, quantity, {
+    const { error: err } = await addToCart(product.id, quantity, {
       variantId: variant?.id,
       openDrawer: !redirectToCheckout,
     })
@@ -167,21 +162,18 @@ export default function ProductDetailPage() {
       return false
     }
 
-    if (redirectToCheckout) {
+    if (redirectToCheckout && isAuthenticated) {
       router.push('/checkout')
     }
+
     setAdding(false)
     setBuyingNow(false)
     return true
   }
 
   const handleRelatedAdd = async (related: MarketplaceProduct) => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}/p/${productSlug}`)}`)
-      return
-    }
     setAddingRelatedId(related.id)
-    await addItem(related.id, 1)
+    await addToCart(related.id, 1)
     setAddingRelatedId(null)
   }
 
@@ -460,7 +452,7 @@ export default function ProductDetailPage() {
                       <div className="flex flex-col sm:flex-row lg:flex-1 gap-3 lg:gap-2">
                         <button
                           type="button"
-                          onClick={() => addToCart(false)}
+                          onClick={() => addToCartHandler(false)}
                           disabled={adding || buyingNow}
                           className="w-full lg:flex-1 bg-slate-900 text-white min-h-[48px] py-3.5 lg:py-0 lg:h-11 rounded-full lg:rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 group disabled:opacity-50"
                         >
@@ -474,7 +466,7 @@ export default function ProductDetailPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => addToCart(true)}
+                          onClick={() => addToCartHandler(true)}
                           disabled={adding || buyingNow}
                           className="w-full lg:flex-1 bg-brand-50 border-2 border-brand-200 text-brand-700 min-h-[48px] py-3.5 lg:py-0 lg:h-11 rounded-full lg:rounded-xl text-sm font-bold hover:bg-brand-100 hover:border-brand-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >

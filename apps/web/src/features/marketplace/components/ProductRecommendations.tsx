@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
 import { ProductCarousel } from '@/features/marketplace/components/ProductCarousel'
 import { fetchRecommendations } from '@/lib/discoveryApi'
 import type { MarketplaceProduct } from '@/lib/marketplaceApi'
-import { useAuthReady } from '@/hooks/useAuthReady'
-import { useCartStore } from '@/stores/cartStore'
+import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { useT } from '@/providers/LocaleProvider'
 
 const CAROUSEL_LIMIT = 10
@@ -21,10 +19,7 @@ export function ProductRecommendations({
   limit?: number
 }) {
   const t = useT()
-  const router = useRouter()
-  const pathname = usePathname()
-  const { isAuthenticated } = useAuthReady()
-  const addItem = useCartStore(s => s.addItem)
+  const { addToCart } = useMarketplaceAddToCart()
   const [items, setItems] = useState<MarketplaceProduct[]>([])
   const [addingId, setAddingId] = useState<string | null>(null)
 
@@ -37,12 +32,8 @@ export function ProductRecommendations({
   }, [productId, limit])
 
   const handleAdd = async (product: MarketplaceProduct) => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(pathname)}`)
-      return
-    }
     setAddingId(product.id)
-    await addItem(product.id, 1)
+    await addToCart(product.id, 1)
     setAddingId(null)
   }
 

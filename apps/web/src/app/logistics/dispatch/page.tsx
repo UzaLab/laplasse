@@ -17,7 +17,7 @@ import {
 } from '@/lib/deliveryStakeholdersApi'
 import { notify } from '@/lib/notify'
 
-const POLL_MS = 8_000
+const POLL_MS = 10_000
 
 const TABS = [
   { id: 'all', label: 'Toutes' },
@@ -69,11 +69,12 @@ export default function LogisticsDispatchPage() {
   const prevJobIdsRef = useRef<Set<string>>(new Set())
   const initializedRef = useRef(false)
 
+  const [communeFilter, setCommuneFilter] = useState('')
   const verified = partner?.verification === 'VERIFIED'
 
   const { data: board, isLoading, isFetching, dataUpdatedAt } = useQuery({
-    queryKey: ['logistics-dispatch-board'],
-    queryFn: fetchPartnerDispatchBoard,
+    queryKey: ['logistics-dispatch-board', communeFilter],
+    queryFn: () => fetchPartnerDispatchBoard(communeFilter || undefined),
     enabled: ready && verified,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
@@ -239,11 +240,37 @@ export default function LogisticsDispatchPage() {
           </div>
         </div>
 
+        {board?.offline_couriers && board.offline_couriers.length > 0 && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-800">
+            <p className="font-bold mb-1">Livreur(s) hors ligne avec course active</p>
+            <ul className="space-y-1">
+              {board.offline_couriers.map(c => (
+                <li key={c.id}>{c.label} — {c.active_jobs} course(s) en cours</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {board?.commune_options && board.commune_options.length > 0 && (
+          <select
+            value={communeFilter}
+            onChange={e => setCommuneFilter(e.target.value)}
+            className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white max-w-xs"
+          >
+            <option value="">Toutes les communes</option>
+            {board.commune_options.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+
         <LogisticsDispatchMapLazy
           couriers={mapCouriers}
           jobs={mapJobs}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
+          title="Dispatch live"
+          subtitle="Courses et livreurs en temps réel — touchez un marqueur pour plus de détails."
         />
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">

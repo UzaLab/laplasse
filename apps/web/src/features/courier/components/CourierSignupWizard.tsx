@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
@@ -16,9 +17,12 @@ import { PUBLIC_NARROW } from '@/lib/pageLayout'
 import { PublicPageHeader } from '@/components/layout/PublicPageHeader'
 import { registerCourier } from '@/lib/courierApi'
 import { VEHICLE_OPTIONS, type DeliveryVehicle } from '@/lib/courierLabels'
+import { buildLoginUrl } from '@/lib/authIntent'
 
 export function CourierSignupWizard() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const partnerRef = searchParams.get('ref')?.replace(/^partner:/, '') ?? undefined
   const { isAuthenticated, user, updateUser } = useAuthStore()
   const countryCode = getCountryCode()
   const countryLabel = getCountryLabel(countryCode)
@@ -36,13 +40,16 @@ export function CourierSignupWizard() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login?redirect=/courier/signup')
+      const redirect = partnerRef
+        ? `/courier/signup?ref=partner:${partnerRef}`
+        : '/courier/signup'
+      router.push(buildLoginUrl(redirect, 'courier'))
       return
     }
     if (user?.courier_profile) {
       router.replace('/courier/dashboard')
     }
-  }, [isAuthenticated, user, router])
+  }, [isAuthenticated, user, router, partnerRef])
 
   const { data: cities = [], isLoading: citiesLoading } = useQuery({
     queryKey: ['courier-signup-cities', countryCode],
@@ -77,7 +84,10 @@ export function CourierSignupWizard() {
 
   const handleSubmit = async () => {
     if (!isAuthenticated) {
-      router.push('/login?redirect=/courier/signup')
+      const redirect = partnerRef
+        ? `/courier/signup?ref=partner:${partnerRef}`
+        : '/courier/signup'
+      router.push(buildLoginUrl(redirect, 'courier'))
       return
     }
     if (!phone.trim() || phone.trim().length < 8) {
@@ -94,6 +104,7 @@ export function CourierSignupWizard() {
       country_code: countryCode,
       vehicle,
       plate_number: plateNumber.trim() || undefined,
+      partner_ref: partnerRef,
     })
 
     if ('error' in result) {
@@ -128,6 +139,12 @@ export function CourierSignupWizard() {
           <span>·</span>
           <span>Réseau LaPlasse — livraisons last-mile</span>
         </div>
+
+        {partnerRef && (
+          <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-sm text-indigo-900">
+            Vous rejoignez la flotte <strong>{partnerRef}</strong> sur LaPlasse.
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mb-10">
           {steps.map((s, i) => (

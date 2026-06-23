@@ -2,7 +2,7 @@ import {
   UtensilsCrossed, Wine, Gem, Sparkles, Scissors, Dumbbell, Coffee, BedDouble, Pill,
   Utensils, ShoppingBag, Wrench, Store, Globe, MapPin, Star, Trophy, Heart, Share2,
   Gift, Bell, Hand, Search, Link as LinkIcon, ArrowUp, ArrowDown, CircleDot, Package,
-  CheckCircle, XCircle, Clock, LucideIcon,
+  CheckCircle, XCircle, Clock, Truck, AlertTriangle, FileText, LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -97,6 +97,13 @@ export const NOTIFICATION_ICONS: Record<string, LucideIcon> = {
   order_return: Package,
   delivery_status: Package,
   delivery_job_offered: Package,
+  logistics_dispatch: Truck,
+  logistics_sla_breach: AlertTriangle,
+  logistics_courier_underperforming: AlertTriangle,
+  logistics_onboarding_complete: CheckCircle,
+  delivery_contract_proposal: FileText,
+  logistics_contract_request: FileText,
+  delivery_dispute_open: AlertTriangle,
   subscription_upgraded: Trophy,
   default: Bell,
 }

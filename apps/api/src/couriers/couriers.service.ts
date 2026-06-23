@@ -74,6 +74,21 @@ export class CouriersService {
     const phone = dto.phone.trim()
 
     const profile = await this.prisma.$transaction(async (tx) => {
+      let logisticsPartnerId: string | null = null
+      let partnerKind: 'PARTNER_FLEET' | 'INDEPENDENT' = 'INDEPENDENT'
+
+      if (dto.partner_ref?.trim()) {
+        const slug = dto.partner_ref.trim().replace(/^partner:/, '')
+        const partner = await tx.logisticsPartner.findFirst({
+          where: { slug, is_active: true },
+          select: { id: true },
+        })
+        if (partner) {
+          logisticsPartnerId = partner.id
+          partnerKind = 'PARTNER_FLEET'
+        }
+      }
+
       const created = await tx.courierProfile.create({
         data: {
           user_id: userId,
@@ -83,6 +98,8 @@ export class CouriersService {
           vehicle: dto.vehicle ?? DeliveryVehicle.MOTO,
           plate_number: dto.plate_number?.trim() || null,
           status: 'PENDING_REVIEW',
+          kind: partnerKind,
+          logistics_partner_id: logisticsPartnerId,
         },
         select: COURIER_PROFILE_SELECT,
       })

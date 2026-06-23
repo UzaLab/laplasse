@@ -36,6 +36,8 @@ export class AuthService {
     phone: true,
     verification: true,
     is_active: true,
+    onboarding_step: true,
+    logo: true,
     _count: { select: { couriers: true, contracts: true } },
   } as const
 

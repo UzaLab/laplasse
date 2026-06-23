@@ -684,8 +684,8 @@ Découpage vertical pour intégration progressive dans LaPlasse :
 
 | Tier | Slices | Durée | Statut (juin 2026) |
 |------|--------|-------|---------------------|
-| **Tier 1** — Conviction | DN-7.1 Landing B2B, DN-7.2 Onboarding KYC/zones, DN-7.3 Dispatch carte, DN-7.4 Finances ledger | 4–6 sem. | ⏳ partiel — **DN-7.3/7.4 ✅** (dispatch carte, finances) · landing B2B ⏳ |
-| **Tier 2** — Scalabilité | DN-7.5 Équipe multi-users, DN-7.6 Flotte avancée, DN-7.7 Contrats + prospects | 6–8 sem. | ⏸ en pause |
+| **Tier 1** — Conviction | DN-7.1 Landing B2B, DN-7.2 Onboarding KYC/zones, DN-7.3 Dispatch carte, DN-7.4 Finances ledger | 4–6 sem. | ⏳ partiel — **DN-7.2/7.3/7.4 ✅** · **DN-7.1 ⏸ pause** |
+| **Tier 2** — Scalabilité | DN-7.5 Équipe multi-users, DN-7.6 Flotte avancée, DN-7.7 Contrats + prospects | 6–8 sem. | ⏳ partiel — **DN-7.6/7.7 ✅** · DN-7.5 ⏸ pause |
 | **Tier 3** — Enterprise | DN-7.8 Qualité/incidents, DN-7.9 API + webhooks | 8–12 sem. | **DN-7.8 ✅** · DN-7.9 ⏸ |
 
 ---
@@ -895,11 +895,12 @@ PostHog : events `courier_online`, `delivery_offer_received`, `delivery_accepted
 | DN-7.4 Finances | ✅ `/logistics/finances`, payouts, export CSV |
 | Paramètres partner | ✅ `/logistics/settings`, logo, KYC |
 | DN-7.8 Qualité | ✅ `/logistics/quality`, alertes |
+| DN-7.7 Contrats + prospects | ✅ `/logistics/contracts/:id`, `/logistics/prospects`, API stats/pause/propose |
 | E2E API A–D | ✅ `scripts/e2e-delivery-network.ts` (HTTP, pas navigateur) |
 
 **Migrations :** `20260623180000_delivery_split_eta`, `20260623200000_logistics_payouts`, `20260624120000_order_eta_delay`
 
-**Prochaine slice :** DN-7.1 landing B2B, DN-7.2 wizard onboarding, DN-7.5 équipe (en pause)
+**Prochaine slice :** DN-7.1 landing B2B (⏸ pause), DN-7.5 équipe (⏸ pause), DN-7.9 API enterprise (⏸ pause), payouts auto MM (⏸ pause)
 
 ---
 
@@ -910,6 +911,8 @@ PostHog : events `courier_online`, `delivery_offer_received`, `delivery_accepted
 ---
 
 ### DN-7.1 — Landing B2B & page de valeur
+
+> **⏸ EN PAUSE** — non prioritaire pour cette itération.
 
 > *Répond à : « Pourquoi rejoindre LaPlasse plutôt que gérer mes propres contrats marchands ? »*
 
@@ -984,11 +987,11 @@ model LogisticsPartnerServiceArea {
 ```
 
 **Critères d'acceptation :**
-- [ ] Wizard 4 étapes avec navigation avant/arrière, state persisté
-- [ ] Upload document (Cloudflare R2 ou S3) + visuel dans l'admin KYC
-- [ ] `country` résolu depuis le cookie/sous-domaine, pas hardcodé
-- [ ] Sélecteur communes multi-pays (BF → Ouaga/Bobo, CI → Abidjan/Yamoussoukro…)
-- [ ] Email de bienvenue + confirmation envoyé automatiquement
+- [x] Wizard 4 étapes avec navigation avant/arrière, state persisté (`PATCH /logistics/me/onboarding`, `onboarding_step`)
+- [x] Upload document (R2) + visuel dans l'admin KYC
+- [x] `country` résolu depuis le cookie/sous-domaine, pas hardcodé
+- [x] Sélecteur communes multi-pays (BF → Ouaga/Bobo, CI → Abidjan/Yamoussoukro…)
+- [x] Notification de bienvenue + confirmation (`logistics_onboarding_complete`)
 
 ---
 
@@ -1018,12 +1021,14 @@ score_livreur_disponible(c, job) =
 ```
 
 **Critères d'acceptation :**
-- [ ] Carte (OSM / Leaflet) avec positions livreurs temps réel (refresh 10 s)
-- [ ] Pins commandes PENDING avec badge urgence si > 5 min
-- [ ] Bouton « Assigner le plus proche » sur chaque course
-- [ ] Toggle auto-dispatch actif/inactif (persisté en base par partenaire)
-- [ ] Notification push dispatcher si PENDING > seuil configurable (défaut 5 min)
-- [ ] Réassignation en 2 clics si livreur actif tombe (course rebascule PENDING)
+- [x] Carte (OSM / Leaflet) avec positions livreurs temps réel (refresh 10 s)
+- [x] Pins commandes PENDING avec badge urgence si > seuil configurable
+- [x] Bouton « Assigner le plus proche » + top 3 suggestions cliquables
+- [x] Toggle auto-dispatch actif/inactif (persisté en base par partenaire)
+- [x] Notification push dispatcher si PENDING > seuil configurable (`dispatch_pending_alert_minutes`)
+- [x] Réassignation en 2 clics si livreur actif tombe (course rebascule PENDING)
+- [x] Filtre commune sur le board dispatch
+- [x] Auto-dispatch respecte `DeliveryPartnerContract.auto_dispatch`
 
 ---
 
@@ -1076,10 +1081,10 @@ enum PayoutStatus {
 - Admin : `POST /admin/logistics/payouts/:partnerId` — créer payout manuel
 
 **Critères d'acceptation :**
-- [ ] Ledger mensuel consultable jusqu'à 12 mois en arrière
-- [ ] Détail par boutique et par livreur exportable en CSV
-- [ ] Statut payout visible et mis à jour depuis l'admin
-- [ ] Totaux cohérents avec `PartnerOpsService.getPartnerStats()` (vérification croisée)
+- [x] Ledger mensuel consultable jusqu'à 12 mois en arrière
+- [x] Détail par boutique et par livreur exportable en CSV
+- [x] Statut payout visible et mis à jour depuis l'admin
+- [x] Totaux cohérents avec `PartnerOpsService.getPartnerStats()` (splits `delivery_fee_split` agrégés)
 
 ---
 
@@ -1149,10 +1154,11 @@ model LogisticsPartnerInvite {
 | **Vue livreur offline** | Alerte si livreur était en ligne et a disparu pendant une course active |
 
 **Critères d'acceptation :**
-- [ ] Lien d'invitation flotte généré depuis `/logistics/fleet` (copie dans le presse-papier)
-- [ ] Lien pre-remplit le formulaire `/courier/signup` avec `logistics_partner_id`
-- [ ] Partenaire peut suspendre un livreur de sa flotte sans le supprimer
-- [ ] Carte flotte accessible depuis `/logistics/fleet` (même tile Leaflet que dispatch)
+- [x] Lien d'invitation flotte généré depuis `/logistics/fleet` (copie dans le presse-papier)
+- [x] Lien pre-remplit le formulaire `/courier/signup` avec `ref=partner:slug`
+- [x] Partenaire peut suspendre un livreur de sa flotte sans le supprimer
+- [x] Carte flotte accessible depuis `/logistics/fleet` (même tile Leaflet que dispatch)
+- [x] Alerte livreur offline avec course active (dispatch + flotte)
 
 ---
 
@@ -1186,11 +1192,13 @@ prospects = Shops WHERE
 - Email automatique au marchand avec profil + score du partenaire
 
 **Critères d'acceptation :**
-- [ ] Fiche contrat avec stats, SLA, tarif override, toggle auto-dispatch
-- [ ] Partenaire peut mettre en pause un contrat actif
-- [ ] Liste prospects dans `/logistics/prospects` filtrée sur les communes du partenaire
-- [ ] Action « Proposer » depuis un prospect crée le contrat en attente côté marchand
-- [ ] Email marchand avec score + lien vers profil public du partenaire
+- [x] Fiche contrat avec stats, SLA, tarif override, toggle auto-dispatch (`GET/PATCH /logistics/me/contracts/:id`)
+- [x] Partenaire peut mettre en pause un contrat actif (`status: PAUSED`)
+- [x] Liste prospects dans `/logistics/prospects` filtrée sur les communes du partenaire
+- [x] Action « Proposer » depuis un prospect crée le contrat en attente côté marchand (`PENDING_MERCHANT`)
+- [ ] Email marchand avec score + lien profil public — **partiel** : notification push in-app avec score/grade (pas d'email SMTP dédié)
+
+**Implémenté (juin 2026) :** `logistics-partners.service.ts` (`listPartnerProspects`, `proposePartnership`, `getPartnerContract`, `updatePartnerContract`), pages `/logistics/contracts/[id]` et `/logistics/prospects`.
 
 ---
 
@@ -1209,10 +1217,10 @@ prospects = Shops WHERE
 | **Historique résolutions** | Disputes clôturées avec note admin |
 
 **Critères d'acceptation :**
-- [ ] Litiges liés au partenaire visibles dans `/logistics/quality`
-- [ ] Indicateur rouge si taux SLA breach > 15 % sur 30j
-- [ ] Partenaire reçoit notification si livreur de sa flotte génère un litige
-- [ ] Alerte livreur sous-performant (rating < 3.5 ou cancellation > 20 %)
+- [x] Litiges liés au partenaire visibles dans `/logistics/quality`
+- [x] Indicateur rouge si taux SLA breach > 15 % sur 30j
+- [x] Partenaire reçoit notification si livreur de sa flotte génère un litige
+- [x] Alerte livreur sous-performant (rating < 3.5 ou cancellation > 20 %)
 
 ---
 

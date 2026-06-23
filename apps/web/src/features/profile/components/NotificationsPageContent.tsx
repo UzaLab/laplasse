@@ -13,9 +13,9 @@ import { NotificationIcon } from '@/lib/icons'
 import { WebPushToggle } from '@/components/WebPushToggle'
 import { cn } from '@/lib/utils'
 import { fetchNotifications, type NotificationItem } from '@/lib/notificationsApi'
-import { resolveNotificationHref } from '@/lib/notificationLinks'
+import { notificationIsActionable, resolveNotificationHref } from '@/lib/notificationLinks'
 
-export type NotificationsAudience = 'client' | 'merchant'
+export type NotificationsAudience = 'client' | 'merchant' | 'logistics'
 
 const AUDIENCE_COPY: Record<NotificationsAudience, {
   subtitle: string
@@ -41,6 +41,14 @@ const AUDIENCE_COPY: Record<NotificationsAudience, {
     emptyCtaHref: '/merchant/dashboard',
     emptyCtaLabel: 'Retour au dashboard',
   },
+  logistics: {
+    subtitle: 'Courses à dispatcher, alertes SLA, litiges et qualité de flotte — suivi en temps réel.',
+    pushDescription: 'Recevez les alertes dispatch, courses urgentes et litiges livraison, même lorsque l\'application est fermée.',
+    emptyAll: 'Les courses, alertes SLA et litiges s\'afficheront ici.',
+    emptyUnread: 'Aucune alerte en attente. Les prochaines courses urgentes apparaîtront ici.',
+    emptyCtaHref: '/logistics/dispatch',
+    emptyCtaLabel: 'Ouvrir le dispatch',
+  },
 }
 
 type FilterTab = 'all' | 'unread'
@@ -56,6 +64,13 @@ const TYPE_ACCENT: Record<string, { bg: string; ring: string; icon: string }> = 
   referral_reward: { bg: 'bg-pink-50', ring: 'ring-pink-200/80', icon: 'text-pink-600' },
   promotion_created: { bg: 'bg-orange-50', ring: 'ring-orange-200/80', icon: 'text-orange-600' },
   delivery_job_offered: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
+  logistics_dispatch: { bg: 'bg-indigo-50', ring: 'ring-indigo-200/80', icon: 'text-indigo-600' },
+  logistics_sla_breach: { bg: 'bg-orange-50', ring: 'ring-orange-200/80', icon: 'text-orange-600' },
+  logistics_courier_underperforming: { bg: 'bg-red-50', ring: 'ring-red-200/80', icon: 'text-red-500' },
+  logistics_onboarding_complete: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
+  delivery_contract_proposal: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
+  logistics_contract_request: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
+  delivery_dispute_open: { bg: 'bg-red-50', ring: 'ring-red-200/80', icon: 'text-red-500' },
   booking_created: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
   booking_confirmed: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
   booking_status: { bg: 'bg-blue-50', ring: 'ring-blue-200/80', icon: 'text-blue-600' },
@@ -178,7 +193,15 @@ function NotificationsPagination({
   )
 }
 
-export function NotificationsPageContent({ audience = 'client' }: { audience?: NotificationsAudience }) {
+export function NotificationsPageContent({
+  audience = 'client',
+  backHref,
+  backLabel = 'Retour',
+}: {
+  audience?: NotificationsAudience
+  backHref?: string
+  backLabel?: string
+}) {
   const router = useRouter()
   const qc = useQueryClient()
   const copy = AUDIENCE_COPY[audience]
@@ -224,6 +247,16 @@ export function NotificationsPageContent({ audience = 'client' }: { audience?: N
     <div className="w-full min-w-0">
       {/* En-tête */}
       <div className="mb-8">
+        {backHref && (
+          <Link
+            href={backHref}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 mb-4 transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            <ChevronLeft size={16} />
+            {backLabel}
+          </Link>
+        )}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-600 mb-2">
@@ -353,21 +386,27 @@ export function NotificationsPageContent({ audience = 'client' }: { audience?: N
                 <ul className="space-y-2">
                   {group.items.map(n => {
                     const accent = accentFor(n.type)
+                    const actionable = notificationIsActionable(n.data, n.type)
                     return (
                       <li key={n.id}>
                         <button
                           type="button"
+                          disabled={!actionable}
                           className={cn(
                             'w-full text-left rounded-2xl border transition-all',
-                            'flex items-start gap-4 p-4 sm:p-5',
+                            'flex items-start gap-4 p-4 sm:p-5 min-h-[72px]',
+                            actionable && 'hover:border-slate-200 hover:shadow-sm active:bg-slate-50',
+                            !actionable && 'cursor-default',
                             n.read
-                              ? 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'
-                              : 'bg-white border-amber-200/60 shadow-sm ring-1 ring-amber-100/50 hover:shadow-md',
+                              ? 'bg-white border-slate-100'
+                              : 'bg-white border-amber-200/60 shadow-sm ring-1 ring-amber-100/50',
+                            actionable && !n.read && 'hover:shadow-md',
                           )}
                           onClick={() => {
-                            if (!n.read) markRead.mutate(n.id)
                             const href = resolveNotificationHref(n.data, n.type)
-                            if (href) router.push(href)
+                            if (!href) return
+                            if (!n.read) markRead.mutate(n.id)
+                            router.push(href)
                           }}
                         >
                           <div className={cn(
@@ -392,6 +431,9 @@ export function NotificationsPageContent({ audience = 'client' }: { audience?: N
                             <p className="text-sm text-slate-500 mt-1 leading-relaxed line-clamp-3">{n.body}</p>
                             <p className="text-[11px] font-medium text-slate-400 mt-2">{formatTime(n.created_at)}</p>
                           </div>
+                          {actionable && (
+                            <ChevronRight size={18} className="text-slate-300 shrink-0 mt-3" aria-hidden />
+                          )}
                         </button>
                       </li>
                     )

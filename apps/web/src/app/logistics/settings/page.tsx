@@ -70,6 +70,7 @@ export default function LogisticsSettingsPage() {
     commune_ids: [] as string[],
     sla_eta_default_minutes: 45,
     auto_dispatch_default: true,
+    dispatch_pending_alert_minutes: 5,
     payout_method: 'MTN_MOBILE_MONEY',
     payout_number: '',
   })
@@ -90,6 +91,7 @@ export default function LogisticsSettingsPage() {
       commune_ids: settings.commune_ids,
       sla_eta_default_minutes: settings.sla_eta_default_minutes ?? 45,
       auto_dispatch_default: settings.auto_dispatch_default,
+      dispatch_pending_alert_minutes: settings.dispatch_pending_alert_minutes ?? 5,
       payout_method: settings.payout_method ?? 'MTN_MOBILE_MONEY',
       payout_number: settings.payout_number ?? '',
     })
@@ -151,6 +153,7 @@ export default function LogisticsSettingsPage() {
         commune_ids: form.commune_ids,
         sla_eta_default_minutes: form.sla_eta_default_minutes,
         auto_dispatch_default: form.auto_dispatch_default,
+        dispatch_pending_alert_minutes: form.dispatch_pending_alert_minutes,
         payout_method: form.payout_method,
         payout_number: form.payout_number.trim() || undefined,
       })
@@ -439,6 +442,17 @@ export default function LogisticsSettingsPage() {
                 max={180}
                 value={form.sla_eta_default_minutes}
                 onChange={e => setForm(f => ({ ...f, sla_eta_default_minutes: Number(e.target.value) }))}
+                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+              />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">
+              Alerte dispatch (minutes en attente)
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={form.dispatch_pending_alert_minutes}
+                onChange={e => setForm(f => ({ ...f, dispatch_pending_alert_minutes: Number(e.target.value) }))}
                 className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
               />
             </label>

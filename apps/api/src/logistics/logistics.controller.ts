@@ -23,6 +23,11 @@ import {
   RegisterLogisticsPartnerDto,
 } from '../delivery/dto/delivery-stakeholders.dto'
 import { UpdateLogisticsSettingsDto } from './dto/logistics-settings.dto'
+import { SaveLogisticsOnboardingDto } from './dto/logistics-onboarding.dto'
+import {
+  RespondPartnerContractDto,
+  UpdatePartnerContractDto,
+} from './dto/partner-contract.dto'
 
 @Controller('logistics')
 @UseGuards(JwtAuthGuard)
@@ -35,6 +40,16 @@ export class LogisticsController {
   @Post('register')
   register(@CurrentUser('id') userId: string, @Body() dto: RegisterLogisticsPartnerDto) {
     return this.partners.register(userId, dto)
+  }
+
+  @Patch('me/onboarding')
+  saveOnboarding(@CurrentUser('id') userId: string, @Body() body: SaveLogisticsOnboardingDto) {
+    return this.partners.saveOnboarding(userId, body)
+  }
+
+  @Get('me/fleet/invite-link')
+  getFleetInviteLink(@CurrentUser('id') userId: string) {
+    return this.partners.getFleetInviteLink(userId)
   }
 
   @Get('partners/:id/score')
@@ -90,8 +105,11 @@ export class LogisticsController {
   }
 
   @Get('me/dispatch-board')
-  getDispatchBoard(@CurrentUser('id') userId: string) {
-    return this.ops.getDispatchBoard(userId)
+  getDispatchBoard(
+    @CurrentUser('id') userId: string,
+    @Query('commune_id') communeId?: string,
+  ) {
+    return this.ops.getDispatchBoard(userId, communeId)
   }
 
   @Get('me/fleet')
@@ -216,12 +234,38 @@ export class LogisticsController {
     return this.partners.listPartnerContracts(userId)
   }
 
+  @Get('me/contracts/:id')
+  getMyContract(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.partners.getPartnerContract(userId, id)
+  }
+
   @Patch('me/contracts/:id')
-  respondContract(
+  patchContract(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
-    @Body() body: { accept: boolean },
+    @Body() body: RespondPartnerContractDto & UpdatePartnerContractDto,
   ) {
-    return this.partners.respondContract(userId, id, body.accept)
+    if (body.accept !== undefined) {
+      return this.partners.respondContract(userId, id, body.accept)
+    }
+    return this.partners.updatePartnerContract(userId, id, {
+      sla_eta_max_minutes: body.sla_eta_max_minutes,
+      fee_override: body.fee_override,
+      auto_dispatch: body.auto_dispatch,
+      pause: body.pause,
+    })
+  }
+
+  @Get('me/prospects')
+  listProspects(@CurrentUser('id') userId: string) {
+    return this.partners.listPartnerProspects(userId)
+  }
+
+  @Post('me/prospects/:shopId/propose')
+  proposePartnership(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+  ) {
+    return this.partners.proposePartnership(userId, shopId)
   }
 }

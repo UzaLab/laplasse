@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   Headphones,
@@ -21,8 +20,7 @@ import {
   type ShopCollectionPublic,
 } from '@/lib/marketplaceApi'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
-import { useAuthReady } from '@/hooks/useAuthReady'
-import { useCartStore } from '@/stores/cartStore'
+import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { ProductCard } from './ProductCard'
 
 export interface BoutiqueDisplay {
@@ -240,9 +238,7 @@ function ContactBlock({
 }
 
 export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
-  const router = useRouter()
-  const { isAuthenticated } = useAuthReady()
-  const addItem = useCartStore(s => s.addItem)
+  const { addToCart } = useMarketplaceAddToCart()
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ProductCategoryOption[]>([])
   const [collections, setCollections] = useState<ShopCollectionPublic[]>([])
@@ -313,12 +309,8 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   }, [search, selectedCategory, selectedCollection, priceFilter, priceCeiling])
 
   const handleAddToCart = async (product: MarketplaceProduct) => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(`/m/${merchant.slug}/boutique`)}`)
-      return
-    }
     setAddingId(product.id)
-    await addItem(product.id, 1)
+    await addToCart(product.id, 1)
     setAddingId(null)
   }
 

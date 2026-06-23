@@ -11,12 +11,22 @@ import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_REGISTER_SUBTITLE } from '@/lib/brandCopy'
 import { PUBLIC_AUTH } from '@/lib/pageLayout'
 import { getPhonePlaceholder, getCountryCode } from '@/lib/country'
+import {
+  buildLoginUrl,
+  getAuthIntentCopy,
+  resolveAuthIntent,
+} from '@/lib/authIntent'
 
 function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const setAuth = useAuthStore(s => s.setAuth)
   const refCode = searchParams.get('ref') ?? ''
+  const redirectTo = searchParams.get('redirect')
+  const authIntent = resolveAuthIntent(redirectTo, searchParams.get('intent'))
+  const intentCopy = getAuthIntentCopy(authIntent)
+  const safeRedirect = redirectTo && !redirectTo.startsWith('//') ? redirectTo : '/'
+  const loginHref = buildLoginUrl(safeRedirect, authIntent !== 'default' ? authIntent : undefined)
 
   const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '' })
   const [showPass, setShowPass] = useState(false)
@@ -73,7 +83,7 @@ function RegisterContent() {
         }).catch(() => {})
       }
 
-      router.push('/')
+      router.push(safeRedirect)
     } catch {
       setError('Erreur de connexion. Vérifiez votre réseau.')
     } finally {
@@ -99,13 +109,33 @@ function RegisterContent() {
         </div>
 
         <div className="bg-white rounded-[28px] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
-          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Créer un compte</h1>
-          <p className="text-slate-500 text-sm mb-7">
-            Déjà inscrit ?{' '}
-            <Link href="/login" className="font-bold text-brand-600 hover:text-brand-700">
-              Se connecter
-            </Link>
-          </p>
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">
+            {authIntent === 'courier' ? 'Compte livreur'
+              : authIntent === 'logistics' ? 'Compte partenaire logistique'
+                : authIntent === 'merchant' ? 'Compte marchand'
+                  : 'Créer un compte'}
+          </h1>
+          {authIntent !== 'default' ? (
+            <p className="text-slate-500 text-sm mb-7 leading-relaxed">
+              {intentCopy.subtitle}
+            </p>
+          ) : (
+            <p className="text-slate-500 text-sm mb-7">
+              Déjà inscrit ?{' '}
+              <Link href={loginHref} className="font-bold text-brand-600 hover:text-brand-700">
+                Se connecter
+              </Link>
+            </p>
+          )}
+
+          {authIntent !== 'default' && (
+            <p className="text-slate-500 text-sm mb-7">
+              Déjà inscrit ?{' '}
+              <Link href={loginHref} className="font-bold text-brand-600 hover:text-brand-700">
+                Se connecter
+              </Link>
+            </p>
+          )}
 
           {error && (
             <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-2xl">

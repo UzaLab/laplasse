@@ -1,14 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Loader2, UserMinus, UserPlus } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, Loader2, Pause, Play, UserMinus, UserPlus } from 'lucide-react'
 import { LogisticsShell } from '@/features/logistics/components/LogisticsShell'
+import { LogisticsDispatchMapLazy } from '@/features/logistics/components/LogisticsDispatchMapLazy'
+import { LogisticsFleetInviteCard } from '@/features/logistics/components/LogisticsFleetInviteCard'
 import { useLogisticsSession } from '@/features/logistics/hooks/useLogisticsSession'
 import {
+  fetchFleetInviteLink,
   fetchPartnerFleet,
   linkPartnerFleetCourier,
   unlinkPartnerFleetCourier,
+  updateFleetCourierStatus,
   type PartnerFleetCourier,
 } from '@/lib/deliveryStakeholdersApi'
 import { formatFcfa } from '@/lib/courierJobLabels'
@@ -22,6 +27,13 @@ export default function LogisticsFleetPage() {
   const [email, setEmail] = useState('')
   const [linking, setLinking] = useState(false)
   const [unlinking, setUnlinking] = useState<string | null>(null)
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null)
+
+  const { data: inviteLink } = useQuery({
+    queryKey: ['logistics-fleet-invite'],
+    queryFn: fetchFleetInviteLink,
+    enabled: ready,
+  })
 
   const load = async () => {
     setLoading(true)
@@ -32,6 +44,18 @@ export default function LogisticsFleetPage() {
   useEffect(() => {
     if (ready) void load()
   }, [ready])
+
+  const mapCouriers = useMemo(
+    () => fleet.map(c => ({
+      id: c.id,
+      label: c.user.full_name ?? c.user.email,
+      lat: c.current_latitude ?? null,
+      lng: c.current_longitude ?? null,
+      is_online: c.is_online,
+      active_jobs: c.stats_90d.active_jobs,
+    })),
+    [fleet],
+  )
 
   if (!ready) {
     return (
@@ -69,7 +93,20 @@ export default function LogisticsFleetPage() {
     void load()
   }
 
-  const onlineCount = fleet.filter(c => c.is_online).length
+  const toggleSuspend = async (courier: PartnerFleetCourier) => {
+    const next = courier.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED'
+    setStatusUpdating(courier.id)
+    const { ok, error } = await updateFleetCourierStatus(courier.id, next)
+    setStatusUpdating(null)
+    if (!ok) {
+      notify.error(error ?? 'Erreur')
+      return
+    }
+    notify.success(next === 'SUSPENDED' ? 'Livreur suspendu' : 'Livreur réactivé')
+    void load()
+  }
+
+  const onlineCount = fleet.filter(c => c.is_online && c.status === 'ACTIVE').length
 
   return (
     <LogisticsShell>
@@ -82,50 +119,46 @@ export default function LogisticsFleetPage() {
               {fleet.length > 0 && ` · ${onlineCount} en ligne`}
             </p>
           </div>
-          <Link
-            href="/logistics/stats"
-            className="text-sm font-bold text-indigo-600 hover:text-indigo-700"
-            style={{ textDecoration: 'none' }}
-          >
-            Voir les statistiques →
+          <Link href="/logistics/dispatch" className="text-sm font-bold text-indigo-600 hover:text-indigo-700" style={{ textDecoration: 'none' }}>
+            Ouvrir le dispatch →
           </Link>
         </div>
 
+        {inviteLink && (
+          <LogisticsFleetInviteCard
+            partnerName={inviteLink.partner_name}
+            url={inviteLink.url}
+          />
+        )}
+
+        <LogisticsDispatchMapLazy
+          couriers={mapCouriers}
+          jobs={[]}
+          selectedJobId={null}
+          onSelectJob={() => {}}
+          title="Positions flotte"
+        />
+
         <form onSubmit={handleLink} className="bg-white rounded-2xl border border-slate-100 p-5 space-y-3">
           <h2 className="font-bold text-slate-900 flex items-center gap-2">
-            <UserPlus size={18} /> Rattacher un livreur
+            <UserPlus size={18} /> Rattacher un livreur existant
           </h2>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Email compte livreur (/courier/signup)"
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={linking}
-            className="w-full py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm disabled:opacity-50"
-          >
-            {linking ? '…' : 'Ajouter'}
+          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Email compte livreur" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+          <button type="submit" disabled={linking} className="w-full py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm disabled:opacity-50">
+            {linking ? '…' : 'Ajouter par email'}
           </button>
         </form>
 
         {loading ? (
           <Loader2 className="animate-spin text-slate-300 mx-auto" size={28} />
         ) : fleet.length === 0 ? (
-          <p className="text-sm text-slate-500 text-center py-8">Aucun livreur dans la flotte.</p>
+          <p className="text-sm text-slate-500 text-center py-8">Aucun livreur dans la flotte — partagez le lien d&apos;invitation.</p>
         ) : (
           <ul className="space-y-3">
             {fleet.map(c => (
               <li key={c.id} className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <Link
-                    href={`/logistics/fleet/${c.id}`}
-                    className="min-w-0 flex-1 group"
-                    style={{ textDecoration: 'none' }}
-                  >
+                  <Link href={`/logistics/fleet/${c.id}`} className="min-w-0 flex-1 group" style={{ textDecoration: 'none' }}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                         {c.user.full_name ?? c.user.email}
@@ -134,31 +167,30 @@ export default function LogisticsFleetPage() {
                     </div>
                     <p className="text-sm text-slate-500 mt-0.5">{c.phone} · {c.city}</p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.is_online ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-                        {c.is_online ? 'En ligne' : 'Hors ligne'}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.status === 'SUSPENDED' ? 'bg-red-100 text-red-800' : c.is_online ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                        {c.status === 'SUSPENDED' ? 'Suspendu' : c.is_online ? 'En ligne' : 'Hors ligne'}
                       </span>
                       {c.vehicle && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                           {vehicleLabel(c.vehicle)}
                         </span>
                       )}
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">
-                        {c.stats_90d.success_rate}% OK · {c.stats_90d.delivered_jobs} livr.
-                      </span>
                     </div>
                   </Link>
                   <div className="flex sm:flex-col items-end gap-2 shrink-0 text-right">
                     <p className="text-sm font-extrabold text-slate-900">{formatFcfa(c.wallet_balance)}</p>
-                    <p className="text-xs text-slate-400">{c.rating_avg.toFixed(1)}/5 · {c.completed_jobs} courses</p>
-                    <button
-                      type="button"
-                      disabled={unlinking === c.id || c.stats_90d.active_jobs > 0}
-                      onClick={() => void handleUnlink(c.id)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 disabled:opacity-40"
-                      title={c.stats_90d.active_jobs > 0 ? 'Course en cours' : 'Retirer de la flotte'}
-                    >
-                      <UserMinus size={14} />
-                      {unlinking === c.id ? '…' : 'Retirer'}
+                    {c.status !== 'SUSPENDED' && (
+                      <button type="button" disabled={statusUpdating === c.id || c.stats_90d.active_jobs > 0} onClick={() => void toggleSuspend(c)} className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-800 disabled:opacity-40">
+                        <Pause size={14} /> Suspendre
+                      </button>
+                    )}
+                    {c.status === 'SUSPENDED' && (
+                      <button type="button" disabled={statusUpdating === c.id} onClick={() => void toggleSuspend(c)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+                        <Play size={14} /> Réactiver
+                      </button>
+                    )}
+                    <button type="button" disabled={unlinking === c.id || c.stats_90d.active_jobs > 0} onClick={() => void handleUnlink(c.id)} className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 disabled:opacity-40">
+                      <UserMinus size={14} /> Retirer
                     </button>
                   </div>
                 </div>

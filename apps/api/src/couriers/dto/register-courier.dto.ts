@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator'
+import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 import { DeliveryVehicle } from '../../../generated/prisma/client'
 
 export class RegisterCourierDto {
@@ -21,4 +21,10 @@ export class RegisterCourierDto {
   @IsOptional()
   @IsString()
   plate_number?: string
+
+  /** Slug partenaire logistique — ex. ref=partner:express-abidjan */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  partner_ref?: string
 }

@@ -139,14 +139,30 @@ export class LogisticsPartnerOpsService {
           status: 'DELIVERED',
           delivered_at: { gte: since30 },
         },
-        select: { order: { select: { delivery_fee: true } } },
+        select: {
+          order: { select: { delivery_fee: true } },
+          delivery_fee_split: true,
+        },
       }),
     ])
 
     const deliveryFees30 = deliveredJobs30.reduce((n, j) => n + (j.order.delivery_fee ?? 0), 0)
-    const courierPayouts30 = Math.round(deliveryFees30 * COURIER_EARNING_RATE)
-    const partnerCommission30 = Math.round(deliveryFees30 * partner.commission_rate)
-    const platformShare30 = Math.max(0, deliveryFees30 - courierPayouts30 - partnerCommission30)
+    let courierPayouts30 = 0
+    let partnerCommission30 = 0
+    let platformShare30 = 0
+    for (const j of deliveredJobs30) {
+      const split = j.delivery_fee_split as { courier?: number; partner?: number; platform?: number } | null
+      if (split?.courier != null) {
+        courierPayouts30 += split.courier
+        partnerCommission30 += split.partner ?? 0
+        platformShare30 += split.platform ?? 0
+      } else {
+        const fee = j.order.delivery_fee ?? 0
+        courierPayouts30 += Math.round(fee * COURIER_EARNING_RATE)
+        partnerCommission30 += Math.round(fee * partner.commission_rate)
+        platformShare30 += Math.max(0, fee - Math.round(fee * COURIER_EARNING_RATE) - Math.round(fee * partner.commission_rate))
+      }
+    }
 
     return {
       score: scoreDetail.score,
@@ -366,17 +382,23 @@ export class LogisticsPartnerOpsService {
     }
   }
 
-  async getDispatchBoard(userId: string) {
+  async getDispatchBoard(userId: string, communeId?: string) {
     const staff = await this.requirePartnerStaff(userId)
     const partnerId = staff.logistics_partner_id
 
     const partner = await this.prisma.logisticsPartner.findUnique({
       where: { id: partnerId },
-      select: { auto_dispatch_default: true, sla_eta_default_minutes: true },
+      select: {
+        auto_dispatch_default: true,
+        sla_eta_default_minutes: true,
+        dispatch_pending_alert_minutes: true,
+        service_areas: { select: { commune_id: true } },
+      },
     })
     if (!partner) throw new NotFoundException('Partenaire introuvable')
 
-    void this.processSlaAlerts(5, partnerId).catch(() => {})
+    const alertThreshold = partner.dispatch_pending_alert_minutes ?? 5
+    void this.processSlaAlerts(alertThreshold, partnerId).catch(() => {})
 
     const [couriersRaw, jobs] = await Promise.all([
       this.listFleetWithStats(userId),
@@ -442,6 +464,22 @@ export class LogisticsPartnerOpsService {
       active_jobs: c.stats_90d.active_jobs,
     }))
 
+    const offlineWithActiveJob = couriersRaw
+      .filter(c => c.stats_90d.active_jobs > 0 && (!c.is_online || (c.last_location_at && Date.now() - c.last_location_at.getTime() > 3 * 60_000)))
+      .map(c => ({
+        id: c.id,
+        label: c.user.full_name ?? c.user.email,
+        active_jobs: c.stats_90d.active_jobs,
+        is_online: c.is_online,
+        last_location_at: c.last_location_at,
+      }))
+
+    const communeOptions = await this.prisma.geoCommune.findMany({
+      where: { id: { in: partner.service_areas.map(a => a.commune_id) } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
     const mappedJobs = jobs.map(job => {
       const pickup = resolveJobPickupCoords(job)
       const ranked = scoreFleetCouriersForJob(fleetForScore, pickup)
@@ -459,21 +497,38 @@ export class LogisticsPartnerOpsService {
         eta_minutes: job.eta_minutes,
         created_at: job.created_at,
         pending_minutes: pendingMin,
-        is_urgent: isJobUrgent(job.created_at),
+        is_urgent: pendingMin >= alertThreshold,
         suggested_courier_id: ranked[0]?.id ?? null,
         suggested_courier_name: ranked[0]
           ? (couriersRaw.find(c => c.id === ranked[0].id)?.user.full_name ?? null)
           : null,
+        suggested_couriers: ranked.slice(0, 3).map((c, idx) => ({
+          courier_profile_id: c.id,
+          label: couriersRaw.find(r => r.id === c.id)?.user.full_name ?? `Livreur ${idx + 1}`,
+          dispatch_score: Math.round(c.dispatch_score * 1000) / 1000,
+        })),
         order: job.order,
         courier_profile: job.courier_profile,
       }
     })
 
+    const filteredJobs = communeId
+      ? mappedJobs.filter(j => {
+          // Filtre approximatif : adresse contient le nom de la commune
+          const commune = communeOptions.find(c => c.id === communeId)
+          if (!commune) return true
+          const hay = `${j.dropoff_address ?? ''} ${j.pickup_address ?? ''}`.toLowerCase()
+          return hay.includes(commune.name.toLowerCase())
+        })
+      : mappedJobs
+
     return {
       auto_dispatch_default: partner.auto_dispatch_default,
-      sla_pending_threshold_minutes: 5,
+      sla_pending_threshold_minutes: alertThreshold,
+      commune_options: communeOptions,
+      offline_couriers: offlineWithActiveJob,
       fleet,
-      jobs: mappedJobs,
+      jobs: filteredJobs,
     }
   }
 
@@ -1029,7 +1084,7 @@ export class LogisticsPartnerOpsService {
           data: {
             job_id: job.id,
             logistics_partner_id: job.logistics_partner_id,
-            href: '/logistics/dispatch',
+            href: job.id ? `/logistics/orders/${job.id}` : '/logistics/dispatch',
           },
         })
       }

@@ -2,6 +2,6 @@
 
 import { LogisticsSignupWizard } from '@/features/logistics/components/LogisticsSignupWizard'
 
-export default function LogisticsSignupPage() {
-  return <LogisticsSignupWizard />
+export default function LogisticsOnboardingPage() {
+  return <LogisticsSignupWizard resume />
 }

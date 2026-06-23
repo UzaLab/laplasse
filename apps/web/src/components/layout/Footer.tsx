@@ -50,7 +50,7 @@ export function Footer() {
               links: [
                 { label: 'Inscrire son lieu', href: '#' },
                 { label: 'Devenir livreur', href: '/courier/signup' },
-                { label: 'Accès Partenaire', href: '#' },
+                { label: 'Partenaire logistique', href: '/logistics/signup' },
                 { label: 'Solutions de paiement', href: '#' },
                 { label: 'Tarifs Pro', href: '#' },
               ],

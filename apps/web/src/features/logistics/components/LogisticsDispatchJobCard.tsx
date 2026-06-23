@@ -23,6 +23,11 @@ interface LogisticsDispatchJobCardProps {
     pending_minutes?: number
     suggested_courier_id?: string | null
     suggested_courier_name?: string | null
+    suggested_couriers?: Array<{
+      courier_profile_id: string
+      label: string
+      dispatch_score: number
+    }>
   }
   fleet: PartnerFleetCourier[]
   assigning: boolean
@@ -137,6 +142,25 @@ export function LogisticsDispatchJobCard({
                 {job.courier_profile.user.full_name ?? 'Assigné'}
               </Link>
             </p>
+          )}
+
+          {isPending && job.suggested_couriers && job.suggested_couriers.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {job.suggested_couriers.map(c => (
+                <button
+                  key={c.courier_profile_id}
+                  type="button"
+                  onClick={() => onSelectCourier(c.courier_profile_id)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
+                    selectedCourierId === c.courier_profile_id
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           )}
 
           {isPending && job.suggested_courier_name && (

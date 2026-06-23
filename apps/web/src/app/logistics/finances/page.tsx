@@ -24,10 +24,25 @@ const PAYOUT_STATUS: Record<string, string> = {
   FAILED: 'Échec',
 }
 
+function monthOptions(count = 12) {
+  const opts: { value: string; label: string }[] = []
+  const d = new Date()
+  for (let i = 0; i < count; i++) {
+    const y = d.getFullYear()
+    const m = d.getMonth() + 1
+    const value = `${y}-${String(m).padStart(2, '0')}`
+    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    opts.push({ value, label })
+    d.setMonth(d.getMonth() - 1)
+  }
+  return opts
+}
+
 export default function LogisticsFinancesPage() {
   const { ready, partner } = useLogisticsSession()
   const [month, setMonth] = useState(currentMonth)
   const [exporting, setExporting] = useState(false)
+  const months = useMemo(() => monthOptions(12), [])
 
   const verified = partner?.verification === 'VERIFIED'
 
@@ -78,12 +93,15 @@ export default function LogisticsFinancesPage() {
             <p className="text-slate-500 mt-1">Commissions, répartition livraison et versements — {monthLabel}.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="month"
+            <select
               value={month}
               onChange={e => setMonth(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold bg-white"
-            />
+              className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold bg-white capitalize"
+            >
+              {months.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
             <button
               type="button"
               disabled={exporting || isLoading}

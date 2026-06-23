@@ -5,12 +5,17 @@ import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff, Loader2, MapPin, Smartphone } from 'lucide-react'
+import { Eye, EyeOff, Loader2, MapPin, Smartphone, Bike, Truck, Building2 } from 'lucide-react'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_AUTH_SUBTITLE } from '@/lib/brandCopy'
 import { PUBLIC_AUTH } from '@/lib/pageLayout'
 import { getPhonePlaceholder, getCountryCode } from '@/lib/country'
+import {
+  buildRegisterUrl,
+  getAuthIntentCopy,
+  resolveAuthIntent,
+} from '@/lib/authIntent'
 
 type LoginMode = 'email' | 'otp'
 
@@ -18,6 +23,11 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect')
+  const intentParam = searchParams.get('intent')
+  const authIntent = resolveAuthIntent(redirectTo, intentParam)
+  const intentCopy = getAuthIntentCopy(authIntent)
+  const safeRedirect = redirectTo && !redirectTo.startsWith('//') ? redirectTo : '/'
+  const registerHref = buildRegisterUrl(safeRedirect, authIntent !== 'default' ? authIntent : undefined)
   const setAuth = useAuthStore(s => s.setAuth)
 
   const [mode, setMode] = useState<LoginMode>('email')
@@ -130,6 +140,11 @@ function LoginForm() {
 
   const phonePlaceholder = getPhonePlaceholder(getCountryCode())
 
+  const IntentIcon = authIntent === 'courier' ? Bike
+    : authIntent === 'logistics' ? Truck
+      : authIntent === 'merchant' ? Building2
+        : null
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center px-4">
 
@@ -148,13 +163,35 @@ function LoginForm() {
         </div>
 
         <div className="bg-white rounded-[28px] shadow-xl shadow-slate-200/60 border border-slate-100 p-8">
-          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Connexion</h1>
-          <p className="text-slate-500 text-sm mb-7">
-            Pas encore de compte ?{' '}
-            <Link href="/register" className="font-bold text-brand-600 hover:text-brand-700">
-              S&apos;inscrire
-            </Link>
-          </p>
+          {authIntent !== 'default' && intentCopy.badge && (
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider mb-4">
+              {IntentIcon && <IntentIcon size={14} />}
+              {intentCopy.badge}
+            </div>
+          )}
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">{intentCopy.title}</h1>
+          {authIntent !== 'default' ? (
+            <p className="text-slate-500 text-sm mb-7 leading-relaxed">
+              {intentCopy.subtitle}
+            </p>
+          ) : (
+            <p className="text-slate-500 text-sm mb-7">
+              {intentCopy.registerPrompt}{' '}
+              <Link href={registerHref} className="font-bold text-brand-600 hover:text-brand-700">
+                {intentCopy.registerLabel}
+              </Link>
+            </p>
+          )}
+
+          {authIntent !== 'default' && (
+            <div className="mb-6 p-4 rounded-2xl bg-brand-50/80 border border-brand-100 text-sm text-slate-700 leading-relaxed">
+              {intentCopy.registerPrompt}{' '}
+              <Link href={registerHref} className="font-bold text-brand-700 hover:text-brand-800">
+                {intentCopy.registerLabel}
+              </Link>
+              {' '}ou connectez-vous ci-dessous si vous avez déjà un compte.
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-2 mb-6 p-1 bg-slate-100 rounded-2xl">

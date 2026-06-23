@@ -19,6 +19,10 @@ import {
   PLACEHOLDER_PRODUCT_IMAGE,
 } from '@/lib/marketplaceApi'
 import { detectCartKind, getCartRoute, getCheckoutRoute } from '@/lib/orderFlow'
+import { GuestCheckoutAuth } from '@/features/marketplace/components/GuestCheckoutAuth'
+import { flushPendingCartAdds } from '@/hooks/useMarketplaceAddToCart'
+import { hasPendingCartAdds } from '@/lib/pendingCartAdd'
+import { buildLoginUrl } from '@/lib/authIntent'
 
 export function CartDrawer() {
   const router = useRouter()
@@ -31,6 +35,7 @@ export function CartDrawer() {
   const updateQuantity = useCartStore(s => s.updateQuantity)
   const removeItem = useCartStore(s => s.removeItem)
   const loadCart = useCartStore(s => s.loadCart)
+  const addItem = useCartStore(s => s.addItem)
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -60,7 +65,13 @@ export function CartDrawer() {
 
   const goToLogin = () => {
     closeDrawer()
-    router.push(`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '/')}`)
+    const path = typeof window !== 'undefined' ? window.location.pathname : '/'
+    router.push(buildLoginUrl(path))
+  }
+
+  const handleGuestAuthenticated = async () => {
+    await flushPendingCartAdds(addItem)
+    await loadCart()
   }
 
   const goTo = (path: string) => {
@@ -121,19 +132,23 @@ export function CartDrawer() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {!isAuthenticated ? (
-            <div className="flex flex-col items-center justify-center text-center py-16 px-4">
-              <ShoppingBag size={40} className="text-slate-200 mb-4" />
-              <p className="font-bold text-slate-900 mb-2">Connectez-vous</p>
-              <p className="text-sm text-slate-500 mb-6">
-                Identifiez-vous pour voir votre panier et passer commande.
+            <div className="py-4">
+              {hasPendingCartAdds() && (
+                <p className="text-sm text-slate-600 mb-4 px-1 leading-relaxed">
+                  Identifiez-vous par SMS pour ajouter vos articles au panier et commander.
+                </p>
+              )}
+              <GuestCheckoutAuth compact onAuthenticated={handleGuestAuthenticated} />
+              <p className="text-xs text-slate-500 mt-4 text-center">
+                Déjà un compte ?{' '}
+                <button
+                  type="button"
+                  onClick={goToLogin}
+                  className="font-bold text-brand-600 hover:text-brand-700"
+                >
+                  Se connecter
+                </button>
               </p>
-              <button
-                type="button"
-                onClick={goToLogin}
-                className="bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors text-sm"
-              >
-                Se connecter
-              </button>
             </div>
           ) : loading && !cart ? (
             <div className="flex justify-center py-24">

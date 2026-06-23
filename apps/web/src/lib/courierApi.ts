@@ -36,6 +36,7 @@ export async function registerCourier(payload: {
   country_code?: string
   vehicle?: string
   plate_number?: string
+  partner_ref?: string
 }): Promise<{ profile: CourierProfileSummary; role: string } | { error: string }> {
   const res = await authApiFetch('/couriers/register', {
     method: 'POST',

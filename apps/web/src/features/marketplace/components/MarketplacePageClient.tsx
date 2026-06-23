@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Loader2,
   RotateCcw,
@@ -22,8 +21,7 @@ import {
 } from '@/lib/marketplaceApi'
 import { getCountryCode } from '@/lib/country'
 import { NetworkErrorBanner } from '@/components/ui/NetworkErrorBanner'
-import { useAuthReady } from '@/hooks/useAuthReady'
-import { useCartStore } from '@/stores/cartStore'
+import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { ProductCard } from './ProductCard'
 import { SpotlightShopsCarousel } from './SpotlightShopsCarousel'
 import { ProductRecommendations } from './ProductRecommendations'
@@ -202,10 +200,8 @@ function MarketplaceFiltersPanel({
 }
 
 export function MarketplacePageClient() {
-  const router = useRouter()
   const t = useT()
-  const { isAuthenticated } = useAuthReady()
-  const addItem = useCartStore(s => s.addItem)
+  const { addToCart } = useMarketplaceAddToCart()
   const [products, setProducts] = useState<MarketplaceCatalogProduct[]>([])
   const [merchants, setMerchants] = useState<MarketplaceBoutique[]>([])
   const [spotlight, setSpotlight] = useState<MarketplaceSpotlightShop[]>([])
@@ -316,12 +312,8 @@ export function MarketplacePageClient() {
   }
 
   const handleAdd = async (product: MarketplaceCatalogProduct) => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent('/marketplace')}`)
-      return
-    }
     setAddingId(product.id)
-    await addItem(product.id, 1)
+    await addToCart(product.id, 1)
     setAddingId(null)
   }
 
@@ -355,10 +347,6 @@ export function MarketplacePageClient() {
       </header>
 
       <main className={`${PAGE_CONTAINER} py-8 md:py-12 pb-28 lg:pb-12`}>
-        <div className="space-y-10 mb-10">
-          <RecentlyViewedProducts />
-          <ProductRecommendations />
-        </div>
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-28">
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">
@@ -392,6 +380,11 @@ export function MarketplacePageClient() {
           </aside>
 
           <div className="flex-1 w-full min-w-0">
+            <div className="space-y-8 mb-8">
+              <RecentlyViewedProducts />
+              <ProductRecommendations />
+            </div>
+
             {loadError && (
               <NetworkErrorBanner
                 message={loadError}

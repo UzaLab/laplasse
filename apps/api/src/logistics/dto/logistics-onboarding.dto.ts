@@ -11,7 +11,12 @@ import {
   MinLength,
 } from 'class-validator'
 
-export class UpdateLogisticsSettingsDto {
+export class SaveLogisticsOnboardingDto {
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  step!: number
+
   @IsOptional()
   @IsString()
   @MinLength(2)
@@ -30,9 +35,19 @@ export class UpdateLogisticsSettingsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  address?: string
+
+  @IsOptional()
+  @IsString()
   @MinLength(2)
   @MaxLength(80)
   city?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4)
+  country?: string
 
   @IsOptional()
   @IsString()
@@ -76,10 +91,4 @@ export class UpdateLogisticsSettingsDto {
   @IsString()
   @MaxLength(40)
   payout_number?: string
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(60)
-  dispatch_pending_alert_minutes?: number
 }

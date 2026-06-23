@@ -9,7 +9,9 @@ import { StorageService } from '../storage/storage.service'
 import { slugify } from '../marketplace/marketplace.util'
 import { RegisterLogisticsPartnerDto } from '../delivery/dto/delivery-stakeholders.dto'
 import { UpdateLogisticsSettingsDto } from './dto/logistics-settings.dto'
+import { SaveLogisticsOnboardingDto } from './dto/logistics-onboarding.dto'
 import { LogisticsPartnerScoringService } from './logistics-partner-scoring.service'
+import { NotificationQueueService } from '../queue/notification-queue.service'
 import { resolveJobPickupCoords, scoreFleetCouriersForJob } from './logistics-partner-dispatch.util'
 
 const ALLOWED_DOC_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
@@ -21,6 +23,7 @@ export class LogisticsPartnersService {
     private readonly prisma: PrismaService,
     private readonly scoring: LogisticsPartnerScoringService,
     private readonly storage: StorageService,
+    private readonly notificationQueue: NotificationQueueService,
   ) {}
 
   async register(userId: string, dto: RegisterLogisticsPartnerDto) {
@@ -55,6 +58,137 @@ export class LogisticsPartnersService {
     })
 
     return partner
+  }
+
+  async saveOnboarding(userId: string, dto: SaveLogisticsOnboardingDto) {
+    let staff = await this.prisma.logisticsPartnerStaff.findUnique({ where: { user_id: userId } })
+
+    if (!staff && dto.step === 1) {
+      if (!dto.legal_name?.trim() || !dto.city?.trim() || !dto.phone?.trim()) {
+        throw new BadRequestException('Raison sociale, ville et téléphone requis')
+      }
+      const country = (dto.country ?? 'CI').toUpperCase()
+      let slug = slugify(dto.trade_name?.trim() || dto.legal_name)
+      let n = 0
+      while (await this.prisma.logisticsPartner.findUnique({ where: { slug } })) {
+        n += 1
+        slug = `${slugify(dto.legal_name)}-${n}`
+      }
+      const partner = await this.prisma.logisticsPartner.create({
+        data: {
+          owner_user_id: userId,
+          legal_name: dto.legal_name.trim(),
+          trade_name: dto.trade_name?.trim() || null,
+          slug,
+          country,
+          city: dto.city.trim(),
+          phone: dto.phone.trim(),
+          email: dto.email?.trim().toLowerCase() || null,
+          rccm_number: dto.rccm_number?.trim() || null,
+          address: dto.address?.trim() || null,
+          verification: 'PENDING',
+          onboarding_step: 1,
+        },
+      })
+      await this.prisma.logisticsPartnerStaff.create({
+        data: { logistics_partner_id: partner.id, user_id: userId, role: 'OWNER' },
+      })
+      staff = await this.prisma.logisticsPartnerStaff.findUnique({ where: { user_id: userId } })
+    }
+
+    if (!staff) throw new NotFoundException('Structure logistique requise — commencez par l\'étape 1')
+
+    const partner = await this.prisma.logisticsPartner.findUnique({ where: { id: staff.logistics_partner_id } })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+
+    const communeIds = dto.commune_ids
+    let validCommuneIds: string[] | undefined
+    if (communeIds !== undefined) {
+      if (communeIds.length === 0) {
+        throw new BadRequestException('Sélectionnez au moins une commune')
+      }
+      const validCommunes = await this.prisma.geoCommune.findMany({
+        where: { id: { in: communeIds }, is_active: true, city: { country: partner.country } },
+        select: { id: true },
+      })
+      if (validCommunes.length !== communeIds.length) {
+        throw new BadRequestException('Une ou plusieurs communes sont invalides')
+      }
+      validCommuneIds = validCommunes.map(c => c.id)
+    }
+
+    const nextStep = Math.max(partner.onboarding_step, dto.step)
+    const completing = dto.step >= 4
+
+    const updated = await this.prisma.$transaction(async tx => {
+      const p = await tx.logisticsPartner.update({
+        where: { id: partner.id },
+        data: {
+          ...(dto.legal_name !== undefined ? { legal_name: dto.legal_name.trim() } : {}),
+          ...(dto.trade_name !== undefined ? { trade_name: dto.trade_name.trim() || null } : {}),
+          ...(dto.rccm_number !== undefined ? { rccm_number: dto.rccm_number.trim() || null } : {}),
+          ...(dto.address !== undefined ? { address: dto.address.trim() || null } : {}),
+          ...(dto.city !== undefined ? { city: dto.city.trim() } : {}),
+          ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+          ...(dto.email !== undefined ? { email: dto.email.trim().toLowerCase() || null } : {}),
+          ...(dto.fleet_size_range !== undefined ? { fleet_size_range: dto.fleet_size_range } : {}),
+          ...(dto.vehicle_types !== undefined ? { vehicle_types: dto.vehicle_types } : {}),
+          ...(dto.sla_eta_default_minutes !== undefined
+            ? { sla_eta_default_minutes: dto.sla_eta_default_minutes }
+            : {}),
+          ...(dto.auto_dispatch_default !== undefined
+            ? { auto_dispatch_default: dto.auto_dispatch_default }
+            : {}),
+          ...(dto.payout_method !== undefined ? { payout_method: dto.payout_method } : {}),
+          ...(dto.payout_number !== undefined
+            ? { payout_number: dto.payout_number.trim() || null }
+            : {}),
+          onboarding_step: completing ? 4 : nextStep,
+          ...(completing ? { verification: 'PENDING' as const } : {}),
+        },
+      })
+
+      if (validCommuneIds !== undefined) {
+        await tx.logisticsPartnerServiceArea.deleteMany({ where: { logistics_partner_id: partner.id } })
+        if (validCommuneIds.length) {
+          await tx.logisticsPartnerServiceArea.createMany({
+            data: validCommuneIds.map(commune_id => ({
+              logistics_partner_id: partner.id,
+              commune_id,
+            })),
+          })
+        }
+      }
+
+      return p
+    })
+
+    if (completing) {
+      await this.notificationQueue.enqueuePush({
+        userId,
+        type: 'logistics_onboarding_complete',
+        title: 'Inscription reçue',
+        body: `${updated.trade_name ?? updated.legal_name} — votre dossier est en cours de validation.`,
+        data: { partner_id: updated.id, href: '/logistics' },
+      })
+    }
+
+    return this.getPartnerSettings(userId)
+  }
+
+  async getFleetInviteLink(userId: string) {
+    const staff = await this.requirePartnerStaff(userId)
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+      select: { slug: true, legal_name: true, trade_name: true },
+    })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+    const baseUrl = (process.env.WEB_URL ?? process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+    return {
+      slug: partner.slug,
+      partner_name: partner.trade_name ?? partner.legal_name,
+      url: `${baseUrl}/courier/signup?ref=partner:${partner.slug}`,
+    }
   }
 
   async getMyPartner(userId: string) {
@@ -156,7 +290,7 @@ export class LogisticsPartnersService {
     })
     if (!partner) throw new NotFoundException('Partenaire logistique introuvable')
 
-    return this.prisma.deliveryPartnerContract.upsert({
+    const contract = await this.prisma.deliveryPartnerContract.upsert({
       where: {
         shop_id_logistics_partner_id: { shop_id: shopId, logistics_partner_id: logisticsPartnerId },
       },
@@ -172,15 +306,47 @@ export class LogisticsPartnersService {
         fee_override: feeOverride ?? null,
         sla_eta_max_minutes: sla ?? null,
       },
-      include: { partner: { select: { legal_name: true, trade_name: true } } },
+      include: {
+        partner: { select: { legal_name: true, trade_name: true, owner_user_id: true } },
+        shop: { select: { name: true } },
+      },
     })
+
+    const staff = await this.prisma.logisticsPartnerStaff.findMany({
+      where: { logistics_partner_id: logisticsPartnerId },
+      select: { user_id: true },
+    })
+    const userIds = new Set(staff.map(s => s.user_id))
+    userIds.add(contract.partner.owner_user_id)
+    const shopName = contract.shop?.name ?? 'Commerce'
+
+    await Promise.all(
+      [...userIds].map(userId =>
+        this.notificationQueue.enqueuePush({
+          userId,
+          type: 'logistics_contract_request',
+          title: 'Demande de partenariat',
+          body: `${shopName} souhaite un contrat de livraison — répondez depuis vos contrats.`,
+          data: {
+            contract_id: contract.id,
+            shop_id: shopId,
+            logistics_partner_id: logisticsPartnerId,
+            href: `/logistics/contracts/${contract.id}`,
+          },
+        }),
+      ),
+    )
+
+    return contract
   }
 
   async listPartnerContracts(userId: string) {
     const staff = await this.requirePartnerStaff(userId)
     return this.prisma.deliveryPartnerContract.findMany({
       where: { logistics_partner_id: staff.logistics_partner_id },
-      include: { shop: { select: { id: true, name: true, slug: true } } },
+      include: {
+        shop: { select: { id: true, name: true, slug: true, city: true, logo: true } },
+      },
       orderBy: { updated_at: 'desc' },
     })
   }
@@ -191,6 +357,9 @@ export class LogisticsPartnersService {
       where: { id: contractId, logistics_partner_id: staff.logistics_partner_id },
     })
     if (!contract) throw new NotFoundException('Contrat introuvable')
+    if (contract.status !== 'PENDING_PARTNER') {
+      throw new BadRequestException('Ce contrat ne peut plus être accepté ou refusé')
+    }
 
     if (accept) {
       return this.prisma.deliveryPartnerContract.update({
@@ -202,6 +371,312 @@ export class LogisticsPartnersService {
       where: { id: contractId },
       data: { status: 'TERMINATED' },
     })
+  }
+
+  async getPartnerContract(userId: string, contractId: string) {
+    const staff = await this.requirePartnerStaff(userId)
+    const contract = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { id: contractId, logistics_partner_id: staff.logistics_partner_id },
+      include: {
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            city: true,
+            district: true,
+            logo: true,
+            delivery_fulfilment_default: true,
+          },
+        },
+      },
+    })
+    if (!contract) throw new NotFoundException('Contrat introuvable')
+
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+      select: { sla_eta_default_minutes: true },
+    })
+    const stats = await this.computeContractStats(
+      staff.logistics_partner_id,
+      contract.shop_id,
+      contract.sla_eta_max_minutes,
+      partner?.sla_eta_default_minutes ?? 45,
+    )
+
+    return { ...contract, stats }
+  }
+
+  async updatePartnerContract(
+    userId: string,
+    contractId: string,
+    dto: {
+      sla_eta_max_minutes?: number
+      fee_override?: number | null
+      auto_dispatch?: boolean
+      pause?: boolean
+    },
+  ) {
+    const staff = await this.requirePartnerStaff(userId)
+    const contract = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { id: contractId, logistics_partner_id: staff.logistics_partner_id },
+    })
+    if (!contract) throw new NotFoundException('Contrat introuvable')
+
+    if (dto.pause !== undefined) {
+      if (dto.pause && contract.status !== 'ACTIVE') {
+        throw new BadRequestException('Seul un contrat actif peut être mis en pause')
+      }
+      if (!dto.pause && contract.status !== 'PAUSED') {
+        throw new BadRequestException('Seul un contrat en pause peut être réactivé')
+      }
+    } else if (!['ACTIVE', 'PAUSED', 'PENDING_PARTNER', 'PENDING_MERCHANT'].includes(contract.status)) {
+      throw new BadRequestException('Contrat non modifiable')
+    }
+
+    await this.prisma.deliveryPartnerContract.update({
+      where: { id: contractId },
+      data: {
+        ...(dto.sla_eta_max_minutes !== undefined
+          ? { sla_eta_max_minutes: dto.sla_eta_max_minutes }
+          : {}),
+        ...(dto.fee_override !== undefined ? { fee_override: dto.fee_override } : {}),
+        ...(dto.auto_dispatch !== undefined ? { auto_dispatch: dto.auto_dispatch } : {}),
+        ...(dto.pause === true ? { status: 'PAUSED' } : {}),
+        ...(dto.pause === false ? { status: 'ACTIVE' } : {}),
+      },
+    })
+
+    return this.getPartnerContract(userId, contractId)
+  }
+
+  async listPartnerProspects(userId: string) {
+    const staff = await this.requirePartnerStaff(userId)
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+      include: { service_areas: { select: { commune_id: true } } },
+    })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+
+    const communeIds = partner.service_areas.map(a => a.commune_id)
+    if (!communeIds.length) {
+      return { prospects: [], communes_configured: false }
+    }
+
+    const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const blockedStatuses = ['ACTIVE', 'PENDING_PARTNER', 'PENDING_MERCHANT', 'PAUSED'] as const
+
+    const shops = await this.prisma.shop.findMany({
+      where: {
+        status: 'ACTIVE',
+        is_active: true,
+        country: partner.country,
+        delivery_fulfilment_default: { not: 'MERCHANT_OWN' },
+        delivery_zones: {
+          some: {
+            is_active: true,
+            rules: {
+              some: {
+                OR: [
+                  {
+                    all_communes: true,
+                    city: { communes: { some: { id: { in: communeIds } } } },
+                  },
+                  { communes: { some: { commune_id: { in: communeIds } } } },
+                ],
+              },
+            },
+          },
+        },
+        NOT: {
+          delivery_contracts: {
+            some: {
+              logistics_partner_id: partner.id,
+              status: { in: [...blockedStatuses] },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        city: true,
+        district: true,
+        logo: true,
+        delivery_fulfilment_default: true,
+        delivery_zones: {
+          where: { is_active: true },
+          select: {
+            rules: {
+              select: {
+                all_communes: true,
+                communes: { select: { commune_id: true } },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            orders: {
+              where: {
+                created_at: { gte: since30 },
+                delivery_type: 'DELIVERY',
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+      take: 100,
+    })
+
+    const communes = await this.prisma.geoCommune.findMany({
+      where: { id: { in: communeIds } },
+      select: { id: true, name: true, latitude: true, longitude: true },
+    })
+    const communeById = new Map(communes.map(c => [c.id, c]))
+
+    const prospects = shops.map(shop => {
+      const matchedCommuneIds = new Set<string>()
+      for (const zone of shop.delivery_zones) {
+        for (const rule of zone.rules) {
+          if (rule.all_communes) {
+            communeIds.forEach(id => matchedCommuneIds.add(id))
+          } else {
+            for (const c of rule.communes) {
+              if (communeIds.includes(c.commune_id)) matchedCommuneIds.add(c.commune_id)
+            }
+          }
+        }
+      }
+      const primaryCommune = communeIds.map(id => communeById.get(id)).find(Boolean)
+
+      return {
+        id: shop.id,
+        name: shop.name,
+        slug: shop.slug,
+        city: shop.city,
+        district: shop.district,
+        logo: shop.logo,
+        delivery_fulfilment_default: shop.delivery_fulfilment_default,
+        estimated_deliveries_30d: shop._count.orders,
+        matched_communes: [...matchedCommuneIds]
+          .map(id => communeById.get(id)?.name)
+          .filter(Boolean),
+        latitude: primaryCommune?.latitude ?? null,
+        longitude: primaryCommune?.longitude ?? null,
+      }
+    })
+
+    prospects.sort((a, b) => b.estimated_deliveries_30d - a.estimated_deliveries_30d)
+
+    return { prospects, communes_configured: true }
+  }
+
+  async proposePartnership(userId: string, shopId: string) {
+    const staff = await this.requirePartnerStaff(userId)
+    const partner = await this.prisma.logisticsPartner.findUnique({
+      where: { id: staff.logistics_partner_id },
+      include: { service_areas: { select: { commune_id: true } } },
+    })
+    if (!partner) throw new NotFoundException('Structure introuvable')
+    if (partner.verification !== 'VERIFIED' || !partner.is_active) {
+      throw new BadRequestException('Votre structure doit être vérifiée pour prospecter')
+    }
+
+    const { prospects } = await this.listPartnerProspects(userId)
+    if (!prospects.some(p => p.id === shopId)) {
+      throw new BadRequestException('Ce commerce n\'est pas éligible à une proposition')
+    }
+
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true, name: true, owner_id: true },
+    })
+    if (!shop) throw new NotFoundException('Commerce introuvable')
+
+    const contract = await this.prisma.deliveryPartnerContract.upsert({
+      where: {
+        shop_id_logistics_partner_id: {
+          shop_id: shopId,
+          logistics_partner_id: partner.id,
+        },
+      },
+      create: {
+        shop_id: shopId,
+        logistics_partner_id: partner.id,
+        status: 'PENDING_MERCHANT',
+        sla_eta_max_minutes: partner.sla_eta_default_minutes,
+        auto_dispatch: partner.auto_dispatch_default,
+      },
+      update: {
+        status: 'PENDING_MERCHANT',
+        sla_eta_max_minutes: partner.sla_eta_default_minutes,
+      },
+      include: { shop: { select: { name: true } } },
+    })
+
+    const scoreDetail = await this.scoring.computeForPartner(partner.id)
+    const partnerLabel = partner.trade_name ?? partner.legal_name
+    const grade = scoreDetail.grade ?? '—'
+
+    await this.notificationQueue.enqueuePush({
+      userId: shop.owner_id,
+      type: 'delivery_contract_proposal',
+      title: 'Proposition de livraison',
+      body: `${partnerLabel} (score ${grade}) souhaite assurer les livraisons de ${shop.name}.`,
+      data: {
+        contract_id: contract.id,
+        shop_id: shopId,
+        partner_id: partner.id,
+        partner_slug: partner.slug,
+        partner_score: scoreDetail.score,
+        partner_grade: grade,
+        href: '/merchant/shop/delivery-zones?tab=partners',
+      },
+    })
+
+    return contract
+  }
+
+  private async computeContractStats(
+    partnerId: string,
+    shopId: string,
+    slaMinutes: number | null,
+    defaultSla: number,
+  ) {
+    const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const sla = slaMinutes ?? defaultSla
+
+    const jobs = await this.prisma.deliveryJob.findMany({
+      where: {
+        logistics_partner_id: partnerId,
+        status: 'DELIVERED',
+        delivered_at: { gte: since30 },
+        order: { shop_id: shopId },
+      },
+      select: {
+        assigned_at: true,
+        delivered_at: true,
+        order: { select: { delivery_fee: true } },
+      },
+      orderBy: { delivered_at: 'desc' },
+    })
+
+    let onTime = 0
+    for (const job of jobs) {
+      if (!job.assigned_at || !job.delivered_at) continue
+      const deadline = job.assigned_at.getTime() + sla * 60 * 1000 * 1.15
+      if (job.delivered_at.getTime() <= deadline) onTime += 1
+    }
+
+    return {
+      jobs_30d: jobs.length,
+      revenue_30d: jobs.reduce((sum, j) => sum + (j.order.delivery_fee ?? 0), 0),
+      sla_rate: jobs.length ? Math.round((onTime / jobs.length) * 100) : null,
+      last_delivery_at: jobs[0]?.delivered_at ?? null,
+    }
   }
 
   async merchantAcceptContract(shopId: string, contractId: string) {
@@ -347,6 +822,7 @@ export class LogisticsPartnersService {
         pickup_longitude: true,
         dropoff_latitude: true,
         dropoff_longitude: true,
+        order: { select: { shop_id: true } },
       },
     })
     if (!job?.logistics_partner_id || job.status !== 'PENDING') return false
@@ -356,6 +832,18 @@ export class LogisticsPartnersService {
       select: { auto_dispatch_default: true },
     })
     if (!partner?.auto_dispatch_default) return false
+
+    if (job.order.shop_id) {
+      const contract = await this.prisma.deliveryPartnerContract.findFirst({
+        where: {
+          shop_id: job.order.shop_id,
+          logistics_partner_id: job.logistics_partner_id,
+          status: 'ACTIVE',
+        },
+        select: { auto_dispatch: true },
+      })
+      if (contract && !contract.auto_dispatch) return false
+    }
 
     const couriers = await this.prisma.courierProfile.findMany({
       where: {
@@ -437,6 +925,9 @@ export class LogisticsPartnersService {
       payout_method: partner.payout_method,
       payout_number: partner.payout_number,
       commission_rate: partner.commission_rate,
+      onboarding_step: partner.onboarding_step,
+      address: partner.address,
+      dispatch_pending_alert_minutes: partner.dispatch_pending_alert_minutes,
       commune_ids: partner.service_areas.map(a => a.commune_id),
       communes: partner.service_areas.map(a => ({
         id: a.commune.id,
@@ -496,6 +987,9 @@ export class LogisticsPartnersService {
           ...(dto.payout_method !== undefined ? { payout_method: dto.payout_method } : {}),
           ...(dto.payout_number !== undefined
             ? { payout_number: dto.payout_number.trim() || null }
+            : {}),
+          ...(dto.dispatch_pending_alert_minutes !== undefined
+            ? { dispatch_pending_alert_minutes: dto.dispatch_pending_alert_minutes }
             : {}),
         },
       })

@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { DeliveryDisputeStatus } from '../../generated/prisma/client'
+import { NotificationQueueService } from '../queue/notification-queue.service'
 
 @Injectable()
 export class DeliveryDisputesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationQueue: NotificationQueueService,
+  ) {}
 
   async createForOrder(
     userId: string,
@@ -18,7 +22,11 @@ export class DeliveryDisputesService {
   ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, user_id: userId },
-      include: { delivery_job: true, delivery_dispute: { select: { id: true } } },
+      include: {
+        delivery_job: { select: { id: true, status: true, logistics_partner_id: true } },
+        delivery_dispute: { select: { id: true } },
+        shop: { select: { name: true } },
+      },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
     if (order.delivery_type !== 'DELIVERY') {
@@ -34,7 +42,7 @@ export class DeliveryDisputesService {
     const reason = input.reason.trim()
     if (!reason) throw new BadRequestException('Motif requis')
 
-    return this.prisma.deliveryDispute.create({
+    const dispute = await this.prisma.deliveryDispute.create({
       data: {
         order_id: orderId,
         job_id: order.delivery_job.id,
@@ -51,6 +59,34 @@ export class DeliveryDisputesService {
         created_at: true,
       },
     })
+
+    const partnerId = order.delivery_job.logistics_partner_id
+    if (partnerId) {
+      const staff = await this.prisma.logisticsPartnerStaff.findMany({
+        where: { logistics_partner_id: partnerId },
+        select: { user_id: true },
+      })
+      const shopName = order.shop?.name ?? 'Commerce'
+      await Promise.all(
+        staff.map(s =>
+          this.notificationQueue.enqueuePush({
+            userId: s.user_id,
+            type: 'delivery_dispute_open',
+            title: 'Nouveau litige livraison',
+            body: `${shopName} — ${reason}`,
+            data: {
+              dispute_id: dispute.id,
+              order_id: orderId,
+              job_id: order.delivery_job!.id,
+              logistics_partner_id: partnerId,
+              href: '/logistics/quality',
+            },
+          }),
+        ),
+      )
+    }
+
+    return dispute
   }
 
   listForAdmin(filter?: string) {

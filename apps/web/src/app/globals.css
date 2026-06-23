@@ -52,6 +52,37 @@ body {
   display: none;
 }
 
-.safe-area-bottom {
-  padding-bottom: max(0px, env(safe-area-inset-bottom));
+.logistics-dispatch-map {
+  isolation: isolate;
 }
+
+.logistics-dispatch-map__canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.logistics-dispatch-map__canvas .leaflet-container {
+  font-family: inherit;
+  background: #f1f5f9;
+}
+
+.logistics-dispatch-map__canvas .leaflet-pane,
+.logistics-dispatch-map__canvas .leaflet-top,
+.logistics-dispatch-map__canvas .leaflet-bottom {
+  z-index: 1;
+}
+
+.logistics-dispatch-map__canvas .leaflet-popup-pane {
+  z-index: 700;
+}
+
+.logistics-dispatch-map__canvas .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.logistics-dispatch-map__canvas .leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.35;
+}
+
