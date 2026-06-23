@@ -140,6 +140,20 @@ function LoginForm() {
 
   const phonePlaceholder = getPhonePlaceholder(getCountryCode())
 
+  const signupHref = authIntent === 'courier'
+    ? '/courier/signup'
+    : authIntent === 'logistics'
+      ? '/logistics/signup'
+      : authIntent === 'merchant'
+        ? '/merchant/signup'
+        : '/merchant/signup'
+
+  const signupLabel = authIntent === 'courier'
+    ? 'Créer un compte pour devenir livreur'
+    : authIntent === 'logistics'
+      ? intentCopy.registerLabel
+      : 'Inscrire mon établissement →'
+
   const IntentIcon = authIntent === 'courier' ? Bike
     : authIntent === 'logistics' ? Truck
       : authIntent === 'merchant' ? Building2
@@ -183,7 +197,7 @@ function LoginForm() {
             </p>
           )}
 
-          {authIntent !== 'default' && (
+          {authIntent !== 'default' && authIntent !== 'courier' && (
             <div className="mb-6 p-4 rounded-2xl bg-brand-50/80 border border-brand-100 text-sm text-slate-700 leading-relaxed">
               {intentCopy.registerPrompt}{' '}
               <Link href={registerHref} className="font-bold text-brand-700 hover:text-brand-800">
@@ -329,11 +343,11 @@ function LoginForm() {
 
           {/* Merchant CTA */}
           <Link
-            href="/merchant/signup"
+            href={signupHref}
             className="flex items-center justify-center gap-2 w-full border-2 border-slate-200 hover:border-brand-400 text-slate-700 font-semibold py-3 rounded-2xl transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
-            Inscrire mon établissement →
+            {signupLabel}
           </Link>
         </div>
 

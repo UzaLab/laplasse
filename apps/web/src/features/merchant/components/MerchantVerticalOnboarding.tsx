@@ -80,7 +80,7 @@ export function MerchantVerticalOnboarding() {
     }
 
     const profileDone = !!(profile?.description && (profile?.cover_image || profile?.logo))
-    const hoursDone = Array.isArray(hours) && hours.length > 0
+    const hoursDone = Array.isArray(hours) && hours.some((h: { is_closed?: boolean }) => !h.is_closed)
     const menuDone = Array.isArray(menu?.sections)
       ? menu.sections.some((s: { items?: unknown[] }) => (s.items?.length ?? 0) > 0)
       : false

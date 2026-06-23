@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BadgeCheck, MapPin, MessageCircle } from 'lucide-react'
+import { BadgeCheck, MapPin, MessageCircle, Sparkles } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
 import { CategoryIcon } from '@/lib/icons'
 import { MerchantCardPreview } from '@/features/discovery/components/MerchantCardPreview'
@@ -26,6 +26,11 @@ export function CategoryMerchantCard({ merchant }: { merchant: ApiMerchant }) {
           {merchant.verification_status === 'VERIFIED' && (
             <div className="absolute top-3 left-3 bg-blue-500/90 backdrop-blur text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
               <BadgeCheck size={11} /> Vérifié
+            </div>
+          )}
+          {merchant.is_sponsored && (
+            <div className="absolute top-3 right-3 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Sparkles size={11} /> Sponsorisé
             </div>
           )}
         </div>

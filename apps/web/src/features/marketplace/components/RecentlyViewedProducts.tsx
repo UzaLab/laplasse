@@ -7,7 +7,7 @@ import type { MarketplaceProduct } from '@/lib/marketplaceApi'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useT } from '@/providers/LocaleProvider'
 
-const CAROUSEL_LIMIT = 10
+const CAROUSEL_LIMIT = 5
 
 export function RecentlyViewedProducts({
   excludeProductId,

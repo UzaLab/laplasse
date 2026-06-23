@@ -49,6 +49,12 @@ import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryProofService } from '../delivery/delivery-proof.service'
 import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
 import { CreateDeliveryDisputeDto } from '../delivery/dto/create-delivery-dispute.dto'
+import { AuthService } from '../auth/auth.service'
+import { AdsService } from '../ads/ads.service'
+import {
+  GuestCartItemDto,
+  GuestCheckoutDto,
+} from './dto/marketplace.dto'
 
 @Injectable()
 export class MarketplaceService {
@@ -66,6 +72,8 @@ export class MarketplaceService {
     private readonly courierReviews: CourierReviewsService,
     private readonly deliveryProof: DeliveryProofService,
     private readonly deliveryDisputes: DeliveryDisputesService,
+    private readonly authService: AuthService,
+    private readonly ads: AdsService,
   ) {}
 
   private shopPublicSelect = {
@@ -1087,6 +1095,154 @@ export class MarketplaceService {
     }
 
     return this.getCart(userId)
+  }
+
+  private mergeGuestCartLines(items: GuestCartItemDto[]): GuestCartItemDto[] {
+    const map = new Map<string, GuestCartItemDto>()
+    for (const item of items) {
+      const key = `${item.productId}:${item.variantId ?? ''}`
+      const existing = map.get(key)
+      if (existing) {
+        existing.quantity += item.quantity
+      } else {
+        map.set(key, { ...item })
+      }
+    }
+    return Array.from(map.values())
+  }
+
+  private async buildGuestPreviewItems(items: GuestCartItemDto[]) {
+    const merged = this.mergeGuestCartLines(items)
+    const rawItems: Parameters<MarketplaceService['mapRawCartItem']>[0][] = []
+
+    for (const line of merged) {
+      const product = await this.prisma.product.findUnique({
+        where: { id: line.productId },
+        include: {
+          shop: true,
+          variants: true,
+        },
+      })
+      if (!product || product.status !== 'ACTIVE') {
+        throw new BadRequestException('Produit indisponible')
+      }
+      if (isMenuMirrorProductSlug(product.slug)) {
+        throw new BadRequestException('Produit indisponible')
+      }
+      if (!product.shop.is_active || product.shop.status !== 'ACTIVE') {
+        throw new BadRequestException('Boutique indisponible')
+      }
+
+      const hasVariants = product.variants.length > 0
+      let variant: (typeof product.variants)[number] | null = null
+
+      if (hasVariants) {
+        if (!line.variantId) {
+          throw new BadRequestException('Sélectionnez une variante pour ce produit')
+        }
+        variant = product.variants.find(v => v.id === line.variantId) ?? null
+        if (!variant) throw new BadRequestException('Variante introuvable')
+      } else if (line.variantId) {
+        throw new BadRequestException('Ce produit n\'a pas de variantes')
+      }
+
+      const availableStock = this.resolveAvailableStock(product, variant)
+      if (availableStock < line.quantity) {
+        throw new BadRequestException('Stock insuffisant')
+      }
+
+      rawItems.push({
+        id: `guest-${product.id}-${variant?.id ?? 'base'}`,
+        quantity: line.quantity,
+        variant_id: variant?.id ?? null,
+        product: {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          price: product.price,
+          currency: product.currency,
+          stock_quantity: product.stock_quantity,
+          image_url: product.image_url,
+          status: product.status,
+          shop_id: product.shop_id,
+          category_id: product.category_id,
+          allow_pickup: product.allow_pickup,
+          allow_delivery: product.allow_delivery,
+          variants: product.variants.map(v => ({
+            id: v.id,
+            name: v.name,
+            price: v.price,
+            stock_quantity: v.stock_quantity,
+          })),
+          shop: product.shop,
+        },
+        variant: variant
+          ? {
+              id: variant.id,
+              name: variant.name,
+              price: variant.price,
+              stock_quantity: variant.stock_quantity,
+            }
+          : null,
+      })
+    }
+
+    return rawItems
+  }
+
+  async previewGuestCart(items: GuestCartItemDto[]) {
+    const rawItems = await this.buildGuestPreviewItems(items)
+    return this.buildCartResponse({ id: 'guest' }, rawItems)
+  }
+
+  async guestCheckout(dto: GuestCheckoutDto) {
+    if (!dto.cart_items?.length) {
+      throw new BadRequestException('Panier vide')
+    }
+
+    const session = await this.authService.resolveGuestForCheckout({
+      first_name: dto.guest_first_name,
+      last_name: dto.guest_last_name,
+      phone: dto.customer_phone,
+      create_account: dto.create_account,
+      email: dto.email,
+      password: dto.password,
+    })
+
+    const userId = session.user.id as string
+
+    await this.clearCart(userId)
+    for (const item of this.mergeGuestCartLines(dto.cart_items)) {
+      await this.addToCart(userId, {
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      })
+    }
+
+    const checkoutPayload: CheckoutDto = {
+      delivery_type: dto.delivery_type,
+      delivery_address: dto.delivery_address,
+      delivery_city_id: dto.delivery_city_id,
+      delivery_commune_id: dto.delivery_commune_id,
+      delivery_district: dto.delivery_district,
+      delivery_address_detail: dto.delivery_address_detail,
+      delivery_latitude: dto.delivery_latitude,
+      delivery_longitude: dto.delivery_longitude,
+      customer_note: dto.customer_note,
+      customer_phone: dto.customer_phone,
+      applied_promotions: dto.applied_promotions,
+      shop_deliveries: dto.shop_deliveries,
+    }
+
+    const checkout = await this.checkout(userId, checkoutPayload)
+
+    return {
+      checkout,
+      user: session.user,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    }
   }
 
   /** Ajoute un plat du menu au panier — entité MenuItem, sans produit boutique. */
@@ -2672,35 +2828,63 @@ export class MarketplaceService {
   }
 
   async getFeaturedProducts(limit = 8) {
-    return this.prisma.product.findMany({
-      where: {
-        status: 'ACTIVE',
-        stock_quantity: { gt: 0 },
-        shop: {
-          is_active: true,
-          status: 'ACTIVE',
-        },
-      },
-      orderBy: { created_at: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        price: true,
-        currency: true,
-        image_url: true,
-        shop: { select: { name: true, slug: true } },
-      },
-    }).then(rows =>
-      rows.map(row => ({
-        ...row,
-        merchant: {
-          business_name: row.shop.name,
-          slug: row.shop.slug,
-        },
-      })),
+    const sponsoredIds = await this.ads.getActiveProductIdsForPlacement('MARKETPLACE_FEATURED_PRODUCTS')
+    const campaigns = await this.ads.getActiveCampaignTargets('MARKETPLACE_FEATURED_PRODUCTS')
+    const campaignByProduct = new Map(
+      campaigns.filter(c => c.product_id).map(c => [c.product_id!, c.id]),
     )
+
+    const productSelect = {
+      id: true,
+      name: true,
+      slug: true,
+      price: true,
+      currency: true,
+      image_url: true,
+      shop: { select: { name: true, slug: true } },
+    } as const
+
+    const [sponsoredRows, regularRows] = await Promise.all([
+      sponsoredIds.length
+        ? this.prisma.product.findMany({
+            where: {
+              id: { in: sponsoredIds },
+              status: 'ACTIVE',
+              stock_quantity: { gt: 0 },
+              shop: { is_active: true, status: 'ACTIVE' },
+            },
+            select: productSelect,
+          })
+        : Promise.resolve([]),
+      this.prisma.product.findMany({
+        where: {
+          status: 'ACTIVE',
+          stock_quantity: { gt: 0 },
+          shop: { is_active: true, status: 'ACTIVE' },
+          ...(sponsoredIds.length ? { id: { notIn: sponsoredIds } } : {}),
+        },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        select: productSelect,
+      }),
+    ])
+
+    const sponsoredById = new Map(sponsoredRows.map(r => [r.id, r]))
+    const orderedSponsored = sponsoredIds
+      .map(id => sponsoredById.get(id))
+      .filter((r): r is (typeof sponsoredRows)[number] => Boolean(r))
+
+    const rows = [...orderedSponsored, ...regularRows].slice(0, limit)
+
+    return rows.map(row => ({
+      ...row,
+      merchant: {
+        business_name: row.shop.name,
+        slug: row.shop.slug,
+      },
+      is_sponsored: campaignByProduct.has(row.id),
+      ad_campaign_id: campaignByProduct.get(row.id) ?? null,
+    }))
   }
 
   async listMarketplaceProducts(query?: {
@@ -2820,8 +3004,6 @@ export class MarketplaceService {
       ? Math.min(Math.max(Math.floor(requestedLimit), 1), 20)
       : await this.getMarketplaceSpotlightLimit()
 
-    const now = new Date()
-
     const [shops, marketplaceCampaigns] = await Promise.all([
       this.prisma.shop.findMany({
         where: {
@@ -2835,28 +3017,31 @@ export class MarketplaceService {
           slug: true,
           logo: true,
           marketplace_featured: true,
+          merchant_id: true,
           merchant: {
             select: { id: true, is_sponsored: true },
           },
         },
       }),
-      this.prisma.adCampaign.findMany({
-        where: {
-          placement: 'MARKETPLACE',
-          status: 'ACTIVE',
-          starts_at: { lte: now },
-          ends_at: { gte: now },
-        },
-        select: { merchant_id: true },
-      }),
+      this.ads.getActiveCampaignTargets('MARKETPLACE'),
     ])
 
-    const sponsoredMerchantIds = new Set(marketplaceCampaigns.map(c => c.merchant_id))
+    const shopCampaignById = new Map<string, string>()
+    const merchantCampaignById = new Map<string, string>()
+    for (const c of marketplaceCampaigns) {
+      if (c.target_type === 'SHOP' && c.shop_id) {
+        shopCampaignById.set(c.shop_id, c.id)
+      } else if (c.merchant_id) {
+        merchantCampaignById.set(c.merchant_id, c.id)
+      }
+    }
 
     const ranked = shops
       .map(shop => {
-        const merchantId = shop.merchant?.id
-        const hasMarketplaceAd = merchantId ? sponsoredMerchantIds.has(merchantId) : false
+        const merchantId = shop.merchant?.id ?? shop.merchant_id
+        const hasShopAd = shopCampaignById.has(shop.id)
+        const hasLegacyMerchantAd = merchantId ? merchantCampaignById.has(merchantId) : false
+        const hasMarketplaceAd = hasShopAd || hasLegacyMerchantAd
         const isAdminFeatured = shop.marketplace_featured
         const isMerchantSponsored = shop.merchant?.is_sponsored ?? false
 
@@ -2874,6 +3059,7 @@ export class MarketplaceService {
           logo: shop.logo,
           is_sponsored: hasMarketplaceAd || isMerchantSponsored,
           is_admin_featured: isAdminFeatured,
+          ad_campaign_id: shopCampaignById.get(shop.id) ?? (merchantId ? merchantCampaignById.get(merchantId) ?? null : null),
           priority,
         }
       })

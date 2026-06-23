@@ -64,11 +64,11 @@ export default async function HomePage() {
   const defaultCity = getDefaultCity(country)
   const [categoriesRaw, merchantsRaw] = await Promise.allSettled([
     api.categories.list(),
-    api.merchants.list({ city: defaultCity, country, limit: 6, sort: 'trust_score' }),
+    api.merchants.featured(defaultCity, 6, country),
   ])
 
   const categories = categoriesRaw.status === 'fulfilled' ? categoriesRaw.value.map(toCategory) : []
-  const merchants  = merchantsRaw.status === 'fulfilled' ? merchantsRaw.value.data.map(toSpotMerchant) : []
+  const merchants  = merchantsRaw.status === 'fulfilled' ? merchantsRaw.value.map(toSpotMerchant) : []
   const featured   = merchants.slice(0, 3)
   const nearby     = merchants.slice(0, 3)
 

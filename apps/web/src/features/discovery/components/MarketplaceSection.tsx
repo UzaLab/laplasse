@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { fetchPublicJson, type FeaturedProduct } from '@/lib/marketplaceApi'
 import { ProductCard } from '@/features/marketplace/components/ProductCard'
 import { NetworkErrorBanner } from '@/components/ui/NetworkErrorBanner'
+import { AdImpressionTracker } from '@/hooks/useAdImpression'
 import { BRAND_MARKETPLACE_SECTION } from '@/lib/brandCopy'
 
 export function MarketplaceSection() {
@@ -62,7 +63,9 @@ export function MarketplaceSection() {
         ) : error ? null : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {products.map(product => (
-              <ProductCard key={product.id} product={product} />
+              <AdImpressionTracker key={product.id} campaignId={product.ad_campaign_id}>
+                <ProductCard product={product} adCampaignId={product.ad_campaign_id} />
+              </AdImpressionTracker>
             ))}
           </div>
         )}

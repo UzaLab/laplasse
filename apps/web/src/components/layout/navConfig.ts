@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Compass, Search, Store, Building2, User, Bike } from 'lucide-react'
+import { Compass, Search, Store, Building2, User } from 'lucide-react'
 
 export type NavLabelKey =
   | 'nav.discover'
@@ -47,17 +47,11 @@ export const GLOBAL_NAV_ITEMS: NavItemConfig[] = [
     icon: Building2,
     match: (p) => p.startsWith('/merchant/signup') || p.startsWith('/pro/register'),
   },
-  {
-    href: '/courier/signup',
-    labelKey: 'nav.courier',
-    icon: Bike,
-    match: (p) => p.startsWith('/courier/signup') || p.startsWith('/courier/onboarding'),
-  },
 ]
 
 /** Barre basse mobile : découverte, marketplace, recherche, profil (+ panier séparé). */
 export const MOBILE_BOTTOM_NAV_ITEMS: NavItemConfig[] = [
-  ...GLOBAL_NAV_ITEMS.filter((item) => item.href !== '/merchant/signup' && item.href !== '/courier/signup'),
+  ...GLOBAL_NAV_ITEMS.filter((item) => item.href !== '/merchant/signup'),
   {
     href: '/profile',
     labelKey: 'nav.profile',

@@ -4,6 +4,8 @@ import { useRef } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, Sparkles, Store } from 'lucide-react'
 import type { MarketplaceSpotlightShop } from '@/lib/marketplaceApi'
+import { recordAdEvent } from '@/lib/adsApi'
+import { AdImpressionTracker } from '@/hooks/useAdImpression'
 
 interface SpotlightShopsCarouselProps {
   shops: MarketplaceSpotlightShop[]
@@ -49,12 +51,15 @@ export function SpotlightShopsCarousel({ shops }: SpotlightShopsCarouselProps) {
         className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-1 px-1 scroll-smooth"
       >
         {shops.map(shop => (
-          <Link
-            key={shop.id}
-            href={`/m/${shop.slug}/boutique`}
-            className="flex flex-col items-center gap-2.5 min-w-[88px] sm:min-w-[100px] max-w-[100px] snap-start group shrink-0"
-            style={{ textDecoration: 'none' }}
-          >
+          <AdImpressionTracker key={shop.id} campaignId={shop.ad_campaign_id}>
+            <Link
+              href={`/m/${shop.slug}/boutique`}
+              onClick={() => {
+                if (shop.ad_campaign_id) recordAdEvent(shop.ad_campaign_id, 'click')
+              }}
+              className="flex flex-col items-center gap-2.5 min-w-[88px] sm:min-w-[100px] max-w-[100px] snap-start group shrink-0"
+              style={{ textDecoration: 'none' }}
+            >
             <div className="relative w-[72px] h-[72px] sm:w-20 sm:h-20">
               <div className="w-full h-full rounded-2xl bg-white border-2 border-slate-100 p-1 group-hover:border-brand-400 group-hover:shadow-lg transition-all">
                 <div className="w-full h-full rounded-xl overflow-hidden bg-slate-50">
@@ -77,7 +82,8 @@ export function SpotlightShopsCarousel({ shops }: SpotlightShopsCarouselProps) {
             <span className="text-xs font-bold text-slate-700 group-hover:text-brand-600 text-center line-clamp-2 leading-tight w-full">
               {shop.business_name}
             </span>
-          </Link>
+            </Link>
+          </AdImpressionTracker>
         ))}
       </div>
     </div>

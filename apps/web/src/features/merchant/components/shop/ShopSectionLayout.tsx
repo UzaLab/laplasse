@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FolderOpen,
   LayoutGrid,
+  Megaphone,
   Package,
   PackageX,
   Settings,
@@ -27,6 +28,7 @@ const TABS = [
   { href: '/merchant/shop/orders', label: 'Commandes', icon: ShoppingBag },
   { href: '/merchant/shop/returns', label: 'Retours SAV', icon: PackageX },
   { href: '/merchant/shop/promotions', label: 'Promotions', icon: Tag },
+  { href: '/merchant/shop/visibility', label: 'Visibilité', icon: Megaphone },
   { href: '/merchant/shop/delivery-zones', label: 'Livraison', icon: Truck },
   { href: '/merchant/shop/settings', label: 'Paramètres', icon: Settings },
 ] as const

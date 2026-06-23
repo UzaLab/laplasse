@@ -292,6 +292,109 @@ export class AuthService {
     return { user: { ...user, is_verified: true }, ...tokens }
   }
 
+  async resolveGuestForCheckout(input: {
+    first_name: string
+    last_name: string
+    phone: string
+    create_account?: boolean
+    email?: string
+    password?: string
+  }): Promise<AuthSessionResult> {
+    const full_name = `${input.first_name.trim()} ${input.last_name.trim()}`.trim()
+    if (!full_name) {
+      throw new BadRequestException('Nom et prénom requis')
+    }
+
+    const phone = input.phone.trim()
+    if (!phone) {
+      throw new BadRequestException('Numéro de téléphone requis')
+    }
+
+    if (input.create_account) {
+      const email = input.email?.trim().toLowerCase()
+      const password = input.password
+      if (!email || !password) {
+        throw new BadRequestException('Email et mot de passe requis pour créer un compte')
+      }
+
+      const existingEmail = await this.prisma.user.findUnique({ where: { email } })
+      if (existingEmail) {
+        throw new ConflictException('Cet email est déjà utilisé — connectez-vous')
+      }
+
+      const phoneTaken = await this.prisma.user.findFirst({
+        where: { phone, is_active: true },
+      })
+      if (phoneTaken) {
+        throw new ConflictException('Ce numéro de téléphone est déjà utilisé')
+      }
+
+      const passwordHash = await hash(password, 12)
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          password_hash: passwordHash,
+          full_name,
+          phone,
+          role: 'USER',
+          is_verified: true,
+          is_active: true,
+          country: 'CI',
+        },
+        select: this.authUserSelect,
+      })
+
+      const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+      this.afterAuthLinkBookings(user.id, user.phone)
+      return { user: this.mapAuthUser(user), ...tokens }
+    }
+
+    const normalized = this.otp.normalizePhone(phone)
+    const phoneVariants = [
+      phone,
+      `+225${normalized.slice(-10)}`,
+      `+226${normalized.slice(-8)}`,
+      `+221${normalized.slice(-9)}`,
+    ]
+
+    let user = await this.prisma.user.findFirst({
+      where: {
+        is_active: true,
+        OR: phoneVariants.flatMap(p => [
+          { phone: p },
+          { phone: { contains: normalized.slice(-8) } },
+        ]),
+      },
+      select: this.authUserSelect,
+    })
+
+    if (!user) {
+      const guestEmail = `guest.${normalized}.${Date.now()}@guest.laplasse.local`
+      user = await this.prisma.user.create({
+        data: {
+          email: guestEmail,
+          phone: phone.startsWith('+') ? phone : `+225${normalized.slice(-10)}`,
+          full_name,
+          role: 'USER',
+          is_verified: false,
+          is_active: true,
+          country: 'CI',
+        },
+        select: this.authUserSelect,
+      })
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { full_name, phone: user.phone ?? phone },
+        select: this.authUserSelect,
+      })
+    }
+
+    const tokens = await this.issueTokenPair(user.id, user.email, user.role)
+    this.afterAuthLinkBookings(user.id, user.phone ?? phone)
+    return { user: this.mapAuthUser(user), ...tokens }
+  }
+
   async logout(refreshToken: string | null) {
     if (refreshToken) {
       await this.prisma.authToken.deleteMany({

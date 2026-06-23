@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BadgeCheck, MapPin, Star } from 'lucide-react'
+import { BadgeCheck, MapPin, Sparkles, Star } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from './FavoriteButton'
 import { CategoryIcon } from '@/lib/icons'
@@ -83,7 +83,13 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
             </div>
           )}
 
-          {m.review_count > 0 && (
+          {m.is_sponsored && (
+            <div className="absolute top-3 right-3 bg-amber-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 z-[1]">
+              <Sparkles size={11} /> Sponsorisé
+            </div>
+          )}
+
+          {m.review_count > 0 && !m.is_sponsored && (
             <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-bold text-slate-900 flex items-center gap-1">
               <Star size={11} className="fill-slate-700 text-slate-700" />
               {m.review_count}

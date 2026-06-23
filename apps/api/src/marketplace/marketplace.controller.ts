@@ -12,9 +12,11 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import type { Response } from 'express'
+import { ConfigService } from '@nestjs/config'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
+import { setAuthCookies } from '../auth/auth-cookies'
 import { MarketplaceService } from './marketplace.service'
 import { ProductCategoriesService } from './product-categories.service'
 import {
@@ -30,6 +32,8 @@ import {
   CreateOrderReturnDto,
   UpdateOrderReturnDto,
   UpdateProductDto,
+  GuestCartPreviewDto,
+  GuestCheckoutDto,
 } from './dto/marketplace.dto'
 import { OrderStatus, OrderReturnStatus } from '../../generated/prisma/client'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
@@ -51,6 +55,7 @@ export class MarketplaceController {
     private readonly addresses: AddressesService,
     private readonly shopMenu: ShopMenuService,
     private readonly productDiscovery: ProductDiscoveryService,
+    private readonly config: ConfigService,
   ) {}
 
   @Public()
@@ -291,6 +296,12 @@ export class MarketplaceController {
     return this.svc.getCart(userId)
   }
 
+  @Public()
+  @Post('cart/guest/preview')
+  previewGuestCart(@Body() dto: GuestCartPreviewDto) {
+    return this.svc.previewGuestCart(dto.items ?? [])
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('cart/items')
   addToCart(@CurrentUser('id') userId: string, @Body() dto: AddCartItemDto) {
@@ -335,6 +346,17 @@ export class MarketplaceController {
   @Post('orders/checkout')
   checkout(@CurrentUser('id') userId: string, @Body() dto: CheckoutDto) {
     return this.svc.checkout(userId, dto)
+  }
+
+  @Public()
+  @Post('orders/checkout/guest')
+  async guestCheckout(
+    @Body() dto: GuestCheckoutDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.svc.guestCheckout(dto)
+    setAuthCookies(res, this.config, result.access_token, result.refresh_token)
+    return { checkout: result.checkout, user: result.user }
   }
 
   @UseGuards(JwtAuthGuard)

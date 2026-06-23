@@ -20,7 +20,7 @@ export function getVerticalOnboardingSteps(categorySlug: string | undefined): On
       id: 'hours',
       label: 'Horaires d\'ouverture',
       desc: 'Indiquez quand les clients peuvent vous trouver.',
-      href: '/merchant/hours',
+      href: '/merchant/hours?from=onboarding',
     },
   ]
 

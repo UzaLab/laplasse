@@ -19,9 +19,6 @@ import {
   PLACEHOLDER_PRODUCT_IMAGE,
 } from '@/lib/marketplaceApi'
 import { detectCartKind, getCartRoute, getCheckoutRoute } from '@/lib/orderFlow'
-import { GuestCheckoutAuth } from '@/features/marketplace/components/GuestCheckoutAuth'
-import { flushPendingCartAdds } from '@/hooks/useMarketplaceAddToCart'
-import { hasPendingCartAdds } from '@/lib/pendingCartAdd'
 import { buildLoginUrl } from '@/lib/authIntent'
 
 export function CartDrawer() {
@@ -35,7 +32,6 @@ export function CartDrawer() {
   const updateQuantity = useCartStore(s => s.updateQuantity)
   const removeItem = useCartStore(s => s.removeItem)
   const loadCart = useCartStore(s => s.loadCart)
-  const addItem = useCartStore(s => s.addItem)
 
   useEffect(() => {
     if (!drawerOpen) return
@@ -52,7 +48,7 @@ export function CartDrawer() {
   }, [drawerOpen, closeDrawer])
 
   useEffect(() => {
-    if (drawerOpen && isAuthenticated) {
+    if (drawerOpen) {
       void loadCart()
     }
   }, [drawerOpen, isAuthenticated, loadCart])
@@ -67,11 +63,6 @@ export function CartDrawer() {
     closeDrawer()
     const path = typeof window !== 'undefined' ? window.location.pathname : '/'
     router.push(buildLoginUrl(path))
-  }
-
-  const handleGuestAuthenticated = async () => {
-    await flushPendingCartAdds(addItem)
-    await loadCart()
   }
 
   const goTo = (path: string) => {
@@ -100,7 +91,6 @@ export function CartDrawer() {
         aria-modal="true"
         aria-label="Panier"
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
@@ -129,28 +119,8 @@ export function CartDrawer() {
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {!isAuthenticated ? (
-            <div className="py-4">
-              {hasPendingCartAdds() && (
-                <p className="text-sm text-slate-600 mb-4 px-1 leading-relaxed">
-                  Identifiez-vous par SMS pour ajouter vos articles au panier et commander.
-                </p>
-              )}
-              <GuestCheckoutAuth compact onAuthenticated={handleGuestAuthenticated} />
-              <p className="text-xs text-slate-500 mt-4 text-center">
-                Déjà un compte ?{' '}
-                <button
-                  type="button"
-                  onClick={goToLogin}
-                  className="font-bold text-brand-600 hover:text-brand-700"
-                >
-                  Se connecter
-                </button>
-              </p>
-            </div>
-          ) : loading && !cart ? (
+          {loading && !cart ? (
             <div className="flex justify-center py-24">
               <Loader2 size={28} className="animate-spin text-slate-300" />
             </div>
@@ -163,10 +133,10 @@ export function CartDrawer() {
               </p>
               <button
                 type="button"
-                onClick={() => goTo('/')}
+                onClick={() => goTo('/marketplace')}
                 className="bg-brand-50 border border-brand-200 text-brand-700 font-bold px-6 py-3 rounded-xl hover:bg-brand-100 transition-colors text-sm"
               >
-                Explorer
+                Explorer la marketplace
               </button>
             </div>
           ) : (
@@ -267,8 +237,7 @@ export function CartDrawer() {
           )}
         </div>
 
-        {/* Footer */}
-        {isAuthenticated && hasItems && (
+        {hasItems && (
           <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white">
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-medium text-slate-500">Sous-total</span>
@@ -276,6 +245,18 @@ export function CartDrawer() {
                 {formatPrice(cart?.subtotal ?? 0, cart?.currency)}
               </span>
             </div>
+            {!isAuthenticated && (
+              <p className="text-xs text-slate-500 mb-3 text-center">
+                Commande invité —{' '}
+                <button
+                  type="button"
+                  onClick={goToLogin}
+                  className="font-bold text-brand-600 hover:text-brand-700"
+                >
+                  se connecter
+                </button>
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"

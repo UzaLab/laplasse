@@ -380,11 +380,6 @@ export function MarketplacePageClient() {
           </aside>
 
           <div className="flex-1 w-full min-w-0">
-            <div className="space-y-8 mb-8">
-              <RecentlyViewedProducts />
-              <ProductRecommendations />
-            </div>
-
             {loadError && (
               <NetworkErrorBanner
                 message={loadError}
@@ -474,6 +469,11 @@ export function MarketplacePageClient() {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="space-y-10 mt-12 lg:mt-16">
+          <RecentlyViewedProducts />
+          <ProductRecommendations />
         </div>
       </main>
 

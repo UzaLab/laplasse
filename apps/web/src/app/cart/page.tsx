@@ -17,13 +17,14 @@ import {
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
-import { useRequireAuth } from '@/hooks/useRequireAuth'
+import { useAuthReady } from '@/hooks/useAuthReady'
 import { useCartStore } from '@/stores/cartStore'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import {
   applyCartPromo,
   fetchCart,
+  fetchGuestCartPreview,
   fetchFeaturedProducts,
   formatPrice,
   PLACEHOLDER_PRODUCT_IMAGE,
@@ -39,12 +40,13 @@ import {
   clearCartPromos,
 } from '@/lib/cartPromo'
 import { detectCartKind } from '@/lib/orderFlow'
+import { getGuestCartLines } from '@/lib/guestCart'
 import { notify } from '@/lib/notify'
 import { captureCheckoutStep } from '@/lib/analytics'
 
 export default function CartPage() {
   const router = useRouter()
-  const { ready, hydrated, isAuthenticated } = useRequireAuth('/cart')
+  const { hydrated, isAuthenticated } = useAuthReady()
   const setCartStore = useCartStore(s => s.setCart)
   const addItem = useCartStore(s => s.addItem)
   const [cart, setCart] = useState<Cart | null>(null)
@@ -119,7 +121,9 @@ export default function CartPage() {
   const load = async () => {
     setLoading(true)
     const [data, featured] = await Promise.all([
-      fetchCart(),
+      isAuthenticated
+        ? fetchCart()
+        : fetchGuestCartPreview(getGuestCartLines()),
       fetchFeaturedProducts().catch(() => [] as FeaturedProduct[]),
     ])
     setCart(data)
@@ -130,9 +134,9 @@ export default function CartPage() {
   }
 
   useEffect(() => {
-    if (!ready) return
+    if (!hydrated) return
     load()
-  }, [ready])
+  }, [hydrated, isAuthenticated])
 
   useEffect(() => {
     if (loading || !cart) return
@@ -178,8 +182,6 @@ export default function CartPage() {
       </div>
     )
   }
-
-  if (!isAuthenticated) return null
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -346,26 +348,34 @@ export default function CartPage() {
                 <div className="h-px w-full bg-slate-100 mb-6" />
 
                 <div className="mb-6">
-                  <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-                    Code Promo
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={promoCode}
-                      onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                      placeholder="Entrez votre code"
-                      className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleApplyPromo}
-                      disabled={promoLoading}
-                      className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap disabled:opacity-50"
-                    >
-                      {promoLoading ? '…' : 'Appliquer'}
-                    </button>
-                  </div>
+                  {isAuthenticated ? (
+                    <>
+                      <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+                        Code Promo
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={promoCode}
+                          onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                          placeholder="Entrez votre code"
+                          className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyPromo}
+                          disabled={promoLoading}
+                          className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap disabled:opacity-50"
+                        >
+                          {promoLoading ? '…' : 'Appliquer'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                      Connectez-vous pour utiliser un code promo.
+                    </p>
+                  )}
                   {appliedPromos.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {appliedPromos.map(p => (

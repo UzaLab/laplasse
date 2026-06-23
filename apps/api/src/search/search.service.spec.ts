@@ -1,12 +1,14 @@
 import { ConfigService } from '@nestjs/config'
 import { SearchService } from './search.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { AdsService } from '../ads/ads.service'
 
 describe('SearchService', () => {
   let service: SearchService
   let prisma: {
     merchant: { findMany: jest.Mock; findUnique: jest.Mock }
     shop: { findMany: jest.Mock }
+    menuItem: { findMany: jest.Mock }
     searchHistory: { create: jest.Mock }
   }
   const originalFetch = global.fetch
@@ -15,6 +17,7 @@ describe('SearchService', () => {
     prisma = {
       merchant: { findMany: jest.fn(), findUnique: jest.fn() },
       shop: { findMany: jest.fn().mockResolvedValue([]) },
+      menuItem: { findMany: jest.fn().mockResolvedValue([]) },
       searchHistory: { create: jest.fn() },
     }
 
@@ -29,6 +32,7 @@ describe('SearchService', () => {
     service = new SearchService(
       config as unknown as ConfigService,
       prisma as unknown as PrismaService,
+      { getActiveMerchantIdsForPlacement: jest.fn().mockResolvedValue(new Set()) } as unknown as AdsService,
     )
   })
 

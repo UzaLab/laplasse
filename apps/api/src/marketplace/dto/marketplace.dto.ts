@@ -2,6 +2,7 @@ import { Type } from 'class-transformer'
 import {
   IsArray,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsInt,
   IsNumber,
@@ -310,6 +311,57 @@ export class CheckoutDto {
   @ValidateNested({ each: true })
   @Type(() => ShopCheckoutDeliveryDto)
   shop_deliveries?: ShopCheckoutDeliveryDto[]
+}
+
+export class GuestCartItemDto {
+  @IsString()
+  productId!: string
+
+  @IsOptional()
+  @IsString()
+  variantId?: string
+
+  @IsInt()
+  @Min(1)
+  quantity!: number
+}
+
+export class GuestCartPreviewDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GuestCartItemDto)
+  items!: GuestCartItemDto[]
+}
+
+export class GuestCheckoutDto extends CheckoutDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  guest_first_name!: string
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  guest_last_name!: string
+
+  @IsOptional()
+  @IsBoolean()
+  create_account?: boolean
+
+  @IsOptional()
+  @IsEmail()
+  email?: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password?: string
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GuestCartItemDto)
+  cart_items!: GuestCartItemDto[]
 }
 
 export class ConfirmOrderPaymentDto {

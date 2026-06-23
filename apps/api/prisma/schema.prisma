@@ -138,6 +138,7 @@ model User {
   delivery_disputes DeliveryDispute[]
   logistics_partner LogisticsPartner? @relation("LogisticsPartnerOwner")
   logistics_partner_staff LogisticsPartnerStaff?
+  ad_campaigns      AdCampaign[]
 
   @@index([email])
   @@index([phone])
@@ -1049,6 +1050,7 @@ model Booking {
 enum AdCampaignStatus {
   DRAFT
   PENDING_PAYMENT
+  WAITLISTED
   ACTIVE
   EXPIRED
   CANCELLED
@@ -1059,26 +1061,46 @@ enum AdPlacement {
   FEATURED
   CATEGORY
   MARKETPLACE
+  MARKETPLACE_FEATURED_PRODUCTS
+}
+
+enum AdTargetType {
+  MERCHANT
+  SHOP
+  PRODUCT
 }
 
 model AdCampaign {
   id          String           @id @default(cuid())
-  merchant_id String
+  owner_id    String
+  merchant_id String?
+  shop_id     String?
+  product_id  String?
+  target_type AdTargetType     @default(MERCHANT)
   placement   AdPlacement      @default(SEARCH)
   status      AdCampaignStatus @default(DRAFT)
-  amount      Int
-  starts_at   DateTime
-  ends_at     DateTime
-  impressions Int              @default(0)
-  clicks      Int              @default(0)
-  payment_id  String?
+  amount          Int
+  duration_days   Int              @default(7)
+  starts_at       DateTime
+  ends_at         DateTime
+  impressions     Int              @default(0)
+  clicks          Int              @default(0)
+  waitlist_position Int?
+  payment_id      String?
   created_at  DateTime         @default(now())
 
-  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  owner    User      @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  merchant Merchant? @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  shop     Shop?     @relation(fields: [shop_id], references: [id], onDelete: SetNull)
+  product  Product?  @relation(fields: [product_id], references: [id], onDelete: SetNull)
 
   @@index([merchant_id])
+  @@index([owner_id])
+  @@index([shop_id])
+  @@index([product_id])
   @@index([status])
   @@index([ends_at])
+  @@index([target_type, placement, status, ends_at])
 }
 
 // ─── PLATFORM SETTINGS ─────────────────────────────────────────────────────────
@@ -1197,6 +1219,7 @@ model Shop {
   order_returns    OrderReturn[]
   delivery_contracts DeliveryPartnerContract[]
   staff_couriers   CourierProfile[] @relation("ShopStaffCouriers")
+  ad_campaigns     AdCampaign[]
 
   @@index([owner_id])
   @@index([slug])
@@ -1311,6 +1334,7 @@ model Product {
   collections ProductCollection[]
   reviews     ProductReview[]
   views       ProductView[]
+  ad_campaigns AdCampaign[]
 
   @@unique([shop_id, slug])
   @@index([shop_id, status])

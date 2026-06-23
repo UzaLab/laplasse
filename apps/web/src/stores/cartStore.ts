@@ -1,11 +1,30 @@
 import { create } from 'zustand'
 import {
   addCartItem,
+  fetchGuestCartPreview,
   updateCartItemQuantity,
   type Cart,
 } from '@/lib/marketplaceApi'
 import { authApiFetch } from '@/lib/authFetch'
+import {
+  addGuestCartLine,
+  clearGuestCart,
+  getGuestCartLines,
+  guestCartItemCount,
+  updateGuestCartLineByLocalId,
+} from '@/lib/guestCart'
+import { useAuthStore } from '@/stores/authStore'
 import { notify } from '@/lib/notify'
+
+function isAuthenticatedNow() {
+  return useAuthStore.getState().isAuthenticated
+}
+
+async function loadGuestCartPreview(): Promise<Cart | null> {
+  const lines = getGuestCartLines()
+  if (!lines.length) return null
+  return fetchGuestCartPreview(lines)
+}
 
 interface CartState {
   cart: Cart | null
@@ -51,6 +70,12 @@ export const useCartStore = create<CartState>((set, get) => ({
   loadCart: async () => {
     set({ loading: true })
     try {
+      if (!isAuthenticatedNow()) {
+        const guestCart = await loadGuestCartPreview()
+        set({ cart: guestCart })
+        return
+      }
+
       const res = await authApiFetch('/cart')
       if (res.ok) {
         set({ cart: await res.json() as Cart })
@@ -71,6 +96,23 @@ export const useCartStore = create<CartState>((set, get) => ({
   reset: () => set({ cart: null, drawerOpen: false }),
 
   addItem: async (productId, quantity, options) => {
+    if (!isAuthenticatedNow()) {
+      addGuestCartLine({
+        productId,
+        quantity,
+        variantId: options?.variantId,
+      })
+      const guestCart = await loadGuestCartPreview()
+      if (guestCart) {
+        set({ cart: guestCart })
+        if (options?.openDrawer !== false) set({ drawerOpen: true })
+        notify.success('Ajouté au panier')
+        return {}
+      }
+      notify.error('Impossible d\'ajouter au panier')
+      return { error: 'Impossible d\'ajouter au panier' }
+    }
+
     const { cart: next, error } = await addCartItem(productId, quantity, options?.variantId)
     if (next) {
       set({ cart: next })
@@ -83,6 +125,11 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   addMenuItem: async (menuItemId, quantity, options) => {
+    if (!isAuthenticatedNow()) {
+      notify.error('Connectez-vous pour commander au restaurant')
+      return { error: 'Authentification requise' }
+    }
+
     const res = await authApiFetch('/cart/menu-items', {
       method: 'POST',
       body: JSON.stringify({
@@ -106,6 +153,15 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   updateQuantity: async (itemId, quantity) => {
     set({ updatingItemId: itemId })
+
+    if (!isAuthenticatedNow()) {
+      updateGuestCartLineByLocalId(itemId, quantity)
+      const guestCart = await loadGuestCartPreview()
+      set({ cart: guestCart, updatingItemId: null })
+      if (quantity === 0) notify.success('Article retiré du panier')
+      return
+    }
+
     const { cart: next, error } = await updateCartItemQuantity(itemId, quantity)
     if (next) {
       set({ cart: next })
@@ -122,5 +178,10 @@ export const useCartStore = create<CartState>((set, get) => ({
 }))
 
 export function useCartItemCount() {
-  return useCartStore(s => s.cart?.item_count ?? 0)
+  const authCount = useCartStore(s => s.cart?.item_count ?? 0)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  if (isAuthenticated) return authCount
+  return guestCartItemCount()
 }
+
+export { clearGuestCart }

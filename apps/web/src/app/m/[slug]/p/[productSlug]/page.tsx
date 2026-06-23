@@ -162,7 +162,7 @@ export default function ProductDetailPage() {
       return false
     }
 
-    if (redirectToCheckout && isAuthenticated) {
+    if (redirectToCheckout) {
       router.push('/checkout')
     }
 

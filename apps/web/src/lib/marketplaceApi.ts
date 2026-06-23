@@ -114,6 +114,8 @@ export interface FeaturedProduct {
   currency: string
   image_url?: string | null
   merchant: { business_name: string; slug: string }
+  is_sponsored?: boolean
+  ad_campaign_id?: string | null
 }
 
 export interface MarketplaceCatalogProduct extends FeaturedProduct {
@@ -153,6 +155,7 @@ export interface MarketplaceBoutique {
 export interface MarketplaceSpotlightShop extends MarketplaceBoutique {
   is_sponsored?: boolean
   is_admin_featured?: boolean
+  ad_campaign_id?: string | null
 }
 
 export interface CartMerchantGroup {
@@ -416,6 +419,21 @@ export interface CheckoutInput {
   shop_deliveries?: ShopCheckoutDeliveryInput[]
 }
 
+export interface GuestCartItemInput {
+  productId: string
+  variantId?: string
+  quantity: number
+}
+
+export interface GuestCheckoutInput extends CheckoutInput {
+  guest_first_name: string
+  guest_last_name: string
+  create_account?: boolean
+  email?: string
+  password?: string
+  cart_items: GuestCartItemInput[]
+}
+
 export interface ReorderResult {
   cart: Cart
   added_count: number
@@ -614,6 +632,22 @@ export async function clearCart(): Promise<boolean> {
   return res.ok
 }
 
+export async function fetchGuestCartPreview(
+  items: GuestCartItemInput[],
+): Promise<Cart | null> {
+  if (!items.length) return null
+  const res = await fetchWithTimeout(authUrl('/cart/guest/preview'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...countryRequestHeaders(),
+    },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) return null
+  return res.json() as Promise<Cart>
+}
+
 export async function applyCartPromo(
   code: string,
   shopId?: string,
@@ -641,6 +675,23 @@ export async function checkout(
   if (!res.ok) return { result: null, error: await parseError(res) }
   const result = await res.json() as CheckoutResult
   return { result }
+}
+
+export async function guestCheckout(
+  input: GuestCheckoutInput,
+): Promise<{ result: CheckoutResult | null; user?: unknown; error?: string }> {
+  const res = await fetchWithTimeout(authUrl('/orders/checkout/guest'), {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...countryRequestHeaders(),
+    },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) return { result: null, error: await parseError(res) }
+  const data = await res.json() as { checkout: CheckoutResult; user?: unknown }
+  return { result: data.checkout, user: data.user }
 }
 
 export async function confirmOrderPayment(

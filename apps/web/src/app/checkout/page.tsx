@@ -11,8 +11,9 @@ import { Footer } from '@/components/layout/Footer'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
-import { GuestCheckoutAuth } from '@/features/marketplace/components/GuestCheckoutAuth'
 import { useAuthReady } from '@/hooks/useAuthReady'
+import { useAuthStore, type AuthUser } from '@/stores/authStore'
+import { invalidateAuthSession } from '@/lib/authSession'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import {
   buildCheckoutSession,
@@ -26,9 +27,13 @@ import {
 import {
   checkout,
   fetchCart,
+  fetchGuestCartPreview,
+  guestCheckout,
   formatPrice,
   type Cart,
 } from '@/lib/marketplaceApi'
+import { getGuestCartLines } from '@/lib/guestCart'
+import { clearGuestCart } from '@/stores/cartStore'
 import {
   fetchDeliveryQuote,
   fetchGeoCities,
@@ -87,10 +92,17 @@ function CheckoutPageContent() {
   const searchParams = useSearchParams()
   const routeFlow: OrderFlow = pathname.startsWith('/commande') ? 'food' : 'marketplace'
   const foodFlowParam = searchParams.get('flow') === 'food'
-  const { ready, hydrated, isAuthenticated, user } = useAuthReady()
+  const { hydrated, isAuthenticated, user } = useAuthReady()
+  const setAuth = useAuthStore(s => s.setAuth)
   const [cart, setCart] = useState<Cart | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  const [guestFirstName, setGuestFirstName] = useState('')
+  const [guestLastName, setGuestLastName] = useState('')
+  const [createAccount, setCreateAccount] = useState(false)
+  const [accountEmail, setAccountEmail] = useState('')
+  const [accountPassword, setAccountPassword] = useState('')
 
   const [deliveryType, setDeliveryType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP')
   const [deliveryAddress, setDeliveryAddress] = useState('')
@@ -161,12 +173,14 @@ function CheckoutPageContent() {
   }, [cart?.subtotal, promoDiscount, deliveryFee, hasAnyDelivery, routeFlow])
 
   useEffect(() => {
-    if (!ready) return
-    if (!isAuthenticated) {
-      setLoading(false)
-      return
-    }
-    fetchCart().then(data => {
+    if (!hydrated || submitting) return
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      const data = isAuthenticated
+        ? await fetchCart()
+        : await fetchGuestCartPreview(getGuestCartLines())
+      if (cancelled) return
       setCart(data)
       setLoading(false)
       if (!data?.items.length) return
@@ -179,11 +193,13 @@ function CheckoutPageContent() {
         notify.error('Panier incompatible — videz-le avant de continuer.')
         router.replace(getCartRoute('food') ?? '/cart')
       }
-    })
+    }
+    void load()
     void fetchGeoCities().then(r => {
-      if (r.ok) setCities(r.data)
+      if (!cancelled && r.ok) setCities(r.data)
     })
-  }, [ready, isAuthenticated, routeFlow, router])
+    return () => { cancelled = true }
+  }, [hydrated, isAuthenticated, routeFlow, router, submitting])
 
   useEffect(() => {
     if (loading || !cart?.items.length || isFoodFlow) return
@@ -213,14 +229,14 @@ function CheckoutPageContent() {
   }, [])
 
   useEffect(() => {
-    if (!ready) return
+    if (!hydrated) return
     const saved = getCheckoutFormState()
     if (saved?.customerPhone?.trim()) {
       setCustomerPhone(saved.customerPhone)
-    } else if (user?.phone?.trim()) {
+    } else if (isAuthenticated && user?.phone?.trim()) {
       setCustomerPhone(user.phone)
     }
-  }, [ready, user?.phone])
+  }, [hydrated, isAuthenticated, user?.phone])
 
   const applySavedAddress = useCallback((addr: UserAddress) => {
     setSelectedAddressId(addr.id)
@@ -238,7 +254,7 @@ function CheckoutPageContent() {
   }, [])
 
   useEffect(() => {
-    if (!ready) return
+    if (!hydrated || !isAuthenticated) return
     void fetchMyAddresses().then(addrs => {
       setSavedAddresses(addrs)
       const saved = getCheckoutFormState()
@@ -250,7 +266,7 @@ function CheckoutPageContent() {
         if (match) applySavedAddress(match)
       }
     })
-  }, [ready, applySavedAddress])
+  }, [hydrated, isAuthenticated, applySavedAddress])
 
   useEffect(() => {
     const draft: CheckoutDraft = {
@@ -370,9 +386,11 @@ function CheckoutPageContent() {
   useEffect(() => {
     if (!cart?.merchants.length || isFoodFlow) return
     setShopDeliveries(prev => {
+      let changed = false
       const next = { ...prev }
       for (const merchant of cart.merchants) {
         if (!next[merchant.id]) {
+          changed = true
           next[merchant.id] = {
             deliveryType: 'PICKUP',
             deliveryCityId: deliveryCityId || '',
@@ -382,7 +400,7 @@ function CheckoutPageContent() {
           }
         }
       }
-      return next
+      return changed ? next : prev
     })
   }, [cart?.merchants, isFoodFlow, deliveryCityId, deliveryCommuneId, deliveryDistrict, deliveryAddressDetail])
 
@@ -422,7 +440,6 @@ function CheckoutPageContent() {
   const Steps = isFoodFlow ? FoodCheckoutSteps : CheckoutSteps
   const paymentPath = getPaymentRoute(isFoodFlow ? 'food' : 'marketplace')
   const emptyCartHref = isFoodFlow ? '/commande' : '/cart'
-  const loginRedirect = isFoodFlow ? '/commande/livraison' : '/checkout'
 
   useEffect(() => {
     if (isFoodFlow && allowDelivery) {
@@ -462,6 +479,23 @@ function CheckoutPageContent() {
       return
     }
 
+    if (!isAuthenticated) {
+      if (!guestFirstName.trim() || !guestLastName.trim()) {
+        notify.error('Nom et prénom requis pour commander en invité')
+        return
+      }
+      if (createAccount) {
+        if (!accountEmail.trim() || !accountPassword) {
+          notify.error('Email et mot de passe requis pour créer un compte')
+          return
+        }
+        if (accountPassword.length < 8) {
+          notify.error('Le mot de passe doit contenir au moins 8 caractères')
+          return
+        }
+      }
+    }
+
     if (useSplitDelivery) {
       for (const merchant of cart.merchants) {
         const cfg = shopDeliveries[merchant.id]
@@ -488,7 +522,7 @@ function CheckoutPageContent() {
         return
       }
 
-      if (saveNewAddress && !selectedAddressId) {
+      if (saveNewAddress && !selectedAddressId && isAuthenticated) {
         const { address, error: addrErr } = await createUserAddress({
           label: newAddressLabel.trim() || undefined,
           city_id: deliveryCityId,
@@ -534,7 +568,8 @@ function CheckoutPageContent() {
       : undefined
 
     setSubmitting(true)
-    const { result, error: err } = await checkout({
+
+    const checkoutPayload = {
       delivery_type: useSplitDelivery
         ? (hasAnyDelivery ? 'DELIVERY' : 'PICKUP')
         : deliveryType,
@@ -552,12 +587,41 @@ function CheckoutPageContent() {
       customer_phone: phone,
       applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
       shop_deliveries: splitPayload,
-    })
+    }
+
+    let result = null as Awaited<ReturnType<typeof checkout>>['result']
+    let err: string | undefined
+    let guestUser: unknown
+
+    if (isAuthenticated) {
+      const response = await checkout(checkoutPayload)
+      result = response.result
+      err = response.error
+    } else {
+      const response = await guestCheckout({
+        ...checkoutPayload,
+        guest_first_name: guestFirstName.trim(),
+        guest_last_name: guestLastName.trim(),
+        create_account: createAccount || undefined,
+        email: createAccount ? accountEmail.trim() : undefined,
+        password: createAccount ? accountPassword : undefined,
+        cart_items: getGuestCartLines(),
+      })
+      result = response.result
+      err = response.error
+      guestUser = response.user
+    }
 
     if (!result) {
       notify.error(err ?? 'Erreur lors de la commande')
       setSubmitting(false)
       return
+    }
+
+    if (guestUser) {
+      invalidateAuthSession()
+      setAuth(guestUser as AuthUser)
+      clearGuestCart()
     }
 
     saveCheckoutSession(
@@ -606,27 +670,6 @@ function CheckoutPageContent() {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
         <Loader2 size={28} className="animate-spin text-slate-300" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#FAFAFA]">
-        <Navbar />
-        <Steps current={2} />
-        <main className={`${PAGE_CONTAINER} py-12 max-w-xl`}>
-          <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Finaliser votre commande</h1>
-          <p className="text-slate-500 mb-8">Identifiez-vous par SMS pour accéder à votre panier.</p>
-          <GuestCheckoutAuth />
-          <p className="text-sm text-slate-500 mt-6 text-center">
-            Déjà un compte ?{' '}
-            <Link href={`/login?redirect=${encodeURIComponent(loginRedirect)}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
-              Se connecter
-            </Link>
-          </p>
-        </main>
-        <Footer />
       </div>
     )
   }
@@ -752,7 +795,7 @@ function CheckoutPageContent() {
                     <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
                       <p className="text-sm font-bold text-slate-900">Adresse de livraison</p>
 
-                      {savedAddresses.length > 0 && (
+                      {isAuthenticated && savedAddresses.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                             Adresses enregistrées
@@ -803,7 +846,7 @@ function CheckoutPageContent() {
                         </div>
                       )}
 
-                      {(!selectedAddressId || savedAddresses.length === 0) && (
+                      {(!isAuthenticated || !selectedAddressId || savedAddresses.length === 0) && (
                         <>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1.5">Ville</label>
@@ -870,7 +913,7 @@ function CheckoutPageContent() {
                         />
                       </div>
 
-                      {!selectedAddressId && (
+                      {isAuthenticated && !selectedAddressId && (
                         <div className="pt-2 border-t border-slate-100 space-y-3">
                           <label className="flex items-center gap-2.5 cursor-pointer">
                             <input
@@ -956,6 +999,34 @@ function CheckoutPageContent() {
                 </>
                 )}
 
+                {!isAuthenticated && (
+                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                    <p className="text-sm font-bold text-slate-900">Vos coordonnées</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Prénom *</label>
+                        <input
+                          type="text"
+                          value={guestFirstName}
+                          onChange={e => setGuestFirstName(e.target.value)}
+                          required
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">Nom *</label>
+                        <input
+                          type="text"
+                          value={guestLastName}
+                          onChange={e => setGuestLastName(e.target.value)}
+                          required
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">
                     Téléphone <span className="text-red-500">*</span>
@@ -969,6 +1040,46 @@ function CheckoutPageContent() {
                     placeholder="+225…"
                   />
                 </div>
+
+                {!isAuthenticated && (
+                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={createAccount}
+                        onChange={e => setCreateAccount(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-300 text-brand-500 focus:ring-brand-500/20"
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Créer un compte LaPlasse pour suivre mes commandes
+                      </span>
+                    </label>
+                    {createAccount && (
+                      <div className="space-y-4 pt-2 border-t border-slate-100">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5">Email *</label>
+                          <input
+                            type="email"
+                            value={accountEmail}
+                            onChange={e => setAccountEmail(e.target.value)}
+                            placeholder="vous@exemple.ci"
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5">Mot de passe *</label>
+                          <input
+                            type="password"
+                            value={accountPassword}
+                            onChange={e => setAccountPassword(e.target.value)}
+                            placeholder="8 caractères minimum"
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">

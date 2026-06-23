@@ -13,6 +13,7 @@ import {
 import { OrganizationType } from '../../generated/prisma/client'
 import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
 import { uniqueMerchantSlug } from '../common/slug.util'
+import { AdsService } from '../ads/ads.service'
 
 const DEFAULT_CITY_BY_COUNTRY: Record<string, string> = {
   CI: 'Abidjan',
@@ -96,6 +97,7 @@ export class MerchantsService {
     private readonly otp: OtpService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly ads: AdsService,
   ) {}
 
   // ── Helper : résoudre l'établissement actif d'un utilisateur ────────────────
@@ -124,6 +126,10 @@ export class MerchantsService {
       }),
     }
 
+    const categoryBoostIds = query.category
+      ? await this.ads.getActiveMerchantIdsForPlacement('CATEGORY')
+      : new Set<string>()
+
     const [merchants, total] = await Promise.all([
       this.prisma.merchant.findMany({
         where,
@@ -135,7 +141,20 @@ export class MerchantsService {
       this.prisma.merchant.count({ where }),
     ])
 
-    const formatted = merchants.map(m => this.formatMerchant(m))
+    let orderedMerchants = merchants
+    if (categoryBoostIds.size > 0) {
+      const boosted = merchants.filter(m => categoryBoostIds.has(m.id))
+      const regular = merchants.filter(m => !categoryBoostIds.has(m.id))
+      orderedMerchants = [...boosted.slice(0, 3), ...regular]
+    }
+
+    const formatted = orderedMerchants.map(m => {
+      const row = this.formatMerchant(m)
+      if (categoryBoostIds.has(m.id)) {
+        ;(row as { is_sponsored: boolean }).is_sponsored = true
+      }
+      return row
+    })
 
     return {
       data: await attachCardPreviewsToMerchants(this.prisma, formatted),
@@ -155,31 +174,57 @@ export class MerchantsService {
       location: buildLocationFilter({ city: resolvedCity, country: cc }),
     }
 
+    const featuredBoostIds = await this.ads.getActiveMerchantIdsForPlacement('FEATURED')
+    const boostIdList = [...featuredBoostIds]
+
+    const boosted = boostIdList.length
+      ? await this.prisma.merchant.findMany({
+          where: { ...baseWhere, id: { in: boostIdList }, verification_status: 'VERIFIED' },
+          select: MERCHANT_PUBLIC_SELECT,
+        })
+      : []
+
     const verified = await this.prisma.merchant.findMany({
-      where: { ...baseWhere, verification_status: 'VERIFIED' },
+      where: {
+        ...baseWhere,
+        verification_status: 'VERIFIED',
+        ...(boostIdList.length ? { id: { notIn: boostIdList } } : {}),
+      },
       select: MERCHANT_PUBLIC_SELECT,
       orderBy: [{ is_sponsored: 'desc' }, { trust_score: 'desc' }],
       take: limit,
     })
 
-    let merchants = verified
-    if (verified.length < limit) {
-      const verifiedIds = new Set(verified.map(m => m.id))
+    const seen = new Set<string>()
+    let merchants = [...boosted, ...verified].filter(m => {
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    }).slice(0, limit)
+
+    if (merchants.length < limit) {
+      const usedIds = new Set(merchants.map(m => m.id))
       const fallback = await this.prisma.merchant.findMany({
         where: {
           ...baseWhere,
-          id: verifiedIds.size ? { notIn: [...verifiedIds] } : undefined,
+          id: usedIds.size ? { notIn: [...usedIds] } : undefined,
         },
         select: MERCHANT_PUBLIC_SELECT,
         orderBy: [{ is_sponsored: 'desc' }, { trust_score: 'desc' }],
-        take: limit - verified.length,
+        take: limit - merchants.length,
       })
-      merchants = [...verified, ...fallback]
+      merchants = [...merchants, ...fallback]
     }
 
     return attachCardPreviewsToMerchants(
       this.prisma,
-      merchants.map(m => this.formatMerchant(m)),
+      merchants.map(m => {
+        const formatted = this.formatMerchant(m)
+        if (featuredBoostIds.has(m.id)) {
+          ;(formatted as { is_sponsored: boolean }).is_sponsored = true
+        }
+        return formatted
+      }),
     )
   }
 

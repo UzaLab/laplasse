@@ -8,6 +8,7 @@ import {
   type FeaturedProduct,
   type MarketplaceProduct,
 } from '@/lib/marketplaceApi'
+import { recordAdEvent } from '@/lib/adsApi'
 import { ProductFavoriteButton } from './ProductFavoriteButton'
 
 type ProductCardProduct = FeaturedProduct | MarketplaceProduct
@@ -22,6 +23,7 @@ interface ProductCardProps {
   variant?: 'default' | 'boutique' | 'related'
   showBestSeller?: boolean
   adding?: boolean
+  adCampaignId?: string | null
 }
 
 function getMerchantInfo(product: ProductCardProduct, merchantSlug?: string, merchantName?: string) {
@@ -41,9 +43,13 @@ export function ProductCard({
   variant = 'default',
   showBestSeller = false,
   adding = false,
+  adCampaignId,
 }: ProductCardProps) {
   const { slug, name } = getMerchantInfo(product, merchantSlug, merchantName)
   const href = slug ? `/m/${slug}/p/${product.slug}` : '#'
+  const trackAdClick = () => {
+    if (adCampaignId) recordAdEvent(adCampaignId, 'click')
+  }
   const image = product.image_url || PLACEHOLDER_PRODUCT_IMAGE
   const outOfStock =
     'stock_quantity' in product && product.stock_quantity !== undefined && product.stock_quantity <= 0
@@ -203,9 +209,11 @@ export function ProductCard({
     )
   }
 
+  const isSponsored = 'is_sponsored' in product && product.is_sponsored
+
   return (
     <div className="group">
-      <Link href={href} className="block" style={{ textDecoration: 'none' }}>
+      <Link href={href} onClick={trackAdClick} className="block" style={{ textDecoration: 'none' }}>
         <div
           className={`aspect-square bg-slate-50 overflow-hidden relative border border-slate-100 group-hover:border-brand-200 transition-colors ${
             compact ? 'rounded-xl mb-2' : 'rounded-3xl mb-4'
@@ -225,6 +233,11 @@ export function ProductCard({
           {showBestSeller && !outOfStock && (
             <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-brand-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
               <Sparkles size={10} /> Best-Seller
+            </div>
+          )}
+          {isSponsored && !showBestSeller && !outOfStock && (
+            <div className="absolute top-3 left-3 bg-amber-400 text-white px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+              <Sparkles size={10} /> Sponsorisé
             </div>
           )}
         </div>

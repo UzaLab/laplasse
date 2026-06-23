@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '../prisma/prisma.service'
 import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
 import { isMenuMirrorProductSlug } from '../marketplace/marketplace.util'
+import { AdsService } from '../ads/ads.service'
 
 export interface SearchFilters {
   q?: string
@@ -47,6 +48,7 @@ export class SearchService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly ads: AdsService,
   ) {
     this.meiliHost = this.config.get('MEILI_HOST') ?? 'http://localhost:7700'
     this.meiliKey = this.config.get('MEILI_MASTER_KEY') ?? ''
@@ -262,10 +264,19 @@ export class SearchService implements OnModuleInit {
         processingTimeMs: number
       }
 
-      // Sponsored merchants bubble up (max 2 slots), only when relevant (verified)
-      const sponsored = result.hits.filter(h => h['is_sponsored'] && h['verification_status'] === 'VERIFIED')
-      const regular   = result.hits.filter(h => !h['is_sponsored'] || h['verification_status'] !== 'VERIFIED')
-      const sorted    = [...sponsored.slice(0, 3), ...regular]
+      const searchBoostIds = await this.ads.getActiveMerchantIdsForPlacement('SEARCH')
+      let hits = result.hits
+
+      if (offset === 0 && searchBoostIds.size > 0) {
+        const hitIds = new Set(hits.map(h => String(h.id)))
+        const injected = await this.fetchInjectedSearchSponsors(searchBoostIds, filters, hitIds, 3)
+        hits = [...injected, ...hits]
+      }
+
+      const sorted = this.sortSearchHitsWithBoost(hits, searchBoostIds).slice(0, limit)
+      const injectedCount = offset === 0
+        ? sorted.filter(h => searchBoostIds.has(String(h.id)) && !result.hits.some(r => String(r.id) === String(h.id))).length
+        : 0
 
       const enriched = await attachCardPreviewsToMerchants(
         this.prisma,
@@ -273,9 +284,9 @@ export class SearchService implements OnModuleInit {
       )
 
       return {
-        data: enriched,
+        data: this.markSearchSponsors(enriched, searchBoostIds),
         meta: {
-          total: result.estimatedTotalHits ?? result.hits.length,
+          total: (result.estimatedTotalHits ?? result.hits.length) + injectedCount,
           query: q,
           limit,
           offset,
@@ -288,9 +299,155 @@ export class SearchService implements OnModuleInit {
     }
   }
 
+  private isSearchHitBoosted(
+    hit: { id?: unknown; is_sponsored?: unknown; verification_status?: unknown },
+    searchBoostIds: Set<string>,
+  ) {
+    return (
+      (searchBoostIds.has(String(hit.id)) || Boolean(hit.is_sponsored))
+      && hit.verification_status === 'VERIFIED'
+    )
+  }
+
+  private sortSearchHitsWithBoost(
+    hits: MeiliDocument[],
+    searchBoostIds: Set<string>,
+  ): MeiliDocument[] {
+    const isBoosted = (h: MeiliDocument) => this.isSearchHitBoosted(h, searchBoostIds)
+    const sponsored = hits.filter(isBoosted)
+    const regular = hits.filter(h => !isBoosted(h))
+    const seen = new Set<string>()
+    return [...sponsored.slice(0, 3), ...regular].filter(h => {
+      const id = String(h.id)
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  }
+
+  private markSearchSponsors<T extends Record<string, unknown>>(
+    items: Array<T & { id: string }>,
+    searchBoostIds: Set<string>,
+  ): Array<T & { id: string }> {
+    return items.map(item => {
+      const fromCampaign = searchBoostIds.has(String(item.id))
+      const legacy = Boolean(item.is_sponsored)
+      if ((fromCampaign || legacy) && item.verification_status === 'VERIFIED') {
+        return { ...item, is_sponsored: true }
+      }
+      return item
+    })
+  }
+
+  private merchantSearchSelect = {
+    id: true,
+    business_name: true,
+    slug: true,
+    description: true,
+    cover_image: true,
+    whatsapp: true,
+    verification_status: true,
+    trust_score: true,
+    is_sponsored: true,
+    category: { select: { name: true, slug: true, icon: true } },
+    location: { select: { city: true, district: true, country: true } },
+    _count: { select: { reviews: { where: { status: 'APPROVED' as const } } } },
+  } as const
+
+  private formatMerchantAsSearchHit(
+    m: {
+      id: string
+      business_name: string
+      slug: string
+      description: string | null
+      cover_image: string | null
+      whatsapp: string | null
+      verification_status: string
+      trust_score: number
+      is_sponsored: boolean
+      category: { name: string; slug: string; icon: string | null }
+      location: { city: string | null; district: string | null; country?: string | null } | null
+      _count: { reviews: number }
+    },
+    forceSponsored = false,
+  ): MeiliDocument {
+    return {
+      id: m.id,
+      business_name: m.business_name,
+      slug: m.slug,
+      description: m.description ?? '',
+      cover_image: m.cover_image,
+      whatsapp: m.whatsapp,
+      verification_status: m.verification_status,
+      trust_score: m.trust_score,
+      is_sponsored: forceSponsored || m.is_sponsored,
+      category_name: m.category.name,
+      category_slug: m.category.slug,
+      category_icon: m.category.icon,
+      city: m.location?.city ?? null,
+      district: m.location?.district ?? null,
+      country: m.location?.country ?? 'CI',
+      review_count: m._count.reviews,
+    }
+  }
+
+  private buildSearchSponsorWhere(filters: SearchFilters, candidateIds: string[]) {
+    const { q, category, city, district, country, verified } = filters
+    return {
+      id: { in: candidateIds },
+      is_active: true,
+      verification_status: 'VERIFIED' as const,
+      ...(category && { category: { slug: category } }),
+      ...(country && { location: { country: country.toUpperCase() } }),
+      ...(city && { location: { city: { equals: city, mode: 'insensitive' as const } } }),
+      ...(district && { location: { district: { contains: district, mode: 'insensitive' as const } } }),
+      ...(verified && { verification_status: 'VERIFIED' as const }),
+      ...(q?.trim() && {
+        OR: [
+          { business_name: { contains: q.trim(), mode: 'insensitive' as const } },
+          { description: { contains: q.trim(), mode: 'insensitive' as const } },
+        ],
+      }),
+    }
+  }
+
+  private async fetchInjectedSearchMerchants(
+    searchBoostIds: Set<string>,
+    filters: SearchFilters,
+    existingHitIds: Set<string>,
+    max: number,
+  ) {
+    const candidateIds = [...searchBoostIds].filter(id => !existingHitIds.has(id))
+    if (!candidateIds.length) return []
+
+    return this.prisma.merchant.findMany({
+      where: this.buildSearchSponsorWhere(filters, candidateIds),
+      select: this.merchantSearchSelect,
+      take: max,
+      orderBy: { trust_score: 'desc' },
+    })
+  }
+
+  private async fetchInjectedSearchSponsors(
+    searchBoostIds: Set<string>,
+    filters: SearchFilters,
+    existingHitIds: Set<string>,
+    max: number,
+  ): Promise<MeiliDocument[]> {
+    const merchants = await this.fetchInjectedSearchMerchants(
+      searchBoostIds,
+      filters,
+      existingHitIds,
+      max,
+    )
+    return merchants.map(m => this.formatMerchantAsSearchHit(m, true))
+  }
+
   private async fallbackSearch(filters: SearchFilters) {
     const { q, category, city, district, country, verified, limit = 20, offset = 0 } = filters
-    const merchants = await this.prisma.merchant.findMany({
+    const searchBoostIds = await this.ads.getActiveMerchantIdsForPlacement('SEARCH')
+
+    let merchants = await this.prisma.merchant.findMany({
       where: {
         is_active: true,
         ...(q && {
@@ -305,26 +462,27 @@ export class SearchService implements OnModuleInit {
         ...(district && { location: { district: { contains: district, mode: 'insensitive' } } }),
         ...(verified && { verification_status: 'VERIFIED' }),
       },
-      select: {
-        id: true,
-        business_name: true,
-        slug: true,
-        description: true,
-        cover_image: true,
-        whatsapp: true,
-        verification_status: true,
-        trust_score: true,
-        is_sponsored: true,
-        category: { select: { name: true, slug: true, icon: true } },
-        location: { select: { city: true, district: true } },
-        _count: { select: { reviews: { where: { status: 'APPROVED' } } } },
-      },
+      select: this.merchantSearchSelect,
       orderBy: { trust_score: 'desc' },
       take: limit,
       skip: offset,
     })
 
-    const formatted = merchants.map(m => ({
+    if (offset === 0 && searchBoostIds.size > 0) {
+      const pageIds = new Set(merchants.map(m => m.id))
+      const injected = await this.fetchInjectedSearchMerchants(searchBoostIds, filters, pageIds, 3)
+      if (injected.length) {
+        merchants = [...injected, ...merchants]
+      }
+    }
+
+    const isBoosted = (m: (typeof merchants)[number]) =>
+      this.isSearchHitBoosted(m, searchBoostIds)
+    const sponsored = merchants.filter(isBoosted)
+    const regular = merchants.filter(m => !isBoosted(m))
+    const merged = [...sponsored.slice(0, 3), ...regular].slice(0, limit)
+
+    const formatted = merged.map(m => ({
       id: m.id,
       business_name: m.business_name,
       slug: m.slug,
@@ -333,7 +491,7 @@ export class SearchService implements OnModuleInit {
       whatsapp: m.whatsapp,
       verification_status: m.verification_status,
       trust_score: m.trust_score,
-      is_sponsored: m.is_sponsored,
+      is_sponsored: searchBoostIds.has(m.id) || m.is_sponsored,
       category: m.category,
       category_name: m.category.name,
       category_slug: m.category.slug,
@@ -344,9 +502,11 @@ export class SearchService implements OnModuleInit {
       review_count: m._count.reviews,
     }))
 
+    const enriched = await attachCardPreviewsToMerchants(this.prisma, formatted)
+
     return {
-      data: await attachCardPreviewsToMerchants(this.prisma, formatted),
-      meta: { total: merchants.length, query: q ?? '', limit, offset, processing_time_ms: 0 },
+      data: this.markSearchSponsors(enriched, searchBoostIds),
+      meta: { total: merged.length, query: q ?? '', limit, offset, processing_time_ms: 0 },
     }
   }
 

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutGrid, Package, ShoppingBag, FolderOpen, Tag, Truck, Settings,
   LogOut, Compass, Menu, X, UserCircle2, Store, Building2, Plus,
-  ChevronDown, ExternalLink, Lock,
+  ChevronDown, ExternalLink, Lock, Megaphone,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { getIndependentShops } from '@/lib/shopApi'
@@ -65,6 +65,7 @@ export function ShopShell({ children }: ShopShellProps) {
       locked: !hasPlan,
     },
     { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: <Truck size={17} /> },
+    { href: '/shop/manage/visibility', label: 'Visibilité', icon: <Megaphone size={17} /> },
     { href: '/shop/manage/settings', label: 'Paramètres', icon: <Settings size={17} /> },
   ]
 
