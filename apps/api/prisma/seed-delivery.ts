@@ -22,3 +22,22 @@ export async function seedDelivery(prisma: PrismaClient) {
 
   console.log(`✅ Seed delivery : ${couriers.length} coursiers`)
 }
+
+async function main() {
+  const { Pool } = await import('pg')
+  const { PrismaPg } = await import('@prisma/adapter-pg')
+  const { PrismaClient } = await import('../generated/prisma/client')
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
+  try {
+    await seedDelivery(prisma)
+  } finally {
+    await prisma.$disconnect()
+    await pool.end()
+  }
+}
+
+if (require.main === module) {
+  main().catch(e => { console.error(e); process.exit(1) })
+}
