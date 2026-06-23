@@ -89,7 +89,10 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
         {/* Tabs sub-nav */}
         {!hideTabs && activeShop && (
           <nav className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl">
-            {TABS.map(({ href, label, icon: Icon, exact, locked }) => {
+            {TABS.map(tab => {
+              const { href, label, icon: Icon } = tab
+              const exact = 'exact' in tab ? tab.exact : undefined
+              const locked = 'locked' in tab ? tab.locked : undefined
               const active = isTabActive(href, exact)
               return (
                 <Link
@@ -107,7 +110,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
                 >
                   <Icon size={16} className={active ? 'text-brand-500' : undefined} />
                   {label}
-                  {'locked' in { locked } && locked && <Lock size={11} className="text-slate-300" />}
+                  {locked && <Lock size={11} className="text-slate-300" />}
                 </Link>
               )
             })}

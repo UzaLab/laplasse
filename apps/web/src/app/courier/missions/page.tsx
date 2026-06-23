@@ -179,9 +179,9 @@ export default function CourierMissionsPage() {
               job={activeJob}
               mode="active"
               loading={advanceMutation.isPending}
-              onAdvance={(jobId, status, proofOtp) =>
-                advanceMutation.mutateAsync({ jobId, status, proofOtp })
-              }
+              onAdvance={async (jobId, status, proofOtp) => {
+                await advanceMutation.mutateAsync({ jobId, status, proofOtp })
+              }}
               onProofPhoto={async (jobId, file) => {
                 const { proof_photo_url, error } = await uploadCourierProofPhoto(jobId, file)
                 if (error) {

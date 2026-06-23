@@ -106,8 +106,7 @@ export function AddressLocationPicker({
     if (latitude == null && longitude == null && commune?.latitude != null && commune.longitude != null) {
       onChange({ latitude: commune.latitude!, longitude: commune.longitude! })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [commune?.id, city?.id])
+  }, [commune?.latitude, commune?.longitude, latitude, longitude, onChange])
 
   const useMyLocation = () => {
     if (!navigator.geolocation) return

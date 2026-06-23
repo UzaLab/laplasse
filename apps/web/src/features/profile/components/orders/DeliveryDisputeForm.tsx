@@ -36,7 +36,7 @@ export function DeliveryDisputeForm({
   dialogOnly = false,
 }: Props) {
   const queryClient = useQueryClient()
-  const [reason, setReason] = useState(DELIVERY_DISPUTE_REASONS[0].value)
+  const [reason, setReason] = useState<string>(DELIVERY_DISPUTE_REASONS[0].value)
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showForm, setShowForm] = useState(false)

@@ -42,7 +42,7 @@ export async function subscribeToWebPush(): Promise<{ ok: boolean; reason?: stri
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
+      applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
     })
   }
 
