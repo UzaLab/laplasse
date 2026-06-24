@@ -123,6 +123,7 @@ export interface ApiMerchant {
   has_marketplace?: boolean
   featured_product?: ApiShopFeaturedProduct
   featured_vertical?: ApiVerticalFeaturedItem
+  distance_km?: number
 }
 
 export interface ApiMerchantDetail extends ApiMerchant {
@@ -196,6 +197,24 @@ export const api = {
     nearby: (city = getDefaultCity(), district?: string, limit = 6) => {
       const qs = new URLSearchParams({ city, limit: String(limit) })
       if (district) qs.set('district', district)
+      return apiFetch<ApiMerchant[]>(`/merchants/nearby?${qs}`)
+    },
+    nearbyGeo: (params: {
+      city?: string
+      lat: number
+      lng: number
+      radiusKm?: number
+      limit?: number
+      country?: string
+    }) => {
+      const qs = new URLSearchParams({
+        lat: String(params.lat),
+        lng: String(params.lng),
+        radius: String(params.radiusKm ?? 2),
+        limit: String(params.limit ?? 40),
+      })
+      if (params.city) qs.set('city', params.city)
+      if (params.country) qs.set('country', params.country)
       return apiFetch<ApiMerchant[]>(`/merchants/nearby?${qs}`)
     },
     bySlug: (slug: string) => apiFetch<ApiMerchantDetail>(`/merchants/${slug}`),

@@ -86,3 +86,9 @@ body {
   line-height: 1.35;
 }
 
+/* Slider vertical — contrôle rayon carte mobile */
+.search-mobile-radius-slider {
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+

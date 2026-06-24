@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   X, User, LogOut, LayoutDashboard, UserCircle2, Heart, MapPin, ShoppingBag,
 } from 'lucide-react'
@@ -28,6 +28,13 @@ export function MobileNav({
 }: MobileNavProps) {
   const t = useT()
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const showCartBadge = mounted && cartCount > 0
 
   useEffect(() => {
     if (!open) return
@@ -96,7 +103,7 @@ export function MobileNav({
               <span className="flex items-center gap-3">
                 <ShoppingBag size={18} /> {t('nav.myCart')}
               </span>
-              {cartCount > 0 && (
+              {showCartBadge && (
                 <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {cartCount > 9 ? '9+' : cartCount}
                 </span>
