@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard, Store, Star, AlertTriangle, Users, Tags,
-  Menu, X, ChevronRight, Bell, Settings, MapPin, ChevronUp, TrendingUp,
-  Truck, Globe,
-} from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Menu, X, LogOut, ExternalLink } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
+import { AdminMobileNav } from '@/features/admin/components/AdminMobileNav'
+import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { useAuthStore } from '@/stores/authStore'
 import { adminFetch } from '@/lib/adminApi'
+import {
+  ADMIN_NAV_GROUPS,
+  badgesFromStats,
+  getAdminPageTitle,
+  isAdminNavActive,
+  type AdminNavBadges,
+} from '@/features/admin/adminNav'
 
 interface AdminStats {
   merchants: { total: number; pending: number; verified: number }
@@ -21,33 +28,28 @@ interface AdminStats {
   complaints?: { open: number }
 }
 
-interface NavItem {
-  href: string
-  label: string
-  icon: React.ReactNode
-  badge?: number
-  exact?: boolean
-}
-
 interface AdminShellProps {
-  pageTitle: string
   children: React.ReactNode
 }
 
-export function AdminShell({ pageTitle, children }: AdminShellProps) {
+export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { ready, user } = useAdminSession()
+  const logoutRemote = useAuthStore(s => s.logoutRemote)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [stats, setStats] = useState<AdminStats | null>(null)
+  const [badges, setBadges] = useState<AdminNavBadges>(badgesFromStats(null))
 
   useEffect(() => {
     if (!ready) return
     adminFetch<AdminStats>('/admin/stats').then(data => {
-      if (data) setStats(data)
+      if (data) setBadges(badgesFromStats(data))
     })
-  }, [ready])
+  }, [ready, pathname])
 
   if (!ready || !user) return null
+
+  const pageTitle = getAdminPageTitle(pathname)
 
   const initials = (user.full_name ?? user.email)
     .split(/[\s@]/)
@@ -56,222 +58,179 @@ export function AdminShell({ pageTitle, children }: AdminShellProps) {
     .map(s => s[0]?.toUpperCase())
     .join('')
 
-  const mainNav: NavItem[] = [
-    { href: '/admin', label: "Vue d'ensemble", icon: <LayoutDashboard size={18} />, exact: true },
-    { href: '/admin/growth', label: 'Growth Dashboard', icon: <TrendingUp size={18} /> },
-  ]
+  const handleLogout = async () => {
+    await logoutRemote()
+    router.push('/')
+  }
 
-  const catalogueNav: NavItem[] = [
-    {
-      href: '/admin/merchants',
-      label: 'Établissements',
-      icon: <Store size={18} />,
-      badge: stats?.merchants.pending,
-    },
-    { href: '/admin/product-categories', label: 'Catégories produits', icon: <Tags size={18} /> },
-    { href: '/admin/geo', label: 'Villes & communes', icon: <MapPin size={18} /> },
-    { href: '/admin/countries', label: 'Pays', icon: <Globe size={18} /> },
-    { href: '/admin/delivery', label: 'Livraison', icon: <Truck size={18} /> },
-    {
-      href: '/admin/delivery/couriers',
-      label: 'Livreurs KYC',
-      icon: <Truck size={18} />,
-      badge: stats?.couriers?.pending_kyc,
-    },
-  ]
+  const navLink = (item: (typeof ADMIN_NAV_GROUPS)[number]['items'][number]) => {
+    const active = isAdminNavActive(pathname, item.href, item.exact)
+    const badge = item.badgeKey ? badges[item.badgeKey] : 0
+    const Icon = item.icon
 
-  const opsNav: NavItem[] = [
-    {
-      href: '/admin/reviews',
-      label: 'Avis établ.',
-      icon: <Star size={18} />,
-      badge: stats?.reviews.pending,
-    },
-    {
-      href: '/admin/product-reviews',
-      label: 'Avis produits',
-      icon: <Star size={18} />,
-      badge: stats?.product_reviews?.pending,
-    },
-    {
-      href: '/admin/courier-reviews',
-      label: 'Avis livreurs',
-      icon: <Star size={18} />,
-      badge: stats?.courier_reviews?.pending,
-    },
-    {
-      href: '/admin/delivery/disputes',
-      label: 'Litiges livraison',
-      icon: <Truck size={18} />,
-    },
-    {
-      href: '/admin/delivery/assignments',
-      label: 'Assignations',
-      icon: <Truck size={18} />,
-    },
-    {
-      href: '/admin/complaints',
-      label: 'Signalements',
-      icon: <AlertTriangle size={18} />,
-      badge: stats?.complaints?.open,
-    },
-    { href: '/admin/users', label: 'Utilisateurs', icon: <Users size={18} /> },
-  ]
-
-  const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname.startsWith(href)
-
-  const navLink = (item: NavItem) => (
-    <Link
-      key={item.href}
-      href={item.href}
-      onClick={() => setSidebarOpen(false)}
-      className={`flex items-center justify-between px-3 py-2.5 rounded-xl font-medium transition-colors group ${
-        isActive(item.href, item.exact)
-          ? 'bg-brand-500/10 text-brand-400 font-bold'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-      }`}
-      style={{ textDecoration: 'none' }}
-    >
-      <div className="flex items-center gap-3">
-        <span>{item.icon}</span>
-        <span className="text-sm">{item.label}</span>
-      </div>
-      {item.badge != null && item.badge > 0 && (
-        <span className="bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
-          {item.badge}
-        </span>
-      )}
-    </Link>
-  )
-
-  const totalPending = (stats?.reviews.pending ?? 0) + (stats?.merchants.pending ?? 0) + (stats?.complaints?.open ?? 0)
-
-  return (
-    <div className="font-sans text-slate-800 bg-slate-50 flex h-screen overflow-hidden">
-
-      {/* ── Sidebar ─────────────────────────────────────────────── */}
-      <aside
-        className={`w-64 bg-slate-900 text-white flex flex-col h-full shrink-0 transition-transform duration-300 absolute md:relative z-50 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => setSidebarOpen(false)}
+        className={cn(
+          'flex items-center justify-between px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all',
+          active
+            ? 'bg-slate-900 text-white shadow-sm'
+            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
+        )}
+        style={{ textDecoration: 'none' }}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-slate-800">
-          <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shrink-0">
-            <MapPin size={16} className="text-white" />
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={active ? 'text-violet-400' : ''}>
+            <Icon size={17} />
+          </span>
+          <span className="truncate">{item.label}</span>
+        </div>
+        {badge > 0 && (
+          <span
+            className={cn(
+              'text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0',
+              active ? 'bg-violet-500 text-white' : 'bg-violet-100 text-violet-700',
+            )}
+          >
+            {badge}
+          </span>
+        )}
+      </Link>
+    )
+  }
+
+  const sidebarInner = (
+    <>
+      <div className="h-[72px] flex items-center px-6 border-b border-slate-100 shrink-0">
+        <Link href="/admin" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
+          <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
+            <span className="text-violet-400 font-black text-sm">LP</span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-extrabold tracking-tight leading-none">
-              LaPlasse<span className="text-brand-500">.</span>
-            </p>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-              Admin
-            </p>
+            <span className="text-base font-black text-slate-900 tracking-tight leading-none block">
+              La<span className="text-violet-600">Plasse</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              Administration
+            </span>
           </div>
-          <button
-            type="button"
-            className="md:hidden ml-auto text-slate-500 hover:text-white"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X size={18} />
-          </button>
-        </div>
+        </Link>
+        <button
+          type="button"
+          className="ml-auto lg:hidden text-slate-400 hover:text-slate-900 transition-colors"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <X size={20} />
+        </button>
+      </div>
 
-        {/* Nav */}
-        <div className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
-          <div>
-            <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">
-              Principal
-            </p>
-            <nav className="space-y-0.5">{mainNav.map(navLink)}</nav>
-          </div>
-          <div>
-            <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">
-              Catalogue
-            </p>
-            <nav className="space-y-0.5">{catalogueNav.map(navLink)}</nav>
-          </div>
-          <div>
-            <p className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2">
-              Modération
-            </p>
-            <nav className="space-y-0.5">{opsNav.map(navLink)}</nav>
-          </div>
-        </div>
+      <div className="mx-3 mt-4 px-3 py-3 bg-violet-50 border border-violet-100 rounded-2xl">
+        <p className="text-[10px] text-violet-600 font-bold uppercase tracking-wider mb-0.5">
+          Connecté en tant que
+        </p>
+        <p className="text-sm font-extrabold text-slate-900 truncate">
+          {user.full_name ?? user.email}
+        </p>
+        <p className="text-[10px] font-bold text-violet-500 uppercase mt-0.5">{user.role}</p>
+      </div>
 
-        {/* User */}
-        <div className="p-3 border-t border-slate-800">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800">
-            <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0">
-              {initials || 'AD'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{user.full_name ?? user.email}</p>
-              <p className="text-[10px] text-slate-500 uppercase">{user.role}</p>
-            </div>
-            <ChevronUp size={14} className="text-slate-600 shrink-0" />
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
+        {ADMIN_NAV_GROUPS.map(group => (
+          <div key={group.id}>
+            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">{group.items.map(navLink)}</div>
           </div>
-          <Link
-            href="/"
-            className="block text-center text-[11px] text-slate-600 hover:text-slate-400 mt-2 transition-colors"
-            style={{ textDecoration: 'none' }}
-          >
-            ← Retour au site
-          </Link>
-        </div>
-      </aside>
+        ))}
 
-      {/* Overlay mobile */}
+        <div className="h-px bg-slate-100 mx-2" />
+        <Link
+          href="/"
+          onClick={() => setSidebarOpen(false)}
+          className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all"
+          style={{ textDecoration: 'none' }}
+        >
+          <ExternalLink size={16} /> Retour au site public
+        </Link>
+      </nav>
+
+      <div className="p-3 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
+        >
+          <LogOut size={17} /> Déconnexion
+        </button>
+      </div>
+    </>
+  )
+
+  return (
+    <div
+      className="flex h-screen bg-slate-50 overflow-hidden"
+      style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}
+    >
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* ── Main ────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+      <aside
+        className={cn(
+          'fixed lg:relative z-50 inset-y-0 left-0 w-72 bg-white border-r border-slate-100',
+          'flex flex-col h-full flex-shrink-0 transition-transform duration-300',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        )}
+      >
+        {sidebarInner}
+      </aside>
 
-        {/* Topbar */}
-        <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-5 shrink-0">
-          <div className="flex items-center gap-3">
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
+          <div className="flex items-center gap-4">
             <button
               type="button"
-              className="md:hidden text-slate-400 hover:text-slate-900"
+              className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu size={20} />
+              <Menu size={22} />
             </button>
-            <div className="hidden sm:flex items-center text-sm text-slate-400">
-              <span>Admin</span>
-              <ChevronRight size={14} className="mx-1" />
-              <span className="text-slate-900 font-semibold">{pageTitle}</span>
-            </div>
+            <p className="text-sm font-semibold text-slate-500 hidden sm:block">
+              Admin ·{' '}
+              <span className="text-slate-900 font-bold">{pageTitle}</span>
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Dev
-            </span>
-            <button type="button" className="relative text-slate-400 hover:text-slate-900 transition-colors">
-              <Bell size={18} />
-              {totalPending > 0 && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
-              )}
-            </button>
-            <button type="button" className="text-slate-400 hover:text-slate-900 transition-colors">
-              <Settings size={18} />
-            </button>
+          <div className="flex items-center gap-4">
+            <NotificationBell viewAllHref="/profile/notifications" refetchIntervalMs={30_000} />
+            <div className="flex items-center gap-2.5">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-900 leading-none">
+                  {user.full_name?.split(' ')[0] ?? 'Admin'}
+                </p>
+                <p className="text-[10px] font-bold uppercase mt-0.5 text-violet-600">
+                  {user.role === 'SUPER_ADMIN' ? 'Super admin' : 'Admin'}
+                </p>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-slate-900 text-violet-400 flex items-center justify-center font-black text-sm select-none">
+                {initials || 'AD'}
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 md:p-7">
+        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
           {children}
         </div>
       </main>
+
+      <AdminMobileNav />
     </div>
   )
 }

@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ShieldAlert, Loader2, Check } from 'lucide-react'
+import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { authApiFetch } from '@/lib/authFetch'
-import { useAuthStore } from '@/stores/authStore'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 export default function AdminFraudPage() {
-  const router = useRouter()
-  const { user } = useAuthStore()
+  const { ready } = useAdminSession()
   const [signals, setSignals] = useState<Array<{
     id: string
     signal_type: string
@@ -26,12 +25,9 @@ export default function AdminFraudPage() {
   }
 
   useEffect(() => {
-    if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
-      router.push('/')
-      return
-    }
+    if (!ready) return
     load()
-  }, [user, router])
+  }, [ready])
 
   const resolve = async (id: string) => {
     await authApiFetch(`/admin/fraud/${id}/resolve`, { method: 'PATCH' })
@@ -39,25 +35,45 @@ export default function AdminFraudPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-extrabold flex items-center gap-2 mb-6">
-        <ShieldAlert size={22} className="text-red-500" /> Signaux fraude
-      </h1>
-      {loading ? <Loader2 className="animate-spin" /> : signals.length === 0 ? (
+    <AdminPageContainer>
+      <div>
+        <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+          <ShieldAlert size={22} className="text-red-500" /> Signaux fraude
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Alertes automatiques détectées sur la plateforme.
+        </p>
+      </div>
+
+      {loading ? (
+        <Loader2 className="animate-spin text-violet-600" />
+      ) : signals.length === 0 ? (
         <p className="text-slate-500">Aucun signal actif.</p>
       ) : (
         <div className="space-y-2">
           {signals.map(s => (
-            <div key={s.id} className="bg-white border border-red-100 rounded-xl p-4 flex justify-between items-center">
+            <div
+              key={s.id}
+              className="bg-white border border-red-100 rounded-2xl p-4 flex justify-between items-center gap-4"
+            >
               <div>
                 <p className="font-bold text-red-700">{s.signal_type}</p>
-                <p className="text-xs text-slate-400">{s.entity_type} · {s.severity} · {new Date(s.created_at).toLocaleString('fr-FR')}</p>
+                <p className="text-xs text-slate-400">
+                  {s.entity_type} · {s.severity} · {new Date(s.created_at).toLocaleString('fr-FR')}
+                </p>
               </div>
-              <button onClick={() => resolve(s.id)} className="text-emerald-600"><Check size={18} /></button>
+              <button
+                type="button"
+                onClick={() => resolve(s.id)}
+                className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 transition-colors"
+                title="Marquer comme résolu"
+              >
+                <Check size={18} />
+              </button>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </AdminPageContainer>
   )
 }

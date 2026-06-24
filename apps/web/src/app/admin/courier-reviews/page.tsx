@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, Star, CheckCircle2, EyeOff, Trash2, Truck } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
+import { AdminPageContainer, AdminPageHeader } from '@/features/admin/components/AdminPageContainer'
 
 interface AdminCourierReview {
   id: string
@@ -64,11 +64,12 @@ export default function AdminCourierReviewsPage() {
   }
 
   return (
-    <AdminShell pageTitle="Avis livreurs">
-      <div className="mb-6">
-        <h2 className="text-xl font-extrabold text-slate-900">Avis livreurs</h2>
-        <p className="text-slate-400 text-sm mt-0.5">{reviews.length} avis — recalcul note à chaque publication</p>
-      </div>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Avis livreurs"
+        description={`${reviews.length} avis — recalcul note à chaque publication`}
+        icon={<Truck size={22} className="text-violet-600" />}
+      />
 
       <div className="flex gap-2 mb-6">
         {([['pending', 'En attente'], ['all', 'Tous les avis']] as const).map(([val, label]) => (
@@ -171,6 +172,6 @@ export default function AdminCourierReviewsPage() {
           ))}
         </div>
       )}
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

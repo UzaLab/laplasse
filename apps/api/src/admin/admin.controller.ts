@@ -17,7 +17,8 @@ import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
 import { DeliveryService } from '../delivery/delivery.service'
 import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
-import { CourierStatus, DeliveryDisputeStatus } from '../../generated/prisma/client'
+import { CourierStatus, DeliveryDisputeStatus, AdCampaignStatus, OrderStatus } from '../../generated/prisma/client'
+import { AdsService } from '../ads/ads.service'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +39,7 @@ export class AdminController {
     private readonly deliveryDisputes: DeliveryDisputesService,
     private readonly deliveryService: DeliveryService,
     private readonly logisticsPartners: LogisticsPartnersService,
+    private readonly ads: AdsService,
   ) {}
 
   // ── Stats globales ──────────────────────────────────────────────────────────
@@ -72,26 +74,281 @@ export class AdminController {
   // ── Marchands ───────────────────────────────────────────────────────────────
 
   @Get('merchants')
-  getMerchants(
+  async getMerchants(
     @Query('filter') filter?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
   ) {
-    const where = filter === 'pending' ? { verification_status: 'PENDING' as const } : {}
-    return this.prisma.merchant.findMany({
-      where,
-      select: {
-        id: true, business_name: true, slug: true, verification_status: true,
-        is_active: true, is_sponsored: true, subscription_plan: true,
-        created_at: true, trust_score: true,
-        category: { select: { name: true } },
-        location: { select: { city: true, district: true } },
-        owner: { select: { id: true, email: true, full_name: true } },
+    const take = Math.min(Number(limit ?? 20), 100)
+    const skip = (Math.max(Number(page ?? 1), 1) - 1) * take
+
+    const statusFilter = filter === 'pending' ? { verification_status: 'PENDING' as const }
+      : filter === 'verified' ? { verification_status: 'VERIFIED' as const }
+      : filter === 'rejected' ? { verification_status: 'REJECTED' as const }
+      : filter === 'inactive' ? { is_active: false }
+      : {}
+
+    const searchFilter = q?.trim() ? {
+      OR: [
+        { business_name: { contains: q.trim(), mode: 'insensitive' as const } },
+        { slug: { contains: q.trim(), mode: 'insensitive' as const } },
+        { owner: { email: { contains: q.trim(), mode: 'insensitive' as const } } },
+        { owner: { full_name: { contains: q.trim(), mode: 'insensitive' as const } } },
+      ],
+    } : {}
+
+    const where = { ...statusFilter, ...searchFilter }
+
+    const [merchants, total] = await Promise.all([
+      this.prisma.merchant.findMany({
+        where,
+        select: {
+          id: true, business_name: true, slug: true, verification_status: true,
+          is_active: true, is_sponsored: true, subscription_plan: true,
+          created_at: true, trust_score: true,
+          category: { select: { name: true } },
+          location: { select: { city: true, district: true, country: true } },
+          owner: { select: { id: true, email: true, full_name: true } },
+          _count: { select: { reviews: true, complaints: true, orders: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.merchant.count({ where }),
+    ])
+
+    return { merchants, total, page: Number(page ?? 1), limit: take }
+  }
+
+  @Get('merchants/:id')
+  async getMerchantDetail(@Param('id') id: string) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        location: true,
+        owner: { select: { id: true, email: true, full_name: true, phone: true, role: true, created_at: true } },
+        subscription: true,
+        complaints: {
+          orderBy: { created_at: 'desc' },
+          take: 10,
+          select: { id: true, reason: true, status: true, created_at: true },
+        },
+        reviews: {
+          where: { status: 'APPROVED' },
+          orderBy: { created_at: 'desc' },
+          take: 5,
+          select: { id: true, rating: true, content: true, created_at: true, user: { select: { full_name: true, email: true } } },
+        },
+        _count: { select: { reviews: true, complaints: true, orders: true, favorites: true } },
       },
-      orderBy: { created_at: 'desc' },
-      take: Number(limit ?? 20),
-      skip: Number(offset ?? 0),
     })
+    if (!merchant) throw new NotFoundException('Établissement introuvable')
+
+    const avgRating = await this.prisma.review.aggregate({
+      where: { merchant_id: id, status: 'APPROVED' },
+      _avg: { rating: true },
+    })
+
+    return { ...merchant, avg_rating: avgRating._avg.rating ?? 0 }
+  }
+
+  @Patch('merchants/:id')
+  async updateMerchant(
+    @Param('id') id: string,
+    @Body() body: {
+      business_name?: string
+      description?: string
+      phone?: string
+      whatsapp?: string
+      email?: string
+      website?: string
+      category_id?: string
+      is_active?: boolean
+      is_sponsored?: boolean
+      trust_score?: number
+      food_prep_minutes?: number
+      location?: { city?: string; district?: string; address?: string; country?: string; latitude?: number; longitude?: number }
+    },
+  ) {
+    const { location, ...merchantData } = body
+    const updated = await this.prisma.merchant.update({
+      where: { id },
+      data: merchantData,
+    })
+    if (location) {
+      await this.prisma.merchantLocation.upsert({
+        where: { merchant_id: id },
+        create: { merchant_id: id, city: '', ...location },
+        update: location,
+      })
+    }
+    this.searchService.syncMerchant(id).catch(() => {})
+    await this.audit.log({ action: 'UPDATE', entityType: 'Merchant', entityId: id, payload: body })
+    return updated
+  }
+
+  @Patch('merchants/:id/owner')
+  async reassignMerchantOwner(
+    @Param('id') id: string,
+    @Body() body: { new_owner_id: string },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: body.new_owner_id }, select: { id: true, email: true } })
+    if (!user) throw new NotFoundException('Utilisateur introuvable')
+    const updated = await this.prisma.merchant.update({
+      where: { id },
+      data: { owner_id: body.new_owner_id },
+      select: { id: true, business_name: true, owner: { select: { id: true, email: true, full_name: true } } },
+    })
+    await this.audit.log({ action: 'UPDATE', entityType: 'Merchant', entityId: id, payload: { action: 'reassign_owner', new_owner_id: body.new_owner_id } })
+    return updated
+  }
+
+  @Patch('merchants/:id/subscription')
+  async updateMerchantSubscription(
+    @Param('id') id: string,
+    @Body() body: {
+      plan?: string
+      status?: string
+      billing_cycle?: string
+      expires_at?: string | null
+    },
+  ) {
+    const sub = await this.prisma.subscription.upsert({
+      where: { merchant_id: id },
+      create: {
+        merchant_id: id,
+        plan: (body.plan ?? 'FREE') as never,
+        status: (body.status ?? 'ACTIVE') as never,
+        billing_cycle: body.billing_cycle,
+        expires_at: body.expires_at ? new Date(body.expires_at) : undefined,
+      },
+      update: {
+        plan: body.plan ? (body.plan as never) : undefined,
+        status: body.status ? (body.status as never) : undefined,
+        billing_cycle: body.billing_cycle ?? undefined,
+        expires_at: body.expires_at !== undefined ? (body.expires_at ? new Date(body.expires_at) : null) : undefined,
+      },
+    })
+    if (body.plan) {
+      await this.prisma.merchant.update({ where: { id }, data: { subscription_plan: body.plan as never } })
+    }
+    await this.audit.log({ action: 'UPDATE', entityType: 'Merchant', entityId: id, payload: { action: 'update_subscription', ...body } })
+    return sub
+  }
+
+  @Post('merchants')
+  async createMerchant(
+    @Body() body: {
+      business_name: string
+      owner_id: string
+      category_id: string
+      description?: string
+      phone?: string
+      email?: string
+      country?: string
+      city?: string
+    },
+  ) {
+    if (!body.business_name || !body.owner_id || !body.category_id) {
+      throw new BadRequestException('business_name, owner_id, category_id requis')
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: body.owner_id }, select: { id: true } })
+    if (!user) throw new NotFoundException('Utilisateur introuvable')
+    const category = await this.prisma.category.findUnique({ where: { id: body.category_id }, select: { id: true } })
+    if (!category) throw new NotFoundException('Catégorie introuvable')
+
+    const slug = body.business_name
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      + '-' + Date.now().toString(36)
+
+    const merchant = await this.prisma.merchant.create({
+      data: {
+        business_name: body.business_name,
+        slug,
+        owner_id: body.owner_id,
+        category_id: body.category_id,
+        description: body.description,
+        phone: body.phone,
+        email: body.email,
+        verification_status: 'UNVERIFIED',
+        ...(body.city ? {
+          location: { create: { city: body.city, country: body.country ?? 'CI' } },
+        } : {}),
+      },
+      include: {
+        owner: { select: { id: true, email: true, full_name: true } },
+        category: { select: { name: true } },
+        location: true,
+      },
+    })
+    await this.audit.log({ action: 'CREATE', entityType: 'Merchant', entityId: merchant.id, payload: body })
+    return merchant
+  }
+
+  // ── Catégories établissements ─────────────────────────────────────────────────
+
+  @Get('categories')
+  async listMerchantCategories() {
+    return this.prisma.category.findMany({
+      include: {
+        children: {
+          include: { _count: { select: { merchants: true } } },
+          orderBy: { sort_order: 'asc' },
+        },
+        _count: { select: { merchants: true } },
+      },
+      where: { parent_id: null },
+      orderBy: { sort_order: 'asc' },
+    })
+  }
+
+  @Post('categories')
+  async createMerchantCategory(
+    @Body() body: { name: string; parent_id?: string; icon?: string; sort_order?: number },
+  ) {
+    if (!body.name?.trim()) throw new BadRequestException('Nom requis')
+    const slug = body.name
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      + '-' + Date.now().toString(36)
+    const cat = await this.prisma.category.create({
+      data: {
+        name: body.name.trim(),
+        slug,
+        parent_id: body.parent_id ?? null,
+        icon: body.icon ?? null,
+        sort_order: body.sort_order ?? 0,
+      },
+    })
+    await this.audit.log({ action: 'CREATE', entityType: 'Category', entityId: cat.id, payload: body })
+    return cat
+  }
+
+  @Patch('categories/:id')
+  async updateMerchantCategory(
+    @Param('id') id: string,
+    @Body() body: { name?: string; icon?: string | null; sort_order?: number; is_active?: boolean; parent_id?: string | null },
+  ) {
+    const cat = await this.prisma.category.update({
+      where: { id },
+      data: {
+        name: body.name?.trim() ?? undefined,
+        icon: body.icon !== undefined ? body.icon : undefined,
+        sort_order: body.sort_order ?? undefined,
+        is_active: body.is_active ?? undefined,
+        parent_id: body.parent_id !== undefined ? body.parent_id : undefined,
+      },
+    })
+    await this.audit.log({ action: 'UPDATE', entityType: 'Category', entityId: id, payload: body })
+    return cat
   }
 
   @Patch('merchants/:id/verify')
@@ -240,15 +497,90 @@ export class AdminController {
   // ── Utilisateurs ────────────────────────────────────────────────────────────
 
   @Get('users')
-  getUsers(@Query('limit') limit?: string) {
-    return this.prisma.user.findMany({
+  async getUsers(
+    @Query('q') q?: string,
+    @Query('role') role?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const take = Math.min(Number(limit ?? 20), 100)
+    const skip = (Math.max(Number(page ?? 1), 1) - 1) * take
+
+    const roles = ['USER', 'MERCHANT', 'COURIER', 'MODERATOR', 'ADMIN', 'SUPER_ADMIN']
+    const roleFilter = role && roles.includes(role) ? { role: role as never } : {}
+    const searchFilter = q?.trim() ? {
+      OR: [
+        { email: { contains: q.trim(), mode: 'insensitive' as const } },
+        { full_name: { contains: q.trim(), mode: 'insensitive' as const } },
+        { phone: { contains: q.trim(), mode: 'insensitive' as const } },
+      ],
+    } : {}
+    const where = { ...roleFilter, ...searchFilter }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true, email: true, full_name: true, role: true, phone: true,
+          is_active: true, is_verified: true, created_at: true, country: true, city: true,
+          _count: { select: { orders: true, merchants: true } },
+        },
+        orderBy: { created_at: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.user.count({ where }),
+    ])
+
+    return { users, total, page: Number(page ?? 1), limit: take }
+  }
+
+  @Get('users/:id')
+  async getUserDetail(@Param('id') id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
       select: {
-        id: true, email: true, full_name: true, role: true,
-        is_active: true, is_verified: true, created_at: true,
+        id: true, email: true, full_name: true, role: true, phone: true, avatar: true,
+        is_active: true, is_verified: true, created_at: true, updated_at: true,
+        country: true, city: true,
+        merchants: {
+          select: { id: true, business_name: true, slug: true, verification_status: true, subscription_plan: true, is_active: true },
+          take: 10,
+        },
+        orders: {
+          orderBy: { created_at: 'desc' },
+          take: 10,
+          select: {
+            id: true, status: true, total: true, currency: true, created_at: true,
+            shop: { select: { name: true } },
+          },
+        },
+        loyalty_account: { select: { points: true, tier: true } },
+        _count: { select: { orders: true, merchants: true, reviews: true, favorites: true } },
       },
-      orderBy: { created_at: 'desc' },
-      take: Number(limit ?? 50),
     })
+    if (!user) throw new NotFoundException('Utilisateur introuvable')
+    return user
+  }
+
+  @Patch('users/:id')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: { role?: string; is_active?: boolean; is_verified?: boolean },
+  ) {
+    const roles = ['USER', 'MERCHANT', 'COURIER', 'MODERATOR', 'ADMIN', 'SUPER_ADMIN']
+    if (body.role && !roles.includes(body.role)) throw new BadRequestException('Rôle invalide')
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: {
+        role: body.role ? (body.role as never) : undefined,
+        is_active: body.is_active ?? undefined,
+        is_verified: body.is_verified ?? undefined,
+      },
+      select: { id: true, email: true, role: true, is_active: true, is_verified: true },
+    })
+    await this.audit.log({ action: 'UPDATE', entityType: 'User', entityId: id, payload: body })
+    return updated
   }
 
   @Post('users/set-password')
@@ -357,8 +689,13 @@ export class AdminController {
   }
 
   @Get('audit')
-  getAuditLogs(@Query('limit') limit?: string) {
-    return this.audit.listRecent(limit ? Number(limit) : 50)
+  getAuditLogs(
+    @Query('limit') limit?: string,
+    @Query('action') action?: string,
+    @Query('entity_type') entity_type?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.audit.listRecent(limit ? Number(limit) : 50, { action, entity_type, q })
   }
 
   // ── Marketplace spotlight ────────────────────────────────────────────────────
@@ -388,6 +725,31 @@ export class AdminController {
     @Body() body: { featured: boolean },
   ) {
     return this.marketplace.setShopMarketplaceFeatured(id, Boolean(body.featured))
+  }
+
+  @Get('shops')
+  searchShops(@Query('q') q?: string, @Query('limit') limit?: string) {
+    const take = Math.min(Number(limit ?? 30), 100)
+    const term = q?.trim()
+    return this.prisma.shop.findMany({
+      where: term
+        ? {
+            OR: [
+              { slug: { contains: term, mode: 'insensitive' } },
+              { name: { contains: term, mode: 'insensitive' } },
+            ],
+          }
+        : { status: { in: ['ACTIVE', 'DRAFT'] } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        marketplace_featured: true,
+      },
+      orderBy: { name: 'asc' },
+      take,
+    })
   }
 
   // ── Catégories produit marketplace ───────────────────────────────────────────
@@ -853,5 +1215,200 @@ export class AdminController {
     )
 
     return { countries }
+  }
+
+  // ── Modération (inbox) ───────────────────────────────────────────────────────
+
+  @Get('moderation/summary')
+  async getModerationSummary() {
+    const [
+      merchantsPending,
+      reviewsPending,
+      productReviewsPending,
+      courierReviewsPending,
+      complaintsOpen,
+      couriersKyc,
+      disputesOpen,
+      recentMerchants,
+      recentReviews,
+      recentComplaints,
+    ] = await Promise.all([
+      this.prisma.merchant.count({ where: { verification_status: 'PENDING' } }),
+      this.prisma.review.count({ where: { status: 'PENDING' } }),
+      this.prisma.productReview.count({ where: { status: 'PENDING' } }),
+      this.prisma.courierReview.count({ where: { status: 'PENDING' } }),
+      this.prisma.complaint.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
+      this.prisma.courierProfile.count({ where: { status: 'PENDING_REVIEW' } }),
+      this.prisma.deliveryDispute.count({ where: { status: 'OPEN' } }),
+      this.prisma.merchant.findMany({
+        where: { verification_status: 'PENDING' },
+        take: 8,
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true, business_name: true, slug: true, created_at: true,
+          category: { select: { name: true } },
+        },
+      }),
+      this.prisma.review.findMany({
+        where: { status: 'PENDING' },
+        take: 8,
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true, rating: true, created_at: true,
+          merchant: { select: { business_name: true, slug: true } },
+          user: { select: { email: true, full_name: true } },
+        },
+      }),
+      this.prisma.complaint.findMany({
+        where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } },
+        take: 8,
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true, reason: true, status: true, created_at: true,
+          merchant: { select: { business_name: true, slug: true } },
+        },
+      }),
+    ])
+
+    return {
+      counts: {
+        merchants_pending: merchantsPending,
+        reviews_pending: reviewsPending,
+        product_reviews_pending: productReviewsPending,
+        courier_reviews_pending: courierReviewsPending,
+        complaints_open: complaintsOpen,
+        couriers_kyc: couriersKyc,
+        disputes_open: disputesOpen,
+      },
+      recent: {
+        merchants: recentMerchants,
+        reviews: recentReviews,
+        complaints: recentComplaints,
+      },
+    }
+  }
+
+  // ── Campagnes publicitaires ────────────────────────────────────────────────────
+
+  @Get('ads/overview')
+  async getAdsOverview() {
+    const [placement_availability, campaigns_by_status] = await Promise.all([
+      this.ads.getAllPlacementAvailability(),
+      this.prisma.adCampaign.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ])
+    return {
+      placement_availability,
+      campaigns_by_status: campaigns_by_status.map(r => ({
+        status: r.status,
+        count: r._count._all,
+      })),
+    }
+  }
+
+  @Get('ads/campaigns')
+  listAdCampaigns(
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsed = status as AdCampaignStatus | undefined
+    const allowed: AdCampaignStatus[] = [
+      'DRAFT', 'PENDING_PAYMENT', 'WAITLISTED', 'ACTIVE', 'EXPIRED', 'CANCELLED',
+    ]
+    const statusFilter = parsed && allowed.includes(parsed) ? parsed : undefined
+    return this.ads.listCampaignsForAdmin(statusFilter, Number(limit ?? 50))
+  }
+
+  @Patch('ads/campaigns/:id/cancel')
+  async cancelAdCampaign(@Param('id') id: string) {
+    const result = await this.ads.adminCancelCampaign(id)
+    await this.audit.log({
+      action: 'MODERATION',
+      entityType: 'AdCampaign',
+      entityId: id,
+      payload: { action: 'admin_cancel' },
+    })
+    return result
+  }
+
+  // ── Commandes ─────────────────────────────────────────────────────────────────
+
+  @Get('orders')
+  async listOrders(
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const take = Math.min(Number(limit ?? 20), 100)
+    const skip = (Math.max(Number(page ?? 1), 1) - 1) * take
+    const allowed: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CANCELLED', 'REFUNDED']
+    const statusFilter = status && allowed.includes(status as OrderStatus) ? { status: status as OrderStatus } : {}
+    const searchFilter = q?.trim() ? {
+      OR: [
+        { id: { contains: q.trim(), mode: 'insensitive' as const } },
+        { user: { email: { contains: q.trim(), mode: 'insensitive' as const } } },
+        { user: { full_name: { contains: q.trim(), mode: 'insensitive' as const } } },
+        { shop: { name: { contains: q.trim(), mode: 'insensitive' as const } } },
+        { merchant: { business_name: { contains: q.trim(), mode: 'insensitive' as const } } },
+      ],
+    } : {}
+    const where = { ...statusFilter, ...searchFilter }
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        take,
+        skip,
+        select: {
+          id: true, status: true, total: true, currency: true,
+          delivery_type: true, order_source: true, created_at: true,
+          user: { select: { id: true, email: true, full_name: true } },
+          shop: { select: { id: true, name: true, slug: true } },
+          merchant: { select: { id: true, business_name: true, slug: true } },
+          payment: { select: { id: true, status: true, reference: true } },
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { orders, total, page: Number(page ?? 1), limit: take }
+  }
+
+  @Get('orders/:id')
+  async getOrderDetail(@Param('id') id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, full_name: true, phone: true } },
+        shop: { select: { id: true, name: true, slug: true } },
+        merchant: { select: { id: true, business_name: true, slug: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+            menu_item: { select: { id: true, name: true } },
+          },
+        },
+        payment: true,
+        return_request: true,
+      },
+    })
+    if (!order) throw new NotFoundException('Commande introuvable')
+
+    const deliveryJob = await this.prisma.deliveryJob.findFirst({
+      where: { order_id: id },
+      include: {
+        courier_profile: {
+          select: {
+            id: true, phone: true, vehicle: true, rating_avg: true,
+            user: { select: { full_name: true, email: true } },
+          },
+        },
+      },
+    })
+
+    return { ...order, delivery_job: deliveryJob ?? null }
   }
 }

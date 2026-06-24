@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, Plus, Tags } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 import { adminFetch } from '@/lib/adminApi'
 import { notify } from '@/lib/notify'
 
@@ -62,8 +62,7 @@ export default function AdminProductCategoriesPage() {
   const childrenOf = (parentId: string) => categories.filter(c => c.parent_id === parentId)
 
   return (
-    <AdminShell pageTitle="Catégories produits">
-      <div className="max-w-3xl space-y-8">
+    <AdminPageContainer className="space-y-8">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
             <Tags className="text-brand-500" /> Catégories marketplace
@@ -137,7 +136,6 @@ export default function AdminProductCategoriesPage() {
             ))}
           </ul>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

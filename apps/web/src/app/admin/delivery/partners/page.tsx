@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { BadgeCheck, Ban, Building2, Loader2 } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { notify } from '@/lib/notify'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface AdminLogisticsPartner {
   id: string
@@ -60,8 +60,7 @@ export default function AdminDeliveryPartnersPage() {
   }
 
   return (
-    <AdminShell pageTitle="Partenaires logistiques">
-      <div className="max-w-5xl space-y-6">
+    <AdminPageContainer>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -143,7 +142,6 @@ export default function AdminDeliveryPartnersPage() {
             ))}
           </ul>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

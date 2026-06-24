@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import Link from 'next/link'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 import { adminFetch } from '@/lib/adminApi'
 
 interface AdminDeliveryDispute {
@@ -65,8 +65,7 @@ export default function AdminDeliveryDisputesPage() {
   }
 
   return (
-    <AdminShell pageTitle="Litiges livraison">
-      <div className="max-w-4xl space-y-6">
+    <AdminPageContainer>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -178,7 +177,6 @@ export default function AdminDeliveryDisputesPage() {
             ))}
           </div>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

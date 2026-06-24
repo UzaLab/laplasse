@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Loader2, Truck, MapPin, AlertCircle, Users, Star, Building2 } from 'lucide-react'
 import Link from 'next/link'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { SUPPORTED_COUNTRIES, getCountryLabel } from '@/lib/country'
 import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface DeliveryStats {
   country: string
@@ -59,8 +59,7 @@ function AdminDeliveryPageContent() {
     : 0
 
   return (
-    <AdminShell pageTitle="Livraison">
-      <div className="max-w-5xl space-y-8">
+    <AdminPageContainer className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -241,8 +240,7 @@ function AdminDeliveryPageContent() {
         ) : (
           <p className="text-sm text-slate-400">Impossible de charger les statistiques.</p>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }
 

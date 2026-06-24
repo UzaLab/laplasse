@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, Globe, Store, ShoppingBag, MapPin, Truck, Package } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { COUNTRY_HUB_ENTRIES, getCountryLabel } from '@/lib/country'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface CountryOverview {
   code: string
@@ -43,8 +43,7 @@ export default function AdminCountriesPage() {
   }, [ready])
 
   return (
-    <AdminShell pageTitle="Pays">
-      <div className="max-w-5xl space-y-8">
+    <AdminPageContainer className="space-y-8">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
             <Globe className="text-brand-500" /> Multi-pays
@@ -121,7 +120,6 @@ export default function AdminCountriesPage() {
         ) : (
           <p className="text-sm text-slate-400">Impossible de charger l&apos;overview pays.</p>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { Users, Store, Search, Star, BadgeCheck, TrendingUp, Loader2, RefreshCw } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
+import { AdminMiniChart } from '@/features/admin/components/AdminMiniChart'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface GrowthKpis {
   period_days: number
@@ -20,40 +21,6 @@ interface GrowthKpis {
     daily_users: Array<{ day: string; count: number }>
     daily_searches: Array<{ day: string; count: number }>
   }
-}
-
-function MiniChart({ data, color }: { data: Array<{ day: string; count: number }>; color: string }) {
-  if (data.length < 2) return <div className="h-14 flex items-center justify-center text-xs text-slate-300">Pas assez de données</div>
-
-  const max = Math.max(...data.map(d => d.count), 1)
-  const w = 280
-  const h = 56
-  const pad = 4
-
-  const points = data.map((d, i) => {
-    const x = pad + (i / (data.length - 1)) * (w - pad * 2)
-    const y = h - pad - ((d.count / max) * (h - pad * 2))
-    return `${x},${y}`
-  })
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-14">
-      <polyline
-        points={points.join(' ')}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {data.map((d, i) => {
-        const [x, y] = points[i].split(',').map(Number)
-        return (
-          <circle key={i} cx={x} cy={y} r="2.5" fill={color} />
-        )
-      })}
-    </svg>
-  )
 }
 
 const KPI_CARDS = [
@@ -94,8 +61,8 @@ export default function AdminGrowthPage() {
   }
 
   return (
-    <AdminShell pageTitle="Growth Dashboard">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <AdminPageContainer>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900">Growth Dashboard</h2>
           <p className="text-slate-400 text-sm mt-0.5">KPIs acquisition, rétention & activité</p>
@@ -169,7 +136,7 @@ export default function AdminGrowthPage() {
                 </div>
                 <Users size={16} className="text-blue-400" />
               </div>
-              <MiniChart data={data.charts.daily_users} color="#3b82f6" />
+              <AdminMiniChart data={data.charts.daily_users} color="#3b82f6" />
               {data.charts.daily_users.length > 0 && (
                 <div className="flex justify-between text-[10px] text-slate-300 mt-2">
                   <span>{new Date(data.charts.daily_users[0]?.day).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>
@@ -187,7 +154,7 @@ export default function AdminGrowthPage() {
                 </div>
                 <Search size={16} className="text-violet-400" />
               </div>
-              <MiniChart data={data.charts.daily_searches} color="#8b5cf6" />
+              <AdminMiniChart data={data.charts.daily_searches} color="#8b5cf6" />
               {data.charts.daily_searches.length > 0 && (
                 <div className="flex justify-between text-[10px] text-slate-300 mt-2">
                   <span>{new Date(data.charts.daily_searches[0]?.day).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</span>
@@ -221,6 +188,6 @@ export default function AdminGrowthPage() {
       ) : (
         <div className="text-center py-24 text-slate-400">Erreur de chargement</div>
       )}
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

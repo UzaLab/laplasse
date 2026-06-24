@@ -10,10 +10,10 @@ import {
   RotateCcw,
   Truck,
 } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { SUPPORTED_COUNTRIES, getCountryLabel } from '@/lib/country'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface AdminCourier {
   id: string
@@ -106,8 +106,7 @@ export default function AdminDeliveryCouriersPage() {
   }
 
   return (
-    <AdminShell pageTitle="Livreurs KYC">
-      <div className="max-w-5xl space-y-6">
+    <AdminPageContainer>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <Link
@@ -240,7 +239,6 @@ export default function AdminDeliveryCouriersPage() {
             ))}
           </div>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

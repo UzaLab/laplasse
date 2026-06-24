@@ -13,7 +13,7 @@ import { getPlanLimits } from '../common/plan-limits'
 import { AuditService } from '../audit/audit.service'
 import { AD_CAMPAIGN_PRICES, AD_DURATION_OPTIONS, computeCampaignAmount } from './ad-pricing'
 import { CreateAdCampaignDto } from './dto/ad.dto'
-import { AdPlacement, AdTargetType } from '../../generated/prisma/client'
+import { AdCampaignStatus, AdPlacement, AdTargetType } from '../../generated/prisma/client'
 import {
   ALL_AD_PLACEMENTS,
   DEFAULT_PLACEMENT_CAPACITY,
@@ -928,6 +928,39 @@ export class AdsService implements OnModuleInit, OnModuleDestroy {
   /** @deprecated Utiliser getActiveMerchantIdsForPlacement */
   async getActiveSponsoredMerchantIds(): Promise<Set<string>> {
     return this.getActiveMerchantIdsForPlacement('SEARCH')
+  }
+
+  async listCampaignsForAdmin(status?: AdCampaignStatus, limit = 50) {
+    await this.expireCampaigns()
+    return this.prisma.adCampaign.findMany({
+      where: status ? { status } : {},
+      include: {
+        owner: { select: { id: true, email: true, full_name: true } },
+        merchant: { select: { id: true, business_name: true, slug: true } },
+        shop: { select: { id: true, name: true, slug: true } },
+        product: { select: { id: true, name: true, slug: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: Math.min(limit, 100),
+    })
+  }
+
+  async adminCancelCampaign(campaignId: string) {
+    await this.expireCampaigns()
+    const campaign = await this.prisma.adCampaign.findUnique({ where: { id: campaignId } })
+    if (!campaign) throw new NotFoundException('Campagne introuvable')
+    if (campaign.status === 'CANCELLED' || campaign.status === 'EXPIRED') {
+      return { ok: true, already: true as const }
+    }
+    const wasActive = campaign.status === 'ACTIVE'
+    const wasWaitlisted = campaign.status === 'WAITLISTED'
+    await this.prisma.adCampaign.update({
+      where: { id: campaignId },
+      data: { status: 'CANCELLED', waitlist_position: null },
+    })
+    if (wasWaitlisted) await this.refreshWaitlistPositions(campaign.placement)
+    if (wasActive) await this.promoteWaitlistForPlacement(campaign.placement)
+    return { ok: true }
   }
 }
 

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, CheckCircle2, Eye, X } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
+import { Loader2, CheckCircle2, Eye, X, AlertTriangle } from 'lucide-react'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
+import { AdminPageContainer, AdminPageHeader } from '@/features/admin/components/AdminPageContainer'
 
 interface Complaint {
   id: string
@@ -66,11 +66,12 @@ export default function AdminComplaintsPage() {
   }
 
   return (
-    <AdminShell pageTitle="Signalements">
-      <div className="mb-6">
-        <h2 className="text-xl font-extrabold text-slate-900">Signalements</h2>
-        <p className="text-slate-400 text-sm mt-0.5">{complaints.length} signalements</p>
-      </div>
+    <AdminPageContainer>
+      <AdminPageHeader
+        title="Signalements"
+        description={`${complaints.length} signalement${complaints.length !== 1 ? 's' : ''}`}
+        icon={<AlertTriangle size={22} className="text-violet-600" />}
+      />
 
       <div>
         <div className="flex gap-2 mb-6">
@@ -154,6 +155,6 @@ export default function AdminComplaintsPage() {
           </div>
         )}
       </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }

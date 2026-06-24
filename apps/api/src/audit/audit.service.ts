@@ -26,8 +26,26 @@ export class AuditService {
     })
   }
 
-  async listRecent(limit = 50) {
+  async listRecent(
+    limit = 50,
+    filters?: { action?: string; entity_type?: string; q?: string },
+  ) {
+    const q = filters?.q?.trim()
     return this.prisma.auditLog.findMany({
+      where: {
+        ...(filters?.action ? { action: filters.action as AuditAction } : {}),
+        ...(filters?.entity_type ? { entity_type: filters.entity_type } : {}),
+        ...(q
+          ? {
+              OR: [
+                { entity_id: { contains: q, mode: 'insensitive' } },
+                { entity_type: { contains: q, mode: 'insensitive' } },
+                { user: { email: { contains: q, mode: 'insensitive' } } },
+                { user: { full_name: { contains: q, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      },
       orderBy: { created_at: 'desc' },
       take: limit,
       include: {

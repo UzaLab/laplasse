@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Truck, UserPlus } from 'lucide-react'
-import { AdminShell } from '@/features/admin/components/AdminShell'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { JOB_STATUS_LABELS } from '@/lib/courierJobLabels'
+import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
 
 interface AdminDeliveryJob {
   id: string
@@ -79,8 +79,7 @@ export default function AdminDeliveryAssignmentsPage() {
   }
 
   return (
-    <AdminShell pageTitle="Assignations livraison">
-      <div className="max-w-5xl space-y-6">
+    <AdminPageContainer>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
@@ -173,7 +172,6 @@ export default function AdminDeliveryAssignmentsPage() {
             ))}
           </div>
         )}
-      </div>
-    </AdminShell>
+    </AdminPageContainer>
   )
 }
