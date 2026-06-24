@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCartStore, useCartItemCount } from '@/stores/cartStore'
@@ -13,6 +14,13 @@ export function MobileBottomNav() {
   const openDrawer = useCartStore(s => s.openDrawer)
   const itemCount = useCartItemCount()
   const t = useT()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const showBadge = mounted && itemCount > 0
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex items-center justify-around h-16 z-40 safe-area-bottom">
@@ -46,7 +54,7 @@ export function MobileBottomNav() {
         aria-label={t('nav.openCart')}
       >
         <ShoppingBag size={20} strokeWidth={pathname === '/cart' ? 2.25 : 2} />
-        {itemCount > 0 && (
+        {showBadge && (
           <span className="absolute top-0 right-2 min-w-[14px] h-3.5 px-0.5 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full">
             {itemCount > 9 ? '9+' : itemCount}
           </span>

@@ -13,6 +13,8 @@ import { NearbyCard } from '@/features/discovery/components/NearbyCard'
 import { MarketplaceSection } from '@/features/discovery/components/MarketplaceSection'
 import { B2BSection } from '@/features/discovery/components/B2BSection'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import { HomeMobilePage } from '@/features/discovery/home-mobile-v2/HomeMobileV2Page'
+import { fetchHomeMobileData } from '@/features/discovery/home-mobile-v2/fetchHomeMobileData'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
 import {
   getDefaultCity,
@@ -53,27 +55,19 @@ function HubHomePage() {
   )
 }
 
-export default async function HomePage() {
-  const headerStore = await headers()
-  if (isRootDomainHost(headerStore.get('host') ?? '')) {
-    return <HubHomePage />
-  }
-
-  const cookieStore = await cookies()
-  const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
-  const defaultCity = getDefaultCity(country)
-  const [categoriesRaw, merchantsRaw] = await Promise.allSettled([
-    api.categories.list(),
-    api.merchants.featured(defaultCity, 6, country),
-  ])
-
-  const categories = categoriesRaw.status === 'fulfilled' ? categoriesRaw.value.map(toCategory) : []
-  const merchants  = merchantsRaw.status === 'fulfilled' ? merchantsRaw.value.map(toSpotMerchant) : []
-  const featured   = merchants.slice(0, 3)
-  const nearby     = merchants.slice(0, 3)
-
+function DesktopHomePage({
+  categories,
+  featured,
+  nearby,
+  defaultCity,
+}: {
+  categories: ReturnType<typeof toCategory>[]
+  featured: ReturnType<typeof toSpotMerchant>[]
+  nearby: ReturnType<typeof toSpotMerchant>[]
+  defaultCity: string
+}) {
   return (
-    <div className="bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
+    <div className="hidden md:block bg-[#FAFAFA] selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
       <Navbar />
 
       <HeroSection />
@@ -143,8 +137,52 @@ export default async function HomePage() {
       <B2BSection />
 
       <Footer />
-
-      <MobileBottomNav />
     </div>
+  )
+}
+
+export default async function HomePage() {
+  const headerStore = await headers()
+  if (isRootDomainHost(headerStore.get('host') ?? '')) {
+    return <HubHomePage />
+  }
+
+  const cookieStore = await cookies()
+  const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
+  const defaultCity = getDefaultCity(country)
+
+  const [categoriesRaw, merchantsRaw, mobileData] = await Promise.allSettled([
+    api.categories.list(),
+    api.merchants.featured(defaultCity, 6, country),
+    fetchHomeMobileData(defaultCity, country),
+  ])
+
+  const categories =
+    categoriesRaw.status === 'fulfilled' ? categoriesRaw.value.map(toCategory) : []
+  const merchants =
+    merchantsRaw.status === 'fulfilled' ? merchantsRaw.value.map(toSpotMerchant) : []
+  const featured = merchants.slice(0, 3)
+  const nearby = merchants.slice(0, 3)
+  const mobile =
+    mobileData.status === 'fulfilled'
+      ? mobileData.value
+      : { categories: [], merchants: [], products: [], shops: [] }
+
+  return (
+    <>
+      <div className="md:hidden">
+        <HomeMobilePage
+          {...mobile}
+          defaultCity={defaultCity}
+        />
+      </div>
+
+      <DesktopHomePage
+        categories={categories}
+        featured={featured}
+        nearby={nearby}
+        defaultCity={defaultCity}
+      />
+    </>
   )
 }

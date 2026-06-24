@@ -6,12 +6,14 @@ import { ChevronLeft, ChevronRight, Sparkles, Store } from 'lucide-react'
 import type { MarketplaceSpotlightShop } from '@/lib/marketplaceApi'
 import { recordAdEvent } from '@/lib/adsApi'
 import { AdImpressionTracker } from '@/hooks/useAdImpression'
+import { cn } from '@/lib/utils'
 
 interface SpotlightShopsCarouselProps {
   shops: MarketplaceSpotlightShop[]
+  trackClassName?: string
 }
 
-export function SpotlightShopsCarousel({ shops }: SpotlightShopsCarouselProps) {
+export function SpotlightShopsCarousel({ shops, trackClassName }: SpotlightShopsCarouselProps) {
   const trackRef = useRef<HTMLDivElement>(null)
 
   const scroll = (direction: 'left' | 'right') => {
@@ -48,7 +50,10 @@ export function SpotlightShopsCarousel({ shops }: SpotlightShopsCarouselProps) {
 
       <div
         ref={trackRef}
-        className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 -mx-1 px-1 scroll-smooth"
+        className={cn(
+          'flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 scroll-smooth justify-start',
+          trackClassName ?? '-mx-1 px-1',
+        )}
       >
         {shops.map(shop => (
           <AdImpressionTracker key={shop.id} campaignId={shop.ad_campaign_id}>
