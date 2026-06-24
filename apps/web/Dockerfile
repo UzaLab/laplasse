@@ -17,9 +17,10 @@ RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
 
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM base AS builder
-# Webpack + 1 worker : pic RAM plus bas que Turbopack sur VPS ~2 Go
-ENV NODE_OPTIONS="--max-old-space-size=640" \
+# Webpack + 1 worker ; heap 896 Mo (640 Mo OOM sur VPS 2 Go avec builds parallèles)
+ENV NODE_OPTIONS="--max-old-space-size=896" \
     NEXT_PRIVATE_WORKER_COUNT=1 \
+    GENERATE_SOURCEMAP=false \
     CI=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web ./apps/web
