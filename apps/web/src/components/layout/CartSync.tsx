@@ -17,6 +17,7 @@ export function CartSync() {
       void loadCart()
     } else {
       reset()
+      void loadCart()
     }
   }, [sessionStatus, loadCart, reset])
 

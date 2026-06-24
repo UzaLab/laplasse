@@ -175,6 +175,138 @@ export class MarketplaceService {
     return product.stock_quantity
   }
 
+  /** Produits catalogue marketplace réellement ajoutables au panier (hors miroirs menu). */
+  private marketplaceCartProductWhere(
+    extra: Prisma.ProductWhereInput = {},
+  ): Prisma.ProductWhereInput {
+    return {
+      status: 'ACTIVE',
+      slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
+      OR: [
+        { variants: { none: {} }, stock_quantity: { gt: 0 } },
+        { variants: { some: { stock_quantity: { gt: 0 } } } },
+      ],
+      shop: { is_active: true, status: 'ACTIVE' },
+      ...extra,
+    }
+  }
+
+  private marketplaceCatalogSelect() {
+    return {
+      id: true,
+      name: true,
+      slug: true,
+      price: true,
+      currency: true,
+      image_url: true,
+      created_at: true,
+      category: { select: { id: true, name: true, slug: true } },
+      shop: { select: { name: true, slug: true, logo: true } },
+      variants: {
+        where: { stock_quantity: { gt: 0 } },
+        orderBy: { created_at: 'asc' as const },
+        select: { id: true, stock_quantity: true },
+      },
+      _count: { select: { variants: true } },
+    }
+  }
+
+  private mapCatalogProductRow(
+    row: {
+      id: string
+      name: string
+      slug: string
+      price: number
+      currency: string
+      image_url: string | null
+      created_at?: Date
+      category?: { id: string; name: string; slug: string } | null
+      shop: { name: string; slug: string; logo?: string | null }
+      variants: { id: string; stock_quantity: number }[]
+      _count: { variants: number }
+    },
+    extras?: { is_sponsored?: boolean; ad_campaign_id?: string | null },
+  ) {
+    const inStockVariants = row.variants
+    const hasVariants = row._count.variants > 0
+    const canQuickAdd = !hasVariants || inStockVariants.length === 1
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      price: row.price,
+      currency: row.currency,
+      image_url: row.image_url,
+      ...(row.created_at ? { created_at: row.created_at.toISOString() } : {}),
+      ...(row.category ? { category: row.category } : {}),
+      merchant: {
+        business_name: row.shop.name,
+        slug: row.shop.slug,
+        logo: row.shop.logo ?? null,
+      },
+      has_variants: hasVariants,
+      can_quick_add: canQuickAdd,
+      default_variant_id: inStockVariants.length === 1 ? inStockVariants[0].id : null,
+      ...extras,
+    }
+  }
+
+  private async enrichMeiliCatalogProducts(
+    hits: Array<{ id: string; slug: string; _formatted?: Record<string, string> }>,
+  ) {
+    const visible = hits.filter(h => !isMenuMirrorProductSlug(h.slug))
+    if (!visible.length) return []
+
+    const rows = await this.prisma.product.findMany({
+      where: {
+        id: { in: visible.map(h => h.id) },
+        ...this.marketplaceCartProductWhere(),
+      },
+      select: this.marketplaceCatalogSelect(),
+    })
+    const byId = new Map(rows.map(r => [r.id, r]))
+
+    return visible.flatMap(hit => {
+      const row = byId.get(hit.id)
+      if (!row) return []
+      return [{
+        ...this.mapCatalogProductRow(row),
+        ...(hit._formatted ? { _formatted: hit._formatted } : {}),
+      }]
+    })
+  }
+
+  /** Résout la variante panier — auto-sélection si une seule variante en stock (quick-add marketplace). */
+  private resolveCartVariant<
+    T extends { id: string; stock_quantity: number },
+  >(
+    product: { variants: T[] },
+    variantId?: string,
+  ): T | null {
+    const variants = product.variants ?? []
+    if (variants.length === 0) {
+      if (variantId) {
+        throw new BadRequestException('Ce produit n\'a pas de variantes')
+      }
+      return null
+    }
+
+    if (variantId) {
+      const variant = variants.find(v => v.id === variantId) ?? null
+      if (!variant) throw new BadRequestException('Variante introuvable')
+      return variant
+    }
+
+    const inStock = variants.filter(v => v.stock_quantity > 0)
+    if (inStock.length === 0) {
+      throw new BadRequestException('Produit indisponible')
+    }
+    if (inStock.length > 1) {
+      throw new BadRequestException('Sélectionnez une variante pour ce produit')
+    }
+    return inStock[0]
+  }
+
   private assertDeliveryModes(allowPickup?: boolean, allowDelivery?: boolean) {
     const pickup = allowPickup ?? true
     const delivery = allowDelivery ?? true
@@ -1046,18 +1178,7 @@ export class MarketplaceService {
     const cart = await this.getOrCreateCart(userId)
     this.assertHomogeneousCartFromRaw(cart.items, false)
 
-    const hasVariants = product.variants.length > 0
-    let variant: (typeof product.variants)[number] | null = null
-
-    if (hasVariants) {
-      if (!dto.variantId) {
-        throw new BadRequestException('Sélectionnez une variante pour ce produit')
-      }
-      variant = product.variants.find(v => v.id === dto.variantId) ?? null
-      if (!variant) throw new BadRequestException('Variante introuvable')
-    } else if (dto.variantId) {
-      throw new BadRequestException('Ce produit n\'a pas de variantes')
-    }
+    const variant = this.resolveCartVariant(product, dto.variantId)
 
     const availableStock = this.resolveAvailableStock(product, variant)
     if (availableStock < dto.quantity) {
@@ -1133,18 +1254,7 @@ export class MarketplaceService {
         throw new BadRequestException('Boutique indisponible')
       }
 
-      const hasVariants = product.variants.length > 0
-      let variant: (typeof product.variants)[number] | null = null
-
-      if (hasVariants) {
-        if (!line.variantId) {
-          throw new BadRequestException('Sélectionnez une variante pour ce produit')
-        }
-        variant = product.variants.find(v => v.id === line.variantId) ?? null
-        if (!variant) throw new BadRequestException('Variante introuvable')
-      } else if (line.variantId) {
-        throw new BadRequestException('Ce produit n\'a pas de variantes')
-      }
+      const variant = this.resolveCartVariant(product, line.variantId)
 
       const availableStock = this.resolveAvailableStock(product, variant)
       if (availableStock < line.quantity) {
@@ -2834,38 +2944,22 @@ export class MarketplaceService {
       campaigns.filter(c => c.product_id).map(c => [c.product_id!, c.id]),
     )
 
-    const productSelect = {
-      id: true,
-      name: true,
-      slug: true,
-      price: true,
-      currency: true,
-      image_url: true,
-      shop: { select: { name: true, slug: true } },
-    } as const
+    const catalogSelect = this.marketplaceCatalogSelect()
 
     const [sponsoredRows, regularRows] = await Promise.all([
       sponsoredIds.length
         ? this.prisma.product.findMany({
-            where: {
-              id: { in: sponsoredIds },
-              status: 'ACTIVE',
-              stock_quantity: { gt: 0 },
-              shop: { is_active: true, status: 'ACTIVE' },
-            },
-            select: productSelect,
+            where: this.marketplaceCartProductWhere({ id: { in: sponsoredIds } }),
+            select: catalogSelect,
           })
         : Promise.resolve([]),
       this.prisma.product.findMany({
-        where: {
-          status: 'ACTIVE',
-          stock_quantity: { gt: 0 },
-          shop: { is_active: true, status: 'ACTIVE' },
-          ...(sponsoredIds.length ? { id: { notIn: sponsoredIds } } : {}),
-        },
+        where: this.marketplaceCartProductWhere(
+          sponsoredIds.length ? { id: { notIn: sponsoredIds } } : {},
+        ),
         orderBy: { created_at: 'desc' },
         take: limit,
-        select: productSelect,
+        select: catalogSelect,
       }),
     ])
 
@@ -2876,15 +2970,12 @@ export class MarketplaceService {
 
     const rows = [...orderedSponsored, ...regularRows].slice(0, limit)
 
-    return rows.map(row => ({
-      ...row,
-      merchant: {
-        business_name: row.shop.name,
-        slug: row.shop.slug,
-      },
-      is_sponsored: campaignByProduct.has(row.id),
-      ad_campaign_id: campaignByProduct.get(row.id) ?? null,
-    }))
+    return rows.map(row =>
+      this.mapCatalogProductRow(row, {
+        is_sponsored: campaignByProduct.has(row.id),
+        ad_campaign_id: campaignByProduct.get(row.id) ?? null,
+      }),
+    )
   }
 
   async listMarketplaceProducts(query?: {
@@ -2912,7 +3003,7 @@ export class MarketplaceService {
         maxPrice: query?.maxPrice,
         limit: 100,
       })
-      if (meili) return meili.data
+      if (meili) return this.enrichMeiliCatalogProducts(meili.data)
     }
 
     const orderBy =
@@ -2932,10 +3023,10 @@ export class MarketplaceService {
       if (!categoryId) return []
     }
 
+    const catalogSelect = this.marketplaceCatalogSelect()
+
     return this.prisma.product.findMany({
-      where: {
-        status: 'ACTIVE',
-        stock_quantity: { gt: 0 },
+      where: this.marketplaceCartProductWhere({
         ...(categoryId ? { category_id: categoryId } : {}),
         ...(query?.maxPrice != null && query.maxPrice > 0
           ? { price: { lte: query.maxPrice } }
@@ -2951,29 +3042,10 @@ export class MarketplaceService {
             ? { slug: query.shop ?? query.merchant }
             : {}),
         },
-      },
+      }),
       orderBy,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        price: true,
-        currency: true,
-        image_url: true,
-        created_at: true,
-        category: { select: { id: true, name: true, slug: true } },
-        shop: { select: { name: true, slug: true, logo: true } },
-      },
-    }).then(rows =>
-      rows.map(row => ({
-        ...row,
-        merchant: {
-          business_name: row.shop.name,
-          slug: row.shop.slug,
-          logo: row.shop.logo,
-        },
-      })),
-    )
+      select: catalogSelect,
+    }).then(rows => rows.map(row => this.mapCatalogProductRow(row)))
   }
 
   async listMarketplaceMerchants(limit = 20) {

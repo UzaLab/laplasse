@@ -18,6 +18,7 @@
     "test:cov": "pnpm --filter api test:cov",
     "test:e2e:delivery": "pnpm --filter api test:e2e:delivery",
     "test:e2e:ads": "pnpm --filter api test:e2e:ads",
+    "test:e2e:guest-cart": "pnpm --filter api test:e2e:guest-cart",
     "load-test": "node scripts/load-test.mjs",
     "backup": "bash scripts/backup.sh"
   },

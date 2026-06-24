@@ -7,7 +7,6 @@ import {
   LayoutDashboard, Heart, Star, Settings, Store, ShieldCheck, Building2,
   LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar, ShoppingBag,
 } from 'lucide-react'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import { getIndependentShops, getShopManageHref } from '@/lib/shopApi'
@@ -224,7 +223,6 @@ export function ProfileShell({ children }: ProfileShellProps) {
         </div>
       </main>
 
-      <MobileBottomNav />
     </div>
   )
 }

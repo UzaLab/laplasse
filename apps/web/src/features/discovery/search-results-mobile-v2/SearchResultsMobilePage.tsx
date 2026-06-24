@@ -6,7 +6,6 @@ import { ArrowRight, Loader2, Search, SlidersHorizontal, TrendingUp } from 'luci
 
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { CartSync } from '@/components/layout/CartSync'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { SearchBar } from '@/features/discovery/components/SearchBar'
 import { usePaginatedUnifiedSearch, useSearch } from '@/features/discovery/hooks/useDiscovery'
 import type { SearchHit } from '@/features/discovery/components/SearchResultCard'
@@ -394,7 +393,6 @@ export function SearchResultsMobilePage({
         )}
       </main>
 
-      <MobileBottomNav />
       <CartDrawer />
 
       <SearchResultsMobileFiltersSheet

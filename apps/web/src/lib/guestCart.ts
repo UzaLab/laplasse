@@ -35,6 +35,10 @@ export function getGuestCartLines(): GuestCartLine[] {
   return read()
 }
 
+export function setGuestCartLines(items: GuestCartLine[]) {
+  write(items)
+}
+
 export function addGuestCartLine(item: GuestCartLine) {
   const items = read()
   const key = lineKey(item)

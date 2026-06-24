@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { CountryHubModal } from '@/components/layout/CountryHubModal'
 import { HubCountriesSection } from '@/components/layout/HubCountriesSection'
 import { HeroSection } from '@/features/discovery/components/HeroSection'
@@ -12,7 +12,6 @@ import { SpotCard } from '@/features/discovery/components/SpotCard'
 import { NearbyCard } from '@/features/discovery/components/NearbyCard'
 import { MarketplaceSection } from '@/features/discovery/components/MarketplaceSection'
 import { B2BSection } from '@/features/discovery/components/B2BSection'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { HomeMobilePage } from '@/features/discovery/home-mobile-v2/HomeMobileV2Page'
 import { fetchHomeMobileData } from '@/features/discovery/home-mobile-v2/fetchHomeMobileData'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
@@ -48,8 +47,7 @@ function HubHomePage() {
       <HeroSection mode="hub" />
       <HubCountriesSection />
       <B2BSection />
-      <Footer />
-      <MobileBottomNav />
+      <AppFooter />
       <CountryHubModal />
     </div>
   )
@@ -136,7 +134,7 @@ function DesktopHomePage({
 
       <B2BSection />
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

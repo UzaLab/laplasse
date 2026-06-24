@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Search } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { api, ApiCategory, ApiMerchant } from '@/lib/api'
 import { getDefaultCity, getServerCountryCode } from '@/lib/country'
 import {
@@ -107,7 +107,7 @@ export default async function CategoryPage({ params }: Props) {
         )}
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

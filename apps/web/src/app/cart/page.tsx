@@ -16,7 +16,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useCartStore } from '@/stores/cartStore'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
@@ -123,7 +124,7 @@ export default function CartPage() {
     const [data, featured] = await Promise.all([
       isAuthenticated
         ? fetchCart()
-        : fetchGuestCartPreview(getGuestCartLines()),
+        : fetchGuestCartPreview(getGuestCartLines()).then(r => r.cart),
       fetchFeaturedProducts().catch(() => [] as FeaturedProduct[]),
     ])
     setCart(data)
@@ -188,7 +189,7 @@ export default function CartPage() {
       <Navbar />
       <CheckoutSteps current={1} />
 
-      <main className={`${PAGE_CONTAINER} py-12`}>
+      <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
             Mon Panier{' '}
@@ -505,7 +506,7 @@ export default function CartPage() {
         </section>
       )}
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

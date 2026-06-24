@@ -7,7 +7,8 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Loader2, UtensilsCrossed } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
@@ -179,7 +180,7 @@ function CheckoutPageContent() {
       setLoading(true)
       const data = isAuthenticated
         ? await fetchCart()
-        : await fetchGuestCartPreview(getGuestCartLines())
+        : (await fetchGuestCartPreview(getGuestCartLines())).cart
       if (cancelled) return
       setCart(data)
       setLoading(false)
@@ -692,7 +693,7 @@ function CheckoutPageContent() {
             Retour au panier
           </Link>
         </main>
-        <Footer />
+        <AppFooter />
       </div>
     )
   }
@@ -702,7 +703,7 @@ function CheckoutPageContent() {
       <Navbar />
       <Steps current={2} />
 
-      <main className={`${PAGE_CONTAINER} py-12`}>
+      <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="mb-8">
           {isFoodFlow && (
             <div className="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100 flex gap-3">
@@ -1134,7 +1135,7 @@ function CheckoutPageContent() {
         </div>
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

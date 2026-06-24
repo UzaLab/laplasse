@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle2, ExternalLink, Loader2, XCircle } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
@@ -107,7 +108,7 @@ function CheckoutConfirmationContent() {
       <Navbar />
       <CheckoutSteps current={4} />
 
-      <main className={`${PAGE_CONTAINER} py-12`}>
+      <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10 bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-8">
             {isSuccess ? (
@@ -234,7 +235,7 @@ function CheckoutConfirmationContent() {
         </div>
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

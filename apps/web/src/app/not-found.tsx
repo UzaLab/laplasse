@@ -3,15 +3,15 @@
 import Link from 'next/link'
 import { ArrowLeft, Compass, Home, Search } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col selection:bg-brand-200 selection:text-brand-900">
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center px-6 py-20">
+      <main className={`flex-1 flex items-center justify-center px-6 py-20 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="relative max-w-lg w-full text-center">
           <div
             aria-hidden
@@ -65,8 +65,7 @@ export default function NotFound() {
         </div>
       </main>
 
-      <Footer />
-      <MobileBottomNav />
+      <AppFooter />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Loader2,
@@ -12,6 +13,8 @@ import {
   X,
 } from 'lucide-react'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
+import { cn } from '@/lib/utils'
+import { useScrollFabVisibility } from '@/hooks/useScrollFabVisibility'
 import {
   fetchPublicJson,
   type MarketplaceBoutique,
@@ -20,6 +23,11 @@ import {
   type ProductCategoryNode,
 } from '@/lib/marketplaceApi'
 import { getCountryCode } from '@/lib/country'
+import {
+  marketplaceProductHref,
+  marketplaceQuickAddOptions,
+  shouldRedirectToProductPage,
+} from '@/lib/marketplaceQuickAdd'
 import { NetworkErrorBanner } from '@/components/ui/NetworkErrorBanner'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { ProductCard } from './ProductCard'
@@ -201,6 +209,7 @@ function MarketplaceFiltersPanel({
 
 export function MarketplacePageClient() {
   const t = useT()
+  const router = useRouter()
   const { addToCart } = useMarketplaceAddToCart()
   const [products, setProducts] = useState<MarketplaceCatalogProduct[]>([])
   const [merchants, setMerchants] = useState<MarketplaceBoutique[]>([])
@@ -216,6 +225,7 @@ export function MarketplacePageClient() {
   const [priceFilter, setPriceFilter] = useState(100_000)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const filtersFabVisible = useScrollFabVisibility()
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -312,8 +322,12 @@ export function MarketplacePageClient() {
   }
 
   const handleAdd = async (product: MarketplaceCatalogProduct) => {
+    if (shouldRedirectToProductPage(product)) {
+      router.push(marketplaceProductHref(product))
+      return
+    }
     setAddingId(product.id)
-    await addToCart(product.id, 1)
+    await addToCart(product.id, 1, marketplaceQuickAddOptions(product))
     setAddingId(null)
   }
 
@@ -478,11 +492,23 @@ export function MarketplacePageClient() {
       </main>
 
       {!filtersOpen && (
-        <div className="lg:hidden fixed bottom-16 inset-x-0 z-30 p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none">
+        <div
+          className={cn(
+            'lg:hidden fixed bottom-16 inset-x-0 z-30 p-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none transition-all duration-300 ease-out',
+            filtersFabVisible
+              ? 'translate-y-0 opacity-100'
+              : 'translate-y-6 opacity-0',
+          )}
+          aria-hidden={!filtersFabVisible}
+        >
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}
-            className="pointer-events-auto w-full flex items-center justify-center gap-2.5 bg-slate-900 text-white py-4 rounded-full text-sm font-extrabold shadow-xl shadow-slate-900/25 hover:bg-slate-800 active:scale-[0.98] transition-all"
+            tabIndex={filtersFabVisible ? 0 : -1}
+            className={cn(
+              'w-full flex items-center justify-center gap-2.5 bg-slate-900 text-white py-4 rounded-full text-sm font-extrabold shadow-xl shadow-slate-900/25 hover:bg-slate-800 active:scale-[0.98] transition-transform',
+              filtersFabVisible ? 'pointer-events-auto scale-100' : 'pointer-events-none scale-95',
+            )}
           >
             <SlidersHorizontal size={18} />
             {t('marketplace.filters')}

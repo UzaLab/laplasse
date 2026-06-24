@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useEffect, useState } from 'react'
 import {
   addCartItem,
   fetchGuestCartPreview,
@@ -10,9 +11,10 @@ import {
   addGuestCartLine,
   clearGuestCart,
   getGuestCartLines,
-  guestCartItemCount,
+  setGuestCartLines,
   updateGuestCartLineByLocalId,
 } from '@/lib/guestCart'
+import { sanitizeGuestCartLines } from '@/lib/guestCartSanitize'
 import { useAuthStore } from '@/stores/authStore'
 import { notify } from '@/lib/notify'
 
@@ -20,15 +22,15 @@ function isAuthenticatedNow() {
   return useAuthStore.getState().isAuthenticated
 }
 
-async function loadGuestCartPreview(): Promise<Cart | null> {
-  const lines = getGuestCartLines()
-  if (!lines.length) return null
-  return fetchGuestCartPreview(lines)
+async function loadGuestCartPreview(): Promise<{ cart: Cart | null; error?: string }> {
+  const { cart } = await sanitizeGuestCartLines()
+  return { cart }
 }
 
 interface CartState {
   cart: Cart | null
   loading: boolean
+  guestHydrated: boolean
   updatingItemId: string | null
   drawerOpen: boolean
 
@@ -54,6 +56,7 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   cart: null,
   loading: false,
+  guestHydrated: false,
   updatingItemId: null,
   drawerOpen: false,
 
@@ -71,11 +74,15 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ loading: true })
     try {
       if (!isAuthenticatedNow()) {
-        const guestCart = await loadGuestCartPreview()
-        set({ cart: guestCart })
+        const { cart: guestCart, removed } = await sanitizeGuestCartLines()
+        if (removed > 0 && guestCart) {
+          notify.info(`${removed} article${removed > 1 ? 's' : ''} retiré${removed > 1 ? 's' : ''} (indisponible${removed > 1 ? 's' : ''})`)
+        }
+        set({ cart: guestCart, guestHydrated: true })
         return
       }
 
+      set({ guestHydrated: true })
       const res = await authApiFetch('/cart')
       if (res.ok) {
         set({ cart: await res.json() as Cart })
@@ -87,30 +94,43 @@ export const useCartStore = create<CartState>((set, get) => ({
       notify.error('Impossible de charger le panier')
       set({ cart: null })
     } finally {
-      set({ loading: false })
+      set({ loading: false, guestHydrated: true })
     }
   },
 
   setCart: cart => set({ cart }),
 
-  reset: () => set({ cart: null, drawerOpen: false }),
+  reset: () => set({ cart: null, drawerOpen: false, guestHydrated: false }),
 
   addItem: async (productId, quantity, options) => {
     if (!isAuthenticatedNow()) {
+      const snapshot = getGuestCartLines()
       addGuestCartLine({
         productId,
         quantity,
         variantId: options?.variantId,
       })
-      const guestCart = await loadGuestCartPreview()
+
+      let { cart: guestCart, error } = await fetchGuestCartPreview(getGuestCartLines())
+      if (!guestCart) {
+        const sanitized = await sanitizeGuestCartLines()
+        guestCart = sanitized.cart
+        if (sanitized.removed > 0 && guestCart) {
+          notify.info(`${sanitized.removed} ancien${sanitized.removed > 1 ? 's' : ''} article${sanitized.removed > 1 ? 's' : ''} retiré${sanitized.removed > 1 ? 's' : ''}`)
+        }
+      }
+
       if (guestCart) {
-        set({ cart: guestCart })
+        set({ cart: guestCart, guestHydrated: true })
         if (options?.openDrawer !== false) set({ drawerOpen: true })
         notify.success('Ajouté au panier')
         return {}
       }
-      notify.error('Impossible d\'ajouter au panier')
-      return { error: 'Impossible d\'ajouter au panier' }
+
+      setGuestCartLines(snapshot)
+      const message = error ?? 'Impossible d\'ajouter au panier'
+      notify.error(message)
+      return { error: message }
     }
 
     const { cart: next, error } = await addCartItem(productId, quantity, options?.variantId)
@@ -156,8 +176,8 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     if (!isAuthenticatedNow()) {
       updateGuestCartLineByLocalId(itemId, quantity)
-      const guestCart = await loadGuestCartPreview()
-      set({ cart: guestCart, updatingItemId: null })
+      const { cart: guestCart } = await loadGuestCartPreview()
+      set({ cart: guestCart, updatingItemId: null, guestHydrated: true })
       if (quantity === 0) notify.success('Article retiré du panier')
       return
     }
@@ -178,10 +198,26 @@ export const useCartStore = create<CartState>((set, get) => ({
 }))
 
 export function useCartItemCount() {
-  const authCount = useCartStore(s => s.cart?.item_count ?? 0)
+  const cart = useCartStore(s => s.cart)
+  const guestHydrated = useCartStore(s => s.guestHydrated)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
-  if (isAuthenticated) return authCount
-  return guestCartItemCount()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return 0
+
+  if (isAuthenticated) {
+    return cart?.item_count ?? 0
+  }
+
+  if (guestHydrated) {
+    return cart?.item_count ?? 0
+  }
+
+  return 0
 }
 
 export { clearGuestCart }

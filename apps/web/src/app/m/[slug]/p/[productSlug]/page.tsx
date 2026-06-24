@@ -17,7 +17,8 @@ import {
   Truck,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { api, type ApiMerchantDetail } from '@/lib/api'
@@ -40,6 +41,7 @@ import { recordProductView } from '@/lib/discoveryApi'
 import { ProductHtmlContent } from '@/components/ui/ProductHtmlContent'
 import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
 import { notify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
 import { useT } from '@/providers/LocaleProvider'
 
 type TabId = 'description' | 'composition' | 'reviews'
@@ -195,7 +197,7 @@ export default function ProductDetailPage() {
             Retour à la fiche
           </Link>
         </main>
-        <Footer />
+        <AppFooter />
       </div>
     )
   }
@@ -262,7 +264,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Section produit principale */}
-      <main className="bg-white pb-16">
+      <main className={cn('bg-white', MOBILE_BOTTOM_NAV_PAD, 'lg:pb-16')}>
         <div className={PAGE_CONTAINER}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* Galerie */}
@@ -631,7 +633,7 @@ export default function ProductDetailPage() {
         </div>
       </section>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

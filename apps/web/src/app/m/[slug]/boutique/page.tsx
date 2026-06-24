@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { api } from '@/lib/api'
 import { BoutiquePageClient } from '@/features/marketplace/components/BoutiquePageClient'
 
@@ -26,7 +26,7 @@ export default async function MerchantBoutiquePage({ params }: Props) {
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
       <BoutiquePageClient merchant={merchant} />
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

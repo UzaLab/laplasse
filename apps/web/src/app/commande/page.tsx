@@ -13,7 +13,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
@@ -102,7 +103,7 @@ export default function FoodOrderCartPage() {
       <Navbar />
       <FoodCheckoutSteps current={1} />
 
-      <main className={`${PAGE_CONTAINER} py-12`}>
+      <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
@@ -250,7 +251,7 @@ export default function FoodOrderCartPage() {
         )}
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

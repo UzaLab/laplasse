@@ -10,7 +10,7 @@ import {
   Store,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PUBLIC_NARROW } from '@/lib/pageLayout'
@@ -189,7 +189,7 @@ export default function CreateShopPage() {
           </button>
         </form>
       </main>
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

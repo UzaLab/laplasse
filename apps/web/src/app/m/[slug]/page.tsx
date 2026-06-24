@@ -6,7 +6,7 @@ import {
   BadgeCheck, Clock,
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { api, ApiMerchant, ApiMerchantDetail } from '@/lib/api'
 import { MerchantActions } from '@/features/merchant/components/MerchantActions'
 import { ReportTrigger } from '@/features/merchant/components/ReportTrigger'
@@ -332,7 +332,7 @@ export default async function MerchantPage({ params }: Props) {
         </div>
       )}
 
-      <Footer />
+      <AppFooter />
 
       <MerchantMobileActionBar
         categorySlug={merchant.category.slug}

@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { ServiceDetailView } from '@/features/merchant/components/profile/ServiceDetailView'
 import type { BookingSettingsConfig, MerchantServiceConfig, StaffMemberConfig } from '@/lib/bookingConfig'
 import { getServicePublicPath, serviceListingSlug } from '@/lib/serviceListingConfig'
@@ -66,7 +66,7 @@ export default async function PublicPrestationPage({ params }: Props) {
         bookingEnabled={data.booking_enabled}
         bookingType="APPOINTMENT"
       />
-      <Footer />
+      <AppFooter />
     </>
   )
 }

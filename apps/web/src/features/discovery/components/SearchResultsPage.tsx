@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 
 import { Navbar } from '@/components/layout/Navbar'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { SearchBar } from '@/features/discovery/components/SearchBar'
 import { SearchResultCard, type SearchHit } from '@/features/discovery/components/SearchResultCard'
 import { ProductSearchResultCard } from '@/features/discovery/components/ProductSearchResultCard'
@@ -401,7 +400,6 @@ export function SearchResultsPage() {
         )}
       </div>
 
-      <MobileBottomNav />
     </div>
   )
 }

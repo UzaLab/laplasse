@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { RoomDetailView } from '@/features/merchant/components/profile/RoomDetailView'
 import type { BookingSettingsConfig, MerchantServiceConfig } from '@/lib/bookingConfig'
 import { getRoomPublicPath } from '@/lib/roomListingConfig'
@@ -62,7 +62,7 @@ export default async function PublicRoomPage({ params }: Props) {
         bookingEnabled={data.booking_enabled}
         variant="page"
       />
-      <Footer />
+      <AppFooter />
     </>
   )
 }

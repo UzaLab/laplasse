@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { CartSync } from '@/components/layout/CartSync'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { NearbyCard } from '@/features/discovery/components/NearbyCard'
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { SpotlightShopsCarousel } from '@/features/marketplace/components/SpotlightShopsCarousel'
@@ -150,7 +149,6 @@ export function HomeMobilePage({
         )}
       </main>
 
-      <MobileBottomNav />
       <CartDrawer />
     </div>
   )

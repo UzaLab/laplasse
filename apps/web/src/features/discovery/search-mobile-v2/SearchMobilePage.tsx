@@ -7,7 +7,6 @@ import { Menu, SlidersHorizontal } from 'lucide-react'
 
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { CartSync } from '@/components/layout/CartSync'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { HOME_MOBILE_GUTTER, HOME_MOBILE_TRACK } from '@/features/discovery/home-mobile-v2/homeMobileLayout'
@@ -273,7 +272,6 @@ export function SearchMobilePage({
         )}
       </div>
 
-      <MobileBottomNav />
       <CartDrawer />
 
       <MobileNav

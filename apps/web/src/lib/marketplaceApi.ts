@@ -116,12 +116,18 @@ export interface FeaturedProduct {
   merchant: { business_name: string; slug: string }
   is_sponsored?: boolean
   ad_campaign_id?: string | null
+  has_variants?: boolean
+  can_quick_add?: boolean
+  default_variant_id?: string | null
 }
 
 export interface MarketplaceCatalogProduct extends FeaturedProduct {
   created_at?: string
   category?: { id: string; name: string; slug: string } | null
   merchant: { business_name: string; slug: string; logo?: string | null }
+  has_variants?: boolean
+  can_quick_add?: boolean
+  default_variant_id?: string | null
 }
 
 export interface ProductCategoryNode {
@@ -634,8 +640,8 @@ export async function clearCart(): Promise<boolean> {
 
 export async function fetchGuestCartPreview(
   items: GuestCartItemInput[],
-): Promise<Cart | null> {
-  if (!items.length) return null
+): Promise<{ cart: Cart | null; error?: string }> {
+  if (!items.length) return { cart: null }
   const res = await fetchWithTimeout(authUrl('/cart/guest/preview'), {
     method: 'POST',
     headers: {
@@ -644,8 +650,9 @@ export async function fetchGuestCartPreview(
     },
     body: JSON.stringify({ items }),
   })
-  if (!res.ok) return null
-  return res.json() as Promise<Cart>
+  if (!res.ok) return { cart: null, error: await parseError(res) }
+  const cart = await res.json() as Cart
+  return { cart }
 }
 
 export async function applyCartPromo(

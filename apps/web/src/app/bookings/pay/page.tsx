@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Loader2, Smartphone, XCircle } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { confirmBookingPayment, fetchBookingPayment, type BookingPaymentSession } from '@/lib/bookingPaymentApi'
@@ -128,7 +128,7 @@ function BookingPaymentContent() {
           </Link>
         </div>
       </main>
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

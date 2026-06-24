@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
 import { authUrl } from '@/lib/authClient'
 import { BoutiquePageClient } from '@/features/marketplace/components/BoutiquePageClient'
 import { COUNTRY_COOKIE, getCountryFromCookieStore, getDefaultCity } from '@/lib/country'
@@ -65,7 +65,7 @@ export default async function BoutiquePage({ params }: Props) {
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
       <BoutiquePageClient merchant={merchant} />
-      <Footer />
+      <AppFooter />
     </div>
   )
 }

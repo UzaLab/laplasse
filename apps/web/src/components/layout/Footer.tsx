@@ -1,10 +1,21 @@
 import Link from 'next/link'
 import { BookOpen, Globe, Share2, LinkIcon, Heart } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { BRAND_FOOTER_TAGLINE } from '@/lib/brandCopy'
 
-export function Footer() {
+interface FooterProps {
+  /** Masque le footer sur mobile (expérience type application). */
+  mobileHidden?: boolean
+}
+
+export function Footer({ mobileHidden = false }: FooterProps) {
   return (
-    <footer className="bg-white pt-20 pb-10 border-t border-slate-100">
+    <footer
+      className={cn(
+        'bg-white pt-20 pb-10 border-t border-slate-100',
+        mobileHidden && 'hidden md:block',
+      )}
+    >
       <div className="max-w-7xl mx-auto px-6">
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">

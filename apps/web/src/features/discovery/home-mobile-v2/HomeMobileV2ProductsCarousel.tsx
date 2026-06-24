@@ -1,10 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ProductCard } from '@/features/marketplace/components/ProductCard'
 import { AdImpressionTracker } from '@/hooks/useAdImpression'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import type { FeaturedProduct } from '@/lib/marketplaceApi'
+import {
+  marketplaceProductHref,
+  marketplaceQuickAddOptions,
+  shouldRedirectToProductPage,
+} from '@/lib/marketplaceQuickAdd'
 
 import { HomeMobileV2CarouselTrack } from './HomeMobileV2CarouselTrack'
 
@@ -13,12 +19,20 @@ interface HomeMobileV2ProductsCarouselProps {
 }
 
 export function HomeMobileV2ProductsCarousel({ products }: HomeMobileV2ProductsCarouselProps) {
+  const router = useRouter()
   const { addToCart } = useMarketplaceAddToCart()
   const [addingId, setAddingId] = useState<string | null>(null)
 
   const handleAdd = async (product: FeaturedProduct) => {
+    if (shouldRedirectToProductPage(product)) {
+      router.push(marketplaceProductHref(product))
+      return
+    }
     setAddingId(product.id)
-    await addToCart(product.id, 1, { openDrawer: true })
+    await addToCart(product.id, 1, {
+      ...marketplaceQuickAddOptions(product),
+      openDrawer: true,
+    })
     setAddingId(null)
   }
 

@@ -9,6 +9,7 @@ import { AppToaster } from '@/components/ui/AppToaster'
 import { PwaProvider } from '@/components/PwaProvider'
 import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
 import { CountrySuggestionBanner } from '@/components/layout/CountrySuggestionBanner'
+import { PublicMobileBottomNav } from '@/components/layout/PublicMobileBottomNav'
 import './globals.css'
 import {
   BRAND_DESCRIPTION,
@@ -119,6 +120,7 @@ export default async function RootLayout({
               <AuthBootstrap />
               <AppToaster />
               {children}
+              <PublicMobileBottomNav />
               <CountrySuggestionBanner />
               <PwaInstallPrompt />
             </LocaleProvider>

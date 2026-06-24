@@ -321,6 +321,7 @@ export class GuestCartItemDto {
   @IsString()
   variantId?: string
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   quantity!: number

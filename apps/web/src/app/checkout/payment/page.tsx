@@ -7,7 +7,8 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CreditCard, Loader2, Smartphone, XCircle } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
-import { Footer } from '@/components/layout/Footer'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
@@ -164,7 +165,7 @@ function CheckoutPaymentPageContent() {
       <Navbar />
       <Steps current={3} />
 
-      <main className={`${PAGE_CONTAINER} py-12`}>
+      <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
             Paiement
@@ -281,7 +282,7 @@ function CheckoutPaymentPageContent() {
         </div>
       </main>
 
-      <Footer />
+      <AppFooter />
     </div>
   )
 }
