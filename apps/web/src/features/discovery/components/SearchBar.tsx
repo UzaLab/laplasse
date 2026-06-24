@@ -36,7 +36,7 @@ export function SearchBar({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="flex-1 bg-transparent outline-none text-slate-900 placeholder:text-slate-400 text-base font-medium"
+        className="flex-1 min-w-0 bg-transparent outline-none text-slate-900 placeholder:text-slate-400 text-base font-medium [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
       />
       {value && (
         <button

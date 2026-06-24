@@ -147,6 +147,8 @@ export function usePaginatedUnifiedSearch(
   return {
     merchants,
     products,
+    merchantTotal,
+    productTotal,
     hasMoreMerchants: showMerchants && merchants.length < merchantTotal,
     hasMoreProducts: showProducts && products.length < productTotal,
     isLoading,

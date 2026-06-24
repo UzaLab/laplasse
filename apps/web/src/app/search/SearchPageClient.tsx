@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { SearchResultsPage } from '@/features/discovery/components/SearchResultsPage'
+import { SearchResultsMobilePage } from '@/features/discovery/search-results-mobile-v2/SearchResultsMobilePage'
 import { SearchMobilePage } from '@/features/discovery/search-mobile-v2/SearchMobilePage'
 import type { SearchMobileData } from '@/features/discovery/search-mobile-v2/fetchSearchMobileData'
 
@@ -31,12 +32,11 @@ function SearchPageRouter({
     <>
       <div className="md:hidden">
         {showMobileResults ? (
-          <SearchResultsPage />
+          <SearchResultsMobilePage defaultCity={defaultCity} />
         ) : (
           <SearchMobilePage
             {...mapData}
             defaultCity={defaultCity}
-            preview={false}
           />
         )}
       </div>

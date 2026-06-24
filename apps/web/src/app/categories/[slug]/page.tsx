@@ -11,16 +11,12 @@ import {
   categoryPageTitle,
 } from '@/lib/brandCopy'
 import { CategoryIcon } from '@/lib/icons'
-import { CategoryMerchantCard } from '@/features/discovery/components/CategoryMerchantCard'
+import { CategoryMerchantsGrid } from '@/features/discovery/components/CategoryMerchantsGrid'
 
 export const dynamic = 'force-dynamic'
 
 interface Props {
   params: Promise<{ slug: string }>
-}
-
-function MerchantCard({ merchant }: { merchant: ApiMerchant }) {
-  return <CategoryMerchantCard merchant={merchant} />
 }
 
 export default async function CategoryPage({ params }: Props) {
@@ -43,7 +39,6 @@ export default async function CategoryPage({ params }: Props) {
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
 
-      {/* ── HEADER ────────────────────────────────────────────────────────── */}
       <div className="pt-20 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
         <div className="max-w-7xl mx-auto px-6 py-12">
           <Link
@@ -70,7 +65,6 @@ export default async function CategoryPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── BREADCRUMB + FILTER ───────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-2 text-sm text-slate-500">
           <Link href="/" className="hover:text-brand-600 transition-colors" style={{ textDecoration: 'none' }}>Accueil</Link>
@@ -79,10 +73,9 @@ export default async function CategoryPage({ params }: Props) {
         </div>
       </div>
 
-      {/* ── RESULTS ───────────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-8">
-          <p className="text-slate-500">
+      <main className="max-w-7xl mx-auto px-6 py-8 md:py-12 pb-24 md:pb-12">
+        <div className="flex items-center justify-between mb-6 md:mb-8">
+          <p className="text-slate-500 text-sm md:text-base">
             <span className="font-bold text-slate-900">{merchants.meta.total}</span> établissements
           </p>
           <Link
@@ -95,9 +88,7 @@ export default async function CategoryPage({ params }: Props) {
         </div>
 
         {merchants.data.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {merchants.data.map(m => <MerchantCard key={m.id} merchant={m} />)}
-          </div>
+          <CategoryMerchantsGrid merchants={merchants.data} />
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-3xl flex items-center justify-center mb-4">

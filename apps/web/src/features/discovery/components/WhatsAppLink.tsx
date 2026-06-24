@@ -9,6 +9,7 @@ interface WhatsAppLinkProps {
   className?: string
   iconSize?: number
   label?: string
+  iconOnly?: boolean
   onClick?: () => void
 }
 
@@ -18,6 +19,7 @@ export function WhatsAppLink({
   className = '',
   iconSize = 12,
   label = 'WhatsApp',
+  iconOnly = false,
   onClick,
 }: WhatsAppLinkProps) {
   const href = getWhatsAppUrl(phone)
@@ -41,9 +43,10 @@ export function WhatsAppLink({
       }}
       className={className}
       style={{ textDecoration: 'none' }}
+      aria-label={iconOnly ? 'Contacter sur WhatsApp' : undefined}
     >
       <MessageCircle size={iconSize} />
-      {label}
+      {!iconOnly && label}
     </a>
   )
 }

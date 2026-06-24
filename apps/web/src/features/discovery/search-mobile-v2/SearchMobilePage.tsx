@@ -1,10 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { MapPin, Menu, SlidersHorizontal } from 'lucide-react'
+import { Menu, SlidersHorizontal } from 'lucide-react'
 
 import { CartDrawer } from '@/components/layout/CartDrawer'
 import { CartSync } from '@/components/layout/CartSync'
@@ -36,51 +35,12 @@ export interface SearchMobilePageProps {
   categories: Category[]
   merchants: ApiMerchant[]
   defaultCity: string
-  preview?: boolean
-}
-
-function PreviewBanner() {
-  return (
-    <div className="fixed top-0 inset-x-0 z-[60] bg-brand-800 text-white text-center py-1.5 px-3 text-[11px] font-bold tracking-wide pt-[max(0.375rem,env(safe-area-inset-top))]">
-      Aperçu recherche mobile v2 — non publié
-    </div>
-  )
-}
-
-function DesktopGate() {
-  return (
-    <div className="hidden md:flex min-h-dvh flex-col items-center justify-center bg-[#FAFAFA] px-6 text-center">
-      <div className="max-w-md space-y-4">
-        <div className="inline-flex items-center gap-2 mx-auto">
-          <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
-            <MapPin size={18} />
-          </div>
-          <span className="text-xl font-extrabold tracking-tight text-slate-900">LaPlasse</span>
-        </div>
-        <h1 className="text-2xl font-extrabold text-slate-900">Recherche mobile v2 (carte)</h1>
-        <p className="text-slate-500 leading-relaxed">
-          Ouvrez{' '}
-          <span className="font-bold text-brand-600">/preview/search-mobile</span>{' '}
-          sur mobile. Une recherche vous redirige vers{' '}
-          <span className="font-bold text-brand-600">/search</span>.
-        </p>
-        <Link
-          href="/search"
-          className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-500 transition-colors"
-          style={{ textDecoration: 'none' }}
-        >
-          Recherche actuelle
-        </Link>
-      </div>
-    </div>
-  )
 }
 
 export function SearchMobilePage({
   categories,
   merchants: initialMerchants,
   defaultCity,
-  preview = false,
 }: SearchMobilePageProps) {
   const router = useRouter()
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -150,9 +110,9 @@ export function SearchMobilePage({
     router.push('/')
   }
 
-  const topOffset = preview ? 'pt-[calc(28px+1rem)]' : 'pt-[max(1rem,env(safe-area-inset-top))]'
+  const topOffset = 'pt-[max(1rem,env(safe-area-inset-top))]'
 
-  const content = (
+  return (
     <div className="fixed inset-0 flex flex-col bg-[#FAFAFA] overflow-hidden touch-manipulation">
       <CartSync />
 
@@ -330,20 +290,6 @@ export function SearchMobilePage({
       />
     </div>
   )
-
-  if (preview) {
-    return (
-      <>
-        <DesktopGate />
-        <div className="md:hidden">
-          <PreviewBanner />
-          {content}
-        </div>
-      </>
-    )
-  }
-
-  return content
 }
 
 /** Alias preview */
