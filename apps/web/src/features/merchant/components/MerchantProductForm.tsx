@@ -137,8 +137,8 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
 
   useEffect(() => {
     if (!activeShopId) return
-    void fetchShopProductCategories(activeShopId).then(data => {
-      setCategoryOptions(flattenShopCategories(data))
+    void fetchShopProductCategories(activeShopId).then(({ categories }) => {
+      setCategoryOptions(flattenShopCategories(categories))
     })
   }, [activeShopId])
 

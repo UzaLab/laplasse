@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { slugify } from '../marketplace/marketplace.util'
 
@@ -116,6 +116,47 @@ export class ProductCategoriesService {
       },
       include: { countries: true, _count: { select: { products: true } } },
     })
+  }
+
+  async delete(id: string, transferToId?: string) {
+    const category = await this.prisma.productCategory.findUnique({
+      where: { id },
+      include: { _count: { select: { products: true, children: true } } },
+    })
+    if (!category) throw new NotFoundException('Catégorie introuvable')
+
+    const productCount = category._count.products
+    if (productCount > 0) {
+      if (!transferToId?.trim()) {
+        throw new BadRequestException(
+          'Cette catégorie contient des produits. Indiquez une catégorie de destination.',
+        )
+      }
+      if (transferToId === id) {
+        throw new BadRequestException('La catégorie de destination doit être différente')
+      }
+      const target = await this.prisma.productCategory.findUnique({
+        where: { id: transferToId },
+        select: { id: true },
+      })
+      if (!target) throw new NotFoundException('Catégorie de destination introuvable')
+    }
+
+    await this.prisma.$transaction(async tx => {
+      if (productCount > 0 && transferToId) {
+        await tx.product.updateMany({
+          where: { category_id: id },
+          data: { category_id: transferToId },
+        })
+      }
+      await tx.productCategory.delete({ where: { id } })
+    })
+
+    return {
+      deleted_id: id,
+      products_transferred: productCount,
+      children_orphaned: category._count.children,
+    }
   }
 
   async resolveCategoryIdBySlug(slug?: string) {

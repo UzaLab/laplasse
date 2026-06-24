@@ -145,4 +145,11 @@ export class AdminSeedService {
       meilisearch: 'synced',
     }
   }
+
+  /** Catalogue e-commerce produit (catégories + sous-catégories, idempotent). */
+  async seedProductCategories() {
+    const { seedProductCategories } = await import('../../prisma/seed-product-categories')
+    const stats = await seedProductCategories(this.prisma)
+    return { ok: true, ...stats }
+  }
 }

@@ -17,7 +17,8 @@
     "test:cov": "jest --coverage",
     "test:e2e:delivery": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/e2e-delivery-network.ts",
     "test:e2e:ads": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/e2e-ads-campaign.ts",
-    "test:e2e:guest-cart": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/e2e-guest-cart.ts"
+    "test:e2e:guest-cart": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/e2e-guest-cart.ts",
+    "seed:product-categories": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/seed-product-categories.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"

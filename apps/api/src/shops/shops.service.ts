@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { getHighestPlan, getPlanLimits, isWithinLimit } from '../common/plan-limits'
 import { slugify } from '../marketplace/marketplace.util'
 import { CreateShopDto, LinkShopMerchantDto, UpdateShopDto } from './dto/shops.dto'
+import { SHOP_MINI_SELECT, shopAccessibleWhere } from './shop-access.util'
 
 const SHOP_PUBLIC_SELECT = {
   id: true,
@@ -113,9 +114,17 @@ export class ShopsService {
 
   async listMine(userId: string) {
     return this.prisma.shop.findMany({
-      where: { owner_id: userId },
+      where: shopAccessibleWhere(userId),
       orderBy: { created_at: 'asc' },
       select: SHOP_PUBLIC_SELECT,
+    })
+  }
+
+  async listAccessibleMini(userId: string) {
+    return this.prisma.shop.findMany({
+      where: shopAccessibleWhere(userId),
+      orderBy: { created_at: 'asc' },
+      select: SHOP_MINI_SELECT,
     })
   }
 
@@ -147,7 +156,7 @@ export class ShopsService {
 
   async resolveOwnerShop(userId: string, shopId?: string) {
     const shop = await this.prisma.shop.findFirst({
-      where: shopId ? { id: shopId, owner_id: userId } : { owner_id: userId },
+      where: shopAccessibleWhere(userId, shopId),
       orderBy: { created_at: 'asc' },
       include: {
         merchant: { select: { id: true, subscription_plan: true } },

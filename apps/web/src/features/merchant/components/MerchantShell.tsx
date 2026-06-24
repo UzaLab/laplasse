@@ -15,7 +15,7 @@ import { NotificationBell } from '@/features/profile/components/NotificationBell
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
-import { getShopsForMerchant, getIndependentShops } from '@/lib/shopApi'
+import { getShopsForMerchant, getIndependentShops, getActiveMerchantShopId } from '@/lib/shopApi'
 import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
@@ -87,21 +87,19 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
             id: string; name: string; slug: string; status: string; merchant_id?: string | null
           }>
           if (shopList.length) {
-            updateUser({
-              shops: shopList.map(s => ({
-                id: s.id,
-                name: s.name,
-                slug: s.slug,
-                status: s.status as 'DRAFT' | 'ACTIVE' | 'SUSPENDED',
-                merchant_id: s.merchant_id,
-              })),
-            })
             const merchantId = latestMerchantId
-            const linked = shopList.filter(s => s.merchant_id === merchantId)
-            const shopValid = linked.some(s => s.id === activeShopId)
-            if (linked.length && (!activeShopId || !shopValid)) {
-              setActiveShop(linked[0].id)
-            } else if (!linked.length && activeShopId) {
+            const mappedShops = shopList.map(s => ({
+              id: s.id,
+              name: s.name,
+              slug: s.slug,
+              status: s.status as 'DRAFT' | 'ACTIVE' | 'SUSPENDED',
+              merchant_id: s.merchant_id,
+            }))
+            updateUser({ shops: mappedShops })
+            const nextShopId = getActiveMerchantShopId(mappedShops, merchantId, activeShopId)
+            if (nextShopId && nextShopId !== activeShopId) {
+              setActiveShop(nextShopId)
+            } else if (!getShopsForMerchant(mappedShops, merchantId).length && activeShopId) {
               setActiveShop(null)
             }
           }

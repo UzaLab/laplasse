@@ -9,6 +9,7 @@ import { OtpService } from '../otp/otp.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { BookingsService } from '../bookings/bookings.service'
+import { ShopsService } from '../shops/shops.service'
 import { RegisterDto, LoginDto } from './dto/auth.dto'
 import {
   createRefreshTokenValue,
@@ -91,6 +92,18 @@ export class AuthService {
     return { ...rest, logistics_partner: partner }
   }
 
+  private async withAccessibleShops<
+    T extends {
+      id: string
+      shops?: unknown
+      logistics_partner?: unknown
+      logistics_partner_staff?: { partner: unknown } | null
+    },
+  >(user: T) {
+    const shops = await this.shops.listAccessibleMini(user.id)
+    return this.mapAuthUser({ ...user, shops })
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -99,6 +112,7 @@ export class AuthService {
     private readonly notifications: NotificationsService,
     private readonly loyalty: LoyaltyService,
     private readonly bookings: BookingsService,
+    private readonly shops: ShopsService,
   ) {}
 
   private afterAuthLinkBookings(userId: string, phone?: string | null) {
@@ -171,7 +185,7 @@ export class AuthService {
 
     this.afterAuthLinkBookings(user.id, user.phone)
 
-    return { user: this.mapAuthUser(safeUser), ...tokens }
+    return { user: await this.withAccessibleShops(safeUser), ...tokens }
   }
 
   async refresh(userId: string) {
@@ -200,7 +214,7 @@ export class AuthService {
       select: this.authUserSelect,
     })
     if (!user) return null
-    return this.mapAuthUser(user)
+    return this.withAccessibleShops(user)
   }
 
   async sendPhoneOtp(phone: string) {
@@ -346,7 +360,7 @@ export class AuthService {
 
       const tokens = await this.issueTokenPair(user.id, user.email, user.role)
       this.afterAuthLinkBookings(user.id, user.phone)
-      return { user: this.mapAuthUser(user), ...tokens }
+      return { user: await this.withAccessibleShops(user), ...tokens }
     }
 
     const normalized = this.otp.normalizePhone(phone)
@@ -392,7 +406,7 @@ export class AuthService {
 
     const tokens = await this.issueTokenPair(user.id, user.email, user.role)
     this.afterAuthLinkBookings(user.id, user.phone ?? phone)
-    return { user: this.mapAuthUser(user), ...tokens }
+    return { user: await this.withAccessibleShops(user), ...tokens }
   }
 
   async logout(refreshToken: string | null) {

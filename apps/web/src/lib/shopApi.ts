@@ -50,6 +50,17 @@ export function getShopsForMerchant(
   return (shops ?? []).filter(s => s.merchant_id === merchantId)
 }
 
+export function getActiveMerchantShopId(
+  shops: ShopSummary[] | undefined,
+  activeMerchantId: string | null | undefined,
+  activeShopId: string | null | undefined,
+): string | null {
+  const linked = getShopsForMerchant(shops, activeMerchantId)
+  if (!linked.length) return null
+  if (activeShopId && linked.some(s => s.id === activeShopId)) return activeShopId
+  return linked[0].id
+}
+
 /** Boutiques sans établissement lié (créées directement par l'utilisateur). */
 export function getIndependentShops(shops: ShopSummary[] | undefined): ShopSummary[] {
   return (shops ?? []).filter(s => !s.merchant_id)
@@ -161,11 +172,19 @@ export interface ShopProductCategoryOption {
 
 export async function fetchShopProductCategories(
   shopId: string | null | undefined,
-): Promise<ShopProductCategoryOption[]> {
-  if (!shopId) return []
+): Promise<{ categories: ShopProductCategoryOption[]; error?: string }> {
+  if (!shopId) return { categories: [], error: 'Boutique introuvable' }
   const res = await shopApiFetch(`/shops/${shopId}/product-categories`, shopId)
-  if (!res.ok) return []
-  return res.json() as Promise<ShopProductCategoryOption[]>
+  if (!res.ok) {
+    try {
+      const data = await res.json()
+      const msg = Array.isArray(data.message) ? data.message.join(', ') : data.message
+      return { categories: [], error: msg ?? 'Impossible de charger les catégories' }
+    } catch {
+      return { categories: [], error: 'Impossible de charger les catégories' }
+    }
+  }
+  return { categories: await res.json() as ShopProductCategoryOption[] }
 }
 
 export async function saveShopProductCategories(

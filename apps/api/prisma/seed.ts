@@ -384,40 +384,9 @@ async function main() {
 
   // ─── PRODUCT CATEGORIES (marketplace) ───────────────────────────────────────
 
-  const mode = await prisma.productCategory.upsert({
-    where: { slug: 'mode' },
-    update: { is_active: true },
-    create: { name: 'Mode', slug: 'mode', icon: 'Shirt', sort_order: 1 },
-  })
-  const maison = await prisma.productCategory.upsert({
-    where: { slug: 'maison-deco' },
-    update: { is_active: true },
-    create: { name: 'Maison & Déco', slug: 'maison-deco', icon: 'Home', sort_order: 2 },
-  })
-  const artisanat = await prisma.productCategory.upsert({
-    where: { slug: 'artisanat' },
-    update: { is_active: true },
-    create: { name: 'Artisanat', slug: 'artisanat', icon: 'Palette', sort_order: 3 },
-  })
-  const vetements = await prisma.productCategory.upsert({
-    where: { slug: 'mode-vetements' },
-    update: { is_active: true, parent_id: mode.id },
-    create: { name: 'Vêtements', slug: 'mode-vetements', icon: 'Shirt', parent_id: mode.id, sort_order: 1 },
-  })
-  const accessoires = await prisma.productCategory.upsert({
-    where: { slug: 'mode-accessoires' },
-    update: { is_active: true, parent_id: mode.id },
-    create: { name: 'Accessoires', slug: 'mode-accessoires', icon: 'Gem', parent_id: mode.id, sort_order: 2 },
-  })
-
-  for (const cat of [mode, maison, artisanat, vetements, accessoires]) {
-    await prisma.productCategoryCountry.upsert({
-      where: { category_id_country_code: { category_id: cat.id, country_code: 'CI' } },
-      update: {},
-      create: { category_id: cat.id, country_code: 'CI' },
-    })
-  }
-  console.log('✅ Catégories produit marketplace créées')
+  const { seedProductCategories } = await import('./seed-product-categories')
+  const pcStats = await seedProductCategories(prisma)
+  console.log(`✅ Catégories produit marketplace (${pcStats.total} entrées)`)
 
   // ─── MARKETPLACE PRODUCTS (boutiques) ────────────────────────────────────────
 
@@ -441,6 +410,10 @@ async function main() {
   ]
 
   let productCount = 0
+  const catBySlug = Object.fromEntries(
+    (await prisma.productCategory.findMany({ select: { id: true, slug: true } }))
+      .map(c => [c.slug, c.id]),
+  )
   for (const group of boutiqueProducts) {
     const mId = merchantMap[group.merchantSlug]
     if (!mId) continue
@@ -448,9 +421,9 @@ async function main() {
     for (const p of group.products) {
       const categoryId =
         group.merchantSlug === 'yale-design'
-          ? vetements.id
+          ? catBySlug['mode-vetements'] ?? null
           : group.merchantSlug === 'galerie-korhogo'
-            ? artisanat.id
+            ? catBySlug['artisanat-sculpture'] ?? catBySlug['artisanat'] ?? null
             : null
       await prisma.product.upsert({
         where: { shop_id_slug: { shop_id: shopId, slug: p.slug } },

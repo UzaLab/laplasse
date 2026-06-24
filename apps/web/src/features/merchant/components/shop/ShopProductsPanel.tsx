@@ -38,12 +38,12 @@ export function ShopProductsPanel() {
   const load = useCallback(async () => {
     if (!activeShopId) return
     setLoading(true)
-    const [list, cats] = await Promise.all([
+    const [list, catsRes] = await Promise.all([
       fetchMyProducts(activeShopId),
       fetchShopProductCategories(activeShopId),
     ])
     setProducts(list.filter(p => p.status !== 'ARCHIVED'))
-    setCategories(cats)
+    setCategories(catsRes.categories)
     setLoading(false)
   }, [activeShopId])
 

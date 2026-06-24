@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authUrl } from '@/lib/authClient'
 import { invalidateAuthSession, type SessionStatus } from '@/lib/authSession'
-import { getShopsForMerchant, type ShopSummary } from '@/lib/shopApi'
+import { getShopsForMerchant, getActiveMerchantShopId, type ShopSummary } from '@/lib/shopApi'
 
 export interface MerchantSummary {
   id: string
@@ -98,14 +98,18 @@ export const useAuthStore = create<AuthState>()(
             user.merchants?.[0]?.id ?? state.activeMerchantId ?? null
           const linkedShops = getShopsForMerchant(user.shops, activeMerchantId)
           const independentShops = (user.shops ?? []).filter(s => !s.merchant_id)
-          // Prioritise merchant-linked shop; fall back to independent shop
           const firstShop = linkedShops[0] ?? independentShops[0] ?? null
+          const activeShopId = getActiveMerchantShopId(
+            user.shops,
+            activeMerchantId,
+            firstShop?.id ?? state.activeShopId,
+          )
           return {
             user,
             isAuthenticated: true,
             sessionStatus: 'authenticated',
             activeMerchantId,
-            activeShopId: firstShop?.id ?? state.activeShopId ?? null,
+            activeShopId,
           }
         }),
 
@@ -147,13 +151,10 @@ export const useAuthStore = create<AuthState>()(
         })),
 
       setActiveMerchant: (id) =>
-        set((state) => {
-          const linkedShops = getShopsForMerchant(state.user?.shops, id)
-          return {
-            activeMerchantId: id,
-            activeShopId: linkedShops[0]?.id ?? null,
-          }
-        }),
+        set((state) => ({
+          activeMerchantId: id,
+          activeShopId: getActiveMerchantShopId(state.user?.shops, id, state.activeShopId),
+        })),
       setActiveShop: (id) => set({ activeShopId: id }),
     }),
     {

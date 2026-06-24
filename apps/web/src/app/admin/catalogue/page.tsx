@@ -10,20 +10,10 @@ import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { authApiFetch } from '@/lib/authFetch'
 import { notify } from '@/lib/notify'
+import { ProductCategoriesAdminTab } from '@/features/admin/components/ProductCategoriesAdminTab'
 import { AdminPageContainer, AdminPageHeader } from '@/features/admin/components/AdminPageContainer'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ProductCategory {
-  id: string
-  name: string
-  slug: string
-  icon: string | null
-  is_active: boolean
-  parent_id: string | null
-  sort_order: number
-  _count: { products: number }
-}
 
 interface MerchantCategory {
   id: string
@@ -107,159 +97,6 @@ function InlineEdit({
   )
 }
 
-// ─── Tab: Product Categories ───────────────────────────────────────────────────
-
-function ProductCategoriesTab() {
-  const { ready } = useAdminSession()
-  const [categories, setCategories] = useState<ProductCategory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ name: '', parent_id: '', icon: '' })
-  const [creating, setCreating] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-
-  const load = useCallback(async () => {
-    const data = await adminFetch<ProductCategory[]>('/admin/product-categories')
-    if (data) setCategories(data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { if (ready) void load() }, [ready, load])
-
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreating(true)
-    await adminFetch('/admin/product-categories', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: form.name,
-        parent_id: form.parent_id || undefined,
-        icon: form.icon || undefined,
-        country_codes: ['CI'],
-      }),
-    })
-    setForm({ name: '', parent_id: '', icon: '' })
-    setShowForm(false)
-    setCreating(false)
-    notify.success('Catégorie créée')
-    void load()
-  }
-
-  const update = async (id: string, data: { name?: string; is_active?: boolean; icon?: string | null }) => {
-    await adminFetch(`/admin/product-categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
-    void load()
-  }
-
-  const roots = categories.filter(c => !c.parent_id)
-  const childrenOf = (pid: string) => categories.filter(c => c.parent_id === pid)
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{categories.length} catégories</p>
-        <button
-          type="button"
-          onClick={() => setShowForm(v => !v)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700"
-        >
-          <Plus size={14} /> Nouvelle catégorie
-        </button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={create} className="bg-violet-50 border border-violet-100 rounded-2xl p-4 space-y-3">
-          <p className="text-xs font-bold text-violet-700 uppercase">Nouvelle catégorie</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input
-              required
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Nom de la catégorie"
-              className="sm:col-span-2 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-            />
-            <input
-              value={form.icon}
-              onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
-              placeholder="Icône (emoji ou code)"
-              className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select
-              value={form.parent_id}
-              onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}
-              className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
-            >
-              <option value="">— Catégorie racine —</option>
-              {roots.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <div className="flex gap-2">
-              <button type="submit" disabled={creating}
-                className="flex-1 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-1.5">
-                {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Créer
-              </button>
-              <button type="button" onClick={() => setShowForm(false)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 text-sm hover:bg-slate-50">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
-      ) : (
-        <div className="space-y-2">
-          {roots.map(root => (
-            <div key={root.id} className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  {root.icon && <span className="text-lg shrink-0">{root.icon}</span>}
-                  <div className="min-w-0">
-                    <InlineEdit value={root.name} onSave={name => update(root.id, { name })} />
-                    <p className="text-xs text-slate-400">{root.slug} · {root._count.products} produits · {childrenOf(root.id).length} sous-cat.</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => void update(root.id, { is_active: !root.is_active })}
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-colors ${
-                      root.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                    }`}
-                  >
-                    {root.is_active ? 'Active' : 'Inactive'}
-                  </button>
-                </div>
-              </div>
-              {childrenOf(root.id).map(child => (
-                <div key={child.id} className="flex items-center justify-between px-4 py-2.5 pl-10 border-t border-slate-50 bg-slate-50/40 gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <ChevronRight size={12} className="text-slate-300 shrink-0" />
-                    {child.icon && <span>{child.icon}</span>}
-                    <div className="min-w-0">
-                      <InlineEdit value={child.name} onSave={name => update(child.id, { name })} />
-                      <p className="text-xs text-slate-400">{child._count.products} produits</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void update(child.id, { is_active: !child.is_active })}
-                    className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 transition-colors ${
-                      child.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                    }`}
-                  >
-                    {child.is_active ? 'Active' : 'Inactive'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─── Tab: Merchant Categories ─────────────────────────────────────────────────
 
@@ -644,7 +481,7 @@ export default function AdminCataloguePage() {
       </div>
 
       {/* Content */}
-      {tab === 'product-categories' && <ProductCategoriesTab />}
+      {tab === 'product-categories' && <ProductCategoriesAdminTab />}
       {tab === 'merchant-categories' && <MerchantCategoriesTab />}
       {tab === 'spotlight' && <SpotlightTab />}
     </AdminPageContainer>

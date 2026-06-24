@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Param, Body, UseGuards, Query, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Controller, Get, Patch, Post, Delete, Param, Body, UseGuards, Query, NotFoundException, BadRequestException } from '@nestjs/common'
 import { hash } from 'bcryptjs'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
@@ -197,11 +197,17 @@ export class AdminController {
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: body.new_owner_id }, select: { id: true, email: true } })
     if (!user) throw new NotFoundException('Utilisateur introuvable')
-    const updated = await this.prisma.merchant.update({
-      where: { id },
-      data: { owner_id: body.new_owner_id },
-      select: { id: true, business_name: true, owner: { select: { id: true, email: true, full_name: true } } },
-    })
+    const [, updated] = await this.prisma.$transaction([
+      this.prisma.shop.updateMany({
+        where: { merchant_id: id },
+        data: { owner_id: body.new_owner_id },
+      }),
+      this.prisma.merchant.update({
+        where: { id },
+        data: { owner_id: body.new_owner_id },
+        select: { id: true, business_name: true, owner: { select: { id: true, email: true, full_name: true } } },
+      }),
+    ])
     await this.audit.log({ action: 'UPDATE', entityType: 'Merchant', entityId: id, payload: { action: 'reassign_owner', new_owner_id: body.new_owner_id } })
     return updated
   }
@@ -621,6 +627,11 @@ export class AdminController {
     return this.adminSeed.seedMultipays(code as 'BF' | 'SN' | 'ALL')
   }
 
+  @Post('seed-product-categories')
+  seedProductCategories() {
+    return this.adminSeed.seedProductCategories()
+  }
+
   // ── Trust Score ──────────────────────────────────────────────────────────────
 
   @Post('merchants/:id/trust-score/recalculate')
@@ -788,6 +799,14 @@ export class AdminController {
     },
   ) {
     return this.productCategories.update(id, body)
+  }
+
+  @Delete('product-categories/:id')
+  deleteProductCategory(
+    @Param('id') id: string,
+    @Body() body: { transfer_to_id?: string },
+  ) {
+    return this.productCategories.delete(id, body.transfer_to_id)
   }
 
   // ── Référentiel géographique ─────────────────────────────────────────────────
