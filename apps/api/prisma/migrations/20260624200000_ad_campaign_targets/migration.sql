@@ -16,6 +16,8 @@ WHERE ac."merchant_id" = m."id" AND ac."owner_id" IS NULL;
 
 UPDATE "AdCampaign" SET "owner_id" = (SELECT "owner_id" FROM "Merchant" LIMIT 1) WHERE "owner_id" IS NULL;
 
+DELETE FROM "AdCampaign" WHERE "owner_id" IS NULL;
+
 ALTER TABLE "AdCampaign" ALTER COLUMN "owner_id" SET NOT NULL;
 ALTER TABLE "AdCampaign" ALTER COLUMN "merchant_id" DROP NOT NULL;
 

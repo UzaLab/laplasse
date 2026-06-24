@@ -1,5 +1,9 @@
--- DN-7.4 : finances partenaire + champs onboarding
-CREATE TYPE "PayoutStatus" AS ENUM ('PENDING', 'PROCESSING', 'PAID', 'FAILED');
+-- DN-7.4 : finances partenaire + champs onboarding (idempotent vs 20260623120000)
+DO $$ BEGIN
+  CREATE TYPE "PayoutStatus" AS ENUM ('PENDING', 'PROCESSING', 'PAID', 'FAILED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 ALTER TABLE "LogisticsPartner" ADD COLUMN IF NOT EXISTS "fleet_size_range" TEXT;
 ALTER TABLE "LogisticsPartner" ADD COLUMN IF NOT EXISTS "vehicle_types" TEXT[] DEFAULT ARRAY[]::TEXT[];
@@ -22,13 +26,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS "LogisticsPartnerServiceArea_logistics_partner
   ON "LogisticsPartnerServiceArea"("logistics_partner_id", "commune_id");
 CREATE INDEX IF NOT EXISTS "LogisticsPartnerServiceArea_logistics_partner_id_idx"
   ON "LogisticsPartnerServiceArea"("logistics_partner_id");
+CREATE INDEX IF NOT EXISTS "LogisticsPartnerServiceArea_commune_id_idx"
+  ON "LogisticsPartnerServiceArea"("commune_id");
 
-ALTER TABLE "LogisticsPartnerServiceArea"
-  ADD CONSTRAINT "LogisticsPartnerServiceArea_logistics_partner_id_fkey"
-  FOREIGN KEY ("logistics_partner_id") REFERENCES "LogisticsPartner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "LogisticsPartnerServiceArea"
-  ADD CONSTRAINT "LogisticsPartnerServiceArea_commune_id_fkey"
-  FOREIGN KEY ("commune_id") REFERENCES "GeoCommune"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'LogisticsPartnerServiceArea_logistics_partner_id_fkey'
+  ) THEN
+    ALTER TABLE "LogisticsPartnerServiceArea"
+      ADD CONSTRAINT "LogisticsPartnerServiceArea_logistics_partner_id_fkey"
+      FOREIGN KEY ("logistics_partner_id") REFERENCES "LogisticsPartner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'LogisticsPartnerServiceArea_commune_id_fkey'
+  ) THEN
+    ALTER TABLE "LogisticsPartnerServiceArea"
+      ADD CONSTRAINT "LogisticsPartnerServiceArea_commune_id_fkey"
+      FOREIGN KEY ("commune_id") REFERENCES "GeoCommune"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "LogisticsPartnerPayout" (
   "id" TEXT NOT NULL,
@@ -48,6 +67,12 @@ CREATE TABLE IF NOT EXISTS "LogisticsPartnerPayout" (
 CREATE INDEX IF NOT EXISTS "LogisticsPartnerPayout_logistics_partner_id_period_start_idx"
   ON "LogisticsPartnerPayout"("logistics_partner_id", "period_start");
 
-ALTER TABLE "LogisticsPartnerPayout"
-  ADD CONSTRAINT "LogisticsPartnerPayout_logistics_partner_id_fkey"
-  FOREIGN KEY ("logistics_partner_id") REFERENCES "LogisticsPartner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'LogisticsPartnerPayout_logistics_partner_id_fkey'
+  ) THEN
+    ALTER TABLE "LogisticsPartnerPayout"
+      ADD CONSTRAINT "LogisticsPartnerPayout_logistics_partner_id_fkey"
+      FOREIGN KEY ("logistics_partner_id") REFERENCES "LogisticsPartner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;

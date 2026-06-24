@@ -53,4 +53,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 \
   CMD wget -qO- http://localhost:3001/api/health || exit 1
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && ( [ \"$RUN_SEED\" = \"true\" ] && node dist/prisma/seed.js || true ) && ( [ \"$RUN_SEED_DELIVERY\" = \"true\" ] && node dist/prisma/seed-demo-users.js && node dist/prisma/seed-courier-demo.js && node dist/prisma/seed-courier-demo-mission.js && node dist/prisma/seed-delivery-stakeholders.js && node dist/prisma/seed-delivery.js || true ) || echo '[warn] migrate failed'; exec node dist/src/main.js"]
+CMD ["sh", "-c", "set -e; node node_modules/prisma/build/index.js migrate deploy; if [ \"$RUN_SEED\" = \"true\" ]; then node dist/prisma/seed.js; fi; if [ \"$RUN_SEED_DELIVERY\" = \"true\" ]; then node dist/prisma/seed-demo-users.js && node dist/prisma/seed-courier-demo.js && node dist/prisma/seed-courier-demo-mission.js && node dist/prisma/seed-delivery-stakeholders.js && node dist/prisma/seed-delivery.js; fi; exec node dist/src/main.js"]
