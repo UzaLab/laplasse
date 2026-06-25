@@ -1,5 +1,8 @@
 import { MapPin, Store, Wifi, Car, Music, Wind, Utensils, Wine } from 'lucide-react'
 import type { ApiMerchantDetail } from '@/lib/api'
+import { coordsFromCityName } from '@/lib/cityCoords'
+import { StaticLocationMapLazy } from '@/features/maps/components/StaticLocationMapLazy'
+import { DirectionsLinkButton } from '@/features/maps/components/DirectionsLinkButton'
 
 function TagIcon({ name }: { name: string }) {
   const map: Record<string, React.ReactNode> = {
@@ -12,6 +15,14 @@ function TagIcon({ name }: { name: string }) {
     Cocktails: <Wine size={18} className="text-brand-500" />,
   }
   return <>{map[name] ?? <Store size={18} className="text-brand-500" />}</>
+}
+
+function resolveMapCoords(location: NonNullable<ApiMerchantDetail['location']>) {
+  if (location.latitude != null && location.longitude != null) {
+    return { lat: location.latitude, lng: location.longitude, precise: true }
+  }
+  const fallback = coordsFromCityName(location.city)
+  return { lat: fallback.lat, lng: fallback.lng, precise: false }
 }
 
 interface Props {
@@ -31,6 +42,8 @@ export function MerchantInfoTab({ merchant }: Props) {
       </p>
     )
   }
+
+  const mapCoords = merchant.location ? resolveMapCoords(merchant.location) : null
 
   return (
     <div className="space-y-10">
@@ -57,27 +70,33 @@ export function MerchantInfoTab({ merchant }: Props) {
 
       {merchant.location && (
         <section>
-          <h3 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-            <MapPin size={18} className="text-brand-500" /> Adresse
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <MapPin size={18} className="text-brand-500" /> Adresse
+            </h3>
+            {mapCoords && (
+              <DirectionsLinkButton latitude={mapCoords.lat} longitude={mapCoords.lng} />
+            )}
+          </div>
           <p className="text-slate-600 mb-4">
             {[merchant.location.address, merchant.location.district, merchant.location.city]
               .filter(Boolean)
               .join(', ')}
           </p>
-          <div className="w-full h-56 bg-slate-200 rounded-2xl overflow-hidden relative border border-slate-200">
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-80"
-              style={{
-                backgroundImage: `url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Abidjan_OpenStreetMap.png/640px-Abidjan_OpenStreetMap.png')`,
-              }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 bg-brand-500 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white">
-                <MapPin size={22} className="fill-current" />
-              </div>
-            </div>
-          </div>
+          {mapCoords && (
+            <>
+              <StaticLocationMapLazy
+                latitude={mapCoords.lat}
+                longitude={mapCoords.lng}
+                label={`Localisation de ${merchant.business_name}`}
+              />
+              {!mapCoords.precise && (
+                <p className="text-xs text-slate-400 mt-2">
+                  Position approximative (centre-ville). L&apos;établissement n&apos;a pas encore renseigné de point GPS exact.
+                </p>
+              )}
+            </>
+          )}
         </section>
       )}
     </div>

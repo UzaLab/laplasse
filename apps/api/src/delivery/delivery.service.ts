@@ -47,7 +47,7 @@ export class DeliveryService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
-        shop: { select: { address: true, district: true, city: true, country: true, name: true, delivery_fulfilment_default: true } },
+        shop: { select: { address: true, district: true, city: true, country: true, name: true, delivery_fulfilment_default: true, latitude: true, longitude: true } },
         merchant: {
           select: {
             business_name: true,
@@ -125,6 +125,8 @@ export class DeliveryService {
     const pickupCoords = this.etaService.resolvePickupCoords({
       shopCity: order.shop?.city,
       shopCountry: order.shop?.country,
+      shopLat: order.shop?.latitude,
+      shopLng: order.shop?.longitude,
       merchantLat: order.merchant?.location?.latitude,
       merchantLng: order.merchant?.location?.longitude,
     })

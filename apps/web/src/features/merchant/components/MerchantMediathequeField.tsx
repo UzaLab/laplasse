@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Loader2, UploadCloud, X, ZoomIn } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Search, Trash2, UploadCloud, X, ZoomIn } from 'lucide-react'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { notify } from '@/lib/notify'
 import { ImageGalleryViewer } from '@/components/ui/ImageGalleryViewer'
@@ -11,10 +11,17 @@ const INPUT_CLASS =
 
 const LABEL_CLASS = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2'
 
+const LIBRARY_PAGE_SIZE = 20
+
+interface MediaItem {
+  id: string
+  url: string
+}
+
 interface MediaData {
   logo: string | null
   cover_image: string | null
-  gallery: { id: string; url: string }[]
+  gallery: MediaItem[]
   limits?: {
     can_add: boolean
     max_photos: number
@@ -23,15 +30,29 @@ interface MediaData {
   }
 }
 
-function collectMediaUrls(data: MediaData): string[] {
-  const urls: string[] = []
+interface LibraryEntry {
+  id?: string
+  url: string
+  deletable: boolean
+}
+
+function collectLibraryEntries(data: MediaData): LibraryEntry[] {
+  const entries: LibraryEntry[] = []
+  const seen = new Set<string>()
+
   for (const url of [data.logo, data.cover_image]) {
-    if (url && !urls.includes(url)) urls.push(url)
+    if (url && !seen.has(url)) {
+      seen.add(url)
+      entries.push({ url, deletable: false })
+    }
   }
   for (const item of data.gallery) {
-    if (!urls.includes(item.url)) urls.push(item.url)
+    if (!seen.has(item.url)) {
+      seen.add(item.url)
+      entries.push({ id: item.id, url: item.url, deletable: true })
+    }
   }
-  return urls
+  return entries
 }
 
 type SingleProps = {
@@ -60,6 +81,8 @@ type BaseProps = {
   hint?: string
   disabled?: boolean
   className?: string
+  /** Afficher le champ « URL de l'image » (désactivé dans les formulaires produits) */
+  showUrlInput?: boolean
 }
 
 export type MerchantMediathequeFieldProps = BaseProps & (SingleProps | MultipleProps)
@@ -71,6 +94,7 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
     hint,
     disabled = false,
     className = '',
+    showUrlInput = true,
   } = props
 
   const isSingle = props.mode === 'single'
@@ -83,9 +107,12 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
 
   const [uploading, setUploading] = useState(false)
   const [loadingLibrary, setLoadingLibrary] = useState(false)
-  const [libraryUrls, setLibraryUrls] = useState<string[]>([])
+  const [libraryEntries, setLibraryEntries] = useState<LibraryEntry[]>([])
   const [imageUrlDraft, setImageUrlDraft] = useState('')
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [libraryPage, setLibraryPage] = useState(0)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadLibrary = useCallback(async () => {
@@ -95,7 +122,7 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
       const res = await merchantApiFetch('/merchants/me/media', merchantId)
       if (res.ok) {
         const data = (await res.json()) as MediaData
-        setLibraryUrls(collectMediaUrls(data))
+        setLibraryEntries(collectLibraryEntries(data))
       }
     } finally {
       setLoadingLibrary(false)
@@ -105,6 +132,22 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
   useEffect(() => {
     void loadLibrary()
   }, [loadLibrary])
+
+  useEffect(() => {
+    setLibraryPage(0)
+  }, [librarySearch])
+
+  const filteredLibrary = useMemo(() => {
+    const q = librarySearch.trim().toLowerCase()
+    if (!q) return libraryEntries
+    return libraryEntries.filter(e => e.url.toLowerCase().includes(q))
+  }, [libraryEntries, librarySearch])
+
+  const totalPages = Math.max(1, Math.ceil(filteredLibrary.length / LIBRARY_PAGE_SIZE))
+  const pagedLibrary = useMemo(() => {
+    const start = libraryPage * LIBRARY_PAGE_SIZE
+    return filteredLibrary.slice(start, start + LIBRARY_PAGE_SIZE)
+  }, [filteredLibrary, libraryPage])
 
   const applyUrls = (next: string[]) => {
     if (isSingle) {
@@ -216,6 +259,31 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
     notify.success('Image ajoutée')
   }
 
+  const deleteFromLibrary = async (entry: LibraryEntry, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!entry.deletable || !entry.id || !merchantId) return
+    if (!confirm('Supprimer cette image de la médiathèque ?')) return
+
+    setDeletingId(entry.id)
+    try {
+      const res = await merchantApiFetch(`/merchants/me/media/${entry.id}`, merchantId, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        notify.error((d as { message?: string }).message ?? 'Erreur lors de la suppression')
+        return
+      }
+      if (currentUrls.includes(entry.url)) {
+        applyUrls(currentUrls.filter(u => u !== entry.url))
+      }
+      notify.success('Image supprimée')
+      void loadLibrary()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className={className}>
       {label && <p className={LABEL_CLASS}>{label}</p>}
@@ -263,69 +331,141 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
         </div>
       )}
 
-      <div className="mt-4">
-        <label className={LABEL_CLASS}>Ou URL de l&apos;image</label>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="url"
-            value={imageUrlDraft}
-            onChange={e => setImageUrlDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageFromUrl() } }}
-            placeholder="https://…"
-            className={`${INPUT_CLASS} flex-1`}
-            disabled={disabled || !canAddMore}
-          />
-          <button
-            type="button"
-            onClick={addImageFromUrl}
-            disabled={disabled || !canAddMore || !imageUrlDraft.trim()}
-            className="shrink-0 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Ajouter
-          </button>
+      {showUrlInput && (
+        <div className="mt-4">
+          <label className={LABEL_CLASS}>Ou URL de l&apos;image</label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              value={imageUrlDraft}
+              onChange={e => setImageUrlDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageFromUrl() } }}
+              placeholder="https://…"
+              className={`${INPUT_CLASS} flex-1`}
+              disabled={disabled || !canAddMore}
+            />
+            <button
+              type="button"
+              onClick={addImageFromUrl}
+              disabled={disabled || !canAddMore || !imageUrlDraft.trim()}
+              className="shrink-0 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Ajouter
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-6">
-        <p className={LABEL_CLASS}>Médiathèque</p>
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <p className={LABEL_CLASS + ' mb-0'}>
+            Médiathèque
+            {libraryEntries.length > 0 && (
+              <span className="ml-2 normal-case font-medium text-slate-400">
+                ({libraryEntries.length} image{libraryEntries.length > 1 ? 's' : ''})
+              </span>
+            )}
+          </p>
+          {libraryEntries.length > LIBRARY_PAGE_SIZE && (
+            <div className="relative flex-1 min-w-[140px] max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={librarySearch}
+                onChange={e => setLibrarySearch(e.target.value)}
+                placeholder="Rechercher…"
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-brand-400"
+              />
+            </div>
+          )}
+        </div>
+
         {loadingLibrary ? (
           <div className="flex justify-center py-8">
             <Loader2 size={22} className="animate-spin text-slate-300" />
           </div>
-        ) : libraryUrls.length === 0 ? (
+        ) : libraryEntries.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
             <ImageIcon size={28} className="text-slate-300 mx-auto mb-2" />
             <p className="text-sm text-slate-400">Aucune photo dans la médiathèque</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-            {libraryUrls.map(url => {
-              const selected = currentUrls.includes(url)
-              return (
-                <button
-                  key={url}
-                  type="button"
-                  disabled={disabled || (selected && !isSingle)}
-                  onClick={() => pickFromLibrary(url)}
-                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                    selected
-                      ? 'border-brand-500 ring-2 ring-brand-100 opacity-90'
-                      : 'border-slate-200 hover:border-brand-300 hover:ring-2 hover:ring-brand-50'
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                  {selected && (
-                    <span className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
-                      <span className="bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        Sélectionnée
-                      </span>
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+        ) : filteredLibrary.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-6 text-center">
+            <p className="text-sm text-slate-400">Aucun résultat pour « {librarySearch} »</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+              {pagedLibrary.map(entry => {
+                const selected = currentUrls.includes(entry.url)
+                return (
+                  <div key={entry.id ?? entry.url} className="relative group/item">
+                    <button
+                      type="button"
+                      disabled={disabled || (selected && !isSingle)}
+                      onClick={() => pickFromLibrary(entry.url)}
+                      className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                        selected
+                          ? 'border-brand-500 ring-2 ring-brand-100 opacity-90'
+                          : 'border-slate-200 hover:border-brand-300 hover:ring-2 hover:ring-brand-50'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={entry.url} alt="" className="w-full h-full object-cover" />
+                      {selected && (
+                        <span className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
+                          <span className="bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            Sélectionnée
+                          </span>
+                        </span>
+                      )}
+                    </button>
+                    {entry.deletable && entry.id && !disabled && (
+                      <button
+                        type="button"
+                        onClick={e => void deleteFromLibrary(entry, e)}
+                        disabled={deletingId === entry.id}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/95 text-slate-400 hover:text-red-500 flex items-center justify-center shadow-sm opacity-0 group-hover/item:opacity-100 transition-opacity"
+                        aria-label="Supprimer de la médiathèque"
+                      >
+                        {deletingId === entry.id
+                          ? <Loader2 size={12} className="animate-spin" />
+                          : <Trash2 size={12} />}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-500">
+                <span>
+                  {libraryPage * LIBRARY_PAGE_SIZE + 1}–{Math.min((libraryPage + 1) * LIBRARY_PAGE_SIZE, filteredLibrary.length)} sur {filteredLibrary.length}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={libraryPage === 0}
+                    onClick={() => setLibraryPage(p => p - 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    aria-label="Page précédente"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={libraryPage >= totalPages - 1}
+                    onClick={() => setLibraryPage(p => p + 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    aria-label="Page suivante"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

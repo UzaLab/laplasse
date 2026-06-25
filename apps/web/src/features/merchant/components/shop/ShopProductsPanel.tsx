@@ -307,7 +307,13 @@ export function ShopProductsPanel() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-extrabold text-slate-900 truncate">{product.name}</p>
+                  <Link
+                    href={`/merchant/shop/products/${product.id}/edit`}
+                    className="font-extrabold text-slate-900 truncate hover:text-amber-600 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {product.name}
+                  </Link>
                   <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500">
                     {PRODUCT_STATUS_LABELS[product.status]}
                   </span>

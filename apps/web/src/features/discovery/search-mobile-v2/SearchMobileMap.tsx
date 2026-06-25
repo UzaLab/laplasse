@@ -129,7 +129,7 @@ export function SearchMobileMap({
   const mapCenter = userLocation ?? center
 
   return (
-    <div className="absolute inset-0 z-0 bg-slate-100">
+    <div className="laplasse-leaflet-map absolute inset-0 z-0 bg-slate-100">
       <MapContainer
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={13}

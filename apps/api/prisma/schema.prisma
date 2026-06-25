@@ -276,6 +276,7 @@ model GeoCity {
   zone_rules ShopDeliveryZoneRule[]
   user_addresses UserAddress[]
   courier_service_zones CourierServiceZone[]
+  shops Shop[]
 
   @@unique([country, slug])
   @@index([country, is_active])
@@ -296,6 +297,7 @@ model GeoCommune {
   user_addresses UserAddress[]
   courier_zone_links CourierServiceZoneCommune[]
   partner_service_areas LogisticsPartnerServiceArea[]
+  shops Shop[]
 
   @@unique([city_id, slug])
   @@index([city_id, is_active])
@@ -459,6 +461,7 @@ model ProductCategory {
   products  Product[]
   shops     ShopProductCategory[]
   promotions Promotion[]
+  promotion_links PromotionCategory[]
 
   @@index([parent_id, sort_order])
   @@index([is_active])
@@ -706,6 +709,7 @@ model Promotion {
   starts_at        DateTime
   ends_at          DateTime
   max_uses         Int?
+  max_uses_per_user Int?
   uses_count       Int           @default(0)
   created_at       DateTime      @default(now())
 
@@ -714,6 +718,8 @@ model Promotion {
   category    ProductCategory?      @relation(fields: [category_id], references: [id], onDelete: SetNull)
   orders      Order[]
   redemptions PromotionRedemption[]
+  products    PromotionProduct[]
+  categories  PromotionCategory[]
 
   @@unique([merchant_id, code])
   @@index([merchant_id])
@@ -1196,6 +1202,11 @@ model Shop {
   city        String     @default("Abidjan")
   district    String?
   address     String?
+  city_id     String?
+  commune_id  String?
+  latitude    Float?
+  longitude   Float?
+  has_physical_location Boolean @default(false)
   merchant_id String?    @unique
   status      ShopStatus @default(DRAFT)
   is_active   Boolean    @default(true)
@@ -1207,6 +1218,8 @@ model Shop {
 
   owner    User                 @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   merchant Merchant?            @relation(fields: [merchant_id], references: [id], onDelete: SetNull)
+  geo_city    GeoCity?    @relation(fields: [city_id], references: [id], onDelete: SetNull)
+  geo_commune GeoCommune? @relation(fields: [commune_id], references: [id], onDelete: SetNull)
   products Product[]
   orders   Order[]
   payments PaymentTransaction[]
@@ -1335,10 +1348,33 @@ model Product {
   reviews     ProductReview[]
   views       ProductView[]
   ad_campaigns AdCampaign[]
+  promotions   PromotionProduct[]
 
   @@unique([shop_id, slug])
   @@index([shop_id, status])
   @@index([category_id])
+}
+
+model PromotionCategory {
+  promotion_id String
+  category_id  String
+
+  promotion Promotion       @relation(fields: [promotion_id], references: [id], onDelete: Cascade)
+  category  ProductCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([promotion_id, category_id])
+  @@index([category_id])
+}
+
+model PromotionProduct {
+  promotion_id String
+  product_id   String
+
+  promotion Promotion @relation(fields: [promotion_id], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@id([promotion_id, product_id])
+  @@index([product_id])
 }
 
 model ProductView {

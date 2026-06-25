@@ -427,25 +427,25 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       {/* Overlay mobile */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[105] lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — au-dessus du contenu principal (cartes Leaflet) */}
       <aside className={`
-        fixed lg:relative z-50 inset-y-0 left-0 w-72 bg-white border-r border-slate-100
+        fixed lg:relative z-[110] inset-y-0 left-0 w-72 bg-white border-r border-slate-100
         flex flex-col h-full flex-shrink-0 transition-transform duration-300
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {SidebarInner}
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      {/* Main — isolé pour que Leaflet ne déborde pas sur la sidebar */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative z-0 isolate">
 
         {/* Topbar */}
-        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
+        <header className="relative z-20 h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"

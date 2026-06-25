@@ -43,6 +43,8 @@ import { hasHtmlContent, stripHtml } from '@/lib/htmlUtils'
 import { notify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { useT } from '@/providers/LocaleProvider'
+import { ProductPromoPrice } from '@/features/marketplace/components/ProductPromoPrice'
+import { computePromoPriceForAmount, getPromoBadgeLabel } from '@/lib/productPromoUtils'
 
 type TabId = 'description' | 'composition' | 'reviews'
 
@@ -208,6 +210,9 @@ export default function ProductDetailPage() {
   const selectedVariant: ProductVariant | null =
     variants.find(v => v.id === selectedVariantId) ?? null
   const displayPrice = selectedVariant?.price ?? product.price
+  const variantPromo = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
+    ? computePromoPriceForAmount(displayPrice, product.promotion)
+    : null
   const displayStock = selectedVariant?.stock_quantity ?? product.stock_quantity
   const outOfStock = displayStock <= 0 || product.status === 'OUT_OF_STOCK'
   const allowPickup = product.allow_pickup !== false
@@ -278,9 +283,15 @@ export default function ProductDetailPage() {
                 />
                 {!outOfStock && (
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
-                    <span className="bg-white/90 backdrop-blur-sm text-brand-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
-                      <Sparkles size={12} /> Best-Seller
-                    </span>
+                    {product.promotion ? (
+                      <span className="bg-rose-500 text-white px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
+                        {getPromoBadgeLabel(product.promotion)}
+                      </span>
+                    ) : (
+                      <span className="bg-white/90 backdrop-blur-sm text-brand-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+                        <Sparkles size={12} /> Best-Seller
+                      </span>
+                    )}
                   </div>
                 )}
                 {product.id && (
@@ -364,14 +375,47 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="mb-8">
-                <div className="flex items-end gap-3">
-                  <span className="text-4xl font-extrabold text-brand-600">
-                    {formatPrice(displayPrice, product.currency)}
-                  </span>
-                  {hasVariants && !selectedVariant && (
-                    <span className="text-sm text-slate-500">à partir de</span>
-                  )}
-                </div>
+                {variantPromo ? (
+                  <div>
+                    <div className="flex items-end gap-3 flex-wrap">
+                      <span className="text-4xl font-extrabold text-brand-600">
+                        {formatPrice(variantPromo.promoPrice, product.currency)}
+                      </span>
+                      <span className="text-xl text-slate-400 line-through font-semibold">
+                        {formatPrice(displayPrice, product.currency)}
+                      </span>
+                      {product.promotion && (
+                        <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-rose-500 text-white">
+                          {getPromoBadgeLabel(product.promotion)}
+                        </span>
+                      )}
+                    </div>
+                    {product.promotion?.code && (
+                      <p className="text-sm text-amber-700 font-semibold mt-2">
+                        Code promo : <span className="font-mono">{product.promotion.code}</span>
+                      </p>
+                    )}
+                  </div>
+                ) : product.promotion?.type === 'FREE_DELIVERY' ? (
+                  <div>
+                    <ProductPromoPrice
+                      product={product}
+                      currency={product.currency}
+                      priceClassName="text-4xl font-extrabold text-brand-600"
+                      showBadge
+                      layout="stacked"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-extrabold text-brand-600">
+                      {formatPrice(displayPrice, product.currency)}
+                    </span>
+                    {hasVariants && !selectedVariant && (
+                      <span className="text-sm text-slate-500">à partir de</span>
+                    )}
+                  </div>
+                )}
                 <p className="text-sm text-slate-500 mt-1">
                   {t('product.taxesNote')}
                 </p>
@@ -419,7 +463,23 @@ export default function ProductDetailPage() {
                             >
                               {variant.name}
                               <span className="block text-[10px] font-medium opacity-80 mt-0.5">
-                                {formatPrice(variant.price, product.currency)}
+                                {(() => {
+                                  const vp = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
+                                    ? computePromoPriceForAmount(variant.price, product.promotion)
+                                    : null
+                                  if (vp) {
+                                    return (
+                                      <>
+                                        {formatPrice(vp.promoPrice, product.currency)}
+                                        {' '}
+                                        <span className="line-through opacity-70">
+                                          {formatPrice(variant.price, product.currency)}
+                                        </span>
+                                      </>
+                                    )
+                                  }
+                                  return formatPrice(variant.price, product.currency)
+                                })()}
                               </span>
                             </button>
                           )

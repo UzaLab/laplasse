@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, ExternalLink, FolderOpen, LayoutGrid, Lock,
-  Package, PackageX, Settings, ShoppingBag, Tag, Truck,
+  Package, PackageX, Settings, ShoppingBag, Tag, Truck, Users,
 } from 'lucide-react'
 import { ShopShell } from '@/features/shop/components/ShopShell'
 import { useAuthStore } from '@/stores/authStore'
@@ -15,6 +15,7 @@ const TABS = [
   { href: '/shop/manage', label: "Vue d'ensemble", icon: LayoutGrid, exact: true },
   { href: '/shop/manage/products', label: 'Produits', icon: Package },
   { href: '/shop/manage/orders', label: 'Commandes', icon: ShoppingBag },
+  { href: '/shop/manage/crm', label: 'Clients CRM', icon: Users },
   { href: '/shop/manage/collections', label: 'Collections', icon: FolderOpen },
   { href: '/shop/manage/promotions', label: 'Promotions', icon: Tag, locked: true },
   { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: Truck },

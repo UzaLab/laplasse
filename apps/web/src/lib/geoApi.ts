@@ -40,6 +40,31 @@ export async function fetchGeoCountries() {
   return fetchPublicJson<GeoCountry[]>('/geo/countries')
 }
 
+export interface GeoPlaceResult {
+  id: string
+  label: string
+  latitude: number
+  longitude: number
+  type: string | null
+}
+
+export async function searchGeoPlaces(
+  query: string,
+  opts?: { country?: string; lat?: number; lng?: number; limit?: number },
+) {
+  const q = query.trim()
+  if (q.length < 2) return { ok: true as const, data: [] as GeoPlaceResult[] }
+
+  const params = new URLSearchParams({ q })
+  const country = opts?.country ?? getCountryCode()
+  params.set('country', country)
+  if (opts?.lat != null) params.set('lat', String(opts.lat))
+  if (opts?.lng != null) params.set('lng', String(opts.lng))
+  if (opts?.limit != null) params.set('limit', String(opts.limit))
+
+  return fetchPublicJson<GeoPlaceResult[]>(`/geo/places/search?${params.toString()}`)
+}
+
 export interface DeliveryQuoteItem {
   shop_id: string
   merchant_id?: string

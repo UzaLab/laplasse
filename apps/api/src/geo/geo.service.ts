@@ -294,4 +294,58 @@ export class GeoService {
       fallback: cityFallback ?? countryFallback,
     })
   }
+
+  /** Recherche de lieux via Nominatim (OpenStreetMap). */
+  async searchPlaces(
+    query: string,
+    opts?: { country?: string; lat?: number; lng?: number; limit?: number },
+  ) {
+    const q = query.trim()
+    if (q.length < 2) return []
+
+    const params = new URLSearchParams({
+      q,
+      format: 'json',
+      addressdetails: '0',
+      limit: String(Math.min(opts?.limit ?? 8, 10)),
+    })
+
+    const country = opts?.country?.toUpperCase()
+    if (country) params.set('countrycodes', country.toLowerCase())
+
+    if (opts?.lat != null && opts?.lng != null && Number.isFinite(opts.lat) && Number.isFinite(opts.lng)) {
+      const delta = 0.12
+      params.set('viewbox', `${opts.lng - delta},${opts.lat + delta},${opts.lng + delta},${opts.lat - delta}`)
+      params.set('bounded', '0')
+    }
+
+    const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'LaPlasse/1.0 (https://laplasse.app; contact@laplasse.app)',
+        Accept: 'application/json',
+      },
+    })
+
+    if (!res.ok) return []
+
+    const rows = (await res.json()) as Array<{
+      place_id: number
+      lat: string
+      lon: string
+      display_name: string
+      type?: string
+      class?: string
+    }>
+
+    return rows
+      .map(row => ({
+        id: String(row.place_id),
+        label: row.display_name,
+        latitude: Number.parseFloat(row.lat),
+        longitude: Number.parseFloat(row.lon),
+        type: row.type ?? row.class ?? null,
+      }))
+      .filter(r => Number.isFinite(r.latitude) && Number.isFinite(r.longitude))
+  }
 }

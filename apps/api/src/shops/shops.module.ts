@@ -4,9 +4,10 @@ import { ShopsService } from './shops.service'
 import { DeliveryZonesModule } from '../delivery-zones/delivery-zones.module'
 import { ShopCourierStaffService } from './shop-courier-staff.service'
 import { LogisticsModule } from '../logistics/logistics.module'
+import { CrmModule } from '../crm/crm.module'
 
 @Module({
-  imports: [DeliveryZonesModule, LogisticsModule],
+  imports: [DeliveryZonesModule, LogisticsModule, CrmModule],
   controllers: [ShopsController],
   providers: [ShopsService, ShopCourierStaffService],
   exports: [ShopsService, ShopCourierStaffService],

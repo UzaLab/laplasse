@@ -106,7 +106,7 @@ export function CourierOsmMap({
   }
 
   return (
-    <div className={className ?? 'h-56 w-full rounded-2xl overflow-hidden border border-slate-200'}>
+    <div className={`laplasse-leaflet-map ${className ?? 'h-56 w-full rounded-2xl overflow-hidden border border-slate-200'}`}>
       <MapContainer
         center={[center.lat, center.lng]}
         zoom={12}

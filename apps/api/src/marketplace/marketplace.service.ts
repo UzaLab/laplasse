@@ -201,7 +201,7 @@ export class MarketplaceService {
       image_url: true,
       created_at: true,
       category: { select: { id: true, name: true, slug: true } },
-      shop: { select: { name: true, slug: true, logo: true } },
+      shop: { select: { name: true, slug: true, logo: true, merchant_id: true } },
       variants: {
         where: { stock_quantity: { gt: 0 } },
         orderBy: { created_at: 'asc' as const },
@@ -221,7 +221,7 @@ export class MarketplaceService {
       image_url: string | null
       created_at?: Date
       category?: { id: string; name: string; slug: string } | null
-      shop: { name: string; slug: string; logo?: string | null }
+      shop: { name: string; slug: string; logo?: string | null; merchant_id: string | null }
       variants: { id: string; stock_quantity: number }[]
       _count: { variants: number }
     },
@@ -237,6 +237,7 @@ export class MarketplaceService {
       price: row.price,
       currency: row.currency,
       image_url: row.image_url,
+      merchant_id: row.shop.merchant_id ?? undefined,
       ...(row.created_at ? { created_at: row.created_at.toISOString() } : {}),
       ...(row.category ? { category: row.category } : {}),
       merchant: {
@@ -266,7 +267,7 @@ export class MarketplaceService {
     })
     const byId = new Map(rows.map(r => [r.id, r]))
 
-    return visible.flatMap(hit => {
+    const mapped = visible.flatMap(hit => {
       const row = byId.get(hit.id)
       if (!row) return []
       return [{
@@ -274,6 +275,7 @@ export class MarketplaceService {
         ...(hit._formatted ? { _formatted: hit._formatted } : {}),
       }]
     })
+    return this.promotionsService.enrichProductsWithPromotions(mapped)
   }
 
   /** Résout la variante panier — auto-sélection si une seule variante en stock (quick-add marketplace). */
@@ -681,6 +683,18 @@ export class MarketplaceService {
     return this.shopsService.getByMerchantSlug(slug)
   }
 
+  private async enrichShopCatalogProducts<T extends { id: string; price: number; category_id?: string | null }>(
+    products: T[],
+    shop: { id: string; merchant_id: string | null },
+  ) {
+    if (!products.length || !shop.merchant_id) return products
+    return this.promotionsService.enrichProductsWithPromotions(
+      products.map(p => ({ ...p, shop_id: shop.id })),
+      shop.id,
+      shop.merchant_id,
+    )
+  }
+
   // ─── Products (public) ───────────────────────────────────────────────────────
 
   async listPublicProducts(
@@ -695,7 +709,7 @@ export class MarketplaceService {
         query.collection.trim(),
       )
       if (!productIds?.length) return []
-      let products = await this.fetchPublicProductsByIds(shop.id, productIds)
+      let products = await this.fetchPublicProductsByIds(shop, productIds, { enrich: false })
 
       if (query?.category?.trim()) {
         const cat = await this.prisma.productCategory.findFirst({
@@ -718,7 +732,7 @@ export class MarketplaceService {
         )
       }
 
-      return products
+      return this.enrichShopCatalogProducts(products, shop)
     }
 
     if (query?.q?.trim()) {
@@ -730,7 +744,7 @@ export class MarketplaceService {
       })
       if (meili?.data.length) {
         const ids = meili.data.map(p => p.id)
-        return this.fetchPublicProductsByIds(shop.id, ids)
+        return this.fetchPublicProductsByIds(shop, ids)
       }
       if (meili) return []
     }
@@ -771,15 +785,20 @@ export class MarketplaceService {
         },
       },
     })
-    return products.filter(
+    const filtered = products.filter(
       p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0),
     )
+    return this.enrichShopCatalogProducts(filtered, shop)
   }
 
-  private async fetchPublicProductsByIds(shopId: string, ids: string[]) {
+  private async fetchPublicProductsByIds(
+    shop: { id: string; merchant_id: string | null },
+    ids: string[],
+    options?: { enrich?: boolean },
+  ) {
     const products = await this.prisma.product.findMany({
       where: {
-        shop_id: shopId,
+        shop_id: shop.id,
         id: { in: ids },
         status: 'ACTIVE',
         slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
@@ -803,9 +822,11 @@ export class MarketplaceService {
       },
     })
     const order = new Map(ids.map((id, index) => [id, index]))
-    return products
+    const filtered = products
       .filter(p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0))
       .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    if (options?.enrich === false) return filtered
+    return this.enrichShopCatalogProducts(filtered, shop)
   }
 
   async listPublicShopProductCategories(shopSlug: string) {
@@ -852,7 +873,7 @@ export class MarketplaceService {
       },
     })
     if (!product) throw new NotFoundException('Produit introuvable')
-    return this.attachProductImages({
+    const attached = this.attachProductImages({
       ...product,
       has_variants: product.variants.length > 0,
       shop: {
@@ -873,6 +894,8 @@ export class MarketplaceService {
             slug: shop.slug,
           },
     })
+    const [enriched] = await this.enrichShopCatalogProducts([attached], shop)
+    return enriched ?? attached
   }
 
   // ─── Products (boutique) ─────────────────────────────────────────────────────
@@ -1523,6 +1546,7 @@ export class MarketplaceService {
       const shopLineItems = cart.items
         .filter(i => i.product.shop_id === shopId)
         .map(i => ({
+          product_id: i.product.id,
           category_id: i.product.category_id ?? null,
           line_total: i.line_total,
         }))
@@ -1532,6 +1556,7 @@ export class MarketplaceService {
         merchantId: group.merchantId,
         shopId,
         subtotal: group.subtotal,
+        userId,
         lineItems: shopLineItems,
       })
 
@@ -1820,6 +1845,7 @@ export class MarketplaceService {
 
         if (applied && linkedMerchantId) {
           const shopLineItems = items.map(i => ({
+            product_id: i.product.id,
             category_id: i.product.category_id ?? null,
             line_total: i.line_total,
           }))
@@ -1828,6 +1854,7 @@ export class MarketplaceService {
             merchantId: linkedMerchantId,
             shopId: groupShopId,
             subtotal,
+            userId,
             lineItems: shopLineItems,
           })
           if (!validation.valid || validation.promotion.id !== applied.promotion_id) {
@@ -2970,12 +2997,13 @@ export class MarketplaceService {
 
     const rows = [...orderedSponsored, ...regularRows].slice(0, limit)
 
-    return rows.map(row =>
+    const mapped = rows.map(row =>
       this.mapCatalogProductRow(row, {
         is_sponsored: campaignByProduct.has(row.id),
         ad_campaign_id: campaignByProduct.get(row.id) ?? null,
       }),
     )
+    return this.promotionsService.enrichProductsWithPromotions(mapped)
   }
 
   async listMarketplaceProducts(query?: {
@@ -3045,7 +3073,10 @@ export class MarketplaceService {
       }),
       orderBy,
       select: catalogSelect,
-    }).then(rows => rows.map(row => this.mapCatalogProductRow(row)))
+    }).then(async rows => {
+      const mapped = rows.map(row => this.mapCatalogProductRow(row))
+      return this.promotionsService.enrichProductsWithPromotions(mapped)
+    })
   }
 
   async listMarketplaceMerchants(limit = 20) {

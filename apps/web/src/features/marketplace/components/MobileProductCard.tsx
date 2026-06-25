@@ -12,6 +12,8 @@ export interface MobileProductCardProps {
   formattedNameHtml?: string
   image: string
   priceLabel: string
+  originalPriceLabel?: string
+  promoBadge?: string | null
   merchantName?: string
   showMerchantName?: boolean
   variant?: 'compact' | 'carousel'
@@ -28,6 +30,8 @@ export function MobileProductCard({
   formattedNameHtml,
   image,
   priceLabel,
+  originalPriceLabel,
+  promoBadge,
   merchantName,
   showMerchantName = false,
   variant = 'compact',
@@ -68,6 +72,11 @@ export function MobileProductCard({
               Rupture
             </span>
           )}
+          {promoBadge && !outOfStock && (
+            <span className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+              {promoBadge}
+            </span>
+          )}
         </div>
       </Link>
 
@@ -90,9 +99,16 @@ export function MobileProductCard({
         )}
 
         <div className={cn('flex justify-between items-center mt-auto', !isCarousel && 'pt-1')}>
-          <span className={cn('font-bold', outOfStock ? 'text-slate-500' : 'text-brand-600', isCarousel ? 'text-sm' : 'text-xs')}>
-            {priceLabel}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={cn('font-bold', outOfStock ? 'text-slate-500' : 'text-brand-600', isCarousel ? 'text-sm' : 'text-xs')}>
+              {priceLabel}
+            </span>
+            {originalPriceLabel && (
+              <span className={cn('line-through text-slate-400 font-medium', isCarousel ? 'text-xs' : 'text-[10px]')}>
+                {originalPriceLabel}
+              </span>
+            )}
+          </div>
           {showAddButton && onAdd && !outOfStock ? (
             <button
               type="button"

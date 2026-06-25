@@ -2,6 +2,7 @@ import {
   IsArray,
   IsEmail,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
@@ -102,6 +103,23 @@ export class UpdateShopDto {
   @IsString()
   @MaxLength(500)
   address?: string
+
+  @IsOptional()
+  @IsString()
+  city_id?: string
+
+  @IsOptional()
+  @IsString()
+  commune_id?: string
+
+  @IsOptional()
+  latitude?: number
+
+  @IsOptional()
+  longitude?: number
+
+  @IsOptional()
+  has_physical_location?: boolean
 
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'SUSPENDED'])

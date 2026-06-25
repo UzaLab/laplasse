@@ -107,6 +107,25 @@ export class ShopsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':shopId/crm')
+  getShopCRM(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+  ) {
+    return this.svc.getCRM(userId, shopId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':shopId/crm/detail')
+  getShopCRMDetail(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+    @Query('customerId') customerId: string,
+  ) {
+    return this.svc.getCRMDetail(userId, shopId, customerId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':shopId/courier-staff')
   listCourierStaff(
     @CurrentUser('id') userId: string,

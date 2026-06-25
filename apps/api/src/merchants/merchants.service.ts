@@ -14,6 +14,7 @@ import { OrganizationType } from '../../generated/prisma/client'
 import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
 import { uniqueMerchantSlug } from '../common/slug.util'
 import { AdsService } from '../ads/ads.service'
+import { CrmService } from '../crm/crm.service'
 
 const DEFAULT_CITY_BY_COUNTRY: Record<string, string> = {
   CI: 'Abidjan',
@@ -98,6 +99,7 @@ export class MerchantsService {
     private readonly config: ConfigService,
     private readonly storage: StorageService,
     private readonly ads: AdsService,
+    private readonly crm: CrmService,
   ) {}
 
   // ── Helper : résoudre l'établissement actif d'un utilisateur ────────────────
@@ -734,24 +736,61 @@ export class MerchantsService {
     data: {
       business_name?: string; description?: string; phone?: string;
       whatsapp?: string; website?: string; email?: string;
-      district?: string; address?: string;
+      district?: string; address?: string; city?: string; country?: string;
+      latitude?: number | null; longitude?: number | null;
       logo?: string; cover_image?: string;
     },
     userId: string,
     merchantId?: string,
   ) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    const { district, address, ...merchantData } = data
+
+    const {
+      district,
+      address,
+      city,
+      country,
+      latitude,
+      longitude,
+    } = data
+
+    const merchantPatch = {
+      ...(data.business_name !== undefined ? { business_name: data.business_name } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      ...(data.whatsapp !== undefined ? { whatsapp: data.whatsapp } : {}),
+      ...(data.website !== undefined ? { website: data.website } : {}),
+      ...(data.email !== undefined ? { email: data.email } : {}),
+      ...(data.logo !== undefined ? { logo: data.logo } : {}),
+      ...(data.cover_image !== undefined ? { cover_image: data.cover_image } : {}),
+    }
+
+    const locationPatch: Record<string, unknown> = {}
+    if (district !== undefined) locationPatch.district = district || null
+    if (address !== undefined) locationPatch.address = address || null
+    if (city !== undefined) locationPatch.city = city
+    if (country !== undefined) locationPatch.country = country.toUpperCase()
+    if (latitude !== undefined) locationPatch.latitude = latitude
+    if (longitude !== undefined) locationPatch.longitude = longitude
+
+    const hasLocationUpdate = Object.keys(locationPatch).length > 0
 
     const updated = await this.prisma.merchant.update({
       where: { id: merchant.id },
       data: {
-        ...merchantData,
-        ...(district || address ? {
+        ...merchantPatch,
+        ...(hasLocationUpdate ? {
           location: {
             upsert: {
-              create: { city: 'Abidjan', country: 'CI', district: district ?? null, address: address ?? null },
-              update: { district: district ?? undefined, address: address ?? undefined },
+              create: {
+                city: city ?? defaultCityForCountry(country ?? 'CI'),
+                country: (country ?? 'CI').toUpperCase(),
+                district: district ?? null,
+                address: address ?? null,
+                latitude: latitude ?? null,
+                longitude: longitude ?? null,
+              },
+              update: locationPatch,
             },
           },
         } : {}),
@@ -760,7 +799,7 @@ export class MerchantsService {
         id: true, business_name: true, slug: true, description: true,
         phone: true, whatsapp: true, website: true, email: true,
         verification_status: true, trust_score: true, is_active: true,
-        location: { select: { city: true, district: true, address: true } },
+        location: { select: { city: true, district: true, address: true, latitude: true, longitude: true } },
       },
     })
     return updated
@@ -874,161 +913,28 @@ export class MerchantsService {
       throw new ForbiddenException('Le CRM nécessite le plan Starter ou supérieur.')
     }
 
-    const now = new Date()
-    const days30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const days90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-    const days180 = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000)
+    return this.crm.getMerchantCRM(merchant.id)
+  }
 
-    const allReviews = await this.prisma.review.findMany({
-      where: { merchant_id: merchant.id, status: 'APPROVED' },
-      select: {
-        user_id: true,
-        rating: true,
-        created_at: true,
-        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    })
+  async getMyCRMDetail(userId: string, customerId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
 
-    const bookingClients = await this.prisma.booking.findMany({
+    const limits = getPlanLimits(merchant.subscription_plan)
+    if (!limits.crm) {
+      throw new ForbiddenException('Le CRM nécessite le plan Starter ou supérieur.')
+    }
+
+    const shop = await this.prisma.shop.findFirst({
       where: { merchant_id: merchant.id },
-      select: {
-        user_id: true,
-        guest_name: true,
-        guest_phone: true,
-        guest_email: true,
-        booked_at: true,
-        status: true,
-        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
-      },
-      orderBy: { booked_at: 'desc' },
+      select: { id: true },
     })
 
-    const favoriteUsers = await this.prisma.favorite.findMany({
-      where: { merchant_id: merchant.id },
-      select: {
-        user_id: true,
-        created_at: true,
-        user: { select: { id: true, full_name: true, email: true, phone: true, created_at: true } },
-      },
+    const detail = await this.crm.getCustomerDetail(customerId, {
+      merchantId: merchant.id,
+      shopId: shop?.id,
     })
-
-    type CustomerRow = {
-      id: string
-      full_name: string | null
-      email: string | null
-      phone: string | null
-      created_at: Date
-      reviewCount: number
-      avgRating: number
-      lastReviewAt: Date | null
-      lastBookingAt: Date | null
-      bookingCount: number
-      isFavorite: boolean
-      sources: string[]
-      segment: 'recent' | 'inactive' | 'lost' | 'regular'
-    }
-
-    const customerMap = new Map<string, CustomerRow>()
-
-    const upsertCustomer = (
-      key: string,
-      user: { id: string; full_name: string | null; email: string | null; phone: string | null; created_at: Date },
-      patch: Partial<CustomerRow>,
-    ) => {
-      const existing = customerMap.get(key) ?? {
-        ...user,
-        reviewCount: 0,
-        avgRating: 0,
-        lastReviewAt: null,
-        lastBookingAt: null,
-        bookingCount: 0,
-        isFavorite: false,
-        sources: [],
-        segment: 'regular' as const,
-      }
-      customerMap.set(key, {
-        ...existing,
-        ...patch,
-        sources: [...new Set([...existing.sources, ...(patch.sources ?? [])])],
-      })
-    }
-
-    for (const r of allReviews) {
-      upsertCustomer(r.user_id, r.user, {
-        sources: ['review'],
-        reviewCount: (customerMap.get(r.user_id)?.reviewCount ?? 0) + 1,
-      })
-    }
-
-    for (const b of bookingClients) {
-      const key = b.user_id ?? `phone:${b.guest_phone}`
-      const user = b.user ?? {
-        id: key,
-        full_name: b.guest_name,
-        email: b.guest_email,
-        phone: b.guest_phone,
-        created_at: b.booked_at,
-      }
-      const prev = customerMap.get(key)
-      upsertCustomer(key, user, {
-        sources: ['booking'],
-        bookingCount: (prev?.bookingCount ?? 0) + 1,
-        lastBookingAt: !prev?.lastBookingAt || b.booked_at > prev.lastBookingAt ? b.booked_at : prev.lastBookingAt,
-      })
-    }
-
-    for (const f of favoriteUsers) {
-      upsertCustomer(f.user_id, f.user, { sources: ['favorite'], isFavorite: true })
-    }
-
-    const byUser = new Map<string, typeof allReviews>()
-    for (const r of allReviews) {
-      if (!byUser.has(r.user_id)) byUser.set(r.user_id, [])
-      byUser.get(r.user_id)!.push(r)
-    }
-
-    const customers = Array.from(customerMap.values()).map(c => {
-      const reviews = byUser.get(c.id) ?? []
-      const reviewCount = reviews.length
-      const avgRating = reviewCount
-        ? Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviewCount * 10) / 10
-        : c.avgRating
-      const lastReviewAt = reviews[0]?.created_at ?? c.lastReviewAt
-      const lastActivity = lastReviewAt && c.lastBookingAt
-        ? (lastReviewAt > c.lastBookingAt ? lastReviewAt : c.lastBookingAt)
-        : (lastReviewAt ?? c.lastBookingAt)
-      const isRecent = lastActivity && lastActivity >= days30
-      const isInactive = lastActivity && lastActivity < days90 && lastActivity >= days180
-      const isLost = lastActivity && lastActivity < days180
-      const segment: 'recent' | 'inactive' | 'lost' | 'regular' =
-        isLost ? 'lost' : isInactive ? 'inactive' : isRecent ? 'recent' : 'regular'
-      return { ...c, reviewCount, avgRating, lastReviewAt, segment }
-    })
-
-    const recent = customers.filter(c => c.segment === 'recent')
-    const inactive = customers.filter(c => c.segment === 'inactive')
-    const lost = customers.filter(c => c.segment === 'lost')
-    const regular = customers.filter(c => c.segment === 'regular')
-
-    const recentReviewers = new Set(
-      allReviews.filter(r => r.created_at >= days30).map(r => r.user_id),
-    ).size
-
-    return {
-      summary: {
-        total_customers: customers.length,
-        recent_30d: recent.length,
-        inactive_90d: inactive.length,
-        lost_180d: lost.length,
-        regular: regular.length,
-        recent_reviewers_30d: recentReviewers,
-      },
-      customers: customers.sort((a, b) => {
-        const segOrder = { recent: 0, regular: 1, inactive: 2, lost: 3 }
-        return segOrder[a.segment] - segOrder[b.segment]
-      }),
-    }
+    if (!detail) throw new NotFoundException('Contact introuvable')
+    return detail
   }
 
   private dedupeBusinessHours<T extends { day: number }>(hours: T[]): T[] {

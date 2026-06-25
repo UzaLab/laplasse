@@ -85,7 +85,9 @@ export class MerchantsController {
     @Body() body: {
       business_name?: string; description?: string; phone?: string;
       whatsapp?: string; website?: string; email?: string;
-      district?: string; address?: string; logo?: string; cover_image?: string;
+      district?: string; address?: string; city?: string; country?: string;
+      latitude?: number | null; longitude?: number | null;
+      logo?: string; cover_image?: string;
     },
     @CurrentUser() user: { id: string },
     @Query('merchantId') merchantId?: string,
@@ -198,6 +200,16 @@ export class MerchantsController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.merchantsService.getMyCRM(user.id, merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/crm/detail')
+  getMyCRMDetail(
+    @CurrentUser() user: { id: string },
+    @Query('customerId') customerId: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.getMyCRMDetail(user.id, customerId, merchantId)
   }
 
   @UseGuards(JwtAuthGuard)

@@ -348,9 +348,14 @@ export class DeliveryEtaService {
   resolvePickupCoords(input: {
     shopCity?: string | null
     shopCountry?: string | null
+    shopLat?: number | null
+    shopLng?: number | null
     merchantLat?: number | null
     merchantLng?: number | null
   }): { lat: number; lng: number } {
+    if (input.shopLat != null && input.shopLng != null) {
+      return { lat: input.shopLat, lng: input.shopLng }
+    }
     if (input.merchantLat != null && input.merchantLng != null) {
       return { lat: input.merchantLat, lng: input.merchantLng }
     }

@@ -1,7 +1,39 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreatePromotionDto } from './dto/create-promotion.dto'
+import { UpdatePromotionDto } from './dto/update-promotion.dto'
 import { getPlanLimits, planLimitMessage } from '../common/plan-limits'
+
+export type ProductPromotionBadge = {
+  id: string
+  title: string
+  type: string
+  value: number
+  code: string | null
+  discount_amount: number
+  promo_price: number | null
+}
+
+type PromoWithProducts = {
+  id: string
+  merchant_id: string
+  shop_id: string | null
+  category_id: string | null
+  title: string
+  description: string | null
+  type: string
+  value: number
+  code: string | null
+  min_order_amount: number | null
+  is_active: boolean
+  starts_at: Date
+  ends_at: Date
+  max_uses: number | null
+  uses_count: number
+  products: { product_id: string }[]
+  categories: { category_id: string }[]
+  category?: { id: string; name: string } | null
+}
 
 @Injectable()
 export class PromotionsService {
@@ -18,6 +50,37 @@ export class PromotionsService {
     return merchant
   }
 
+  private async assertProductIdsForMerchant(merchantId: string, productIds: string[]) {
+    if (!productIds.length) return
+    const owned = await this.prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        shop: { merchant_id: merchantId },
+      },
+      select: { id: true },
+    })
+    if (owned.length !== productIds.length) {
+      throw new BadRequestException('Un ou plusieurs produits sont invalides')
+    }
+  }
+
+  private getPromoCategoryIds(promo: PromoWithProducts): string[] {
+    const fromLinks = promo.categories.map(c => c.category_id)
+    if (fromLinks.length) return fromLinks
+    if (promo.category_id) return [promo.category_id]
+    return []
+  }
+
+  private async assertCategoryIds(categoryIds: string[]) {
+    if (!categoryIds.length) return
+    const count = await this.prisma.productCategory.count({
+      where: { id: { in: categoryIds }, is_active: true },
+    })
+    if (count !== categoryIds.length) {
+      throw new BadRequestException('Une ou plusieurs catégories sont invalides')
+    }
+  }
+
   async create(ownerId: string, dto: CreatePromotionDto, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(ownerId, merchantId)
 
@@ -26,31 +89,70 @@ export class PromotionsService {
       throw new ForbiddenException(planLimitMessage('promotions', merchant.subscription_plan))
     }
 
-    if (new Date(dto.ends_at) <= new Date(dto.starts_at)) {
+    const startsAt = new Date(dto.starts_at)
+    const endsAt = new Date(dto.ends_at)
+    if (endsAt <= startsAt) {
       throw new BadRequestException('La date de fin doit être après la date de début')
     }
+    if (startsAt.getTime() < Date.now() - 60_000) {
+      throw new BadRequestException('La date de début ne peut pas être antérieure à maintenant')
+    }
 
-    if (dto.category_id) {
-      const cat = await this.prisma.productCategory.findFirst({
-        where: { id: dto.category_id, is_active: true },
-      })
-      if (!cat) throw new BadRequestException('Catégorie produit invalide')
+    const categoryIds = [...new Set([
+      ...(dto.category_ids ?? []).filter(Boolean),
+      ...(dto.category_id ? [dto.category_id] : []),
+    ])]
+    await this.assertCategoryIds(categoryIds)
+
+    const productIds = [...new Set((dto.product_ids ?? []).filter(Boolean))]
+    await this.assertProductIdsForMerchant(merchant.id, productIds)
+
+    if (productIds.length && categoryIds.length) {
+      throw new BadRequestException('Choisissez soit des produits, soit des catégories — pas les deux')
     }
 
     return this.prisma.promotion.create({
       data: {
         merchant_id: merchant.id,
         shop_id: dto.shop_id ?? null,
-        category_id: dto.category_id ?? null,
+        category_id: categoryIds[0] ?? null,
         title: dto.title,
         description: dto.description,
         type: dto.type,
         value: dto.value,
         code: dto.code?.trim().toUpperCase() ?? null,
         min_order_amount: dto.min_order_amount,
-        starts_at: new Date(dto.starts_at),
-        ends_at: new Date(dto.ends_at),
+        starts_at: startsAt,
+        ends_at: endsAt,
         max_uses: dto.max_uses,
+        max_uses_per_user: dto.max_uses_per_user,
+        ...(productIds.length
+          ? {
+              products: {
+                create: productIds.map(product_id => ({ product_id })),
+              },
+            }
+          : {}),
+        ...(categoryIds.length
+          ? {
+              categories: {
+                create: categoryIds.map(category_id => ({ category_id })),
+              },
+            }
+          : {}),
+      },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        categories: {
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+          },
+        },
+        products: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, image_url: true } },
+          },
+        },
       },
     })
   }
@@ -77,12 +179,178 @@ export class PromotionsService {
     }
   }
 
+  computePromoPrice(price: number, promo: { type: string; value: number }) {
+    const { discount, free_delivery } = this.computeDiscount(promo, price)
+    if (free_delivery) {
+      return { promo_price: price, discount_amount: 0, free_delivery: true }
+    }
+    if (discount <= 0) {
+      return { promo_price: null, discount_amount: 0, free_delivery: false }
+    }
+    return {
+      promo_price: Math.max(price - discount, 0),
+      discount_amount: discount,
+      free_delivery: false,
+    }
+  }
+
+  promoAppliesToProduct(
+    promo: PromoWithProducts,
+    product: { id: string; category_id?: string | null },
+    shopId?: string,
+  ): boolean {
+    if (promo.shop_id && shopId && promo.shop_id !== shopId) return false
+    const productIds = promo.products.map(p => p.product_id)
+    if (productIds.length > 0) {
+      return productIds.includes(product.id)
+    }
+    const categoryIds = this.getPromoCategoryIds(promo)
+    if (categoryIds.length > 0) {
+      return product.category_id != null && categoryIds.includes(product.category_id)
+    }
+    if (promo.category_id) {
+      return product.category_id === promo.category_id
+    }
+    return true
+  }
+
+  findBestPromoForProduct(
+    promos: PromoWithProducts[],
+    product: { id: string; price: number; category_id?: string | null },
+    shopId?: string,
+    options?: { vitrineOnly?: boolean },
+  ): ProductPromotionBadge | null {
+    let best: { promo: PromoWithProducts; discount: number; promo_price: number | null } | null = null
+    let freeDeliveryBadge: ProductPromotionBadge | null = null
+
+    for (const promo of promos) {
+      if (options?.vitrineOnly && promo.code) continue
+      if (!this.promoAppliesToProduct(promo, product, shopId)) continue
+      if (promo.type === 'FREE_DELIVERY') {
+        if (!freeDeliveryBadge) {
+          freeDeliveryBadge = {
+            id: promo.id,
+            title: promo.title,
+            type: promo.type,
+            value: promo.value,
+            code: promo.code,
+            discount_amount: 0,
+            promo_price: product.price,
+          }
+        }
+        continue
+      }
+      if (promo.type !== 'PERCENTAGE' && promo.type !== 'FIXED') continue
+
+      const { promo_price, discount_amount } = this.computePromoPrice(product.price, promo)
+      if (discount_amount <= 0 || promo_price == null) continue
+
+      const specificity =
+        (promo.products.length > 0 ? 3 : 0)
+        + (this.getPromoCategoryIds(promo).length > 0 ? 2 : 0)
+        + (promo.shop_id ? 1 : 0)
+
+      const bestSpecificity = best
+        ? (best.promo.products.length > 0 ? 3 : 0)
+          + (this.getPromoCategoryIds(best.promo).length > 0 ? 2 : 0)
+          + (best.promo.shop_id ? 1 : 0)
+        : -1
+
+      if (
+        discount_amount > (best === null ? 0 : best.discount)
+        || (discount_amount === (best === null ? 0 : best.discount) && specificity > bestSpecificity)
+      ) {
+        best = { promo, discount: discount_amount, promo_price }
+      }
+    }
+
+    if (best) {
+      return {
+        id: best.promo.id,
+        title: best.promo.title,
+        type: best.promo.type,
+        value: best.promo.value,
+        code: best.promo.code,
+        discount_amount: best.discount,
+        promo_price: best.promo_price,
+      }
+    }
+
+    return freeDeliveryBadge
+  }
+
+  async loadActivePromosForMerchants(merchantIds: string[]) {
+    if (!merchantIds.length) return []
+    const now = new Date()
+    const rows = await this.prisma.promotion.findMany({
+      where: {
+        merchant_id: { in: merchantIds },
+        is_active: true,
+        starts_at: { lte: now },
+        ends_at: { gte: now },
+      },
+      include: {
+        products: { select: { product_id: true } },
+        categories: { select: { category_id: true } },
+        category: { select: { id: true, name: true } },
+      },
+    })
+    return rows.filter(p => p.max_uses == null || p.uses_count < p.max_uses) as PromoWithProducts[]
+  }
+
+  async enrichProductsWithPromotions<
+    T extends { id: string; price: number; category_id?: string | null; shop_id?: string; merchant_id?: string },
+  >(products: T[], shopId?: string, merchantId?: string): Promise<Array<T & {
+    original_price?: number
+    promo_price?: number | null
+    promotion?: ProductPromotionBadge | null
+  }>> {
+    if (!products.length) return products
+
+    const merchantIds = merchantId
+      ? [merchantId]
+      : [...new Set(products.map(p => p.merchant_id).filter(Boolean))] as string[]
+
+    const promos = await this.loadActivePromosForMerchants(merchantIds)
+    const promosByMerchant = new Map<string, PromoWithProducts[]>()
+    for (const promo of promos) {
+      const list = promosByMerchant.get(promo.merchant_id) ?? []
+      list.push(promo)
+      promosByMerchant.set(promo.merchant_id, list)
+    }
+
+    return products.map(product => {
+      const mId = merchantId ?? product.merchant_id
+      if (!mId) return product
+      const merchantPromos = promosByMerchant.get(mId) ?? []
+      const badge = this.findBestPromoForProduct(
+        merchantPromos,
+        product,
+        shopId ?? product.shop_id,
+        { vitrineOnly: true },
+      )
+      if (!badge || badge.type === 'FREE_DELIVERY') {
+        if (badge?.type === 'FREE_DELIVERY') {
+          return { ...product, promotion: badge }
+        }
+        return product
+      }
+      return {
+        ...product,
+        original_price: product.price,
+        promo_price: badge.promo_price,
+        promotion: badge,
+      }
+    })
+  }
+
   async validateForShop(input: {
     code: string
     merchantId: string
     shopId: string
     subtotal: number
-    lineItems?: Array<{ category_id: string | null; line_total: number }>
+    userId?: string
+    lineItems?: Array<{ product_id: string; category_id: string | null; line_total: number }>
   }) {
     const code = input.code.trim().toUpperCase()
     if (!code) {
@@ -101,6 +369,8 @@ export class PromotionsService {
       },
       include: {
         category: { select: { id: true, name: true } },
+        products: { select: { product_id: true } },
+        categories: { select: { category_id: true } },
       },
     })
 
@@ -108,13 +378,50 @@ export class PromotionsService {
       return { valid: false as const, message: 'Code promo invalide ou expiré' }
     }
 
+    const promoWithLinks = promo as PromoWithProducts
+
     if (promo.max_uses != null && promo.uses_count >= promo.max_uses) {
       return { valid: false as const, message: 'Ce code promo a atteint sa limite d\'utilisation' }
     }
 
+    if (input.userId && promo.max_uses_per_user != null) {
+      const userUses = await this.prisma.promotionRedemption.count({
+        where: { promotion_id: promo.id, user_id: input.userId },
+      })
+      if (userUses >= promo.max_uses_per_user) {
+        return {
+          valid: false as const,
+          message: 'Vous avez déjà utilisé ce code le nombre maximum de fois autorisé',
+        }
+      }
+    }
+
+    const lines = input.lineItems ?? []
+    const productIds = promoWithLinks.products.map(p => p.product_id)
+    const categoryIds = this.getPromoCategoryIds(promoWithLinks)
+
     let eligibleSubtotal = input.subtotal
-    if (promo.category_id) {
-      const lines = input.lineItems ?? []
+    if (productIds.length > 0) {
+      eligibleSubtotal = lines
+        .filter(li => productIds.includes(li.product_id))
+        .reduce((sum, li) => sum + li.line_total, 0)
+      if (eligibleSubtotal <= 0) {
+        return {
+          valid: false as const,
+          message: 'Ce code s\'applique uniquement à certains produits de votre panier',
+        }
+      }
+    } else if (categoryIds.length > 0) {
+      eligibleSubtotal = lines
+        .filter(li => li.category_id != null && categoryIds.includes(li.category_id))
+        .reduce((sum, li) => sum + li.line_total, 0)
+      if (eligibleSubtotal <= 0) {
+        return {
+          valid: false as const,
+          message: 'Aucun article éligible pour ce code promo dans les catégories sélectionnées',
+        }
+      }
+    } else if (promo.category_id) {
       eligibleSubtotal = lines
         .filter(li => li.category_id === promo.category_id)
         .reduce((sum, li) => sum + li.line_total, 0)
@@ -148,12 +455,165 @@ export class PromotionsService {
     }
   }
 
+  async update(ownerId: string, promotionId: string, dto: UpdatePromotionDto, merchantId?: string) {
+    const promo = await this.assertOwner(ownerId, promotionId, merchantId)
+
+    const startsAt = dto.starts_at ? new Date(dto.starts_at) : promo.starts_at
+    const endsAt = dto.ends_at ? new Date(dto.ends_at) : promo.ends_at
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('La date de fin doit être après la date de début')
+    }
+    if (dto.starts_at) {
+      const newStart = new Date(dto.starts_at)
+      const unchanged = Math.abs(newStart.getTime() - promo.starts_at.getTime()) < 60_000
+      if (!unchanged && newStart.getTime() < Date.now() - 60_000) {
+        throw new BadRequestException('La date de début ne peut pas être antérieure à maintenant')
+      }
+    }
+
+    const categoryIds = dto.category_ids !== undefined
+      ? [...new Set(dto.category_ids.filter(Boolean))]
+      : undefined
+    const productIds = dto.product_ids !== undefined
+      ? [...new Set(dto.product_ids.filter(Boolean))]
+      : undefined
+
+    if (categoryIds && productIds && categoryIds.length && productIds.length) {
+      throw new BadRequestException('Choisissez soit des produits, soit des catégories — pas les deux')
+    }
+    if (categoryIds) await this.assertCategoryIds(categoryIds)
+    if (productIds) await this.assertProductIdsForMerchant(promo.merchant_id, productIds)
+
+    const nextCode = dto.code !== undefined
+      ? (dto.code.trim() ? dto.code.trim().toUpperCase() : null)
+      : promo.code
+
+    if (nextCode !== promo.code && promo.uses_count > 0) {
+      throw new BadRequestException('Impossible de modifier le code après des utilisations')
+    }
+
+    await this.prisma.$transaction(async tx => {
+      if (productIds !== undefined) {
+        await tx.promotionProduct.deleteMany({ where: { promotion_id: promotionId } })
+        if (productIds.length) {
+          await tx.promotionProduct.createMany({
+            data: productIds.map(product_id => ({ promotion_id: promotionId, product_id })),
+          })
+        }
+      }
+      if (categoryIds !== undefined) {
+        await tx.promotionCategory.deleteMany({ where: { promotion_id: promotionId } })
+        if (categoryIds.length) {
+          await tx.promotionCategory.createMany({
+            data: categoryIds.map(category_id => ({ promotion_id: promotionId, category_id })),
+          })
+        }
+      }
+
+      await tx.promotion.update({
+        where: { id: promotionId },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+          ...(dto.description !== undefined ? { description: dto.description?.trim() || null } : {}),
+          ...(dto.type !== undefined ? { type: dto.type } : {}),
+          ...(dto.value !== undefined ? { value: dto.value } : {}),
+          ...(dto.code !== undefined ? { code: nextCode } : {}),
+          ...(dto.starts_at !== undefined ? { starts_at: startsAt } : {}),
+          ...(dto.ends_at !== undefined ? { ends_at: endsAt } : {}),
+          ...(dto.max_uses !== undefined ? { max_uses: dto.max_uses } : {}),
+          ...(dto.max_uses_per_user !== undefined ? { max_uses_per_user: dto.max_uses_per_user } : {}),
+          ...(dto.min_order_amount !== undefined ? { min_order_amount: dto.min_order_amount } : {}),
+          ...(dto.is_active !== undefined ? { is_active: dto.is_active } : {}),
+          ...(categoryIds !== undefined ? { category_id: categoryIds[0] ?? null } : {}),
+        },
+      })
+    })
+
+    return this.getPromotionForOwner(ownerId, promotionId, merchantId)
+  }
+
+  async getPromotionForOwner(ownerId: string, promotionId: string, merchantId?: string) {
+    await this.assertOwner(ownerId, promotionId, merchantId)
+    return this.prisma.promotion.findUnique({
+      where: { id: promotionId },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        categories: {
+          include: { category: { select: { id: true, name: true, slug: true } } },
+        },
+        products: {
+          include: { product: { select: { id: true, name: true, slug: true, image_url: true } } },
+        },
+      },
+    })
+  }
+
+  async getRedemptionsForOwner(ownerId: string, promotionId: string, merchantId?: string) {
+    const promo = await this.assertOwner(ownerId, promotionId, merchantId)
+    if (!promo.code) {
+      throw new BadRequestException('Les utilisations ne s\'appliquent qu\'aux codes promo')
+    }
+
+    const redemptions = await this.prisma.promotionRedemption.findMany({
+      where: { promotion_id: promotionId },
+      orderBy: { created_at: 'desc' },
+      include: {
+        user: {
+          select: { id: true, email: true, full_name: true, phone: true },
+        },
+        order: {
+          select: { id: true, total: true, discount_amount: true, created_at: true },
+        },
+      },
+    })
+
+    const byUser = new Map<string, { user: typeof redemptions[0]['user']; count: number; total_saved: number }>()
+    for (const r of redemptions) {
+      const existing = byUser.get(r.user_id)
+      if (existing) {
+        existing.count += 1
+        existing.total_saved += r.amount_saved
+      } else {
+        byUser.set(r.user_id, { user: r.user, count: 1, total_saved: r.amount_saved })
+      }
+    }
+
+    return {
+      promotion: {
+        id: promo.id,
+        title: promo.title,
+        code: promo.code,
+        uses_count: promo.uses_count,
+        max_uses: promo.max_uses,
+        max_uses_per_user: promo.max_uses_per_user,
+      },
+      redemptions: redemptions.map(r => ({
+        id: r.id,
+        amount_saved: r.amount_saved,
+        created_at: r.created_at,
+        user: r.user,
+        order: r.order,
+      })),
+      summary_by_user: [...byUser.values()].sort((a, b) => b.count - a.count),
+    }
+  }
+
   async getMerchantPromotions(merchantId: string) {
     return this.prisma.promotion.findMany({
       where: { merchant_id: merchantId },
       orderBy: { created_at: 'desc' },
       include: {
         category: { select: { id: true, name: true, slug: true } },
+        categories: {
+          include: {
+            category: { select: { id: true, name: true, slug: true } },
+          },
+        },
+        products: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, image_url: true } },
+          },
+        },
       },
     })
   }
@@ -173,6 +633,13 @@ export class PromotionsService {
         ends_at: { gte: now },
       },
       orderBy: { ends_at: 'asc' },
+      include: {
+        products: {
+          include: {
+            product: { select: { id: true, name: true, slug: true } },
+          },
+        },
+      },
     })
   }
 

@@ -39,6 +39,12 @@ export interface ShopDetails extends ShopSummary {
   city?: string | null
   district?: string | null
   address?: string | null
+  city_id?: string | null
+  commune_id?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  has_physical_location?: boolean
+  country?: string | null
   is_active?: boolean
 }
 
@@ -121,6 +127,11 @@ export async function updateShop(
     status?: ShopStatus
     logo?: string
     cover_image?: string
+    city_id?: string
+    commune_id?: string
+    latitude?: number | null
+    longitude?: number | null
+    has_physical_location?: boolean
     delivery_fulfilment_default?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
   },
 ): Promise<{ shop: ShopSummary | null; error?: string }> {

@@ -379,6 +379,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
                 label="Images du produit"
                 hint={`La première image est l'image principale — ${form.images.length}/${MAX_PRODUCT_IMAGES}`}
                 disabled={saving}
+                showUrlInput={false}
               />
             </section>
 

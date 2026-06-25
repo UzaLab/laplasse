@@ -9,6 +9,7 @@ import { getHighestPlan, getPlanLimits, isWithinLimit } from '../common/plan-lim
 import { slugify } from '../marketplace/marketplace.util'
 import { CreateShopDto, LinkShopMerchantDto, UpdateShopDto } from './dto/shops.dto'
 import { SHOP_MINI_SELECT, shopAccessibleWhere } from './shop-access.util'
+import { CrmService } from '../crm/crm.service'
 
 const SHOP_PUBLIC_SELECT = {
   id: true,
@@ -24,6 +25,11 @@ const SHOP_PUBLIC_SELECT = {
   city: true,
   district: true,
   address: true,
+  city_id: true,
+  commune_id: true,
+  latitude: true,
+  longitude: true,
+  has_physical_location: true,
   merchant_id: true,
   status: true,
   is_active: true,
@@ -44,7 +50,10 @@ const SHOP_PUBLIC_SELECT = {
 
 @Injectable()
 export class ShopsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crm: CrmService,
+  ) {}
 
   private async assertShopLimit(userId: string) {
     const [shops, merchants] = await Promise.all([
@@ -174,6 +183,29 @@ export class ShopsService {
 
   async update(userId: string, shopId: string, dto: UpdateShopDto) {
     const shop = await this.resolveOwnerShop(userId, shopId)
+
+    let cityName = dto.city
+    let districtName = dto.district
+    if (dto.city_id) {
+      const geoCity = await this.prisma.geoCity.findUnique({
+        where: { id: dto.city_id },
+        select: { id: true, name: true, country: true },
+      })
+      if (!geoCity) throw new BadRequestException('Ville invalide')
+      cityName = geoCity.name
+    }
+    if (dto.commune_id) {
+      const geoCommune = await this.prisma.geoCommune.findUnique({
+        where: { id: dto.commune_id },
+        select: { id: true, name: true, city_id: true },
+      })
+      if (!geoCommune) throw new BadRequestException('Commune invalide')
+      if (dto.city_id && geoCommune.city_id !== dto.city_id) {
+        throw new BadRequestException('La commune ne correspond pas à la ville sélectionnée')
+      }
+      districtName = geoCommune.name
+    }
+
     return this.prisma.shop.update({
       where: { id: shop.id },
       data: {
@@ -184,9 +216,14 @@ export class ShopsService {
         phone: dto.phone,
         whatsapp: dto.whatsapp,
         email: dto.email,
-        city: dto.city,
-        district: dto.district,
+        city: cityName,
+        district: districtName,
         address: dto.address,
+        city_id: dto.city_id,
+        commune_id: dto.commune_id,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        has_physical_location: dto.has_physical_location,
         status: dto.status,
         enabled_modules: dto.enabled_modules,
         delivery_fulfilment_default: dto.delivery_fulfilment_default,
@@ -309,6 +346,27 @@ export class ShopsService {
       select: { category_id: true },
     })
     return rows.map(r => r.category_id)
+  }
+
+  async getCRM(userId: string, shopId: string) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const includeMerchant = shop.merchant_id && shop.merchant?.subscription_plan
+      ? getPlanLimits(shop.merchant.subscription_plan).crm
+      : !!shop.merchant_id
+    return this.crm.getShopCRM(shop.id, { includeMerchantSignals: includeMerchant })
+  }
+
+  async getCRMDetail(userId: string, shopId: string, customerId: string) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const includeMerchant = shop.merchant_id && shop.merchant?.subscription_plan
+      ? getPlanLimits(shop.merchant.subscription_plan).crm
+      : !!shop.merchant_id
+    const detail = await this.crm.getCustomerDetail(customerId, {
+      merchantId: includeMerchant ? (shop.merchant_id ?? undefined) : undefined,
+      shopId: shop.id,
+    })
+    if (!detail) throw new NotFoundException('Contact introuvable')
+    return detail
   }
 
   async assertProductCategoryAllowed(shopId: string, categoryId: string | null | undefined) {

@@ -80,6 +80,16 @@ export interface ProductVariant {
   sku?: string | null
 }
 
+export interface ProductPromotionInfo {
+  id: string
+  title: string
+  type: string
+  value: number
+  code?: string | null
+  discount_amount?: number
+  promo_price?: number | null
+}
+
 export interface MarketplaceProduct {
   id: string
   name: string
@@ -98,6 +108,9 @@ export interface MarketplaceProduct {
   variants?: ProductVariant[]
   category_id?: string | null
   category?: { id: string; name: string; slug: string; parent_id?: string | null } | null
+  original_price?: number
+  promo_price?: number | null
+  promotion?: ProductPromotionInfo | null
   merchant?: {
     id: string
     business_name: string
@@ -113,6 +126,9 @@ export interface FeaturedProduct {
   price: number
   currency: string
   image_url?: string | null
+  original_price?: number
+  promo_price?: number | null
+  promotion?: ProductPromotionInfo | null
   merchant: { business_name: string; slug: string }
   is_sponsored?: boolean
   ad_campaign_id?: string | null

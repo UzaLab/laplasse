@@ -29,4 +29,21 @@ export class GeoController {
   findCountries() {
     return this.geoService.findCountriesPublic()
   }
+
+  @Get('places/search')
+  searchPlaces(
+    @Query('q') q: string,
+    @Query('country') country: string | undefined,
+    @Query('lat') lat: string | undefined,
+    @Query('lng') lng: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Req() req: RequestWithCountry,
+  ) {
+    return this.geoService.searchPlaces(q ?? '', {
+      country: country ?? req.countryCode ?? DEFAULT_COUNTRY,
+      lat: lat != null && lat !== '' ? Number(lat) : undefined,
+      lng: lng != null && lng !== '' ? Number(lng) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    })
+  }
 }

@@ -11,6 +11,8 @@ import {
 import { recordAdEvent } from '@/lib/adsApi'
 import { ProductFavoriteButton } from './ProductFavoriteButton'
 import { MobileProductCard } from './MobileProductCard'
+import { ProductPromoPrice } from './ProductPromoPrice'
+import { getPromoBadgeLabel, getProductDisplayPrices } from '@/lib/productPromoUtils'
 
 type ProductCardProduct = FeaturedProduct | MarketplaceProduct
 
@@ -54,13 +56,21 @@ export function ProductCard({
   const image = product.image_url || PLACEHOLDER_PRODUCT_IMAGE
   const outOfStock =
     'stock_quantity' in product && product.stock_quantity !== undefined && product.stock_quantity <= 0
+  const promoBadge = product.promotion ? getPromoBadgeLabel(product.promotion) : null
+  const priceInfo = getProductDisplayPrices(product)
 
   const mobileCard = (
     <MobileProductCard
       href={href}
       name={product.name}
       image={image}
-      priceLabel={formatPrice(product.price, product.currency)}
+      priceLabel={formatPrice(priceInfo.displayPrice, product.currency)}
+      originalPriceLabel={
+        priceInfo.originalPrice != null
+          ? formatPrice(priceInfo.originalPrice, product.currency)
+          : undefined
+      }
+      promoBadge={promoBadge}
       merchantName={name}
       showMerchantName={variant === 'default' && !compact}
       variant="compact"
@@ -98,9 +108,14 @@ export function ProductCard({
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                {showBestSeller && !outOfStock && (
+                {showBestSeller && !outOfStock && !promoBadge && (
                   <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                     Best-seller
+                  </div>
+                )}
+                {promoBadge && !outOfStock && (
+                  <div className="absolute top-2 left-2 bg-rose-500 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                    {promoBadge}
                   </div>
                 )}
                 {'id' in product && product.id && (
@@ -128,9 +143,11 @@ export function ProductCard({
               </Link>
 
               <div className="flex items-center justify-between mt-auto pt-1">
-                <span className={`font-extrabold ${outOfStock ? 'text-slate-500' : 'text-brand-600'}`}>
-                  {formatPrice(product.price, product.currency)}
-                </span>
+                <ProductPromoPrice
+                  product={product}
+                  currency={product.currency}
+                  priceClassName={`font-extrabold ${outOfStock ? 'text-slate-500' : 'text-brand-600'}`}
+                />
                 {showAddButton && onAdd && !outOfStock && (
                   <button
                     type="button"
@@ -186,9 +203,10 @@ export function ProductCard({
               </h4>
             </Link>
             <div className="flex items-center justify-between">
-              <span className="font-extrabold text-brand-600">
-                {formatPrice(product.price, product.currency)}
-              </span>
+              <ProductPromoPrice
+                product={product}
+                currency={product.currency}
+              />
               {showAddButton && onAdd && !outOfStock && (
                 <button
                   type="button"
@@ -230,12 +248,17 @@ export function ProductCard({
                 Rupture
               </div>
             )}
-            {showBestSeller && !outOfStock && (
+            {showBestSeller && !outOfStock && !promoBadge && (
               <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-brand-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
                 <Sparkles size={10} /> Best-Seller
               </div>
             )}
-            {isSponsored && !showBestSeller && !outOfStock && (
+            {promoBadge && !outOfStock && (
+              <div className="absolute top-3 left-3 bg-rose-500 text-white px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                {promoBadge}
+              </div>
+            )}
+            {isSponsored && !showBestSeller && !promoBadge && !outOfStock && (
               <div className="absolute top-3 left-3 bg-amber-400 text-white px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
                 <Sparkles size={10} /> Sponsorisé
               </div>
@@ -255,9 +278,11 @@ export function ProductCard({
             </h4>
           </Link>
           <div className="flex items-center justify-between gap-2">
-            <span className={`font-extrabold text-brand-600 ${compact ? 'text-sm' : ''}`}>
-              {formatPrice(product.price, product.currency)}
-            </span>
+            <ProductPromoPrice
+              product={product}
+              currency={product.currency}
+              priceClassName={`font-extrabold text-brand-600 ${compact ? 'text-sm' : ''}`}
+            />
             {showAddButton && onAdd ? (
               <button
                 type="button"
