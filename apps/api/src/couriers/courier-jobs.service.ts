@@ -319,7 +319,12 @@ export class CourierJobsService {
       throw new BadRequestException('Format image non supporté')
     }
 
-    const url = await this.storage.upload(file.buffer, file.mimetype, `delivery-proof/${profile.id}`)
+    const url = await this.storage.uploadImage(
+      file.buffer,
+      file.mimetype,
+      `delivery-proof/${profile.id}`,
+      'proof',
+    )
     await this.prisma.deliveryJob.update({
       where: { id: jobId },
       data: { proof_photo_url: url },

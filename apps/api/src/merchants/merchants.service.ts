@@ -529,7 +529,12 @@ export class MerchantsService {
     }
 
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    const url = await this.storage.upload(file.buffer, file.mimetype, `merchants/${merchant.id}`)
+    const url = await this.storage.uploadImage(
+      file.buffer,
+      file.mimetype,
+      `merchants/${merchant.id}`,
+      'general',
+    )
     return this.addMyMedia({ url, type: 'IMAGE' }, userId, merchantId)
   }
 

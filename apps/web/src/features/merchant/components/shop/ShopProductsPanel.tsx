@@ -6,7 +6,8 @@ import { Loader2, Package, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { matchesSearchQuery, isProductLowStock, getProductStockQuantity, LOW_STOCK_THRESHOLD } from '@/lib/merchantListFilters'
-import { FilterPill, MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
+import { MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
+import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
 import {
   deleteProduct,
   fetchMyProducts,
@@ -16,16 +17,57 @@ import {
   type MarketplaceProduct,
   type ProductStatus,
 } from '@/lib/marketplaceApi'
-import { fetchShopProductCategories, type ShopProductCategoryOption } from '@/lib/shopApi'
+import { fetchShopProductCategories, getActiveMerchantShopId, type ShopProductCategoryOption } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
+const NONE_CATEGORY = '__none__'
+type StatusFilter = 'all' | ProductStatus | 'low_stock'
+
+const selectClassName =
+  'w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
+
+function buildCategoryOptions(
+  categories: ShopProductCategoryOption[],
+  products: MarketplaceProduct[],
+) {
+  const ids = new Set(categories.map(c => c.id))
+  const roots = categories
+    .filter(c => !c.parent_id || !ids.has(c.parent_id))
+    .sort((a, b) => a.sort_order - b.sort_order)
+
+  const options: Array<{ value: string; label: string }> = []
+
+  for (const root of roots) {
+    const rootCount = products.filter(p => p.category_id === root.id).length
+    options.push({
+      value: root.id,
+      label: `${root.name}${rootCount ? ` (${rootCount})` : ''}`,
+    })
+    for (const child of categories.filter(c => c.parent_id === root.id).sort((a, b) => a.sort_order - b.sort_order)) {
+      const childCount = products.filter(p => p.category_id === child.id).length
+      options.push({
+        value: child.id,
+        label: `↳ ${child.name}${childCount ? ` (${childCount})` : ''}`,
+      })
+    }
+  }
+
+  const noneCount = products.filter(p => !p.category_id).length
+  options.push({
+    value: NONE_CATEGORY,
+    label: `Sans catégorie${noneCount ? ` (${noneCount})` : ''}`,
+  })
+
+  return options
+}
+
 export function ShopProductsPanel() {
-  const { activeShopId } = useAuthStore()
+  const { user, activeMerchantId, activeShopId } = useAuthStore()
+  const shopId = getActiveMerchantShopId(user?.shops, activeMerchantId, activeShopId)
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ShopProductCategoryOption[]>([])
-  const [filterCategoryId, setFilterCategoryId] = useState<string>('all')
-  const [filterStatus, setFilterStatus] = useState<'all' | ProductStatus>('all')
-  const [filterStock, setFilterStock] = useState<'all' | 'low'>('all')
+  const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([])
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const debouncedSearch = useDebounce(searchQuery, 250)
@@ -36,22 +78,22 @@ export function ShopProductsPanel() {
   )
 
   const load = useCallback(async () => {
-    if (!activeShopId) return
+    if (!shopId) return
     setLoading(true)
     const [list, catsRes] = await Promise.all([
-      fetchMyProducts(activeShopId),
-      fetchShopProductCategories(activeShopId),
+      fetchMyProducts(shopId),
+      fetchShopProductCategories(shopId),
     ])
     setProducts(list.filter(p => p.status !== 'ARCHIVED'))
     setCategories(catsRes.categories)
     setLoading(false)
-  }, [activeShopId])
+  }, [shopId])
 
   useEffect(() => { void load() }, [load])
 
   const handleDelete = async (id: string) => {
     if (!confirm('Archiver ce produit ?')) return
-    const { success, error } = await deleteProduct(id, activeShopId)
+    const { success, error } = await deleteProduct(id, shopId)
     if (success) {
       notify.success('Produit archivé')
       await load()
@@ -62,10 +104,21 @@ export function ShopProductsPanel() {
 
   const filteredProducts = useMemo(() => {
     let list = products
-    if (filterCategoryId === 'none') list = list.filter(p => !p.category_id)
-    else if (filterCategoryId !== 'all') list = list.filter(p => p.category_id === filterCategoryId)
-    if (filterStatus !== 'all') list = list.filter(p => p.status === filterStatus)
-    if (filterStock === 'low') list = list.filter(p => isProductLowStock(p))
+
+    if (filterCategoryIds.length > 0) {
+      list = list.filter(p => {
+        if (filterCategoryIds.includes(NONE_CATEGORY) && !p.category_id) return true
+        if (p.category_id && filterCategoryIds.includes(p.category_id)) return true
+        return false
+      })
+    }
+
+    if (filterStatus === 'low_stock') {
+      list = list.filter(p => isProductLowStock(p))
+    } else if (filterStatus !== 'all') {
+      list = list.filter(p => p.status === filterStatus)
+    }
+
     if (debouncedSearch) {
       list = list.filter(p => matchesSearchQuery([
         p.name,
@@ -77,7 +130,7 @@ export function ShopProductsPanel() {
       ], debouncedSearch))
     }
     return list
-  }, [products, filterCategoryId, filterStatus, filterStock, debouncedSearch])
+  }, [products, filterCategoryIds, filterStatus, debouncedSearch])
 
   const statusCounts = useMemo(() => ({
     all: products.length,
@@ -91,17 +144,20 @@ export function ShopProductsPanel() {
     [products],
   )
 
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(enabledCategories, products),
+    [enabledCategories, products],
+  )
+
   const hasExtraFilters =
-    filterCategoryId !== 'all'
+    filterCategoryIds.length > 0
     || filterStatus !== 'all'
-    || filterStock !== 'all'
     || searchQuery.trim().length > 0
 
   const resetFilters = () => {
     setSearchQuery('')
-    setFilterCategoryId('all')
+    setFilterCategoryIds([])
     setFilterStatus('all')
-    setFilterStock('all')
   }
 
   return (
@@ -113,17 +169,17 @@ export function ShopProductsPanel() {
             Gérez les articles visibles sur votre vitrine marketplace.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Link
             href="/merchant/shop/products/categories"
-            className="inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm"
+            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
             <Settings2 size={16} /> Gestion des catégories
           </Link>
           <Link
             href="/merchant/shop/products/new"
-            className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-colors text-sm"
+            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
             <Plus size={16} /> Nouveau produit
@@ -141,7 +197,7 @@ export function ShopProductsPanel() {
         </div>
       )}
 
-      {lowStockCount > 0 && (
+      {lowStockCount > 0 && filterStatus !== 'low_stock' && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-900 flex flex-wrap items-center justify-between gap-3">
           <span>
             <strong>{lowStockCount}</strong> produit{lowStockCount > 1 ? 's' : ''} avec stock bas
@@ -149,7 +205,7 @@ export function ShopProductsPanel() {
           </span>
           <button
             type="button"
-            onClick={() => setFilterStock('low')}
+            onClick={() => setFilterStatus('low_stock')}
             className="font-bold underline text-amber-900"
           >
             Voir la liste
@@ -165,66 +221,44 @@ export function ShopProductsPanel() {
         totalCount={products.length}
         showReset={hasExtraFilters}
         onReset={resetFilters}
-      >
-        <FilterPill active={filterStatus === 'all'} onClick={() => setFilterStatus('all')}>
-          Tous statuts ({statusCounts.all})
-        </FilterPill>
-        {(['ACTIVE', 'DRAFT', 'OUT_OF_STOCK'] as const).map(status => (
-          <FilterPill
-            key={status}
-            active={filterStatus === status}
-            onClick={() => setFilterStatus(status)}
-          >
-            {PRODUCT_STATUS_LABELS[status]} ({statusCounts[status]})
-          </FilterPill>
-        ))}
-        {lowStockCount > 0 && (
-          <FilterPill
-            active={filterStock === 'low'}
-            onClick={() => setFilterStock(filterStock === 'low' ? 'all' : 'low')}
-          >
-            Stock bas ({lowStockCount})
-          </FilterPill>
-        )}
-      </MerchantListToolbar>
+      />
 
-      {enabledCategories.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            type="button"
-            onClick={() => setFilterCategoryId('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-              filterCategoryId === 'all' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600'
-            }`}
-          >
-            Toutes catégories ({products.length})
-          </button>
-          {enabledCategories.map(cat => {
-            const count = products.filter(p => p.category_id === cat.id).length
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setFilterCategoryId(cat.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-                  filterCategoryId === cat.id ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600'
-                }`}
-              >
-                {cat.name} ({count})
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={() => setFilterCategoryId('none')}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold ${
-              filterCategoryId === 'none' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600'
-            }`}
-          >
-            Sans catégorie ({products.filter(p => !p.category_id).length})
-          </button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <div>
+          <label htmlFor="product-status-filter" className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            Statut
+          </label>
+          <div className="relative">
+            <select
+              id="product-status-filter"
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value as StatusFilter)}
+              className={selectClassName}
+            >
+              <option value="all">Tous les statuts ({statusCounts.all})</option>
+              <option value="ACTIVE">{PRODUCT_STATUS_LABELS.ACTIVE} ({statusCounts.ACTIVE})</option>
+              <option value="DRAFT">{PRODUCT_STATUS_LABELS.DRAFT} ({statusCounts.DRAFT})</option>
+              <option value="OUT_OF_STOCK">{PRODUCT_STATUS_LABELS.OUT_OF_STOCK} ({statusCounts.OUT_OF_STOCK})</option>
+              {lowStockCount > 0 && (
+                <option value="low_stock">Stock bas ({lowStockCount})</option>
+              )}
+            </select>
+          </div>
         </div>
-      )}
+
+        {categoryOptions.length > 0 && (
+          <FilterLiveMultiSelect
+            label="Catégories"
+            placeholder="Toutes les catégories"
+            searchPlaceholder="Rechercher une catégorie…"
+            options={categoryOptions}
+            selected={filterCategoryIds}
+            onChange={setFilterCategoryIds}
+            loading={loading}
+            emptyMessage="Aucune catégorie trouvée"
+          />
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -237,9 +271,7 @@ export function ShopProductsPanel() {
           <p className="text-sm text-slate-400 mt-1 mb-4">
             {hasExtraFilters
               ? 'Aucun produit ne correspond à votre recherche.'
-              : filterCategoryId !== 'all'
-                ? 'Aucun produit dans cette catégorie.'
-                : 'Ajoutez votre premier article à la boutique.'}
+              : 'Ajoutez votre premier article à la boutique.'}
           </p>
           {hasExtraFilters && (
             <button
@@ -263,9 +295,9 @@ export function ShopProductsPanel() {
           {filteredProducts.map(product => (
             <div
               key={product.id}
-              className="bg-white border border-slate-100 rounded-2xl p-4 flex gap-4 items-center"
+              className="bg-white border border-slate-100 rounded-2xl p-4 flex gap-3 sm:gap-4 items-center"
             >
-              <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={product.image_url || PLACEHOLDER_PRODUCT_IMAGE}
@@ -304,7 +336,7 @@ export function ShopProductsPanel() {
                   )}
                 </p>
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-1.5 sm:gap-2 shrink-0">
                 <Link
                   href={`/merchant/shop/products/${product.id}/edit`}
                   className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"

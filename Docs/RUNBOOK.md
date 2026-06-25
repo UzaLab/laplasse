@@ -27,6 +27,8 @@ curl http://localhost:3001/api/health
 | `MEILI_MASTER_KEY` | `apps/api/.env` | Clé Meilisearch |
 | `NEXT_PUBLIC_API_URL` | `apps/web/.env.local` | URL API depuis le navigateur |
 
+Voir aussi [`Docs/PREPROD_POWER_MANAGEMENT.md`](./PREPROD_POWER_MANAGEMENT.md) pour arrêter/démarrer la preprod à la demande (économie RAM VPS).
+
 ---
 
 ## 2. Redémarrer les services

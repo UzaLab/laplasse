@@ -1019,10 +1019,11 @@ export class LogisticsPartnersService {
     if (file.size > 2 * 1024 * 1024) throw new BadRequestException('Taille maximale : 2 Mo')
 
     const staff = await this.requirePartnerStaff(userId)
-    const url = await this.storage.upload(
+    const url = await this.storage.uploadImage(
       file.buffer,
       file.mimetype,
       `logistics-logo/${staff.logistics_partner_id}`,
+      'logo',
     )
 
     return this.prisma.logisticsPartner.update({
@@ -1040,11 +1041,18 @@ export class LogisticsPartnersService {
     if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Taille maximale : 5 Mo')
 
     const staff = await this.requirePartnerStaff(userId)
-    const url = await this.storage.upload(
-      file.buffer,
-      file.mimetype,
-      `logistics-kyc/${staff.logistics_partner_id}`,
-    )
+    const url = file.mimetype.startsWith('image/')
+      ? await this.storage.uploadImage(
+          file.buffer,
+          file.mimetype,
+          `logistics-kyc/${staff.logistics_partner_id}`,
+          'general',
+        )
+      : await this.storage.uploadRaw(
+          file.buffer,
+          file.mimetype,
+          `logistics-kyc/${staff.logistics_partner_id}`,
+        )
 
     return this.prisma.logisticsPartner.update({
       where: { id: staff.logistics_partner_id },

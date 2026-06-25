@@ -4,49 +4,86 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { ImagePreset, ImageProcessorService } from './image-processor.service'
+import { resolveStorageConfig } from './storage.config'
+
+/** Cache longue durée — les clés sont immuables (UUID). Réduit l'egress via CDN/proxy. */
+const CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name)
   private readonly s3Client: S3Client | null = null
-  private readonly bucket: string | null
-  private readonly publicUrlBase: string | null
+  private readonly bucket: string | null = null
+  private readonly publicUrlBase: string | null = null
+  private readonly providerLabel: string = 'local'
 
-  constructor(private readonly config: ConfigService) {
-    const r2AccountId = config.get<string>('R2_ACCOUNT_ID')
-    const r2AccessKey = config.get<string>('R2_ACCESS_KEY_ID')
-    const r2Secret = config.get<string>('R2_SECRET_ACCESS_KEY')
-    this.bucket = config.get<string>('R2_BUCKET') ?? null
-    this.publicUrlBase = config.get<string>('R2_PUBLIC_URL') ?? null
+  constructor(
+    private readonly config: ConfigService,
+    private readonly imageProcessor: ImageProcessorService,
+  ) {
+    const resolved = resolveStorageConfig(config)
 
-    if (r2AccountId && r2AccessKey && r2Secret && this.bucket) {
+    if (resolved) {
       this.s3Client = new S3Client({
-        region: 'auto',
-        endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+        region: resolved.region,
+        endpoint: resolved.endpoint,
         credentials: {
-          accessKeyId: r2AccessKey,
-          secretAccessKey: r2Secret,
+          accessKeyId: resolved.accessKeyId,
+          secretAccessKey: resolved.secretAccessKey,
         },
+        forcePathStyle: false,
       })
-      this.logger.log('R2 storage initialized')
+      this.bucket = resolved.bucket
+      this.publicUrlBase = resolved.publicUrlBase
+      this.providerLabel = resolved.provider === 'r2' ? 'Cloudflare R2' : 'S3 (Hetzner)'
+      this.logger.log(`${this.providerLabel} storage initialized — bucket=${resolved.bucket}`)
     } else {
-      this.logger.warn('R2 not configured — using local disk storage')
+      this.logger.warn('Object storage not configured — using local disk (dev only)')
     }
   }
 
+  get isRemote(): boolean {
+    return this.s3Client !== null
+  }
+
   /**
-   * Uploads a file buffer and returns its public URL.
-   * Uses R2 in production when env vars are set, local disk otherwise.
+   * Upload image optimisée (WebP, redimensionnée).
+   * Tous les uploads image passent par l'API — pas d'upload direct navigateur → S3.
    */
-  async upload(
+  async uploadImage(
     buffer: Buffer,
-    mimetype: string,
+    _originalMimetype: string,
     folder: string,
+    preset: ImagePreset = 'general',
   ): Promise<string> {
-    const ext = mimetype === 'image/png' ? 'png' : mimetype === 'image/webp' ? 'webp' : 'jpg'
+    const processed = await this.imageProcessor.process(buffer, preset)
+    const filename = `${randomUUID()}.${processed.ext}`
+    const key = `${folder}/${filename}`
+    return this.putObject(processed.buffer, processed.mimetype, key)
+  }
+
+  /**
+   * Upload fichier brut (PDF KYC, etc.) sans transformation.
+   */
+  async uploadRaw(buffer: Buffer, mimetype: string, folder: string): Promise<string> {
+    const { buffer: body, mimetype: contentType, ext } = this.imageProcessor.passthrough(buffer, mimetype)
     const filename = `${randomUUID()}.${ext}`
     const key = `${folder}/${filename}`
+    return this.putObject(body, contentType, key)
+  }
 
+  /**
+   * @deprecated Préférer uploadImage ou uploadRaw.
+   */
+  async upload(buffer: Buffer, mimetype: string, folder: string): Promise<string> {
+    if (mimetype.startsWith('image/')) {
+      return this.uploadImage(buffer, mimetype, folder)
+    }
+    return this.uploadRaw(buffer, mimetype, folder)
+  }
+
+  private async putObject(buffer: Buffer, mimetype: string, key: string): Promise<string> {
     if (this.s3Client && this.bucket && this.publicUrlBase) {
       await this.s3Client.send(
         new PutObjectCommand({
@@ -54,17 +91,17 @@ export class StorageService {
           Key: key,
           Body: buffer,
           ContentType: mimetype,
-          CacheControl: 'public, max-age=31536000',
+          CacheControl: CACHE_CONTROL,
         }),
       )
-      return `${this.publicUrlBase.replace(/\/$/, '')}/${key}`
+      return `${this.publicUrlBase}/${key}`
     }
 
-    // Fallback: local disk
-    const apiUrl = this.config.get('API_PUBLIC_URL') ?? 'http://localhost:3001'
-    const dir = join(process.cwd(), 'uploads', folder)
+    // Fallback dev : disque local servi par express.static
+    const apiUrl = (this.config.get('API_PUBLIC_URL') ?? 'http://localhost:3001').replace(/\/$/, '')
+    const dir = join(process.cwd(), 'uploads', key.split('/').slice(0, -1).join('/'))
     await mkdir(dir, { recursive: true })
-    await writeFile(join(dir, filename), buffer)
+    await writeFile(join(process.cwd(), 'uploads', key), buffer)
     return `${apiUrl}/uploads/${key}`
   }
 }

@@ -3,6 +3,7 @@ import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const apiOrigin = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/api\/?$/, "");
+const mediaOrigin = (process.env.NEXT_PUBLIC_MEDIA_URL ?? apiOrigin).replace(/\/$/, "");
 
 const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN ?? "";
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com";
@@ -21,7 +22,7 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: https: blob: ${apiOrigin}`,
+      `img-src 'self' data: https: blob: ${apiOrigin} ${mediaOrigin}`,
       "font-src 'self' data:",
       `connect-src 'self' ${apiOrigin} ${posthogHost} ${sentryDsn ? "*.sentry.io" : ""}`.trim(),
       `worker-src 'self' blob:`,

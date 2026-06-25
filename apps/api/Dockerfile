@@ -38,7 +38,7 @@ RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-RUN apk add --no-cache wget
+RUN apk add --no-cache wget vips
 
 ENV NODE_ENV=production
 
