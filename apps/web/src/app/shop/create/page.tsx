@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Loader2,
+  MapPin,
   ShoppingBag,
   Store,
 } from 'lucide-react'
@@ -16,29 +17,76 @@ import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PUBLIC_NARROW } from '@/lib/pageLayout'
 import { createShop } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
-import { getCountryCode, getDefaultCity } from '@/lib/country'
+import { getCountryCode } from '@/lib/country'
+import { fetchGeoCities, fetchGeoCommunes, type GeoCity, type GeoCommune } from '@/lib/geoApi'
+import { AddressLocationPickerLazy } from '@/features/addresses/components/AddressLocationPickerLazy'
+
+const INPUT =
+  'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400'
+const LABEL = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2'
 
 export default function CreateShopPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, setActiveShop, updateUser } = useAuthStore()
   const { ready, hydrated, isAuthenticated } = useRequireAuth('/shop/create')
+  const countryCode = getCountryCode()
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState(() => ({
+  const [cities, setCities] = useState<GeoCity[]>([])
+  const [communes, setCommunes] = useState<GeoCommune[]>([])
+  const [loadingGeo, setLoadingGeo] = useState(false)
+  const [form, setForm] = useState({
     name: '',
     description: '',
     phone: '',
     whatsapp: '',
-    city: getDefaultCity(getCountryCode()),
+    city_id: '',
+    commune_id: '',
     district: '',
-    merchant_id: '',
-  }))
+    address: '',
+    has_precise_location: true,
+    latitude: null as number | null,
+    longitude: null as number | null,
+    merchant_id: searchParams.get('merchant_id') ?? '',
+  })
 
   const merchants = user?.merchants ?? []
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    void fetchGeoCities(countryCode).then(res => {
+      if (res.ok) setCities(res.data)
+    })
+  }, [countryCode])
+
+  const selectedCity = useMemo(
+    () => cities.find(c => c.id === form.city_id) ?? null,
+    [cities, form.city_id],
+  )
+  const selectedCommune = useMemo(
+    () => communes.find(c => c.id === form.commune_id) ?? null,
+    [communes, form.commune_id],
+  )
+
+  useEffect(() => {
+    if (!selectedCity?.slug) {
+      setCommunes([])
+      return
+    }
+    setLoadingGeo(true)
+    void fetchGeoCommunes(selectedCity.slug, countryCode).then(res => {
+      if (res.ok) setCommunes(res.data.communes ?? [])
+      setLoadingGeo(false)
+    })
+  }, [selectedCity?.slug, countryCode])
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) {
       notify.error('Le nom de la boutique est requis')
+      return
+    }
+    if (!form.city_id || !form.commune_id) {
+      notify.error('Sélectionnez votre ville et commune')
       return
     }
 
@@ -48,8 +96,13 @@ export default function CreateShopPage() {
       description: form.description.trim() || undefined,
       phone: form.phone || undefined,
       whatsapp: form.whatsapp || undefined,
-      city: form.city || undefined,
-      district: form.district || undefined,
+      city: selectedCity?.name,
+      district: form.district || selectedCommune?.name || undefined,
+      address: form.address || undefined,
+      city_id: form.city_id,
+      commune_id: form.commune_id,
+      latitude: form.has_precise_location ? form.latitude ?? undefined : undefined,
+      longitude: form.has_precise_location ? form.longitude ?? undefined : undefined,
       merchant_id: form.merchant_id || undefined,
     })
 
@@ -62,13 +115,12 @@ export default function CreateShopPage() {
     updateUser({ shops: [...(user?.shops ?? []), shop] })
     setActiveShop(shop.id)
     notify.success('Boutique créée !')
-    // If linked to a merchant → go to merchant shop flow; otherwise → standalone shop manage
     if (form.merchant_id) {
       router.push('/merchant/shop/products/new')
     } else {
-      router.push('/shop/manage/products/new')
+      router.push('/shop/manage/products/categories')
     }
-  }
+  }, [form, selectedCity?.name, selectedCommune?.name, user?.shops, updateUser, setActiveShop, router])
 
   if (!hydrated || !isAuthenticated) return null
   if (!ready) {
@@ -102,71 +154,165 @@ export default function CreateShopPage() {
           Vous pouvez aussi lier la boutique à un établissement déjà inscrit sur LaPlasse.
         </p>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-5 shadow-sm">
+        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-5 shadow-sm laplasse-leaflet-host">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Nom de la boutique *
-            </label>
+            <label className={LABEL}>Nom de la boutique *</label>
             <input
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Ex : Atelier Wax Yao"
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+              className={INPUT}
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Description
-            </label>
+            <label className={LABEL}>Description</label>
             <textarea
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               rows={3}
               placeholder="Présentez votre univers, vos produits…"
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+              className={INPUT}
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Téléphone</label>
+              <label className={LABEL}>Téléphone</label>
               <input
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm"
+                className={INPUT}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">WhatsApp</label>
+              <label className={LABEL}>WhatsApp</label>
               <input
                 value={form.whatsapp}
                 onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm"
+                className={INPUT}
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={LABEL}>Ville *</label>
+              <select
+                value={form.city_id}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  city_id: e.target.value,
+                  commune_id: '',
+                  latitude: null,
+                  longitude: null,
+                }))}
+                className={INPUT}
+                required
+              >
+                <option value="">Choisir une ville</option>
+                {cities.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={LABEL}>Commune *</label>
+              <select
+                value={form.commune_id}
+                disabled={!form.city_id || loadingGeo}
+                onChange={e => {
+                  const commune = communes.find(c => c.id === e.target.value)
+                  setForm(f => ({
+                    ...f,
+                    commune_id: e.target.value,
+                    district: commune?.name ?? f.district,
+                    latitude: null,
+                    longitude: null,
+                  }))
+                }}
+                className={INPUT}
+                required
+              >
+                <option value="">{loadingGeo ? 'Chargement…' : 'Choisir une commune'}</option>
+                {communes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Quartier</label>
+            <label className={LABEL}>Quartier / repère</label>
             <input
               value={form.district}
               onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
-              placeholder="Cocody, Plateau…"
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm"
+              placeholder="Cocody, près du marché…"
+              className={INPUT}
             />
           </div>
 
+          <div>
+            <label className={LABEL}>Adresse (complément)</label>
+            <input
+              value={form.address}
+              onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+              placeholder="Immeuble, porte, étage…"
+              className={INPUT}
+            />
+          </div>
+
+          {form.city_id && form.commune_id && (
+            <>
+              <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.has_precise_location}
+                  onChange={e => setForm(f => ({
+                    ...f,
+                    has_precise_location: e.target.checked,
+                    latitude: e.target.checked ? f.latitude : null,
+                    longitude: e.target.checked ? f.longitude : null,
+                  }))}
+                  className="mt-1 rounded border-slate-300 text-brand-500 focus:ring-brand-400"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <MapPin size={16} className="text-brand-500" />
+                    Point GPS précis sur la carte
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-1">
+                    Utilisé pour le retrait sur place et la localisation de votre boutique.
+                  </span>
+                </span>
+              </label>
+
+              {form.has_precise_location && (
+                <AddressLocationPickerLazy
+                  latitude={form.latitude}
+                  longitude={form.longitude}
+                  onChange={coords => setForm(f => ({
+                    ...f,
+                    latitude: coords?.latitude ?? null,
+                    longitude: coords?.longitude ?? null,
+                  }))}
+                  city={selectedCity ? { ...selectedCity, country: countryCode } : null}
+                  commune={selectedCommune ? { ...selectedCommune, country: countryCode } : null}
+                />
+              )}
+            </>
+          )}
+
           {merchants.length > 0 && (
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <label className={`${LABEL} flex items-center gap-2`}>
                 <Store size={14} /> Lier à un établissement (optionnel)
               </label>
               <select
                 value={form.merchant_id}
                 onChange={e => setForm(f => ({ ...f, merchant_id: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white"
+                className={`${INPUT} bg-white`}
               >
                 <option value="">Boutique indépendante</option>
                 {merchants.map(m => (

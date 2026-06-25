@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import {
   AlertCircle, ArrowLeft, ChevronDown, ChevronRight, Loader2, Save, Search, Tags,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import {
   fetchShopProductCategories,
-  getActiveMerchantShopId,
+  getActiveShopIdForManage,
+  getShopRoutesFromPathname,
   saveShopProductCategories,
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
@@ -29,8 +31,10 @@ function childrenOf(categories: ShopProductCategoryOption[], parentId: string) {
 }
 
 export function ShopProductCategoriesPanel() {
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveMerchantShopId(user?.shops, activeMerchantId, activeShopId)
+  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
   const [categories, setCategories] = useState<ShopProductCategoryOption[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
@@ -133,7 +137,7 @@ export function ShopProductCategoriesPanel() {
   return (
     <div className="space-y-6">
       <Link
-        href="/merchant/shop/products"
+        href={routes.products}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-amber-600"
         style={{ textDecoration: 'none' }}
       >

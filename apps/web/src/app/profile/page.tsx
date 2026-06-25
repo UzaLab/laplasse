@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Heart, Star, Trophy, Gift, Bell, Hand, Calendar,
-  Loader2, MapPin, ArrowRight, Award,
+  Loader2, MapPin, ArrowRight, Award, ShoppingBag,
 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
@@ -123,6 +123,7 @@ export default function ProfilePage() {
   if (!isAuthenticated || !user) return null
 
   const firstName = user.full_name?.split(' ')[0] ?? 'toi'
+  const hasShop = (user.shops?.length ?? 0) > 0
   const nextBooking = bookings.find(isBookingUpcoming)
   const points = loyalty?.account.points ?? 0
   const tierLabel = TIER_LABELS[loyalty?.account.tier ?? 'EXPLORER'] ?? 'Explorateur'
@@ -147,6 +148,33 @@ export default function ProfilePage() {
             Ravi de vous revoir. Voici un résumé de vos activités récentes.
           </p>
         </div>
+
+        {!hasShop && (
+          <Link
+            href="/shop/create"
+            className="block mb-8 p-6 sm:p-8 rounded-[28px] bg-slate-900 text-white relative overflow-hidden group"
+            style={{ textDecoration: 'none' }}
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/20 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <ShoppingBag size={24} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Nouveau</p>
+                  <h2 className="text-xl font-extrabold text-white mb-1">Lancez votre boutique en ligne</h2>
+                  <p className="text-sm text-slate-400">
+                    Créez votre vitrine, ajoutez vos produits et vendez sur LaPlasse — sans établissement physique.
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-2 bg-amber-500 text-slate-900 font-bold px-5 py-3 rounded-2xl shrink-0 group-hover:bg-amber-400 transition-colors">
+                Créer ma boutique <ArrowRight size={16} />
+              </span>
+            </div>
+          </Link>
+        )}
 
         {/* Row 1 — Réservation + Fidélité */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">

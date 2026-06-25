@@ -49,6 +49,22 @@ export class CreateShopDto {
   @MaxLength(500)
   address?: string
 
+  @IsOptional()
+  @IsString()
+  city_id?: string
+
+  @IsOptional()
+  @IsString()
+  commune_id?: string
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number
+
   /** Rattachement optionnel à un établissement existant (même propriétaire). */
   @IsOptional()
   @IsString()

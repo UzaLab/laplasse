@@ -77,6 +77,58 @@ export function getShopManageHref(shop: ShopSummary | null | undefined): string 
   return shop?.merchant_id ? '/merchant/shop' : '/shop/manage'
 }
 
+export type ShopManageBase = '/shop/manage' | '/merchant/shop'
+
+export interface ShopRoutePaths {
+  base: ShopManageBase
+  products: string
+  productsNew: string
+  productsCategories: string
+  productsEdit: (id: string) => string
+  settings: string
+  orders: string
+  orderDetail: (id: string) => string
+  analytics: string
+  promotions: string
+}
+
+export function buildShopRoutes(base: ShopManageBase): ShopRoutePaths {
+  return {
+    base,
+    products: `${base}/products`,
+    productsNew: `${base}/products/new`,
+    productsCategories: `${base}/products/categories`,
+    productsEdit: id => `${base}/products/${id}/edit`,
+    settings: `${base}/settings`,
+    orders: `${base}/orders`,
+    orderDetail: id => `${base}/orders/${id}`,
+    analytics: `${base}/analytics`,
+    promotions: `${base}/promotions`,
+  }
+}
+
+export function getShopRoutesFromPathname(pathname: string): ShopRoutePaths {
+  return buildShopRoutes(pathname.startsWith('/shop/manage') ? '/shop/manage' : '/merchant/shop')
+}
+
+export function getShopRoutesForShop(shop: ShopSummary | null | undefined): ShopRoutePaths {
+  return buildShopRoutes(getShopManageHref(shop) as ShopManageBase)
+}
+
+/** Boutique active en contexte gestion (marchand lié ou boutique indépendante). */
+export function getActiveShopIdForManage(
+  shops: ShopSummary[] | undefined,
+  activeMerchantId: string | null | undefined,
+  activeShopId: string | null | undefined,
+): string | null {
+  const merchantShopId = getActiveMerchantShopId(shops, activeMerchantId, activeShopId)
+  if (merchantShopId) return merchantShopId
+  const independent = getIndependentShops(shops)
+  if (!independent.length) return null
+  if (activeShopId && independent.some(s => s.id === activeShopId)) return activeShopId
+  return independent[0]?.id ?? null
+}
+
 export interface CreateShopInput {
   name: string
   description?: string
@@ -86,6 +138,10 @@ export interface CreateShopInput {
   city?: string
   district?: string
   address?: string
+  city_id?: string
+  commune_id?: string
+  latitude?: number | null
+  longitude?: number | null
   merchant_id?: string
 }
 
@@ -97,6 +153,13 @@ export async function fetchMyShops(): Promise<ShopSummary[]> {
 
 export async function fetchShopBySlug(slug: string): Promise<ShopDetails | null> {
   const res = await authApiFetch(`/shops/${slug}`)
+  if (!res.ok) return null
+  return res.json() as Promise<ShopDetails>
+}
+
+/** Détails boutique pour le propriétaire (DRAFT, ACTIVE, etc.). */
+export async function fetchShopForManage(shopId: string): Promise<ShopDetails | null> {
+  const res = await shopApiFetch(`/shops/${shopId}/manage`, shopId)
   if (!res.ok) return null
   return res.json() as Promise<ShopDetails>
 }

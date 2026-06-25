@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   ArrowLeft,
   Banknote,
@@ -30,7 +30,7 @@ import {
   type ProductStatus,
   type ProductVariantInput,
 } from '@/lib/marketplaceApi'
-import { fetchShopProductCategories, type ShopProductCategoryOption } from '@/lib/shopApi'
+import { fetchShopProductCategories, getShopRoutesFromPathname, type ShopProductCategoryOption } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 import { MerchantMediathequeField } from '@/features/merchant/components/MerchantMediathequeField'
 
@@ -118,15 +118,17 @@ function normalizeHtmlField(value: string): string | undefined {
 
 interface MerchantProductFormProps {
   productId?: string
+  skipShellLayout?: boolean
 }
 
-export function MerchantProductForm({ productId }: MerchantProductFormProps) {
+export function MerchantProductForm({ productId, skipShellLayout = false }: MerchantProductFormProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const isEdit = Boolean(productId)
   const { activeShopId, activeMerchantId, user } = useAuthStore()
-  const { ready, hydrated, isAuthenticated } = useRequireAuth(
-    isEdit ? `/merchant/shop/products/${productId}/edit` : '/merchant/shop/products/new',
-  )
+  const authPath = isEdit ? routes.productsEdit(productId!) : routes.productsNew
+  const { ready, hydrated, isAuthenticated } = useRequireAuth(authPath)
 
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM)
   const [loading, setLoading] = useState(isEdit)
@@ -240,47 +242,50 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
     }
 
     notify.success(isEdit ? 'Produit mis à jour' : 'Produit créé')
-    router.push('/merchant/shop/products')
+    router.push(routes.products)
   }
+
+  const FormShell = ({ children }: { children: React.ReactNode }) =>
+    skipShellLayout ? <>{children}</> : <ShopSectionLayout hideTabs>{children}</ShopSectionLayout>
 
   if (!hydrated || !isAuthenticated) return null
 
   if (loading) {
     return (
-      <ShopSectionLayout hideTabs>
+      <FormShell>
         <div className="flex justify-center py-24">
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
-      </ShopSectionLayout>
+      </FormShell>
     )
   }
 
   if (notFound) {
     return (
-      <ShopSectionLayout hideTabs>
+      <FormShell>
         <div className="text-center py-24">
           <p className="font-bold text-slate-900 mb-4">Produit introuvable</p>
           <Link
-            href="/merchant/shop/products"
+            href={routes.products}
             className="text-brand-600 font-bold"
             style={{ textDecoration: 'none' }}
           >
             Retour au catalogue
           </Link>
         </div>
-      </ShopSectionLayout>
+      </FormShell>
     )
   }
 
   return (
-    <ShopSectionLayout hideTabs>
+    <FormShell>
       <div>
         {/* En-tête sticky (maquette) */}
         <div className="sticky top-0 z-20 -mx-5 lg:-mx-8 px-5 lg:px-8 py-4 mb-6 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-slate-200/80">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <Link
-                href="/merchant/shop/products"
+                href={routes.products}
                 className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all shadow-sm shrink-0"
                 style={{ textDecoration: 'none' }}
               >
@@ -288,11 +293,11 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
               </Link>
               <div className="min-w-0">
                 <nav className="hidden sm:flex items-center text-sm font-medium text-slate-500 mb-1">
-                  <Link href="/merchant/shop/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
+                  <Link href={routes.products} className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
                     Catalogue
                   </Link>
                   <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
-                  <Link href="/merchant/shop/products" className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
+                  <Link href={routes.products} className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
                     Produits
                   </Link>
                   <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
@@ -308,7 +313,7 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
 
             <div className="flex items-center gap-3 shrink-0">
               <Link
-                href="/merchant/shop/products"
+                href={routes.products}
                 className="text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm hidden sm:block"
                 style={{ textDecoration: 'none' }}
               >
@@ -670,6 +675,6 @@ export function MerchantProductForm({ productId }: MerchantProductFormProps) {
           </div>
         </div>
       </div>
-    </ShopSectionLayout>
+    </FormShell>
   )
 }

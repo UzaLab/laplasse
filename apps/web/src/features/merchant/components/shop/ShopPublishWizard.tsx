@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import {
   Check,
   Circle,
@@ -15,7 +16,12 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { fetchMyProducts } from '@/lib/marketplaceApi'
-import { fetchShopBySlug, updateShop, type ShopStatus } from '@/lib/shopApi'
+import {
+  fetchShopForManage,
+  getShopRoutesFromPathname,
+  updateShop,
+  type ShopStatus,
+} from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
 const MIN_PRODUCTS = 3
@@ -31,6 +37,8 @@ interface WizardStep {
 }
 
 export function ShopPublishWizard() {
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const { user, activeShopId, updateUser } = useAuthStore()
   const activeShop = user?.shops?.find(s => s.id === activeShopId)
   const [loading, setLoading] = useState(true)
@@ -41,13 +49,13 @@ export function ShopPublishWizard() {
   const [copied, setCopied] = useState(false)
 
   const load = useCallback(async () => {
-    if (!activeShopId || !activeShop?.slug) {
+    if (!activeShopId) {
       setLoading(false)
       return
     }
     setLoading(true)
     const [shop, products] = await Promise.all([
-      fetchShopBySlug(activeShop.slug),
+      fetchShopForManage(activeShopId),
       fetchMyProducts(activeShopId),
     ])
     if (shop) {
@@ -56,7 +64,7 @@ export function ShopPublishWizard() {
     }
     setActiveProducts(products.filter(p => p.status === 'ACTIVE').length)
     setLoading(false)
-  }, [activeShop?.slug, activeShopId])
+  }, [activeShopId])
 
   useEffect(() => { load() }, [load])
 
@@ -105,7 +113,7 @@ export function ShopPublishWizard() {
       label: 'Ajouter un logo',
       desc: 'Donnez une identité visuelle à votre boutique',
       done: hasLogo,
-      href: '/merchant/shop/settings',
+      href: routes.settings,
       actionLabel: 'Ajouter le logo',
     },
     {
@@ -113,7 +121,7 @@ export function ShopPublishWizard() {
       label: `Publier ${MIN_PRODUCTS} produits minimum`,
       desc: `${activeProducts}/${MIN_PRODUCTS} produit${activeProducts > 1 ? 's' : ''} actif${activeProducts > 1 ? 's' : ''}`,
       done: hasEnoughProducts,
-      href: '/merchant/shop/products/new',
+      href: routes.productsNew,
       actionLabel: activeProducts === 0 ? 'Créer un produit' : 'Ajouter un produit',
     },
     {

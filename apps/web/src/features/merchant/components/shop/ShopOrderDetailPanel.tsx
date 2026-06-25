@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import {
   ArrowLeft,
   ChevronDown,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/authStore'
+import { getShopRoutesFromPathname } from '@/lib/shopApi'
 import { OrderTimeline } from '@/features/profile/components/orders/OrderTimeline'
 import { OrderStatusBadge } from '@/features/profile/components/orders/OrderStatusBadge'
 import {
@@ -77,6 +78,8 @@ interface ShopOrderDetailPanelProps {
 
 export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const { activeShopId } = useAuthStore()
   const [processing, setProcessing] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | ''>('')
@@ -126,7 +129,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         <Package size={32} className="text-slate-200 mx-auto mb-4" />
         <p className="font-semibold text-slate-600 mb-4">Commande introuvable</p>
         <Link
-          href="/merchant/shop/orders"
+          href={routes.orders}
           className="inline-flex items-center gap-2 text-sm font-bold text-amber-600 hover:text-amber-700"
           style={{ textDecoration: 'none' }}
         >
@@ -148,7 +151,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
     <div className="w-full min-w-0 space-y-6">
       <button
         type="button"
-        onClick={() => router.push('/merchant/shop/orders')}
+        onClick={() => router.push(routes.orders)}
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-amber-600 transition-colors"
       >
         <ArrowLeft size={18} />

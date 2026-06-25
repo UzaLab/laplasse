@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import {
-  fetchShopBySlug,
+  fetchShopForManage,
+  getShopManageHref,
   linkShopToMerchant,
   updateShop,
   type ShopStatus,
@@ -85,9 +86,9 @@ export function ShopSettingsPanel() {
   }, [selectedCity?.slug, countryCode])
 
   const load = useCallback(async () => {
-    if (!activeShop?.slug) return
+    if (!activeShopId) return
     setLoading(true)
-    const shop = await fetchShopBySlug(activeShop.slug)
+    const shop = await fetchShopForManage(activeShopId)
     if (shop) {
       setForm({
         name: shop.name ?? '',
@@ -108,23 +109,23 @@ export function ShopSettingsPanel() {
       })
     }
     setLoading(false)
-  }, [activeShop?.slug])
+  }, [activeShopId])
 
   useEffect(() => {
-    if (!activeShop?.slug) return
+    if (!activeShopId) return
     void load()
-  }, [load])
+  }, [load, activeShopId])
 
   useEffect(() => {
-    if (form.city_id || !cities.length) return
-    void fetchShopBySlug(activeShop!.slug).then(shop => {
+    if (form.city_id || !cities.length || !activeShopId) return
+    void fetchShopForManage(activeShopId).then(shop => {
       if (!shop?.city) return
       const match = cities.find(c => c.name.toLowerCase() === shop.city!.toLowerCase())
       if (match) {
         setForm(f => ({ ...f, city_id: match.id }))
       }
     })
-  }, [cities, form.city_id, activeShop?.slug])
+  }, [cities, form.city_id, activeShopId])
 
   const uploadImage = async (file: File, field: 'logo' | 'cover_image') => {
     if (!activeShopId) return
@@ -164,8 +165,8 @@ export function ShopSettingsPanel() {
       district: form.district || selectedCommune?.name || undefined,
       address: form.address || undefined,
       has_physical_location: form.has_physical_location,
-      latitude: form.has_physical_location ? form.latitude : null,
-      longitude: form.has_physical_location ? form.longitude : null,
+      latitude: form.has_physical_location ? (form.latitude ?? undefined) : null,
+      longitude: form.has_physical_location ? (form.longitude ?? undefined) : null,
       status: form.status,
       logo: form.logo || undefined,
       cover_image: form.cover_image || undefined,
@@ -240,6 +241,15 @@ export function ShopSettingsPanel() {
                 }}
               />
             </div>
+            {isIndependentShop && (
+              <input
+                type="url"
+                value={form.logo}
+                onChange={e => setForm(f => ({ ...f, logo: e.target.value }))}
+                placeholder="Ou collez l'URL de votre logo (https://…)"
+                className={`${INPUT} mt-2`}
+              />
+            )}
           </div>
           <div>
             <label className={LABEL}>Image de couverture</label>
@@ -491,7 +501,7 @@ export function ShopSettingsPanel() {
                     })
                     setActiveMerchant(selectedMerchantId)
                     notify.success('Boutique liée à l\'établissement !')
-                    router.push('/merchant/shop')
+                    router.push(getShopManageHref({ ...activeShop!, merchant_id: selectedMerchantId }))
                   }
                   setLinking(false)
                 }}

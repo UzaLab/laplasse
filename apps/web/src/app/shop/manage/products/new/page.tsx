@@ -6,7 +6,7 @@ import { MerchantProductForm } from '@/features/merchant/components/MerchantProd
 export default function ShopManageNewProductPage() {
   return (
     <ShopManageSectionLayout hideTabs>
-      <MerchantProductForm />
+      <MerchantProductForm skipShellLayout />
     </ShopManageSectionLayout>
   )
 }

@@ -2,7 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { authUrl } from '@/lib/authClient'
 import { invalidateAuthSession, type SessionStatus } from '@/lib/authSession'
-import { getShopsForMerchant, getActiveMerchantShopId, type ShopSummary } from '@/lib/shopApi'
+import {
+  getShopsForMerchant,
+  getActiveMerchantShopId,
+  getActiveShopIdForManage,
+  type ShopSummary,
+} from '@/lib/shopApi'
 
 export interface MerchantSummary {
   id: string
@@ -99,7 +104,7 @@ export const useAuthStore = create<AuthState>()(
           const linkedShops = getShopsForMerchant(user.shops, activeMerchantId)
           const independentShops = (user.shops ?? []).filter(s => !s.merchant_id)
           const firstShop = linkedShops[0] ?? independentShops[0] ?? null
-          const activeShopId = getActiveMerchantShopId(
+          const activeShopId = getActiveShopIdForManage(
             user.shops,
             activeMerchantId,
             firstShop?.id ?? state.activeShopId,

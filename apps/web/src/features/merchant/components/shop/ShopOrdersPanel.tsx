@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ChevronRight, Download, Loader2, ShoppingBag } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -17,6 +18,7 @@ import {
   type Order,
   type OrderStatus,
 } from '@/lib/marketplaceApi'
+import { getShopRoutesFromPathname } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
 const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: string }[]>> = {
@@ -68,6 +70,8 @@ function orderSearchFields(order: Order) {
 }
 
 export function ShopOrdersPanel() {
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const { activeShopId } = useAuthStore()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -211,7 +215,7 @@ export function ShopOrdersPanel() {
               <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
                 <div className="flex-1 min-w-0">
                   <Link
-                    href={`/merchant/shop/orders/${order.id}`}
+                    href={routes.orderDetail(order.id)}
                     className="font-extrabold text-slate-900 hover:text-amber-600 transition-colors inline-flex items-center gap-1"
                     style={{ textDecoration: 'none' }}
                   >
@@ -258,7 +262,7 @@ export function ShopOrdersPanel() {
 
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
                 <Link
-                  href={`/merchant/shop/orders/${order.id}`}
+                  href={routes.orderDetail(order.id)}
                   className="text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 min-h-[44px] inline-flex items-center"
                   style={{ textDecoration: 'none' }}
                 >

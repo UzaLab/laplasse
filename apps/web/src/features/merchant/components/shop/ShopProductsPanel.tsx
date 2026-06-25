@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Loader2, Package, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -17,7 +18,12 @@ import {
   type MarketplaceProduct,
   type ProductStatus,
 } from '@/lib/marketplaceApi'
-import { fetchShopProductCategories, getActiveMerchantShopId, type ShopProductCategoryOption } from '@/lib/shopApi'
+import {
+  fetchShopProductCategories,
+  getActiveShopIdForManage,
+  getShopRoutesFromPathname,
+  type ShopProductCategoryOption,
+} from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
 const NONE_CATEGORY = '__none__'
@@ -62,8 +68,10 @@ function buildCategoryOptions(
 }
 
 export function ShopProductsPanel() {
+  const pathname = usePathname()
+  const routes = getShopRoutesFromPathname(pathname)
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveMerchantShopId(user?.shops, activeMerchantId, activeShopId)
+  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ShopProductCategoryOption[]>([])
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([])
@@ -171,14 +179,14 @@ export function ShopProductsPanel() {
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <Link
-            href="/merchant/shop/products/categories"
+            href={routes.productsCategories}
             className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
             <Settings2 size={16} /> Gestion des catégories
           </Link>
           <Link
-            href="/merchant/shop/products/new"
+            href={routes.productsNew}
             className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
@@ -190,7 +198,7 @@ export function ShopProductsPanel() {
       {enabledCategories.length === 0 && !loading && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-900">
           Activez d&apos;abord vos catégories via{' '}
-          <Link href="/merchant/shop/products/categories" className="font-bold underline">
+          <Link href={routes.productsCategories} className="font-bold underline">
             Gestion des catégories
           </Link>
           {' '}avant de créer des produits.
@@ -283,7 +291,7 @@ export function ShopProductsPanel() {
             </button>
           )}
           <Link
-            href="/merchant/shop/products/new"
+            href={routes.productsNew}
             className="inline-flex items-center gap-2 bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-sm"
             style={{ textDecoration: 'none' }}
           >
@@ -308,7 +316,7 @@ export function ShopProductsPanel() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
-                    href={`/merchant/shop/products/${product.id}/edit`}
+                    href={routes.productsEdit(product.id)}
                     className="font-extrabold text-slate-900 truncate hover:text-amber-600 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
@@ -344,7 +352,7 @@ export function ShopProductsPanel() {
               </div>
               <div className="flex gap-1.5 sm:gap-2 shrink-0">
                 <Link
-                  href={`/merchant/shop/products/${product.id}/edit`}
+                  href={routes.productsEdit(product.id)}
                   className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
                   style={{ textDecoration: 'none' }}
                   aria-label="Modifier"
