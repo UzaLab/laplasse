@@ -30,9 +30,10 @@ RUN pnpm exec tsc -p tsconfig.build.json
 FROM base AS prod-deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json ./apps/api/
-RUN echo "node-linker=hoisted" > .npmrc
+RUN echo "node-linker=hoisted" > .npmrc && echo "onlyBuiltDependencies[]=sharp" >> .npmrc
 RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter api --prod
+RUN pnpm rebuild sharp --filter api 2>/dev/null || pnpm exec --filter api node -e "require('sharp')"
 
 # ── Runner ────────────────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner

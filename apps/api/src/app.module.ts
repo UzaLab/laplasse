@@ -36,7 +36,11 @@ import { LogisticsModule } from './logistics/logistics.module'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      ignoreEnvFile: process.env.NODE_ENV === 'production',
+      envFilePath: '.env',
+    }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     OtpModule,
     PrismaModule,

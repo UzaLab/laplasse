@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { ImagePreset, ImageProcessorService } from './image-processor.service'
-import { resolveStorageConfig } from './storage.config'
+import { resolveStorageConfig, storageConfigDiagnostics } from './storage.config'
 
 /** Cache longue durée — les clés sont immuables (UUID). Réduit l'egress via CDN/proxy. */
 const CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -39,7 +39,10 @@ export class StorageService {
       this.providerLabel = resolved.provider === 'r2' ? 'Cloudflare R2' : 'S3 (Hetzner)'
       this.logger.log(`${this.providerLabel} storage initialized — bucket=${resolved.bucket}`)
     } else {
-      this.logger.warn('Object storage not configured — using local disk (dev only)')
+      const missing = storageConfigDiagnostics(config)
+      this.logger.warn(
+        `Object storage not configured — using local disk (dev only). Missing: ${missing.join(', ') || 'unknown'}`,
+      )
     }
   }
 
@@ -95,6 +98,12 @@ export class StorageService {
         }),
       )
       return `${this.publicUrlBase}/${key}`
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Stockage objet non configuré en production (vérifiez S3_ACCESS_KEY_ID, R2_ENDPOINT, R2_BUCKET_NAME, R2_PUBLIC_URL)',
+      )
     }
 
     // Fallback dev : disque local servi par express.static
