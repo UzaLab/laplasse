@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
 import { countryRequestHeaders } from '@/lib/country'
 import { formatPrice } from '@/lib/marketplaceApi'
+import { cn } from '@/lib/utils'
 
 interface MerchantSuggestion {
   id: string
@@ -41,6 +42,11 @@ interface Props {
   navigateTo?: 'search' | 'current'
   onSearch?: (q: string) => void
   size?: 'sm' | 'md' | 'lg'
+  /** Recherche produits marketplace uniquement (Meilisearch index products). */
+  productsOnly?: boolean
+  /** Mode contrôlé — ex. page marketplace. */
+  value?: string
+  onValueChange?: (v: string) => void
 }
 
 function getApiUrl(): string {
@@ -72,9 +78,18 @@ export function SearchAutocomplete({
   navigateTo = 'search',
   onSearch,
   size = 'md',
+  productsOnly = false,
+  value: controlledValue,
+  onValueChange,
+  className,
 }: Props) {
   const router = useRouter()
-  const [query, setQuery] = useState('')
+  const [internalQuery, setInternalQuery] = useState('')
+  const query = controlledValue !== undefined ? controlledValue : internalQuery
+  const setQuery = useCallback((next: string) => {
+    onValueChange?.(next)
+    if (controlledValue === undefined) setInternalQuery(next)
+  }, [controlledValue, onValueChange])
   const [open, setOpen] = useState(false)
   const [merchants, setMerchants] = useState<MerchantSuggestion[]>([])
   const [products, setProducts] = useState<ProductSuggestion[]>([])
@@ -90,10 +105,11 @@ export function SearchAutocomplete({
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
+    if (productsOnly) return
     fetchSearchJson<TrendingItem[]>('/search/trending?limit=6')
       .then(data => setTrending(Array.isArray(data) ? data : []))
       .catch(() => {})
-  }, [])
+  }, [productsOnly])
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
@@ -102,6 +118,22 @@ export function SearchAutocomplete({
       return
     }
     setLoading(true)
+    if (productsOnly) {
+      fetchSearchJson<ProductSuggestion[]>(
+        `/search/autocomplete/products?q=${encodeURIComponent(debouncedQuery)}&limit=8`,
+      )
+        .then(data => {
+          setMerchants([])
+          setProducts(Array.isArray(data) ? data : [])
+          setLoading(false)
+        })
+        .catch(() => {
+          setMerchants([])
+          setProducts([])
+          setLoading(false)
+        })
+      return
+    }
     fetchSearchJson<{ merchants: MerchantSuggestion[]; products: ProductSuggestion[] }>(
       `/search/autocomplete/unified?q=${encodeURIComponent(debouncedQuery)}&limit=8`,
     )
@@ -115,7 +147,7 @@ export function SearchAutocomplete({
         setProducts([])
         setLoading(false)
       })
-  }, [debouncedQuery])
+  }, [debouncedQuery, productsOnly])
 
   const updatePanelPos = useCallback(() => {
     const el = containerRef.current
@@ -156,6 +188,10 @@ export function SearchAutocomplete({
 
   const goToSearch = useCallback((q: string) => {
     setOpen(false)
+    if (navigateTo === 'current' && onSearch) {
+      onSearch(q)
+      return
+    }
     if (navigateTo === 'search' || !onSearch) {
       router.push(`/search?q=${encodeURIComponent(q)}`)
     } else {
@@ -176,7 +212,11 @@ export function SearchAutocomplete({
   }
 
   const hasSuggestions = merchants.length > 0 || products.length > 0
-  const showDropdown = open && (hasSuggestions || (!query.trim() && trending.length > 0) || loading)
+  const showDropdown = open && (
+    hasSuggestions
+    || (!productsOnly && !query.trim() && trending.length > 0)
+    || loading
+  )
 
   const inputHeight = size === 'sm' ? 'h-11' : size === 'lg' ? 'h-16' : 'h-14'
   const inputText   = size === 'sm' ? 'text-sm' : 'text-base'
@@ -191,7 +231,7 @@ export function SearchAutocomplete({
         style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width }}
         role="listbox"
       >
-        {!query.trim() && trending.length > 0 && (
+        {!productsOnly && !query.trim() && trending.length > 0 && (
           <div>
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <TrendingUp size={10} /> Tendances
@@ -213,7 +253,7 @@ export function SearchAutocomplete({
           </div>
         )}
 
-        {merchants.length > 0 && (
+        {merchants.length > 0 && !productsOnly && (
           <div className={products.length > 0 ? 'border-b border-slate-100' : ''}>
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <Store size={10} /> Établissements
@@ -297,7 +337,9 @@ export function SearchAutocomplete({
                 <Search size={14} className="text-amber-400" />
               </div>
               <span className="text-sm font-bold text-slate-900">
-                Voir tous les résultats pour &ldquo;{query}&rdquo;
+                {productsOnly && navigateTo === 'current'
+                  ? `Rechercher « ${query} »`
+                  : `Voir tous les résultats pour « ${query} »`}
               </span>
             </button>
           </div>
@@ -308,7 +350,7 @@ export function SearchAutocomplete({
   ) : null
 
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div ref={containerRef} className={cn('relative w-full', className)}>
       <form onSubmit={handleSubmit} className="relative">
         <div className={`
           flex items-center bg-white border border-slate-200 rounded-2xl px-4 gap-3

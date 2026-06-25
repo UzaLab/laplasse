@@ -160,7 +160,7 @@ export class MarketplaceController {
 
   @Public()
   @Get('marketplace/products')
-  listCatalog(
+  async listCatalog(
     @Req() req: RequestWithCountry,
     @Query('q') q?: string,
     @Query('merchant') merchant?: string,
@@ -168,15 +168,36 @@ export class MarketplaceController {
     @Query('sort') sort?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('country') country?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('paged') paged?: string,
   ) {
-    return this.svc.listMarketplaceProducts({
+    const parsedLimit =
+      limit != null && limit !== '' ? Number.parseInt(limit, 10) : undefined
+    const parsedOffset =
+      offset != null && offset !== '' ? Number.parseInt(offset, 10) : undefined
+    const usePaging = paged === '1' && Number.isFinite(parsedLimit)
+
+    const result = await this.svc.listMarketplaceProducts({
       q,
       merchant,
       category,
       sort,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
       country: country ?? req.countryCode ?? DEFAULT_COUNTRY,
+      limit: usePaging ? parsedLimit : undefined,
+      offset: usePaging ? (Number.isFinite(parsedOffset) ? parsedOffset : 0) : undefined,
     })
+
+    if (usePaging && result && typeof result === 'object' && 'data' in result) {
+      return result
+    }
+
+    const rows = Array.isArray(result) ? result : []
+    if (parsedLimit != null && Number.isFinite(parsedLimit) && !usePaging) {
+      return rows.slice(0, parsedLimit)
+    }
+    return rows
   }
 
   @Public()

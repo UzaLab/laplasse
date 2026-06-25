@@ -3014,24 +3014,47 @@ export class MarketplaceService {
     sort?: string
     maxPrice?: number
     country?: string
+    limit?: number
+    offset?: number
   }) {
     const countryCode = query?.country?.trim().toUpperCase()
+    const paginate = query?.limit != null
+    const limit = paginate
+      ? Math.min(Math.max(Math.floor(query!.limit!), 1), 100)
+      : undefined
+    const offset = paginate ? Math.max(Math.floor(query?.offset ?? 0), 0) : 0
+
+    const sortParam =
+      query?.sort === 'price_asc'
+        ? 'price_asc'
+        : query?.sort === 'price_desc'
+          ? 'price_desc'
+          : 'newest'
+
     if (query?.q?.trim()) {
       const meili = await this.searchService.searchProducts({
         q: query.q.trim(),
         category: query?.category,
         shop: query?.shop ?? query?.merchant,
         country: countryCode,
-        sort:
-          query?.sort === 'price_asc'
-            ? 'price_asc'
-            : query?.sort === 'price_desc'
-              ? 'price_desc'
-              : 'newest',
+        sort: sortParam,
         maxPrice: query?.maxPrice,
-        limit: 100,
+        limit: limit ?? 100,
+        offset,
       })
-      if (meili) return this.enrichMeiliCatalogProducts(meili.data)
+      if (meili) {
+        const data = await this.enrichMeiliCatalogProducts(meili.data)
+        if (!paginate) return data
+        return {
+          data,
+          meta: {
+            total: meili.meta.total,
+            limit: limit!,
+            offset,
+            hasMore: offset + data.length < meili.meta.total,
+          },
+        }
+      }
     }
 
     const orderBy =
@@ -3048,35 +3071,65 @@ export class MarketplaceService {
         select: { id: true },
       })
       categoryId = cat?.id
-      if (!categoryId) return []
+      if (!categoryId) {
+        if (!paginate) return []
+        return {
+          data: [],
+          meta: { total: 0, limit: limit!, offset, hasMore: false },
+        }
+      }
     }
 
     const catalogSelect = this.marketplaceCatalogSelect()
-
-    return this.prisma.product.findMany({
-      where: this.marketplaceCartProductWhere({
-        ...(categoryId ? { category_id: categoryId } : {}),
-        ...(query?.maxPrice != null && query.maxPrice > 0
-          ? { price: { lte: query.maxPrice } }
+    const where = this.marketplaceCartProductWhere({
+      ...(categoryId ? { category_id: categoryId } : {}),
+      ...(query?.maxPrice != null && query.maxPrice > 0
+        ? { price: { lte: query.maxPrice } }
+        : {}),
+      ...(query?.q
+        ? { name: { contains: query.q, mode: 'insensitive' as const } }
+        : {}),
+      shop: {
+        is_active: true,
+        status: 'ACTIVE',
+        ...(countryCode ? { country: countryCode } : {}),
+        ...(query?.merchant || query?.shop
+          ? { slug: query.shop ?? query.merchant }
           : {}),
-        ...(query?.q
-          ? { name: { contains: query.q, mode: 'insensitive' as const } }
-          : {}),
-        shop: {
-          is_active: true,
-          status: 'ACTIVE',
-          ...(countryCode ? { country: countryCode } : {}),
-          ...(query?.merchant || query?.shop
-            ? { slug: query.shop ?? query.merchant }
-            : {}),
-        },
-      }),
-      orderBy,
-      select: catalogSelect,
-    }).then(async rows => {
-      const mapped = rows.map(row => this.mapCatalogProductRow(row))
-      return this.promotionsService.enrichProductsWithPromotions(mapped)
+      },
     })
+
+    if (!paginate) {
+      return this.prisma.product
+        .findMany({ where, orderBy, select: catalogSelect })
+        .then(async rows => {
+          const mapped = rows.map(row => this.mapCatalogProductRow(row))
+          return this.promotionsService.enrichProductsWithPromotions(mapped)
+        })
+    }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        orderBy,
+        select: catalogSelect,
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.product.count({ where }),
+    ])
+
+    const mapped = rows.map(row => this.mapCatalogProductRow(row))
+    const data = await this.promotionsService.enrichProductsWithPromotions(mapped)
+    return {
+      data,
+      meta: {
+        total,
+        limit: limit!,
+        offset,
+        hasMore: offset + data.length < total,
+      },
+    }
   }
 
   async listMarketplaceMerchants(limit = 20) {
