@@ -121,6 +121,17 @@ interface MerchantProductFormProps {
   skipShellLayout?: boolean
 }
 
+function ProductFormShell({
+  skipShellLayout,
+  children,
+}: {
+  skipShellLayout: boolean
+  children: React.ReactNode
+}) {
+  if (skipShellLayout) return <>{children}</>
+  return <ShopSectionLayout hideTabs>{children}</ShopSectionLayout>
+}
+
 export function MerchantProductForm({ productId, skipShellLayout = false }: MerchantProductFormProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -245,24 +256,21 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
     router.push(routes.products)
   }
 
-  const FormShell = ({ children }: { children: React.ReactNode }) =>
-    skipShellLayout ? <>{children}</> : <ShopSectionLayout hideTabs>{children}</ShopSectionLayout>
-
   if (!hydrated || !isAuthenticated) return null
 
   if (loading) {
     return (
-      <FormShell>
+      <ProductFormShell skipShellLayout={skipShellLayout}>
         <div className="flex justify-center py-24">
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
-      </FormShell>
+      </ProductFormShell>
     )
   }
 
   if (notFound) {
     return (
-      <FormShell>
+      <ProductFormShell skipShellLayout={skipShellLayout}>
         <div className="text-center py-24">
           <p className="font-bold text-slate-900 mb-4">Produit introuvable</p>
           <Link
@@ -273,12 +281,12 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
             Retour au catalogue
           </Link>
         </div>
-      </FormShell>
+      </ProductFormShell>
     )
   }
 
   return (
-    <FormShell>
+    <ProductFormShell skipShellLayout={skipShellLayout}>
       <div>
         {/* En-tête sticky (maquette) */}
         <div className="sticky top-0 z-20 -mx-5 lg:-mx-8 px-5 lg:px-8 py-4 mb-6 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-slate-200/80">
@@ -675,6 +683,6 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
           </div>
         </div>
       </div>
-    </FormShell>
+    </ProductFormShell>
   )
 }

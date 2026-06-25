@@ -2,10 +2,10 @@
 
 import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff, Loader2, MapPin, CheckCircle2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, MapPin } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_REGISTER_SUBTITLE } from '@/lib/brandCopy'
@@ -16,6 +16,9 @@ import {
   getAuthIntentCopy,
   resolveAuthIntent,
 } from '@/lib/authIntent'
+
+const INPUT_CLASS =
+  'w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm'
 
 function RegisterContent() {
   const router = useRouter()
@@ -28,8 +31,15 @@ function RegisterContent() {
   const safeRedirect = redirectTo && !redirectTo.startsWith('//') ? redirectTo : '/'
   const loginHref = buildLoginUrl(safeRedirect, authIntent !== 'default' ? authIntent : undefined)
 
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '' })
+  const [form, setForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    password: '',
+    password_confirm: '',
+  })
   const [showPass, setShowPass] = useState(false)
+  const [showPassConfirm, setShowPassConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -40,10 +50,32 @@ function RegisterContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (!form.full_name.trim()) {
+      setError('Le nom complet est requis')
+      return
+    }
+    if (!form.email.trim()) {
+      setError('L\'email est requis')
+      return
+    }
+    if (!form.phone.trim()) {
+      setError('Le numéro de téléphone est requis')
+      return
+    }
+    if (form.phone.replace(/\D/g, '').length < 8) {
+      setError('Numéro de téléphone invalide')
+      return
+    }
     if (form.password.length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères')
       return
     }
+    if (form.password !== form.password_confirm) {
+      setError('Les mots de passe ne correspondent pas')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -52,10 +84,10 @@ function RegisterContent() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          email: form.email,
+          email: form.email.trim(),
           password: form.password,
-          full_name: form.full_name,
-          ...(form.phone ? { phone: form.phone } : {}),
+          full_name: form.full_name.trim(),
+          phone: form.phone.trim(),
         }),
       })
 
@@ -144,49 +176,55 @@ function RegisterContent() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nom */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Nom complet</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                Nom complet <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={form.full_name}
                 onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
                 placeholder="Kouakou Aya"
                 required
-                className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm"
+                autoComplete="name"
+                className={INPUT_CLASS}
               />
             </div>
 
-            {/* Email */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                Email <span className="text-red-500">*</span>
+              </label>
               <input
                 type="email"
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="vous@exemple.ci"
                 required
-                className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm"
+                autoComplete="email"
+                className={INPUT_CLASS}
               />
             </div>
 
-            {/* Phone (optionnel) */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                Téléphone <span className="font-normal text-slate-400">(optionnel)</span>
+                Téléphone <span className="text-red-500">*</span>
               </label>
               <input
                 type="tel"
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder={phonePlaceholder}
-                className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm"
+                required
+                autoComplete="tel"
+                className={INPUT_CLASS}
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1.5">Mot de passe</label>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                Mot de passe <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <input
                   type={showPass ? 'text' : 'password'}
@@ -194,12 +232,14 @@ function RegisterContent() {
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="Min. 8 caractères"
                   required
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm pr-12"
+                  autoComplete="new-password"
+                  className={`${INPUT_CLASS} pr-12`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPass ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                 >
                   {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -229,14 +269,38 @@ function RegisterContent() {
               )}
             </div>
 
-            {/* Avantages */}
-            <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4 space-y-2">
-              {['Accès aux adresses vérifiées', 'Sauvegardez vos favoris', 'Déposez des avis'].map(txt => (
-                <div key={txt} className="flex items-center gap-2 text-sm text-brand-800 font-medium">
-                  <CheckCircle2 size={15} className="text-brand-500 shrink-0" />
-                  {txt}
-                </div>
-              ))}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                Confirmer le mot de passe <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassConfirm ? 'text' : 'password'}
+                  value={form.password_confirm}
+                  onChange={e => setForm(f => ({ ...f, password_confirm: e.target.value }))}
+                  placeholder="Retapez votre mot de passe"
+                  required
+                  autoComplete="new-password"
+                  className={`${INPUT_CLASS} pr-12 ${
+                    form.password_confirm && form.password !== form.password_confirm
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-500/10'
+                      : ''
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassConfirm(!showPassConfirm)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassConfirm ? 'Masquer la confirmation' : 'Afficher la confirmation'}
+                >
+                  {showPassConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {form.password_confirm && form.password !== form.password_confirm && (
+                <p className="text-xs text-red-500 font-medium mt-1.5">
+                  Les mots de passe ne correspondent pas
+                </p>
+              )}
             </div>
 
             <button

@@ -83,6 +83,7 @@ describe('AuthService', () => {
           email: 'taken@laplasse.ci',
           password: 'Password1!',
           full_name: 'Test User',
+          phone: '0700000001',
         }),
       ).rejects.toThrow(ConflictException)
     })
@@ -98,10 +99,11 @@ describe('AuthService', () => {
       })
 
       const result = await service.register({
-        email: 'new@laplasse.ci',
-        password: 'Password1!',
-        full_name: 'New User',
-      })
+          email: 'new@laplasse.ci',
+          password: 'Password1!',
+          full_name: 'New User',
+          phone: '0700000001',
+        })
 
       expect(hash).toHaveBeenCalledWith('Password1!', 12)
       expect(prisma.authToken.create).toHaveBeenCalled()

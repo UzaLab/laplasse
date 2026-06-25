@@ -125,12 +125,10 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } })
     if (existing) throw new ConflictException('Cet email est déjà utilisé')
 
-    const phone = dto.phone?.trim() || null
+    const phone = dto.phone.trim()
 
-    if (phone) {
-      const phoneTaken = await this.prisma.user.findUnique({ where: { phone } })
-      if (phoneTaken) throw new ConflictException('Ce numéro de téléphone est déjà utilisé')
-    }
+    const phoneTaken = await this.prisma.user.findUnique({ where: { phone } })
+    if (phoneTaken) throw new ConflictException('Ce numéro de téléphone est déjà utilisé')
 
     const passwordHash = await hash(dto.password, 12)
 

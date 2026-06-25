@@ -77,7 +77,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
     ),
     ...(hasShop
       ? [{ href: shopManageHref, label: 'Ma boutique', icon: <ShoppingBag size={17} /> }]
-      : [{ href: '/shop/create', label: 'Créer ma boutique', icon: <ShoppingBag size={17} /> }]
+      : []
     ),
     ...(isAdmin ? [{ href: '/admin', label: 'Administration', icon: <ShieldCheck size={17} /> }] : []),
     { href: '/search', label: exploreLabel, icon: <Compass size={17} /> },
@@ -127,24 +127,6 @@ export function ProfileShell({ children }: ProfileShellProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-1">
-        {!hasShop && (
-          <Link
-            href="/shop/create"
-            onClick={() => setSidebarOpen(false)}
-            className="block mb-4 mx-1 p-4 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20 hover:from-amber-600 hover:to-amber-700 transition-all"
-            style={{ textDecoration: 'none' }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                <ShoppingBag size={20} />
-              </div>
-              <div>
-                <p className="font-extrabold text-sm">Créer ma boutique</p>
-                <p className="text-xs text-amber-100 mt-0.5">Vendez en ligne en quelques minutes</p>
-              </div>
-            </div>
-          </Link>
-        )}
         {mainNav.map(navLink)}
         <div className="h-px bg-slate-100 mx-2 my-3" />
         {extraNav.map(navLink)}
@@ -152,6 +134,25 @@ export function ProfileShell({ children }: ProfileShellProps) {
 
       {/* Footer */}
       <div className="p-3 border-t border-slate-100 space-y-1">
+        {!hasShop && (
+          <Link
+            href="/shop/create"
+            onClick={() => setSidebarOpen(false)}
+            className="block mb-2 mx-1 p-4 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20 hover:from-amber-600 hover:to-amber-700 transition-all"
+            style={{ textDecoration: 'none' }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <ShoppingBag size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-extrabold text-sm">Créer ma boutique</p>
+                <p className="text-xs text-amber-100 mt-0.5">Vendez en ligne en quelques minutes</p>
+              </div>
+              <ArrowRight size={16} className="shrink-0 opacity-80" />
+            </div>
+          </Link>
+        )}
         <Link
           href="#"
           className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-slate-500 hover:bg-slate-50 font-medium text-sm transition-colors"

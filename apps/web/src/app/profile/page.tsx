@@ -134,6 +134,21 @@ export default function ProfilePage() {
   const nextMeta = nextBooking ? getBookingCardMeta(nextBooking) : []
   const nextPricing = nextBooking ? getBookingPricing(nextBooking) : null
 
+  const quickActions = [
+    ...(!hasShop
+      ? [{
+          href: '/shop/create',
+          Icon: ShoppingBag,
+          title: 'Créer ma boutique',
+          sub: 'Vendez en ligne sur LaPlasse',
+          highlight: true,
+        }]
+      : []),
+    { href: '/profile/loyalty', Icon: Trophy, title: 'Mes points', sub: 'Niveaux & récompenses' },
+    { href: '/profile/referral', Icon: Gift, title: 'Parrainage', sub: 'Invitez vos amis' },
+    { href: '/profile/notifications', Icon: Bell, title: 'Notifications', sub: 'Vos alertes' },
+  ]
+
   return (
     <ProfileShell>
       <div className="w-full min-w-0">
@@ -148,33 +163,6 @@ export default function ProfilePage() {
             Ravi de vous revoir. Voici un résumé de vos activités récentes.
           </p>
         </div>
-
-        {!hasShop && (
-          <Link
-            href="/shop/create"
-            className="block mb-8 p-6 sm:p-8 rounded-[28px] bg-slate-900 text-white relative overflow-hidden group"
-            style={{ textDecoration: 'none' }}
-          >
-            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/20 rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center shrink-0">
-                  <ShoppingBag size={24} className="text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Nouveau</p>
-                  <h2 className="text-xl font-extrabold text-white mb-1">Lancez votre boutique en ligne</h2>
-                  <p className="text-sm text-slate-400">
-                    Créez votre vitrine, ajoutez vos produits et vendez sur LaPlasse — sans établissement physique.
-                  </p>
-                </div>
-              </div>
-              <span className="inline-flex items-center gap-2 bg-amber-500 text-slate-900 font-bold px-5 py-3 rounded-2xl shrink-0 group-hover:bg-amber-400 transition-colors">
-                Créer ma boutique <ArrowRight size={16} />
-              </span>
-            </div>
-          </Link>
-        )}
 
         {/* Row 1 — Réservation + Fidélité */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-8">
@@ -467,21 +455,37 @@ export default function ProfilePage() {
         {/* Actions rapides — bas de page */}
         <div className="border-t border-slate-200 pt-8">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Actions rapides</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { href: '/profile/loyalty', Icon: Trophy, title: 'Mes points', sub: 'Niveaux & récompenses' },
-              { href: '/profile/referral', Icon: Gift, title: 'Parrainage', sub: 'Invitez vos amis' },
-              { href: '/profile/notifications', Icon: Bell, title: 'Notifications', sub: 'Vos alertes' },
-            ].map(f => (
+          <div className={`grid grid-cols-1 gap-4 ${quickActions.length > 3 ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
+            {quickActions.map(f => (
               <Link
                 key={f.href}
                 href={f.href}
-                className="bg-white border border-slate-200 rounded-[20px] p-5 hover:border-amber-200 hover:shadow-md transition-all group"
+                className={`rounded-[20px] p-5 hover:shadow-md transition-all group ${
+                  'highlight' in f && f.highlight
+                    ? 'bg-slate-900 border border-slate-900 hover:border-amber-500/50'
+                    : 'bg-white border border-slate-200 hover:border-amber-200'
+                }`}
                 style={{ textDecoration: 'none' }}
               >
-                <f.Icon size={22} strokeWidth={1.75} className="text-slate-600 group-hover:text-amber-600 mb-2 transition-colors" />
-                <p className="font-extrabold text-slate-900 text-sm">{f.title}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{f.sub}</p>
+                <f.Icon
+                  size={22}
+                  strokeWidth={1.75}
+                  className={`mb-2 transition-colors ${
+                    'highlight' in f && f.highlight
+                      ? 'text-amber-400'
+                      : 'text-slate-600 group-hover:text-amber-600'
+                  }`}
+                />
+                <p className={`font-extrabold text-sm ${
+                  'highlight' in f && f.highlight ? 'text-white' : 'text-slate-900'
+                }`}>
+                  {f.title}
+                </p>
+                <p className={`text-xs mt-0.5 ${
+                  'highlight' in f && f.highlight ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  {f.sub}
+                </p>
               </Link>
             ))}
           </div>

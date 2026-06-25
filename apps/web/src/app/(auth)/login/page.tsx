@@ -183,17 +183,10 @@ function LoginForm() {
               {intentCopy.badge}
             </div>
           )}
-          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">{intentCopy.title}</h1>
-          {authIntent !== 'default' ? (
-            <p className="text-slate-500 text-sm mb-7 leading-relaxed">
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-7">{intentCopy.title}</h1>
+          {authIntent !== 'default' && (
+            <p className="text-slate-500 text-sm mb-7 leading-relaxed -mt-4">
               {intentCopy.subtitle}
-            </p>
-          ) : (
-            <p className="text-slate-500 text-sm mb-7">
-              {intentCopy.registerPrompt}{' '}
-              <Link href={registerHref} className="font-bold text-brand-600 hover:text-brand-700">
-                {intentCopy.registerLabel}
-              </Link>
             </p>
           )}
 
@@ -279,6 +272,15 @@ function LoginForm() {
             >
               {loading ? <><Loader2 size={18} className="animate-spin" /> Connexion…</> : 'Se connecter'}
             </button>
+
+            {authIntent === 'default' && (
+              <p className="text-center text-sm text-slate-500 pt-2">
+                {intentCopy.registerPrompt}{' '}
+                <Link href={registerHref} className="font-bold text-brand-600 hover:text-brand-700">
+                  {intentCopy.registerLabel}
+                </Link>
+              </p>
+            )}
           </form> : (
             <div className="space-y-4">
               <div>
