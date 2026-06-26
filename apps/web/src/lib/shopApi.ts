@@ -72,6 +72,22 @@ export function getIndependentShops(shops: ShopSummary[] | undefined): ShopSumma
   return (shops ?? []).filter(s => !s.merchant_id)
 }
 
+/** Fiche établissement marchand créée (distinct d'une boutique standalone). */
+export function hasMerchantEstablishment(
+  user: { role?: string; merchants?: { id: string }[] } | null | undefined,
+): boolean {
+  if (!user) return false
+  return user.role === 'MERCHANT' || (user.merchants?.length ?? 0) > 0
+}
+
+/** Boutique standalone sans fiche établissement. */
+export function hasStandaloneShopOnly(
+  user: { role?: string; merchants?: { id: string }[]; shops?: ShopSummary[] } | null | undefined,
+): boolean {
+  if (!user) return false
+  return getIndependentShops(user.shops).length > 0 && !hasMerchantEstablishment(user)
+}
+
 /** Retourne l'URL de gestion d'une boutique (espace marchand si liée, sinon /shop/manage). */
 /** URL publique vitrine boutique (standalone ou liée). */
 export function getShopPublicHref(shop: { slug: string } | null | undefined): string {

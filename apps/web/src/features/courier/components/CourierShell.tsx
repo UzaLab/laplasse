@@ -86,7 +86,7 @@ export function CourierShell({ children }: CourierShellProps) {
 
   const SidebarInner = (
     <>
-      <div className="h-[72px] flex items-center px-6 border-b border-slate-100 shrink-0">
+      <div className="backoffice-topbar flex items-center px-6 border-b border-slate-100 shrink-0">
         <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
           <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
             <span className="text-emerald-400 font-black text-sm">LP</span>
@@ -169,7 +169,7 @@ export function CourierShell({ children }: CourierShellProps) {
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
+        <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
-import { getIndependentShops, getShopManageHref } from '@/lib/shopApi'
+import { getIndependentShops, getShopManageHref, hasMerchantEstablishment } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 
@@ -55,7 +55,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
     { href: '/profile/settings',      label: 'Paramètres',      icon: <Settings size={17} /> },
   ]
 
-  const isMerchant = user?.role === 'MERCHANT' || (user?.merchants?.length ?? 0) > 0
+  const isMerchant = hasMerchantEstablishment(user)
   const hasLogisticsPartner = !!user?.logistics_partner
 
   const allShops = user?.shops ?? []
@@ -73,7 +73,9 @@ export function ProfileShell({ children }: ProfileShellProps) {
       : []),
     ...(isMerchant
       ? [{ href: '/merchant/dashboard', label: 'Dashboard marchand', icon: <Store size={17} /> }]
-      : [{ href: '/merchant/signup', label: 'Inscrire mon commerce', icon: <Store size={17} /> }]
+      : hasShop
+        ? []
+        : [{ href: '/merchant/signup', label: 'Inscrire mon commerce', icon: <Store size={17} /> }]
     ),
     ...(hasShop
       ? [{ href: shopManageHref, label: 'Ma boutique', icon: <ShoppingBag size={17} /> }]
@@ -108,7 +110,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
   const SidebarInner = (
     <>
       {/* Logo */}
-      <div className="h-[72px] flex items-center px-6 border-b border-slate-100 shrink-0">
+      <div className="backoffice-topbar flex items-center px-6 border-b border-slate-100 shrink-0">
         <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
           <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
             <span className="text-amber-400 font-black text-sm">LP</span>
@@ -194,7 +196,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
 
         {/* Topbar */}
-        <header className="h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-30 relative overflow-visible">
+        <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-30 relative overflow-visible">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"

@@ -12,6 +12,13 @@ import { useT } from '@/providers/LocaleProvider'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { CountrySwitcher } from './CountrySwitcher'
 import { MOBILE_DRAWER_NAV_ITEMS } from './navConfig'
+import {
+  getIndependentShops,
+  getShopManageHref,
+  getShopsForMerchant,
+  hasMerchantEstablishment,
+  hasStandaloneShopOnly,
+} from '@/lib/shopApi'
 
 interface MobileNavProps {
   open: boolean
@@ -35,6 +42,23 @@ export function MobileNav({
   }, [])
 
   const showCartBadge = mounted && cartCount > 0
+
+  const hasMerchant = hasMerchantEstablishment(user)
+  const userShops = user?.shops ?? []
+  const hasShop = userShops.length > 0
+  const standaloneOnly = isAuthenticated && hasStandaloneShopOnly(user)
+  const primaryShop =
+    getIndependentShops(userShops)[0]
+    ?? getShopsForMerchant(userShops, user?.merchants?.[0]?.id)[0]
+    ?? null
+  const shopManageHref = primaryShop ? getShopManageHref(primaryShop) : '/shop/manage'
+
+  const drawerNavItems = MOBILE_DRAWER_NAV_ITEMS.filter(item => {
+    if (item.href !== '/merchant/signup') return true
+    if (!isAuthenticated || !user) return true
+    if (hasMerchant || standaloneOnly) return false
+    return true
+  })
 
   useEffect(() => {
     if (!open) return
@@ -112,7 +136,7 @@ export function MobileNav({
           )}
 
           <ul className="space-y-1">
-            {MOBILE_DRAWER_NAV_ITEMS.map(({ href, labelKey, icon: Icon, match }) => {
+            {drawerNavItems.map(({ href, labelKey, icon: Icon, match }) => {
               const active = match(pathname)
               return (
                 <li key={href}>
@@ -173,7 +197,7 @@ export function MobileNav({
                     <Heart size={18} className="text-slate-600" /> {t('nav.myFavorites')}
                   </Link>
                 </li>
-                {(user.role === 'MERCHANT' || (user.merchants?.length ?? 0) > 0) && (
+                {hasMerchant && (
                   <li>
                     <Link
                       href="/merchant/dashboard"
@@ -182,6 +206,23 @@ export function MobileNav({
                       style={{ textDecoration: 'none' }}
                     >
                       <LayoutDashboard size={18} /> {t('nav.dashboard')}
+                    </Link>
+                  </li>
+                )}
+                {hasShop && (
+                  <li>
+                    <Link
+                      href={shopManageHref}
+                      onClick={onClose}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium transition-colors',
+                        pathname.startsWith('/shop/manage') || pathname.startsWith('/merchant/shop')
+                          ? 'bg-slate-100 text-slate-900'
+                          : 'text-slate-700 hover:bg-slate-50',
+                      )}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <ShoppingBag size={18} /> Ma boutique
                     </Link>
                   </li>
                 )}
@@ -224,7 +265,7 @@ export function MobileNav({
           </div>
         </nav>
 
-        <div className="px-4 py-6 border-t border-slate-100">
+        <div className="px-4 py-6 border-t border-slate-100 safe-area-bottom">
           {isAuthenticated && user ? (
             <button
               type="button"
