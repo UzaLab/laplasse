@@ -419,98 +419,167 @@ export function MerchantMenuPanel() {
   const renderItemCard = (item: MenuItem, siblings: MenuItem[]) => {
     const sorted = [...siblings].sort((a, b) => a.sort_order - b.sort_order)
     const idx = sorted.findIndex(i => i.id === item.id)
+    const canMoveUp = idx > 0 && savingId !== item.id
+    const canMoveDown = idx < sorted.length - 1 && savingId !== item.id
 
     return (
       <div
         key={item.id}
-        className={`group flex items-start gap-3 rounded-2xl border p-3 sm:p-4 transition-all ${
+        className={`group rounded-2xl border transition-all ${
           item.is_available
             ? 'bg-white border-slate-100 hover:border-orange-100 hover:shadow-sm'
             : 'bg-slate-50/80 border-slate-200 opacity-80'
         }`}
       >
-        <MenuItemThumb url={item.image_url} name={item.name} />
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="font-bold text-slate-900 text-sm sm:text-base leading-tight">{item.name}</p>
-            {!item.is_available && (
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                Masqué
-              </span>
-            )}
-            {(item.modifier_groups?.length ?? 0) > 0 && (
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                {item.modifier_groups.length} option{item.modifier_groups.length > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <p className="text-sm font-extrabold text-orange-600 tabular-nums mt-0.5">
-            {formatPrice(item.price, item.currency)}
-          </p>
-          {item.description && (
-            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.description}</p>
-          )}
-          {item.prep_minutes != null && (
-            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-              <Clock size={11} /> {item.prep_minutes} min
+        <div className="flex items-start gap-3 p-3 sm:p-4">
+          <MenuItemThumb url={item.image_url} name={item.name} />
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="font-bold text-slate-900 text-sm sm:text-base leading-tight">{item.name}</p>
+              {!item.is_available && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                  Masqué
+                </span>
+              )}
+              {(item.modifier_groups?.length ?? 0) > 0 && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                  {item.modifier_groups.length} option{item.modifier_groups.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-extrabold text-orange-600 tabular-nums mt-0.5">
+              {formatPrice(item.price, item.currency)}
             </p>
-          )}
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1 shrink-0">
-          <div className="hidden sm:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {item.description && (
+              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.description}</p>
+            )}
+            {item.prep_minutes != null && (
+              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                <Clock size={11} /> {item.prep_minutes} min
+              </p>
+            )}
+          </div>
+
+          {/* Desktop actions */}
+          <div className="hidden sm:flex items-center gap-1 shrink-0">
+            <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                disabled={!canMoveUp}
+                onClick={() => void moveItem(item, sorted, 'up')}
+                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                title="Monter"
+              >
+                <ChevronUp size={14} />
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveDown}
+                onClick={() => void moveItem(item, sorted, 'down')}
+                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                title="Descendre"
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
             <button
               type="button"
-              disabled={savingId === item.id || idx <= 0}
-              onClick={() => void moveItem(item, sorted, 'up')}
-              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-              title="Monter"
+              title={item.is_available ? 'Masquer' : 'Afficher'}
+              disabled={savingId === item.id}
+              onClick={() => void toggleItemAvailable(item)}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
+                item.is_available
+                  ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                  : 'border-slate-200 text-slate-400 bg-white hover:bg-slate-50'
+              }`}
             >
-              <ChevronUp size={14} />
+              {savingId === item.id ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : item.is_available ? (
+                <Eye size={15} />
+              ) : (
+                <EyeOff size={15} />
+              )}
             </button>
             <button
               type="button"
-              disabled={savingId === item.id || idx >= sorted.length - 1}
-              onClick={() => void moveItem(item, sorted, 'down')}
-              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-              title="Descendre"
+              title="Modifier"
+              onClick={() => openEditDrawer(item)}
+              className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
             >
-              <ChevronDown size={14} />
+              <Pencil size={15} />
+            </button>
+            <button
+              type="button"
+              title="Supprimer"
+              onClick={() => void removeItem(item.id)}
+              className="w-9 h-9 rounded-xl border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
+            >
+              <Trash2 size={15} />
             </button>
           </div>
+        </div>
+
+        {/* Mobile actions */}
+        <div className="sm:hidden border-t border-slate-100 px-3 pb-3 pt-2 flex items-center gap-1.5">
           <button
             type="button"
-            title={item.is_available ? 'Masquer' : 'Afficher'}
+            disabled={!canMoveUp}
+            onClick={() => void moveItem(item, sorted, 'up')}
+            title="Monter"
+            aria-label="Monter"
+            className="w-10 h-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 disabled:opacity-40"
+          >
+            <ChevronUp size={18} />
+          </button>
+          <button
+            type="button"
+            disabled={!canMoveDown}
+            onClick={() => void moveItem(item, sorted, 'down')}
+            title="Descendre"
+            aria-label="Descendre"
+            className="w-10 h-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 disabled:opacity-40"
+          >
+            <ChevronDown size={18} />
+          </button>
+          <div className="flex-1" />
+          <button
+            type="button"
             disabled={savingId === item.id}
             onClick={() => void toggleItemAvailable(item)}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
+            title={item.is_available ? 'Masquer' : 'Afficher'}
+            aria-label={item.is_available ? 'Masquer' : 'Afficher'}
+            className={`w-10 h-10 rounded-xl border flex items-center justify-center ${
               item.is_available
-                ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
-                : 'border-slate-200 text-slate-400 bg-white hover:bg-slate-50'
+                ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
+                : 'border-slate-200 text-slate-500 bg-white'
             }`}
           >
             {savingId === item.id ? (
-              <Loader2 size={15} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : item.is_available ? (
-              <Eye size={15} />
+              <Eye size={16} />
             ) : (
-              <EyeOff size={15} />
+              <EyeOff size={16} />
             )}
           </button>
           <button
             type="button"
-            title="Modifier"
             onClick={() => openEditDrawer(item)}
-            className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+            title="Modifier"
+            aria-label="Modifier"
+            className="w-10 h-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-600"
           >
-            <Pencil size={15} />
+            <Pencil size={16} />
           </button>
           <button
             type="button"
-            title="Supprimer"
             onClick={() => void removeItem(item.id)}
-            className="w-9 h-9 rounded-xl border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
+            title="Supprimer"
+            aria-label="Supprimer"
+            className="w-10 h-10 rounded-xl border border-red-100 bg-red-50 flex items-center justify-center text-red-500"
           >
-            <Trash2 size={15} />
+            <Trash2 size={16} />
           </button>
         </div>
       </div>
@@ -519,9 +588,12 @@ export function MerchantMenuPanel() {
 
   const renderSectionHeader = (section: MenuSection, count: number) => {
     const isCollapsed = collapsedSections.has(section.id)
+    const sectionIdx = [...sections].sort((a, b) => a.sort_order - b.sort_order).findIndex(s => s.id === section.id)
+    const canMoveSectionUp = sectionIdx > 0 && savingId !== section.id
+    const canMoveSectionDown = sectionIdx >= 0 && sectionIdx < sections.length - 1 && savingId !== section.id
 
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div className="space-y-3 mb-3">
         {editingSectionId === section.id ? (
           <div className="flex flex-1 gap-2 min-w-[200px]">
             <input
@@ -546,86 +618,155 @@ export function MerchantMenuPanel() {
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => toggleSectionCollapsed(section.id)}
-            className="flex items-center gap-2 min-w-0 text-left"
-          >
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-            />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">{section.name}</h3>
-                {!section.is_active && (
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                    Masquée
-                  </span>
-                )}
-                <span className="text-xs font-bold text-slate-400 tabular-nums">{count}</span>
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => toggleSectionCollapsed(section.id)}
+                className="flex items-center gap-2 min-w-0 text-left flex-1"
+              >
+                <ChevronDown
+                  size={18}
+                  className={`text-slate-400 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">{section.name}</h3>
+                    {!section.is_active && (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        Masquée
+                      </span>
+                    )}
+                    <span className="text-xs font-bold text-slate-400 tabular-nums">{count}</span>
+                  </div>
+                </div>
+              </button>
+
+              {/* Desktop section actions */}
+              <div className="hidden sm:flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => openCreateDrawer(section.id)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100"
+                >
+                  <Plus size={12} /> Plat
+                </button>
+                <button
+                  type="button"
+                  disabled={!canMoveSectionUp}
+                  onClick={() => void moveSection(section, 'up')}
+                  className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                  title="Monter la section"
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={!canMoveSectionDown}
+                  onClick={() => void moveSection(section, 'down')}
+                  className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                  title="Descendre la section"
+                >
+                  <ChevronDown size={14} />
+                </button>
+                <button
+                  type="button"
+                  disabled={savingId === section.id}
+                  onClick={() => void toggleSectionActive(section)}
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                    section.is_active
+                      ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
+                      : 'border-slate-200 text-slate-400'
+                  }`}
+                >
+                  {section.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSectionId(section.id)
+                    setSectionEditName(section.name)
+                  }}
+                  className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void removeSection(section.id)}
+                  className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
-          </button>
-        )}
 
-        {editingSectionId !== section.id && (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => openCreateDrawer(section.id)}
-              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100"
-            >
-              <Plus size={12} /> Plat
-            </button>
-            <button
-              type="button"
-              disabled={savingId === section.id}
-              onClick={() => void moveSection(section, 'up')}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-              title="Monter la section"
-            >
-              <ChevronUp size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={savingId === section.id}
-              onClick={() => void moveSection(section, 'down')}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
-              title="Descendre la section"
-            >
-              <ChevronDown size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={savingId === section.id}
-              onClick={() => void toggleSectionActive(section)}
-              className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                section.is_active
-                  ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
-                  : 'border-slate-200 text-slate-400'
-              }`}
-            >
-              {section.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingSectionId(section.id)
-                setSectionEditName(section.name)
-              }}
-              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void removeSection(section.id)}
-              className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
+            {/* Mobile section actions */}
+            <div className="sm:hidden flex items-center gap-1.5 pl-7">
+              <button
+                type="button"
+                onClick={() => openCreateDrawer(section.id)}
+                className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2.5 rounded-full bg-orange-600 text-white text-sm font-bold hover:bg-orange-700"
+              >
+                <Plus size={16} /> Ajouter
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveSectionUp}
+                onClick={() => void moveSection(section, 'up')}
+                title="Monter la section"
+                aria-label="Monter la section"
+                className="w-10 h-10 shrink-0 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 disabled:opacity-40"
+              >
+                <ChevronUp size={18} />
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveSectionDown}
+                onClick={() => void moveSection(section, 'down')}
+                title="Descendre la section"
+                aria-label="Descendre la section"
+                className="w-10 h-10 shrink-0 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 disabled:opacity-40"
+              >
+                <ChevronDown size={18} />
+              </button>
+              <button
+                type="button"
+                disabled={savingId === section.id}
+                onClick={() => void toggleSectionActive(section)}
+                title={section.is_active ? 'Masquer la section' : 'Afficher la section'}
+                aria-label={section.is_active ? 'Masquer la section' : 'Afficher la section'}
+                className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center ${
+                  section.is_active
+                    ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
+                    : 'border-slate-200 text-slate-500 bg-white'
+                }`}
+              >
+                {section.is_active ? <Eye size={16} /> : <EyeOff size={16} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingSectionId(section.id)
+                  setSectionEditName(section.name)
+                }}
+                title="Renommer"
+                aria-label="Renommer"
+                className="w-10 h-10 shrink-0 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-600"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => void removeSection(section.id)}
+                title="Supprimer"
+                aria-label="Supprimer"
+                className="w-10 h-10 shrink-0 rounded-xl border border-red-100 bg-red-50 flex items-center justify-center text-red-500"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </>
         )}
       </div>
     )
@@ -653,7 +794,7 @@ export function MerchantMenuPanel() {
             onClick={() => openCreateDrawer()}
             className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold"
           >
-            <Plus size={16} /> Ajouter un plat
+            <Plus size={16} /> Ajouter
           </button>
         </div>
       )
@@ -756,12 +897,12 @@ export function MerchantMenuPanel() {
             Gérez la carte affichée sur votre fiche établissement — indépendamment de la boutique en ligne.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
           {activeMerchant?.slug && (
             <Link
               href={`/m/${activeMerchant.slug}?tab=menu#profile-tabs`}
               target="_blank"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-bold text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
               style={{ textDecoration: 'none' }}
             >
               Voir en ligne <ExternalLink size={14} />
@@ -770,9 +911,9 @@ export function MerchantMenuPanel() {
           <button
             type="button"
             onClick={() => openCreateDrawer(sectionFilter !== 'all' && sectionFilter !== 'none' ? sectionFilter : undefined)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold hover:bg-orange-700"
+            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 bg-orange-600 text-white rounded-full text-sm font-bold hover:bg-orange-700 w-full sm:w-auto shadow-sm"
           >
-            <Plus size={16} /> Nouveau plat
+            <Plus size={18} /> Ajouter
           </button>
         </div>
       </div>
@@ -946,7 +1087,7 @@ export function MerchantMenuPanel() {
         sections={sections}
         initialForm={drawerForm}
         initialModifiers={drawerModifiers}
-        saving={savingId === 'create' || savingId === editingItemId}
+        saving={drawerMode === 'create' ? savingId === 'create' : savingId === editingItemId}
         onClose={() => setDrawerOpen(false)}
         onSubmit={submitDrawer}
       />

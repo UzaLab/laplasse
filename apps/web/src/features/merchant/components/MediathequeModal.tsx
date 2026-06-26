@@ -247,12 +247,18 @@ export function MediathequeModal({
   if (!open || typeof document === 'undefined') return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex flex-col bg-white sm:bg-black/50 sm:items-center sm:justify-center sm:p-4">
+    <div className="fixed inset-0 z-[300] flex flex-col sm:items-center sm:justify-center sm:p-4">
       <div
-        className="flex flex-col flex-1 min-h-0 w-full sm:max-w-2xl sm:max-h-[90vh] sm:rounded-[28px] sm:shadow-2xl bg-white overflow-hidden"
+        role="presentation"
+        className="absolute inset-0 bg-white sm:bg-black/50"
+        onClick={onClose}
+      />
+      <div
+        className="relative flex flex-col flex-1 min-h-0 w-full sm:max-w-2xl sm:max-h-[90vh] sm:rounded-[28px] sm:shadow-2xl bg-white overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-labelledby="mediatheque-title"
+        onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 shrink-0 safe-area-top">
           <button
@@ -296,7 +302,7 @@ export function MediathequeModal({
               <Loader2 size={28} className="animate-spin text-slate-300" />
             </div>
           ) : entries.length === 0 ? (
-            <div className="rounded-full border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-16 text-center">
               <ImageIcon size={32} className="text-slate-300 mx-auto mb-3" />
               <p className="text-sm font-bold text-slate-600">Aucune image</p>
               <p className="text-xs text-slate-400 mt-1">Ajoutez votre première photo</p>
@@ -318,6 +324,7 @@ export function MediathequeModal({
                     <button
                       type="button"
                       disabled={disabled}
+                      data-btn-shape="keep"
                       onClick={() => toggleSelect(entry.url)}
                       className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
                         isSelected

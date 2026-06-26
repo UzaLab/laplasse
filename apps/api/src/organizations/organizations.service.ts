@@ -157,6 +157,7 @@ export class OrganizationsService {
           call_clicks: 0,
           favorites: 0,
           reviews: { count: 0, avg_rating: null },
+          interactions: [] as Array<{ event_type: string; count: number }>,
         },
         by_merchant: [],
       }
@@ -216,8 +217,73 @@ export class OrganizationsService {
             ? Math.round(reviewStats._avg.rating * 10) / 10
             : null,
         },
+        interactions: interactions.map(i => ({
+          event_type: i.event_type,
+          count: i._count.event_type,
+        })),
       },
       by_merchant: perMerchant,
+    }
+  }
+
+  async getAnalyticsChart(userId: string, orgId: string, days = 30, eventType = 'VIEW') {
+    const org = await this.resolveOrg(userId, orgId)
+    const merchantIds = org.merchants.map(m => m.id)
+    if (!merchantIds.length) {
+      const safeDays = Number.isFinite(days) && days > 0 && days <= 365 ? Math.floor(days) : 30
+      const since = new Date()
+      since.setDate(since.getDate() - safeDays + 1)
+      since.setHours(0, 0, 0, 0)
+      const emptyDays: Array<{ date: string; count: number }> = []
+      for (let d = 0; d < safeDays; d++) {
+        const dt = new Date(since)
+        dt.setDate(since.getDate() + d)
+        emptyDays.push({ date: dt.toISOString().slice(0, 10), count: 0 })
+      }
+      return {
+        days: emptyDays,
+        total: 0,
+        period_days: safeDays,
+        event_type: eventType,
+      }
+    }
+
+    const validEvents = [
+      'VIEW', 'CALL_CLICK', 'WHATSAPP_CLICK',
+      'DIRECTION_CLICK', 'WEBSITE_CLICK', 'SAVE', 'REVIEW', 'SHARE',
+    ]
+    const event = validEvents.includes(eventType) ? eventType : 'VIEW'
+    const safeDays = Number.isFinite(days) && days > 0 && days <= 365 ? Math.floor(days) : 30
+
+    const since = new Date()
+    since.setDate(since.getDate() - safeDays + 1)
+    since.setHours(0, 0, 0, 0)
+
+    const interactions = await this.prisma.merchantInteraction.findMany({
+      where: {
+        merchant_id: { in: merchantIds },
+        event_type: event as never,
+        created_at: { gte: since },
+      },
+      select: { created_at: true },
+    })
+
+    const byDay: Record<string, number> = {}
+    for (let d = 0; d < safeDays; d++) {
+      const dt = new Date(since)
+      dt.setDate(since.getDate() + d)
+      byDay[dt.toISOString().slice(0, 10)] = 0
+    }
+    for (const row of interactions) {
+      const key = row.created_at.toISOString().slice(0, 10)
+      if (key in byDay) byDay[key]++
+    }
+
+    return {
+      days: Object.entries(byDay).map(([date, count]) => ({ date, count })),
+      total: interactions.length,
+      period_days: safeDays,
+      event_type: event,
     }
   }
 }

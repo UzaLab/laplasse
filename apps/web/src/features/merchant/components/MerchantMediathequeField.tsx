@@ -97,6 +97,7 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
           <div key={`${url}-${index}`} className="relative group">
             <button
               type="button"
+              data-btn-shape="keep"
               onClick={() => setViewerIndex(index)}
               className="relative w-full aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-50"
             >
@@ -140,6 +141,7 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
           <button
             type="button"
             disabled={disabled || !hasScope}
+            data-btn-shape="keep"
             onClick={() => {
               if (!hasScope) return
               setModalOpen(true)

@@ -718,24 +718,39 @@ export class MerchantsService {
     }
   }
 
-  async getMyAnalyticsChart(userId: string, days = 30, merchantId?: string) {
+  async getMyAnalyticsChart(
+    userId: string,
+    days = 30,
+    merchantId?: string,
+    eventType = 'VIEW',
+  ) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
+    return this.buildInteractionChart([merchant.id], days, eventType)
+  }
+
+  private async buildInteractionChart(merchantIds: string[], days: number, eventType: string) {
+    const validEvents = [
+      'VIEW', 'CALL_CLICK', 'WHATSAPP_CLICK',
+      'DIRECTION_CLICK', 'WEBSITE_CLICK', 'SAVE', 'REVIEW', 'SHARE',
+    ]
+    const event = validEvents.includes(eventType) ? eventType : 'VIEW'
+    const safeDays = Number.isFinite(days) && days > 0 && days <= 365 ? Math.floor(days) : 30
 
     const since = new Date()
-    since.setDate(since.getDate() - days + 1)
+    since.setDate(since.getDate() - safeDays + 1)
     since.setHours(0, 0, 0, 0)
 
     const interactions = await this.prisma.merchantInteraction.findMany({
       where: {
-        merchant_id: merchant.id,
-        event_type: 'VIEW',
+        merchant_id: { in: merchantIds },
+        event_type: event as never,
         created_at: { gte: since },
       },
       select: { created_at: true },
     })
 
     const byDay: Record<string, number> = {}
-    for (let d = 0; d < days; d++) {
+    for (let d = 0; d < safeDays; d++) {
       const dt = new Date(since)
       dt.setDate(since.getDate() + d)
       byDay[dt.toISOString().slice(0, 10)] = 0
@@ -748,7 +763,8 @@ export class MerchantsService {
     return {
       days: Object.entries(byDay).map(([date, count]) => ({ date, count })),
       total: interactions.length,
-      period_days: days,
+      period_days: safeDays,
+      event_type: event,
     }
   }
 

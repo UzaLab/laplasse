@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, Loader2, X } from 'lucide-react'
 import { MerchantMediathequeField } from '@/features/merchant/components/MerchantMediathequeField'
 import { MenuModifiersEditor } from '@/features/merchant/components/MenuModifiersEditor'
@@ -71,22 +72,26 @@ export function MenuItemDrawer({
     setModifiers(modifierGroupsFromApi(initialModifiers))
   }, [open, initialForm, initialModifiers])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
   const title = mode === 'create' ? 'Nouveau plat' : 'Modifier le plat'
 
-  return (
-    <div className="fixed inset-0 z-[200] flex justify-end">
-      <button
-        type="button"
-        aria-label="Fermer"
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex flex-col sm:flex-row sm:justify-end">
+      <div
+        role="presentation"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg h-full bg-white shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
-          <div>
-            <p className="text-lg font-extrabold text-slate-900">{title}</p>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="menu-item-drawer-title"
+        className="relative ml-auto flex flex-col w-full sm:max-w-lg h-[100dvh] sm:h-full bg-white shadow-2xl min-h-0"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 shrink-0 safe-area-top">
+          <div className="min-w-0">
+            <p id="menu-item-drawer-title" className="text-lg font-extrabold text-slate-900 truncate">{title}</p>
             <p className="text-xs text-slate-500 mt-0.5">
               {mode === 'create'
                 ? 'Ajoutez un plat à votre carte publique'
@@ -96,14 +101,15 @@ export function MenuItemDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50"
+            className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
           >
             <X size={18} />
           </button>
         </div>
 
         <form
-          className="flex-1 overflow-y-auto px-5 py-5 space-y-4"
+          id="menu-item-drawer-form"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-5 space-y-4"
           onSubmit={e => {
             e.preventDefault()
             void onSubmit(form, modifiers)
@@ -187,25 +193,26 @@ export function MenuItemDrawer({
           )}
         </form>
 
-        <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-slate-50/80 flex gap-2">
+        <div className="shrink-0 z-10 px-4 sm:px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.08)] flex gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-600 bg-white hover:bg-slate-50"
+            className="flex-1 min-h-[48px] px-4 py-3 rounded-full border border-slate-200 text-sm font-bold text-slate-700 bg-white hover:bg-slate-50"
           >
             Annuler
           </button>
           <button
-            type="button"
+            type="submit"
+            form="menu-item-drawer-form"
             disabled={saving}
-            onClick={() => void onSubmit(form, modifiers)}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 disabled:opacity-60"
+            className="flex-1 min-h-[48px] inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 disabled:opacity-60"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
             {mode === 'create' ? 'Ajouter' : 'Enregistrer'}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

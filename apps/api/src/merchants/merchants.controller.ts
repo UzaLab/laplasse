@@ -193,9 +193,15 @@ export class MerchantsController {
   getMyAnalyticsChart(
     @CurrentUser() user: { id: string },
     @Query('days') days?: string,
+    @Query('event') event?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.merchantsService.getMyAnalyticsChart(user.id, days ? Number(days) : 30, merchantId)
+    return this.merchantsService.getMyAnalyticsChart(
+      user.id,
+      days ? Number(days) : 30,
+      merchantId,
+      event ?? 'VIEW',
+    )
   }
 
   @UseGuards(JwtAuthGuard)

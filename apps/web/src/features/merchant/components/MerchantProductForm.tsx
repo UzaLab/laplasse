@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Banknote,
   Check,
-  ChevronRight,
   Layers,
   Loader2,
   Plus,
@@ -319,54 +318,17 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
 
   return (
     <ProductFormShell skipShellLayout={skipShellLayout}>
-      <div className={skipShellLayout ? 'pb-24 lg:pb-8' : undefined}>
-        {/* En-tête sticky (maquette) */}
-        <div className="sticky top-0 z-20 -mx-5 lg:-mx-8 px-5 lg:px-8 py-4 mb-6 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-slate-200/80">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <Link
-                href={routes.products}
-                className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all shadow-sm shrink-0"
-                style={{ textDecoration: 'none' }}
-              >
-                <ArrowLeft size={20} />
-              </Link>
-              <div className="min-w-0">
-                <nav className="hidden sm:flex items-center text-sm font-medium text-slate-500 mb-1">
-                  <Link href={routes.products} className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
-                    Catalogue
-                  </Link>
-                  <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
-                  <Link href={routes.products} className="hover:text-slate-900" style={{ textDecoration: 'none' }}>
-                    Produits
-                  </Link>
-                  <ChevronRight size={14} className="mx-1 text-slate-300 shrink-0" />
-                  <span className="text-slate-900 font-bold truncate">
-                    {isEdit ? 'Modifier' : 'Ajouter un produit'}
-                  </span>
-                </nav>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 truncate">
-                  {isEdit ? 'Modifier le produit' : 'Ajouter un produit'}
-                </h1>
-              </div>
-            </div>
+      <div className="pb-28 lg:pb-24">
+        <Link
+          href={routes.products}
+          className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+          style={{ textDecoration: 'none' }}
+        >
+          <ArrowLeft size={16} />
+          Retour aux produits
+        </Link>
 
-            {!skipShellLayout && (
-              <div className="flex items-center gap-3 shrink-0">
-                <Link
-                  href={routes.products}
-                  className="text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm hidden sm:block"
-                  style={{ textDecoration: 'none' }}
-                >
-                  Annuler
-                </Link>
-                {saveButton}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 pb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Colonne principale */}
           <div className="lg:col-span-2 space-y-6">
             {/* Informations générales */}
@@ -823,11 +785,18 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
         </div>
       </div>
 
-      {skipShellLayout && (
-        <div className="fixed bottom-16 inset-x-0 z-40 px-5 py-3 bg-white/95 backdrop-blur-md border-t border-slate-200 lg:bottom-0 lg:left-72 lg:right-0">
-          {saveButton}
+      <div className="fixed bottom-16 inset-x-0 z-40 px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 lg:bottom-0 lg:left-72 lg:right-0">
+        <div className="flex items-center gap-2 max-w-3xl lg:max-w-none lg:ml-auto lg:mr-0">
+          <Link
+            href={routes.products}
+            className="hidden sm:inline-flex items-center justify-center px-4 py-3 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 shrink-0"
+            style={{ textDecoration: 'none' }}
+          >
+            Annuler
+          </Link>
+          <div className="flex-1 min-w-0">{saveButton}</div>
         </div>
-      )}
+      </div>
     </ProductFormShell>
   )
 }

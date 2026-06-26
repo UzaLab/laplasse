@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
@@ -64,5 +65,20 @@ export class OrganizationsController {
     @Param('id') orgId: string,
   ) {
     return this.organizationsService.getAnalytics(userId, orgId)
+  }
+
+  @Get(':id/analytics/chart')
+  getAnalyticsChart(
+    @CurrentUser('id') userId: string,
+    @Param('id') orgId: string,
+    @Query('days') days?: string,
+    @Query('event') event?: string,
+  ) {
+    return this.organizationsService.getAnalyticsChart(
+      userId,
+      orgId,
+      days ? Number(days) : 30,
+      event ?? 'VIEW',
+    )
   }
 }
