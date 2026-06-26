@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  LayoutGrid, Package, ShoppingBag, FolderOpen, Tag, Truck, Settings,
+  LayoutGrid, Package, ShoppingBag, Tag, Truck, Settings,
   LogOut, Compass, Menu, X, UserCircle2, Store, Plus,
   ChevronDown, ExternalLink, Megaphone, Users, BarChart3,
 } from 'lucide-react'
@@ -57,7 +57,6 @@ export function ShopShell({ children }: ShopShellProps) {
     { href: '/shop/manage/products', label: 'Produits', icon: <Package size={17} /> },
     { href: '/shop/manage/orders', label: 'Commandes', icon: <ShoppingBag size={17} /> },
     { href: '/shop/manage/crm', label: 'Clients CRM', icon: <Users size={17} /> },
-    { href: '/shop/manage/collections', label: 'Collections', icon: <FolderOpen size={17} /> },
     { href: '/shop/manage/promotions', label: 'Promotions', icon: <Tag size={17} /> },
     { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: <Truck size={17} /> },
     { href: '/shop/manage/visibility', label: 'Visibilité', icon: <Megaphone size={17} /> },

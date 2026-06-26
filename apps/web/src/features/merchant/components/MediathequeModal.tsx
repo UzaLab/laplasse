@@ -157,10 +157,29 @@ export function MediathequeModal({
     }
   }, [open, onClose])
 
+  const appendSelection = useCallback(
+    (url: string) => {
+      if (!url.trim()) return
+      if (mode === 'pick-single') {
+        onSelect([url])
+        onClose()
+        return
+      }
+      if (selectedUrls.includes(url)) return
+      if (selectedUrls.length >= maxSelect) {
+        notify.error(`Maximum ${maxSelect} images`)
+        return
+      }
+      onSelect([...selectedUrls, url])
+    },
+    [mode, maxSelect, onClose, onSelect, selectedUrls],
+  )
+
   const uploadFile = async (file: File) => {
     if (!scope || disabled) return
     setUploading(true)
     try {
+      let uploadedUrl: string | undefined
       if (scope.type === 'merchant') {
         const body = new FormData()
         body.append('file', file)
@@ -173,14 +192,18 @@ export function MediathequeModal({
           notify.error((d as { message?: string }).message ?? 'Échec de l\'upload')
           return
         }
+        const data = (await res.json()) as { url?: string }
+        uploadedUrl = data.url
       } else {
         const result = await uploadShopImage(scope.shopId, file)
         if ('error' in result) {
           notify.error(result.error)
           return
         }
+        uploadedUrl = result.url
       }
       notify.success('Image ajoutée')
+      if (uploadedUrl) appendSelection(uploadedUrl)
       reset()
       await loadPage(1, false)
     } finally {

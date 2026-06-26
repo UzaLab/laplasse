@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Loader2, Package, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { FolderOpen, Loader2, Package, Pencil, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { matchesSearchQuery, isProductLowStock, getProductStockQuantity, LOW_STOCK_THRESHOLD } from '@/lib/merchantListFilters'
 import { MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
 import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
+import { ShopCollectionsPanel } from '@/features/merchant/components/shop/ShopCollectionsPanel'
 import {
   deleteProduct,
   fetchMyProducts,
@@ -25,9 +26,11 @@ import {
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
+import { cn } from '@/lib/utils'
 
 const NONE_CATEGORY = '__none__'
 type StatusFilter = 'all' | ProductStatus | 'low_stock'
+type CatalogTab = 'products' | 'collections'
 
 const selectClassName =
   'w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-9 text-sm font-medium text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
@@ -69,7 +72,10 @@ function buildCategoryOptions(
 
 export function ShopProductsPanel() {
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const routes = getShopRoutesFromPathname(pathname)
+  const tab: CatalogTab = searchParams.get('tab') === 'collections' ? 'collections' : 'products'
   const { user, activeMerchantId, activeShopId } = useAuthStore()
   const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
@@ -169,33 +175,75 @@ export function ShopProductsPanel() {
     setFilterStatus('all')
   }
 
+  const setTab = (next: CatalogTab) => {
+    const href = next === 'collections' ? `${routes.products}?tab=collections` : routes.products
+    router.replace(href, { scroll: false })
+  }
+
   return (
     <div>
-      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-6">
+        <div className="min-w-0">
           <h2 className="text-lg font-extrabold text-slate-900">Catalogue produits</h2>
           <p className="text-slate-400 text-sm mt-0.5">
-            Gérez les articles visibles sur votre vitrine marketplace.
+            {tab === 'collections'
+              ? 'Regroupez vos produits pour le merchandising sur votre vitrine.'
+              : 'Gérez les articles visibles sur votre vitrine marketplace.'}
           </p>
         </div>
-        <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-center sm:justify-end sm:shrink-0">
-          <Link
-            href={routes.productsNew}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-3 rounded-full hover:bg-slate-800 transition-colors text-sm"
-            style={{ textDecoration: 'none' }}
-          >
-            <Plus size={16} /> Nouveau produit
-          </Link>
-          <Link
-            href={routes.productsCategories}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-3 rounded-full hover:bg-slate-50 transition-colors text-sm"
-            style={{ textDecoration: 'none' }}
-          >
-            <Settings2 size={16} /> Gestion des catégories
-          </Link>
-        </div>
+        {tab === 'products' && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:justify-self-end">
+            <Link
+              href={routes.productsNew}
+              className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap bg-slate-900 px-5 text-sm font-bold text-white rounded-full hover:bg-slate-800 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              <Plus size={16} /> Nouveau produit
+            </Link>
+            <Link
+              href={routes.productsCategories}
+              className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              <Settings2 size={16} /> Gestion des catégories
+            </Link>
+          </div>
+        )}
       </div>
 
+      <nav className="mb-6 flex gap-1 overflow-x-auto no-scrollbar p-1 bg-slate-100/80 rounded-xl w-full sm:w-auto sm:inline-flex">
+        <button
+          type="button"
+          onClick={() => setTab('products')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',
+            tab === 'products'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
+          )}
+        >
+          <Package size={16} className={tab === 'products' ? 'text-brand-500' : undefined} />
+          Produits
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('collections')}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',
+            tab === 'collections'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
+          )}
+        >
+          <FolderOpen size={16} className={tab === 'collections' ? 'text-brand-500' : undefined} />
+          Collections
+        </button>
+      </nav>
+
+      {tab === 'collections' ? (
+        <ShopCollectionsPanel embedded />
+      ) : (
+        <>
       {enabledCategories.length === 0 && !loading && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-sm text-amber-900">
           Activez d&apos;abord vos catégories via{' '}
@@ -373,6 +421,8 @@ export function ShopProductsPanel() {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   )

@@ -185,7 +185,7 @@ export default function AdminProductDetailPage() {
             <Link
               href={publicHref}
               target="_blank"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700"
               style={{ textDecoration: 'none' }}
             >
               <ExternalLink size={16} /> Fiche publique
@@ -245,7 +245,7 @@ export default function AdminProductDetailPage() {
                   <div key={v.id} className="flex items-center gap-3 text-sm border border-slate-100 rounded-xl p-3">
                     {v.color_hex && (
                       <span
-                        className="w-6 h-6 rounded-full border border-slate-200 shrink-0"
+                        className="w-6 h-6 rounded-md border border-slate-200 shrink-0"
                         style={{ backgroundColor: v.color_hex }}
                       />
                     )}

@@ -46,6 +46,11 @@ import { useT } from '@/providers/LocaleProvider'
 import { ProductPromoPrice } from '@/features/marketplace/components/ProductPromoPrice'
 import { computePromoPriceForAmount, getPromoBadgeLabel } from '@/lib/productPromoUtils'
 import { isProductBestSeller, isProductNew } from '@/lib/productBadges'
+import {
+  allVariantsAreColorSwatches,
+  resolveVariantColorHex,
+  variantShowsAsColorSwatch,
+} from '@/lib/variantColors'
 
 type TabId = 'description' | 'composition' | 'reviews'
 
@@ -114,9 +119,11 @@ export default function ProductDetailPage() {
         if (productData) {
           setProduct(productData)
           const gallery = getProductGallery(productData)
-          setSelectedImage(gallery[0])
           const firstVariant = productData.variants?.find(v => v.stock_quantity > 0)
-          setSelectedVariantId(firstVariant?.id ?? productData.variants?.[0]?.id ?? null)
+            ?? productData.variants?.[0]
+            ?? null
+          setSelectedVariantId(firstVariant?.id ?? null)
+          setSelectedImage(firstVariant?.image_url ?? gallery[0])
         }
         setMerchantDetail(merchantData)
         setRelatedProducts(
@@ -244,9 +251,17 @@ export default function ProductDetailPage() {
   const hasMoreDescription = plainDescription.length > SHORT_DESC_LIMIT
   const isNewProduct = isProductNew(product.created_at)
   const isBestSellerProduct = isProductBestSeller(product)
-  const colorVariantsOnly =
-    variants.length > 0
-    && variants.every(v => v.kind === 'COLOR' && Boolean(v.color_hex))
+  const colorSwatchVariants = allVariantsAreColorSwatches(variants)
+
+  const selectVariant = (variant: ProductVariant) => {
+    setSelectedVariantId(variant.id)
+    setQuantity(1)
+    if (variant.image_url) {
+      setSelectedImage(variant.image_url)
+    } else {
+      setSelectedImage(getProductGallery(product)[0])
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -471,7 +486,7 @@ export default function ProductDetailPage() {
                       </label>
                       <div className={cn(
                         'gap-2',
-                        colorVariantsOnly ? 'flex flex-wrap' : 'grid grid-cols-2 sm:flex sm:flex-wrap',
+                        colorSwatchVariants ? 'flex flex-wrap items-center' : 'grid grid-cols-2 sm:flex sm:flex-wrap',
                       )}>
                         {variants.map(variant => {
                           const variantOut = variant.stock_quantity <= 0
@@ -479,8 +494,10 @@ export default function ProductDetailPage() {
                           const variantPromoPrice = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
                             ? computePromoPriceForAmount(variant.price, product.promotion)
                             : null
+                          const colorHex = resolveVariantColorHex(variant)
+                          const showAsSwatch = variantShowsAsColorSwatch(variant) && colorHex
 
-                          if (colorVariantsOnly) {
+                          if (showAsSwatch) {
                             return (
                               <button
                                 key={variant.id}
@@ -488,10 +505,8 @@ export default function ProductDetailPage() {
                                 disabled={variantOut}
                                 title={variant.name}
                                 aria-label={variant.name}
-                                onClick={() => {
-                                  setSelectedVariantId(variant.id)
-                                  setQuantity(1)
-                                }}
+                                aria-pressed={selected}
+                                onClick={() => selectVariant(variant)}
                                 className={cn(
                                   'w-11 h-11 rounded-xl border-2 transition-all shrink-0 p-1',
                                   selected
@@ -503,7 +518,7 @@ export default function ProductDetailPage() {
                               >
                                 <span
                                   className="block w-full h-full rounded-md border border-black/10"
-                                  style={{ backgroundColor: variant.color_hex ?? '#e2e8f0' }}
+                                  style={{ backgroundColor: colorHex }}
                                 />
                               </button>
                             )
@@ -514,10 +529,7 @@ export default function ProductDetailPage() {
                               key={variant.id}
                               type="button"
                               disabled={variantOut}
-                              onClick={() => {
-                                setSelectedVariantId(variant.id)
-                                setQuantity(1)
-                              }}
+                              onClick={() => selectVariant(variant)}
                               className={`min-h-[48px] px-3 py-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all text-left sm:text-center ${
                                 selected
                                   ? 'bg-slate-900 text-white border-slate-900'
@@ -527,10 +539,10 @@ export default function ProductDetailPage() {
                               }`}
                             >
                               <span className="flex items-center justify-center gap-2">
-                                {variant.kind === 'COLOR' && variant.color_hex && (
+                                {colorHex && (
                                   <span
                                     className="w-4 h-4 rounded-md border border-slate-200 shrink-0"
-                                    style={{ backgroundColor: variant.color_hex }}
+                                    style={{ backgroundColor: colorHex }}
                                   />
                                 )}
                                 {variant.image_url && (
@@ -560,6 +572,11 @@ export default function ProductDetailPage() {
                           )
                         })}
                       </div>
+                      {colorSwatchVariants && selectedVariant && (
+                        <p className="text-sm font-medium text-slate-600 mt-2">
+                          {selectedVariant.name}
+                        </p>
+                      )}
                     </div>
                   )}
 

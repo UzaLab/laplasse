@@ -193,7 +193,7 @@ function CollectionProductsPanel({
   )
 }
 
-export function ShopCollectionsPanel() {
+export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean }) {
   const { activeShopId } = useAuthStore()
   const [collections, setCollections] = useState<ShopCollectionMine[]>([])
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
@@ -317,14 +317,16 @@ export function ShopCollectionsPanel() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-          <FolderOpen size={18} className="text-brand-500" /> Collections
-        </h2>
-        <p className="text-slate-400 text-sm mt-0.5">
-          Regroupez vos produits pour le merchandising sur votre vitrine (ex. Nouveautés, Promos).
-        </p>
-      </div>
+      {!embedded && (
+        <div className="mb-6">
+          <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+            <FolderOpen size={18} className="text-brand-500" /> Collections
+          </h2>
+          <p className="text-slate-400 text-sm mt-0.5">
+            Regroupez vos produits pour le merchandising sur votre vitrine (ex. Nouveautés, Promos).
+          </p>
+        </div>
+      )}
 
       <form onSubmit={create} className="bg-white rounded-2xl border border-slate-100 p-5 mb-6 space-y-3">
         <p className="text-sm font-bold text-slate-700">Nouvelle collection</p>

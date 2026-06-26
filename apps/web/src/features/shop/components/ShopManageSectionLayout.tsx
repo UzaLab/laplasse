@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import {
-  BarChart3, ExternalLink, FolderOpen, LayoutGrid,
+  BarChart3, ExternalLink, LayoutGrid,
   Package, Settings, ShoppingBag, Tag, Truck, Users,
 } from 'lucide-react'
 import { ShopShell } from '@/features/shop/components/ShopShell'
@@ -18,7 +18,6 @@ const TABS = [
   { href: '/shop/manage/products', label: 'Produits', icon: Package },
   { href: '/shop/manage/orders', label: 'Commandes', icon: ShoppingBag },
   { href: '/shop/manage/crm', label: 'Clients CRM', icon: Users },
-  { href: '/shop/manage/collections', label: 'Collections', icon: FolderOpen },
   { href: '/shop/manage/promotions', label: 'Promotions', icon: Tag },
   { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: Truck },
   { href: '/shop/manage/settings', label: 'Paramètres', icon: Settings },

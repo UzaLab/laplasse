@@ -158,7 +158,7 @@ function AdminProductsContent() {
             value={q}
             onChange={e => handleQChange(e.target.value)}
             placeholder="Rechercher par nom, boutique…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           />
         </div>
         <select
@@ -186,7 +186,7 @@ function AdminProductsContent() {
           <p className="text-slate-500 font-semibold">Aucun produit pour ce filtre</p>
         </div>
       ) : (
-        <div className="bg-white border border-slate-100 rounded-full overflow-hidden">
+        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[960px]">
               <thead>
@@ -213,7 +213,7 @@ function AdminProductsContent() {
                   return (
                     <tr key={product.id} className="hover:bg-violet-50/30 transition-colors">
                       <td className="px-4 py-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 overflow-hidden shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0">
                           {product.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={product.image_url} alt="" className="w-full h-full object-cover" />
@@ -309,7 +309,7 @@ function AdminProductsContent() {
                                 <Link
                                   href={publicHref}
                                   target="_blank"
-                                  className="p-2 rounded-full text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors inline-flex"
+                                  className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors inline-flex"
                                   title="Fiche publique"
                                 >
                                   <ExternalLink size={15} />

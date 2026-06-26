@@ -7,6 +7,7 @@ import {
   Headphones,
   Loader2,
   MapPin,
+  RotateCcw,
   SlidersHorizontal,
   Store,
   X,
@@ -19,8 +20,16 @@ import {
   type ProductCategoryOption,
   type ShopCollectionPublic,
 } from '@/lib/marketplaceApi'
+import {
+  buildProductCategoryTree,
+  deriveCategoriesFromProducts,
+  flattenProductCategories,
+} from '@/lib/productCategoryTree'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
+import { useScrollFabVisibility } from '@/hooks/useScrollFabVisibility'
+import { cn } from '@/lib/utils'
+import { MarketplaceFilterListSection } from '@/features/marketplace/components/MarketplaceFilterListSection'
 import { ProductCard } from './ProductCard'
 
 export interface BoutiqueDisplay {
@@ -85,6 +94,17 @@ function BoutiqueFiltersPanel({
   selectedCollection: string
   onCollectionChange: (slug: string) => void
 }) {
+  const [categoryQuery, setCategoryQuery] = useState('')
+  const flatCategories = useMemo(
+    () => flattenProductCategories(buildProductCategoryTree(categories)),
+    [categories],
+  )
+  const filteredCategories = useMemo(() => {
+    const q = categoryQuery.trim().toLowerCase()
+    if (!q) return flatCategories
+    return flatCategories.filter(cat => cat.name.toLowerCase().includes(q))
+  }, [flatCategories, categoryQuery])
+
   return (
     <>
       <div className="mb-8">
@@ -96,34 +116,41 @@ function BoutiqueFiltersPanel({
           value={search}
           onChange={e => onSearchChange(e.target.value)}
           placeholder="Nom du produit…"
-          className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
+          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
         />
       </div>
 
-      {categories.length > 0 && (
+      {flatCategories.length > 0 && (
         <>
           <div className="h-px w-full bg-slate-100 mb-8" />
-          <div className="mb-8">
-            <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
-              Catégories
-            </h4>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <button
-                  type="button"
-                  onClick={() => onCategoryChange('')}
-                  className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
-                    !selectedCategory
-                      ? 'border-brand-500 bg-brand-500'
-                      : 'border-slate-200 group-hover:border-brand-400'
-                  }`}
-                />
-                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
-                  Toutes
-                </span>
-              </label>
-              {categories.map(cat => (
-                <label key={cat.slug} className="flex items-center gap-3 cursor-pointer group">
+          <MarketplaceFilterListSection
+            title="Catégories"
+            searchPlaceholder="Rechercher une catégorie…"
+            searchQuery={categoryQuery}
+            onSearchQueryChange={setCategoryQuery}
+            emptyMessage="Aucune catégorie trouvée"
+          >
+            <label className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-lg hover:bg-white">
+              <button
+                type="button"
+                onClick={() => onCategoryChange('')}
+                className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                  !selectedCategory
+                    ? 'border-brand-500 bg-brand-500'
+                    : 'border-slate-200 group-hover:border-brand-400'
+                }`}
+              />
+              <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                Toutes
+              </span>
+            </label>
+            {filteredCategories.length === 0 ? (
+              <p className="text-sm text-slate-400 font-medium px-2 py-3 text-center">
+                Aucune catégorie trouvée
+              </p>
+            ) : (
+              filteredCategories.map(cat => (
+                <label key={cat.slug} className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-lg hover:bg-white">
                   <button
                     type="button"
                     onClick={() => onCategoryChange(cat.slug)}
@@ -132,14 +159,18 @@ function BoutiqueFiltersPanel({
                         ? 'border-brand-500 bg-brand-500'
                         : 'border-slate-200 group-hover:border-brand-400'
                     }`}
+                    style={{ marginLeft: cat.depth * 12 }}
                   />
-                  <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">
+                  <span
+                    className="text-sm font-medium text-slate-600 group-hover:text-slate-900"
+                    style={{ paddingLeft: cat.depth * 12 }}
+                  >
                     {cat.name}
                   </span>
                 </label>
-              ))}
-            </div>
-          </div>
+              ))
+            )}
+          </MarketplaceFilterListSection>
         </>
       )}
 
@@ -150,7 +181,7 @@ function BoutiqueFiltersPanel({
             <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
               Collections
             </h4>
-            <div className="space-y-3 max-h-48 overflow-y-auto">
+            <div className="space-y-3 max-h-48 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-2">
               <label className="flex items-center gap-3 cursor-pointer group">
                 <button
                   type="button"
@@ -244,6 +275,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ProductCategoryOption[]>([])
   const [collections, setCollections] = useState<ShopCollectionPublic[]>([])
+  const [catalogProducts, setCatalogProducts] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -252,6 +284,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   const [sort, setSort] = useState<SortOption>('recommended')
   const [addingId, setAddingId] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const filtersFabVisible = useScrollFabVisibility()
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -260,12 +293,21 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
 
   useEffect(() => {
     void fetchShopProductCategories(merchant.slug).then(data => {
-      if (data) setCategories(data)
+      if (data?.length) setCategories(data)
     })
     void fetchShopCollections(merchant.slug).then(data => {
       if (data) setCollections(data)
     })
+    void fetchMerchantProducts(merchant.slug).then(data => {
+      if (data) setCatalogProducts(data)
+    })
   }, [merchant.slug])
+
+  useEffect(() => {
+    if (categories.length > 0 || catalogProducts.length === 0) return
+    const derived = deriveCategoriesFromProducts(catalogProducts)
+    if (derived.length > 0) setCategories(derived)
+  }, [categories.length, catalogProducts])
 
   useEffect(() => {
     let cancelled = false
@@ -277,7 +319,11 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
     })
       .then(data => {
         if (cancelled) return
-        setProducts(data ?? [])
+        const list = data ?? []
+        setProducts(list)
+        if (!selectedCategory && !selectedCollection && !debouncedSearch) {
+          setCatalogProducts(list)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -398,7 +444,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
         </div>
       </header>
 
-      <main className={`${PAGE_CONTAINER} pt-6 md:pt-10 pb-28 lg:pb-16`}>
+      <main className={`${PAGE_CONTAINER} pt-6 md:pt-10 pb-24 lg:pb-16`}>
         {establishmentHref && (
         <div className="md:hidden mb-5">
           <Link
@@ -438,7 +484,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
           </aside>
 
           <div className="flex-1 w-full min-w-0">
-            <div className="bg-white rounded-full p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
               <p className="hidden sm:block text-slate-500 font-medium text-sm">
                 Affichage de{' '}
                 <span className="font-bold text-slate-900">{filtered.length}</span> produit
@@ -450,7 +496,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 <select
                   value={sort}
                   onChange={e => setSort(e.target.value as SortOption)}
-                  className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 rounded-full px-3 py-2 font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 transition-colors"
+                  className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 transition-colors"
                 >
                   <option value="recommended">Recommandés</option>
                   <option value="newest">Nouveautés</option>
@@ -522,13 +568,24 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
         </div>
       </main>
 
-      {/* Bouton filtres flottant — mobile */}
       {!filtersOpen && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-none">
+        <div
+          className={cn(
+            'lg:hidden fixed bottom-[calc(4rem+0.75rem)] inset-x-0 z-30 px-6 pointer-events-none transition-all duration-300 ease-out',
+            filtersFabVisible
+              ? 'translate-y-0 opacity-100'
+              : 'translate-y-6 opacity-0',
+          )}
+          aria-hidden={!filtersFabVisible}
+        >
           <button
             type="button"
             onClick={() => setFiltersOpen(true)}
-            className="pointer-events-auto w-full flex items-center justify-center gap-2.5 bg-slate-900 text-white py-4 rounded-full text-sm font-extrabold shadow-xl shadow-slate-900/25 hover:bg-slate-800 active:scale-[0.98] transition-all"
+            tabIndex={filtersFabVisible ? 0 : -1}
+            className={cn(
+              'w-full flex items-center justify-center gap-2.5 bg-slate-900 text-white py-3.5 rounded-full text-sm font-extrabold shadow-xl shadow-slate-900/20 hover:bg-slate-800 active:scale-[0.98] transition-transform',
+              filtersFabVisible ? 'pointer-events-auto scale-100' : 'pointer-events-none scale-95',
+            )}
           >
             <SlidersHorizontal size={18} />
             Filtres
@@ -541,7 +598,6 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
         </div>
       )}
 
-      {/* Modale filtres — mobile */}
       {filtersOpen && (
         <div className="lg:hidden fixed inset-0 z-[300] flex items-end justify-center">
           <div
@@ -553,9 +609,9 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="boutique-filters-title"
-            className="relative bg-white w-full max-h-[85vh] overflow-y-auto rounded-t-[28px] shadow-2xl border border-slate-100"
+            className="relative bg-white w-full max-h-[85vh] flex flex-col rounded-t-[28px] shadow-2xl border border-slate-100"
           >
-            <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
+            <div className="shrink-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between">
               <h2 id="boutique-filters-title" className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
                 <SlidersHorizontal size={20} className="text-brand-500" /> Filtres
               </h2>
@@ -569,7 +625,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
               </button>
             </div>
 
-            <div className="p-5 pb-8">
+            <div className="flex-1 overflow-y-auto p-5 min-h-0">
               <BoutiqueFiltersPanel
                 search={search}
                 onSearchChange={setSearch}
@@ -583,15 +639,9 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 selectedCollection={selectedCollection}
                 onCollectionChange={setSelectedCollection}
               />
+            </div>
 
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(false)}
-                className="w-full mt-4 py-4 bg-slate-900 text-white rounded-full text-sm font-extrabold hover:bg-slate-800 transition-colors"
-              >
-                Voir {filtered.length} produit{filtered.length > 1 ? 's' : ''}
-              </button>
-
+            <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center gap-2">
               {activeFilterCount > 0 && (
                 <button
                   type="button"
@@ -601,11 +651,19 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                     setSelectedCollection('')
                     setPriceFilter(priceCeiling)
                   }}
-                  className="w-full mt-3 py-3 text-slate-500 text-sm font-bold hover:text-slate-900 transition-colors"
+                  className="shrink-0 w-12 h-12 rounded-full border border-slate-200 bg-white text-slate-600 flex items-center justify-center hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                  aria-label="Réinitialiser les filtres"
                 >
-                  Réinitialiser les filtres
+                  <RotateCcw size={18} />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="flex-1 min-w-0 py-3.5 bg-slate-900 text-white rounded-full text-sm font-extrabold hover:bg-slate-800 transition-colors"
+              >
+                Voir {filtered.length} produit{filtered.length > 1 ? 's' : ''}
+              </button>
             </div>
           </div>
         </div>

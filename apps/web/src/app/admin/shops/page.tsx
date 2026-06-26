@@ -169,7 +169,7 @@ function AdminShopsContent() {
             value={q}
             onChange={e => handleQChange(e.target.value)}
             placeholder="Rechercher par nom, propriétaire, établissement…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           />
         </div>
         <select
@@ -210,14 +210,15 @@ function AdminShopsContent() {
           <p className="text-slate-500 font-semibold">Aucune boutique pour ce filtre</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="divide-y divide-slate-50">
           {shops.map(shop => (
             <div
               key={shop.id}
-              className="bg-white border border-slate-100 rounded-full p-4 hover:border-violet-200 hover:shadow-sm transition-all"
+              className="p-4 hover:bg-violet-50/30 transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-violet-50">
+                <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-violet-50">
                   {shop.logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={shop.logo} alt="" className="w-full h-full object-cover" />
@@ -337,7 +338,7 @@ function AdminShopsContent() {
                       <Link
                         href={getShopPublicHref(shop)}
                         target="_blank"
-                        className="p-2 rounded-full text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors inline-flex"
+                        className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-colors inline-flex"
                         title="Voir la vitrine"
                       >
                         <ExternalLink size={16} />
@@ -369,6 +370,7 @@ function AdminShopsContent() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 

@@ -145,7 +145,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   const pathname = usePathname()
   const routes = getShopRoutesFromPathname(pathname)
   const isEdit = Boolean(productId)
-  const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const { activeShopId, user } = useAuthStore()
   const authPath = isEdit ? routes.productsEdit(productId!) : routes.productsNew
   const { ready, hydrated, isAuthenticated } = useRequireAuth(authPath)
 
@@ -187,7 +187,8 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
     if (isEdit) loadProduct()
   }, [ready, isEdit, loadProduct])
 
-  const uploadMerchantId = user?.shops?.find(s => s.id === activeShopId)?.merchant_id ?? activeMerchantId
+  const uploadMerchantId = user?.shops?.find(s => s.id === activeShopId)?.merchant_id ?? undefined
+  const uploadShopId = uploadMerchantId ? undefined : activeShopId
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -251,6 +252,9 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
         ? {
             variants: variants.map(v => ({
               name: v.name.trim(),
+              kind: v.kind ?? 'TEXT',
+              color_hex: v.kind === 'COLOR' ? v.color_hex : undefined,
+              image_url: v.image_url,
               price: v.price,
               stock_quantity: v.stock_quantity ?? 0,
               sku: v.sku,
@@ -374,7 +378,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
               <MerchantMediathequeField
                 mode="multiple"
                 merchantId={uploadMerchantId}
-                shopId={uploadMerchantId ? undefined : activeShopId}
+                shopId={uploadShopId}
                 values={form.images}
                 onChangeValues={urls => setForm(f => ({ ...f, images: urls }))}
                 max={MAX_PRODUCT_IMAGES}
@@ -449,10 +453,10 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                   {form.variants.map((variant, index) => (
                     <div
                       key={index}
-                      className="p-4 bg-slate-50 rounded-full border border-slate-100 space-y-3"
+                      className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3"
                     >
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex gap-1 p-1 bg-white rounded-full border border-slate-200">
+                        <div className="flex gap-1 p-1 bg-white rounded-xl border border-slate-200">
                           {(['TEXT', 'COLOR'] as const).map(kind => (
                             <button
                               key={kind}
@@ -506,7 +510,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                                   return { ...f, variants: next }
                                 })
                               }
-                              className="w-12 h-12 rounded-full border border-slate-200 cursor-pointer shrink-0"
+                              className="w-12 h-12 rounded-xl border border-slate-200 cursor-pointer shrink-0"
                             />
                             <input
                               value={variant.color_hex ?? ''}
@@ -518,7 +522,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                                 })
                               }
                               placeholder="#000000"
-                              className="flex-1 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white font-mono"
+                              className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white font-mono"
                             />
                           </div>
                           <input
@@ -531,7 +535,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                               })
                             }
                             placeholder="Libellé (ex. Rouge bordeaux)"
-                            className="flex-1 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
                           />
                         </div>
                       ) : (
@@ -545,7 +549,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                             })
                           }
                           placeholder="Nom (ex. Taille M, 500 ml…)"
-                          className="w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
                         />
                       )}
 
@@ -562,7 +566,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                             })
                           }
                           placeholder="Prix FCFA"
-                          className="border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white font-bold"
+                          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white font-bold"
                         />
                         <input
                           type="number"
@@ -579,7 +583,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                             })
                           }
                           placeholder="Stock"
-                          className="border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                          className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
                         />
                         <input
                           value={variant.sku ?? ''}
@@ -591,15 +595,15 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                             })
                           }
                           placeholder="SKU"
-                          className="col-span-2 sm:col-span-2 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                          className="col-span-2 sm:col-span-2 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
                         />
                       </div>
 
-                      {(uploadMerchantId || activeShopId) && (
+                      {(uploadMerchantId || uploadShopId) && (
                         <div className="pt-1">
                           <MerchantMediathequeField
                             merchantId={uploadMerchantId}
-                            shopId={uploadMerchantId ? undefined : activeShopId}
+                            shopId={uploadShopId}
                             mode="single"
                             label="Image de la variante (optionnel)"
                             value={variant.image_url ?? ''}

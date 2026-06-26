@@ -909,23 +909,44 @@ export class MarketplaceService {
 
   async listPublicShopProductCategories(shopSlug: string) {
     const shop = await this.resolveShopBySlug(shopSlug)
-    return this.prisma.productCategory.findMany({
+    const enabledIds = await this.shopsService.getEnabledProductCategoryIds(shop.id)
+
+    const productRows = await this.prisma.product.findMany({
       where: {
-        is_active: true,
-        products: {
-          some: {
-            shop_id: shop.id,
-            status: 'ACTIVE',
-            slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
-            OR: [
-              { stock_quantity: { gt: 0 } },
-              { variants: { some: { stock_quantity: { gt: 0 } } } },
-            ],
-          },
-        },
+        shop_id: shop.id,
+        status: 'ACTIVE',
+        category_id: { not: null },
+        slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
       },
+      select: { category_id: true },
+      distinct: ['category_id'],
+    })
+
+    const productCategoryIds = productRows
+      .map(row => row.category_id)
+      .filter((id): id is string => id != null)
+
+    let categoryIds = enabledIds.length > 0
+      ? enabledIds.filter(id => productCategoryIds.includes(id))
+      : productCategoryIds
+
+    if (!categoryIds.length && productCategoryIds.length) {
+      categoryIds = productCategoryIds
+    }
+
+    if (!categoryIds.length) return []
+
+    return this.prisma.productCategory.findMany({
+      where: { id: { in: categoryIds }, is_active: true },
       orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, slug: true, icon: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        icon: true,
+        parent_id: true,
+        sort_order: true,
+      },
     })
   }
 
