@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, ExternalLink, LayoutGrid,
@@ -9,6 +8,7 @@ import {
 } from 'lucide-react'
 import { ShopShell } from '@/features/shop/components/ShopShell'
 import { useAuthStore } from '@/stores/authStore'
+import { useCenterActiveTab } from '@/hooks/useCenterActiveTab'
 import { getIndependentShops, getShopPublicHref } from '@/lib/shopApi'
 import { cn } from '@/lib/utils'
 
@@ -33,24 +33,10 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
   const { user, activeShopId } = useAuthStore()
   const independentShops = getIndependentShops(user?.shops)
   const activeShop = independentShops.find(s => s.id === activeShopId) ?? independentShops[0] ?? null
-  const tabsNavRef = useRef<HTMLElement>(null)
-  const activeTabRef = useRef<HTMLAnchorElement>(null)
+  const { navRef, tabRef } = useCenterActiveTab(pathname, !hideTabs && !!activeShop)
 
   const isTabActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
-
-  useEffect(() => {
-    if (hideTabs) return
-    const frame = requestAnimationFrame(() => {
-      const nav = tabsNavRef.current
-      const tab = activeTabRef.current
-      if (!nav || !tab) return
-
-      const targetLeft = tab.offsetLeft - nav.clientWidth / 2 + tab.clientWidth / 2
-      nav.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [pathname, hideTabs])
 
   return (
     <ShopShell>
@@ -106,7 +92,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
         {/* Tabs sub-nav */}
         {!hideTabs && activeShop && (
           <nav
-            ref={tabsNavRef}
+            ref={navRef}
             className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-xl scroll-smooth"
           >
             {TABS.map(tab => {
@@ -116,7 +102,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
               return (
                 <Link
                   key={href}
-                  ref={active ? activeTabRef : undefined}
+                  ref={active ? tabRef : undefined}
                   href={href}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',

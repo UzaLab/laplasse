@@ -13,6 +13,7 @@ import { getIndependentShops, getShopPublicHref } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 import { cn } from '@/lib/utils'
+import { APP_SHELL_SCROLL_ID } from '@/lib/appShellScroll'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { ShopMobileNav } from '@/features/shop/components/ShopMobileNav'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
@@ -292,7 +293,7 @@ export function ShopShell({ children }: ShopShellProps) {
           </div>
         </header>
 
-        <div id="shop-manage-scroll" className="flex-1 overflow-y-auto p-5 lg:p-8 pb-28 lg:pb-8 w-full min-w-0">
+        <div id={APP_SHELL_SCROLL_ID} className="flex-1 overflow-y-auto p-5 lg:p-8 pb-28 lg:pb-8 w-full min-w-0">
           {children}
         </div>
       </main>

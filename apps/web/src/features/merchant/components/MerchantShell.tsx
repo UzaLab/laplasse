@@ -20,6 +20,7 @@ import { getShopsForMerchant, getIndependentShops, getActiveMerchantShopId } fro
 import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
+import { APP_SHELL_SCROLL_ID } from '@/lib/appShellScroll'
 
 interface MerchantShellProps {
   children: React.ReactNode
@@ -488,7 +489,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
+        <div id={APP_SHELL_SCROLL_ID} className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
           {children}
         </div>
       </main>

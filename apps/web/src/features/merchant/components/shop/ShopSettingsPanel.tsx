@@ -19,6 +19,7 @@ import { notify } from '@/lib/notify'
 import { getCountryCode } from '@/lib/country'
 import { fetchGeoCities, fetchGeoCommunes, type GeoCity, type GeoCommune } from '@/lib/geoApi'
 import { AddressLocationPickerLazy } from '@/features/addresses/components/AddressLocationPickerLazy'
+import { scrollAppShellToTop } from '@/lib/appShellScroll'
 
 const INPUT =
   'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all'
@@ -46,9 +47,6 @@ function serializeSettingsForm(f: SettingsForm) {
   return JSON.stringify(f)
 }
 
-function scrollShopManageToTop() {
-  document.getElementById('shop-manage-scroll')?.scrollTo({ top: 0, behavior: 'smooth' })
-}
 
 export function ShopSettingsPanel() {
   const router = useRouter()
@@ -249,7 +247,7 @@ export function ShopSettingsPanel() {
     setForm(saved)
     setBaseline(serializeSettingsForm(saved))
     notify.success('Boutique mise à jour')
-    scrollShopManageToTop()
+    scrollAppShellToTop()
   }
 
   if (loading) {

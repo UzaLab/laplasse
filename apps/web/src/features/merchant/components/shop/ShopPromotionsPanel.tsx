@@ -30,6 +30,7 @@ import {
 } from '@/lib/shopApi'
 import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
 import { notify } from '@/lib/notify'
+import { scrollAppShellToTop } from '@/lib/appShellScroll'
 
 type PromoMode = 'code' | 'showcase'
 
@@ -535,7 +536,7 @@ export function ShopPromotionsPanel() {
     setEditingId(p.id)
     setForm(promoToForm(p, mode))
     setFormMode(mode)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    scrollAppShellToTop()
   }
 
   const closeForm = () => {

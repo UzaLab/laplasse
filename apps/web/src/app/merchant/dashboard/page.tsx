@@ -274,7 +274,7 @@ function DashboardContent() {
               <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-slate-800">
                 <Link
                   href="/merchant/analytics"
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full p-4 transition-colors block"
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl p-4 transition-colors block"
                   style={{ textDecoration: 'none' }}
                 >
                   <p className="text-2xl font-extrabold text-white">
@@ -286,7 +286,7 @@ function DashboardContent() {
                 </Link>
                 <Link
                   href="/merchant/analytics"
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full p-4 transition-colors block"
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl p-4 transition-colors block"
                   style={{ textDecoration: 'none' }}
                 >
                   <p className="text-2xl font-extrabold text-white">

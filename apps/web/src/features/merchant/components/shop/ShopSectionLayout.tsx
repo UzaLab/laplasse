@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { useAuthStore } from '@/stores/authStore'
+import { useCenterActiveTab } from '@/hooks/useCenterActiveTab'
 import { getShopsForMerchant, getShopPublicHref } from '@/lib/shopApi'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +48,8 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
   const isTabActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
+  const { navRef, tabRef } = useCenterActiveTab(pathname, !hideTabs && !!activeShop)
+
   return (
     <MerchantShell>
       <div className="w-full">
@@ -54,7 +57,7 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-14 h-14 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="w-14 h-14 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
                 {activeShop?.logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={activeShop.logo} alt="" className="w-full h-full object-cover" />
@@ -110,12 +113,16 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
 
         {/* Sous-navigation */}
         {!hideTabs && activeShop && (
-          <nav className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl">
+          <nav
+            ref={navRef}
+            className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-xl scroll-smooth"
+          >
             {TABS.map(({ href, label, icon: Icon }) => {
               const active = isTabActive(href, href === '/merchant/shop')
               return (
                 <Link
                   key={href}
+                  ref={active ? tabRef : undefined}
                   href={href}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',
