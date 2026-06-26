@@ -154,7 +154,7 @@ export function CourierReviewPrompt({ order, effectiveStatus }: Props) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-slate-900 text-white rounded-full text-sm font-bold hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {submitting && <Loader2 size={16} className="animate-spin" />}
                 Envoyer mon avis

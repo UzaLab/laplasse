@@ -60,7 +60,7 @@ export function ReviewDetailModal({ review, open, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
+            className="w-9 h-9 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
             aria-label="Fermer"
           >
             <X size={18} />
@@ -118,7 +118,7 @@ export function ReviewDetailModal({ review, open, onClose }: Props) {
           <Link
             href={`/m/${review.merchant.slug}#avis`}
             onClick={onClose}
-            className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center justify-center gap-2 w-full py-3 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
             style={{ textDecoration: 'none' }}
           >
             <ExternalLink size={16} />

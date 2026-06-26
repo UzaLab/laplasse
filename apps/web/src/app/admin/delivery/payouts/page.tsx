@@ -149,14 +149,14 @@ export default function AdminDeliveryPayoutsPage() {
                 required
                 value={form.period_start}
                 onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
               />
               <input
                 type="date"
                 required
                 value={form.period_end}
                 onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
-                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -167,14 +167,14 @@ export default function AdminDeliveryPayoutsPage() {
                 value={form.amount}
                 onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                 placeholder="Montant (FCFA)"
-                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
               />
               <input
                 type="text"
                 value={form.reference}
                 onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
                 placeholder="Référence virement (optionnel)"
-                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
               />
             </div>
             <input
@@ -182,12 +182,12 @@ export default function AdminDeliveryPayoutsPage() {
               value={form.note}
               onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
               placeholder="Note interne (optionnel)"
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
+              className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm"
             />
             <button
               type="submit"
               disabled={creating}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50"
             >
               {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Enregistrer le versement

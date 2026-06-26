@@ -20,7 +20,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { merchantApiFetch } from '@/lib/merchantApi'
-import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
+import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { formatPrice } from '@/lib/bookingConfig'
 import {
   MAX_ROOM_IMAGES,
@@ -547,7 +547,7 @@ export function MerchantRoomsPanel() {
   })
 
   const plan = getMerchantPlan(user?.merchants ?? [], activeMerchantId)
-  const canOfferings = PLAN_LIMITS[plan]?.offeringsManagement ?? false
+  const canOfferings = getPlanLimitsForMerchant(user?.merchants ?? [], activeMerchantId).offeringsManagement
 
   const load = useCallback(async () => {
     if (!activeMerchantId || !canOfferings) {
@@ -757,7 +757,7 @@ export function MerchantRoomsPanel() {
           <Link
             href={publicHref}
             target="_blank"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300"
             style={{ textDecoration: 'none' }}
           >
             Voir la fiche <ExternalLink size={14} />
@@ -845,7 +845,7 @@ export function MerchantRoomsPanel() {
             type="button"
             onClick={saveSettings}
             disabled={saving}
-            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60"
+            className="px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold disabled:opacity-60"
           >
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
@@ -898,7 +898,7 @@ export function MerchantRoomsPanel() {
             type="button"
             onClick={addBlock}
             disabled={!blockForm.starts_at || !blockForm.ends_at || saving}
-            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold mb-6 disabled:opacity-50"
+            className="px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold mb-6 disabled:opacity-50"
           >
             Ajouter un blocage
           </button>
@@ -941,7 +941,7 @@ export function MerchantRoomsPanel() {
               type="button"
               onClick={addRoom}
               disabled={!createForm.name.trim() || saving}
-              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold flex items-center gap-1 disabled:opacity-50"
+              className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold flex items-center gap-1 disabled:opacity-50"
             >
               <Plus size={14} /> Ajouter
             </button>
@@ -972,7 +972,7 @@ export function MerchantRoomsPanel() {
                               type="button"
                               onClick={saveEdit}
                               disabled={savingId === room.id}
-                              className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold flex items-center gap-1"
+                              className="px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold flex items-center gap-1"
                             >
                               <Check size={14} /> Enregistrer
                             </button>

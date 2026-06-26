@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { CreatePromotionDto } from './dto/create-promotion.dto'
 import { UpdatePromotionDto } from './dto/update-promotion.dto'
 import { getPlanLimits, planLimitMessage } from '../common/plan-limits'
+import { shopAccessibleWhere } from '../shops/shop-access.util'
 
 export type ProductPromotionBadge = {
   id: string
@@ -16,7 +17,7 @@ export type ProductPromotionBadge = {
 
 type PromoWithProducts = {
   id: string
-  merchant_id: string
+  merchant_id: string | null
   shop_id: string | null
   category_id: string | null
   title: string
@@ -50,6 +51,43 @@ export class PromotionsService {
     return merchant
   }
 
+  private async resolveOwnerShop(ownerId: string, shopId: string) {
+    const shop = await this.prisma.shop.findFirst({
+      where: shopAccessibleWhere(ownerId, shopId),
+      select: { id: true, merchant_id: true },
+    })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+    return shop
+  }
+
+  private promoInclude = {
+    category: { select: { id: true, name: true, slug: true } },
+    categories: {
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    products: {
+      include: {
+        product: { select: { id: true, name: true, slug: true, image_url: true } },
+      },
+    },
+  } as const
+
+  private async assertProductIdsForShop(shopId: string, productIds: string[]) {
+    if (!productIds.length) return
+    const owned = await this.prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        shop_id: shopId,
+      },
+      select: { id: true },
+    })
+    if (owned.length !== productIds.length) {
+      throw new BadRequestException('Un ou plusieurs produits sont invalides')
+    }
+  }
+
   private async assertProductIdsForMerchant(merchantId: string, productIds: string[]) {
     if (!productIds.length) return
     const owned = await this.prisma.product.findMany({
@@ -81,7 +119,11 @@ export class PromotionsService {
     }
   }
 
-  async create(ownerId: string, dto: CreatePromotionDto, merchantId?: string) {
+  async create(ownerId: string, dto: CreatePromotionDto, merchantId?: string, shopId?: string) {
+    if (shopId && !merchantId) {
+      return this.createForShop(ownerId, shopId, dto)
+    }
+
     const merchant = await this.resolveMyMerchant(ownerId, merchantId)
 
     const limits = getPlanLimits(merchant.subscription_plan)
@@ -141,19 +183,78 @@ export class PromotionsService {
             }
           : {}),
       },
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        categories: {
-          include: {
-            category: { select: { id: true, name: true, slug: true } },
-          },
-        },
-        products: {
-          include: {
-            product: { select: { id: true, name: true, slug: true, image_url: true } },
-          },
-        },
+      include: this.promoInclude,
+    })
+  }
+
+  private async createForShop(ownerId: string, shopId: string, dto: CreatePromotionDto) {
+    const shop = await this.resolveOwnerShop(ownerId, shopId)
+    const targetShopId = dto.shop_id ?? shop.id
+    if (targetShopId !== shop.id) {
+      throw new BadRequestException('Boutique invalide')
+    }
+
+    const startsAt = new Date(dto.starts_at)
+    const endsAt = new Date(dto.ends_at)
+    if (endsAt <= startsAt) {
+      throw new BadRequestException('La date de fin doit être après la date de début')
+    }
+    if (startsAt.getTime() < Date.now() - 60_000) {
+      throw new BadRequestException('La date de début ne peut pas être antérieure à maintenant')
+    }
+
+    const categoryIds = [...new Set([
+      ...(dto.category_ids ?? []).filter(Boolean),
+      ...(dto.category_id ? [dto.category_id] : []),
+    ])]
+    await this.assertCategoryIds(categoryIds)
+
+    const productIds = [...new Set((dto.product_ids ?? []).filter(Boolean))]
+    await this.assertProductIdsForShop(shop.id, productIds)
+
+    if (productIds.length && categoryIds.length) {
+      throw new BadRequestException('Choisissez soit des produits, soit des catégories — pas les deux')
+    }
+
+    const code = dto.code?.trim().toUpperCase() ?? null
+    if (code) {
+      const existing = await this.prisma.promotion.findFirst({
+        where: { shop_id: shop.id, code },
+      })
+      if (existing) throw new BadRequestException('Ce code existe déjà pour cette boutique')
+    }
+
+    return this.prisma.promotion.create({
+      data: {
+        merchant_id: null,
+        shop_id: shop.id,
+        category_id: categoryIds[0] ?? null,
+        title: dto.title,
+        description: dto.description,
+        type: dto.type,
+        value: dto.value,
+        code,
+        min_order_amount: dto.min_order_amount,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        max_uses: dto.max_uses,
+        max_uses_per_user: dto.max_uses_per_user,
+        ...(productIds.length
+          ? {
+              products: {
+                create: productIds.map(product_id => ({ product_id })),
+              },
+            }
+          : {}),
+        ...(categoryIds.length
+          ? {
+              categories: {
+                create: categoryIds.map(category_id => ({ category_id })),
+              },
+            }
+          : {}),
       },
+      include: this.promoInclude,
     })
   }
 
@@ -298,6 +399,26 @@ export class PromotionsService {
     return rows.filter(p => p.max_uses == null || p.uses_count < p.max_uses) as PromoWithProducts[]
   }
 
+  async loadActivePromosForShops(shopIds: string[]) {
+    if (!shopIds.length) return []
+    const now = new Date()
+    const rows = await this.prisma.promotion.findMany({
+      where: {
+        shop_id: { in: shopIds },
+        merchant_id: null,
+        is_active: true,
+        starts_at: { lte: now },
+        ends_at: { gte: now },
+      },
+      include: {
+        products: { select: { product_id: true } },
+        categories: { select: { category_id: true } },
+        category: { select: { id: true, name: true } },
+      },
+    })
+    return rows.filter(p => p.max_uses == null || p.uses_count < p.max_uses) as PromoWithProducts[]
+  }
+
   async enrichProductsWithPromotions<
     T extends { id: string; price: number; category_id?: string | null; shop_id?: string; merchant_id?: string },
   >(products: T[], shopId?: string, merchantId?: string): Promise<Array<T & {
@@ -314,19 +435,40 @@ export class PromotionsService {
     const promos = await this.loadActivePromosForMerchants(merchantIds)
     const promosByMerchant = new Map<string, PromoWithProducts[]>()
     for (const promo of promos) {
+      if (!promo.merchant_id) continue
       const list = promosByMerchant.get(promo.merchant_id) ?? []
       list.push(promo)
       promosByMerchant.set(promo.merchant_id, list)
     }
 
+    const standaloneShopIds = [
+      ...new Set(
+        products
+          .filter(p => !p.merchant_id && p.shop_id)
+          .map(p => p.shop_id as string),
+      ),
+    ]
+    const shopPromos = await this.loadActivePromosForShops(standaloneShopIds)
+    const promosByShop = new Map<string, PromoWithProducts[]>()
+    for (const promo of shopPromos) {
+      if (!promo.shop_id) continue
+      const list = promosByShop.get(promo.shop_id) ?? []
+      list.push(promo)
+      promosByShop.set(promo.shop_id, list)
+    }
+
     return products.map(product => {
       const mId = merchantId ?? product.merchant_id
-      if (!mId) return product
-      const merchantPromos = promosByMerchant.get(mId) ?? []
+      const sId = shopId ?? product.shop_id
+      const merchantPromos = mId ? (promosByMerchant.get(mId) ?? []) : []
+      const shopOnlyPromos = !mId && sId ? (promosByShop.get(sId) ?? []) : []
+      const applicablePromos = [...merchantPromos, ...shopOnlyPromos]
+      if (!applicablePromos.length) return product
+
       const badge = this.findBestPromoForProduct(
-        merchantPromos,
+        applicablePromos,
         product,
-        shopId ?? product.shop_id,
+        sId,
         { vitrineOnly: true },
       )
       if (!badge || badge.type === 'FREE_DELIVERY') {
@@ -346,7 +488,7 @@ export class PromotionsService {
 
   async validateForShop(input: {
     code: string
-    merchantId: string
+    merchantId: string | null
     shopId: string
     subtotal: number
     userId?: string
@@ -359,14 +501,23 @@ export class PromotionsService {
 
     const now = new Date()
     const promo = await this.prisma.promotion.findFirst({
-      where: {
-        merchant_id: input.merchantId,
-        code,
-        is_active: true,
-        starts_at: { lte: now },
-        ends_at: { gte: now },
-        OR: [{ shop_id: null }, { shop_id: input.shopId }],
-      },
+      where: input.merchantId
+        ? {
+            merchant_id: input.merchantId,
+            code,
+            is_active: true,
+            starts_at: { lte: now },
+            ends_at: { gte: now },
+            OR: [{ shop_id: null }, { shop_id: input.shopId }],
+          }
+        : {
+            merchant_id: null,
+            shop_id: input.shopId,
+            code,
+            is_active: true,
+            starts_at: { lte: now },
+            ends_at: { gte: now },
+          },
       include: {
         category: { select: { id: true, name: true } },
         products: { select: { product_id: true } },
@@ -455,8 +606,8 @@ export class PromotionsService {
     }
   }
 
-  async update(ownerId: string, promotionId: string, dto: UpdatePromotionDto, merchantId?: string) {
-    const promo = await this.assertOwner(ownerId, promotionId, merchantId)
+  async update(ownerId: string, promotionId: string, dto: UpdatePromotionDto, merchantId?: string, shopId?: string) {
+    const promo = await this.assertOwner(ownerId, promotionId, merchantId, shopId)
 
     const startsAt = dto.starts_at ? new Date(dto.starts_at) : promo.starts_at
     const endsAt = dto.ends_at ? new Date(dto.ends_at) : promo.ends_at
@@ -482,7 +633,13 @@ export class PromotionsService {
       throw new BadRequestException('Choisissez soit des produits, soit des catégories — pas les deux')
     }
     if (categoryIds) await this.assertCategoryIds(categoryIds)
-    if (productIds) await this.assertProductIdsForMerchant(promo.merchant_id, productIds)
+    if (productIds) {
+      if (promo.merchant_id) {
+        await this.assertProductIdsForMerchant(promo.merchant_id, productIds)
+      } else if (promo.shop_id) {
+        await this.assertProductIdsForShop(promo.shop_id, productIds)
+      }
+    }
 
     const nextCode = dto.code !== undefined
       ? (dto.code.trim() ? dto.code.trim().toUpperCase() : null)
@@ -529,27 +686,19 @@ export class PromotionsService {
       })
     })
 
-    return this.getPromotionForOwner(ownerId, promotionId, merchantId)
+    return this.getPromotionForOwner(ownerId, promotionId, merchantId, shopId)
   }
 
-  async getPromotionForOwner(ownerId: string, promotionId: string, merchantId?: string) {
-    await this.assertOwner(ownerId, promotionId, merchantId)
+  async getPromotionForOwner(ownerId: string, promotionId: string, merchantId?: string, shopId?: string) {
+    await this.assertOwner(ownerId, promotionId, merchantId, shopId)
     return this.prisma.promotion.findUnique({
       where: { id: promotionId },
-      include: {
-        category: { select: { id: true, name: true, slug: true } },
-        categories: {
-          include: { category: { select: { id: true, name: true, slug: true } } },
-        },
-        products: {
-          include: { product: { select: { id: true, name: true, slug: true, image_url: true } } },
-        },
-      },
+      include: this.promoInclude,
     })
   }
 
-  async getRedemptionsForOwner(ownerId: string, promotionId: string, merchantId?: string) {
-    const promo = await this.assertOwner(ownerId, promotionId, merchantId)
+  async getRedemptionsForOwner(ownerId: string, promotionId: string, merchantId?: string, shopId?: string) {
+    const promo = await this.assertOwner(ownerId, promotionId, merchantId, shopId)
     if (!promo.code) {
       throw new BadRequestException('Les utilisations ne s\'appliquent qu\'aux codes promo')
     }
@@ -618,6 +767,15 @@ export class PromotionsService {
     })
   }
 
+  async getShopPromotionsForOwner(ownerId: string, shopId: string) {
+    await this.resolveOwnerShop(ownerId, shopId)
+    return this.prisma.promotion.findMany({
+      where: { shop_id: shopId },
+      orderBy: { created_at: 'desc' },
+      include: this.promoInclude,
+    })
+  }
+
   async getMerchantPromotionsForOwner(ownerId: string, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(ownerId, merchantId)
     return this.getMerchantPromotions(merchant.id)
@@ -653,27 +811,42 @@ export class PromotionsService {
       },
       include: {
         merchant: { select: { id: true, business_name: true, slug: true, logo: true } },
+        shop: { select: { id: true, name: true, slug: true, logo: true } },
       },
       orderBy: { ends_at: 'asc' },
       take: 20,
     })
   }
 
-  async toggle(ownerId: string, promotionId: string, merchantId?: string) {
-    const promo = await this.assertOwner(ownerId, promotionId, merchantId)
+  async toggle(ownerId: string, promotionId: string, merchantId?: string, shopId?: string) {
+    const promo = await this.assertOwner(ownerId, promotionId, merchantId, shopId)
     return this.prisma.promotion.update({
       where: { id: promotionId },
       data: { is_active: !promo.is_active },
     })
   }
 
-  async delete(ownerId: string, promotionId: string, merchantId?: string) {
-    await this.assertOwner(ownerId, promotionId, merchantId)
+  async delete(ownerId: string, promotionId: string, merchantId?: string, shopId?: string) {
+    await this.assertOwner(ownerId, promotionId, merchantId, shopId)
     await this.prisma.promotion.delete({ where: { id: promotionId } })
     return { success: true }
   }
 
-  private async assertOwner(ownerId: string, promotionId: string, merchantId?: string) {
+  private async assertOwner(
+    ownerId: string,
+    promotionId: string,
+    merchantId?: string,
+    shopId?: string,
+  ) {
+    if (shopId && !merchantId) {
+      await this.resolveOwnerShop(ownerId, shopId)
+      const promo = await this.prisma.promotion.findFirst({
+        where: { id: promotionId, shop_id: shopId },
+      })
+      if (!promo) throw new NotFoundException('Promotion introuvable')
+      return promo
+    }
+
     const merchant = await this.resolveMyMerchant(ownerId, merchantId)
     const promo = await this.prisma.promotion.findFirst({
       where: { id: promotionId, merchant_id: merchant.id },

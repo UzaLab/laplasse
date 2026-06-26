@@ -122,7 +122,7 @@ function VerifyPhoneContent() {
                   <button
                     onClick={sendOtp}
                     disabled={loading}
-                    className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 size={18} className="animate-spin" /> : <Smartphone size={18} />}
                     Envoyer le code OTP
@@ -156,7 +156,7 @@ function VerifyPhoneContent() {
                     value={code}
                     onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
-                    className="w-full text-center text-3xl font-mono font-extrabold tracking-[0.5em] border-2 border-slate-200 focus:border-brand-400 rounded-2xl px-4 py-4 outline-none transition-all"
+                    className="w-full text-center text-3xl font-mono font-extrabold tracking-[0.5em] border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-4 outline-none transition-all"
                     autoFocus
                   />
 
@@ -165,7 +165,7 @@ function VerifyPhoneContent() {
                   <button
                     type="submit"
                     disabled={loading || code.length !== 6}
-                    className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {loading ? <Loader2 size={18} className="animate-spin" /> : 'Confirmer'}
                   </button>

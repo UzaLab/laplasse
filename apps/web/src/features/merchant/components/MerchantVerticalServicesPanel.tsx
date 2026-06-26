@@ -15,7 +15,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { merchantApiFetch } from '@/lib/merchantApi'
-import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
+import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { formatPrice } from '@/lib/bookingConfig'
 import { getVerticalModuleCopy } from '@/lib/merchantVertical'
 import { notify } from '@/lib/notify'
@@ -63,7 +63,7 @@ export function MerchantVerticalServicesPanel() {
   })
 
   const plan = getMerchantPlan(user?.merchants ?? [], activeMerchantId)
-  const canOfferings = PLAN_LIMITS[plan]?.offeringsManagement ?? false
+  const canOfferings = getPlanLimitsForMerchant(user?.merchants ?? [], activeMerchantId).offeringsManagement
 
   const load = useCallback(async () => {
     if (!activeMerchantId || !canOfferings || !serviceKind) {
@@ -204,7 +204,7 @@ export function MerchantVerticalServicesPanel() {
             <Link
               href={publicHref}
               target="_blank"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300"
               style={{ textDecoration: 'none' }}
             >
               Voir la fiche <ExternalLink size={14} />
@@ -212,7 +212,7 @@ export function MerchantVerticalServicesPanel() {
           )}
           <Link
             href="/merchant/offerings"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 text-sm font-bold text-slate-700 hover:bg-slate-200"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-slate-100 text-sm font-bold text-slate-700 hover:bg-slate-200"
             style={{ textDecoration: 'none' }}
           >
             <Settings2 size={14} /> Paramètres avancés
@@ -249,7 +249,7 @@ export function MerchantVerticalServicesPanel() {
                     placeholder="Nb chambres"
                     value={form.capacity}
                     onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))}
-                    className="w-36 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+                    className="w-36 border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
                   />
                 ) : (
                   <input
@@ -259,7 +259,7 @@ export function MerchantVerticalServicesPanel() {
                     placeholder="Durée (min)"
                     value={form.duration_min}
                     onChange={e => setForm(f => ({ ...f, duration_min: e.target.value }))}
-                    className="w-36 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+                    className="w-36 border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
                   />
                 )}
                 <input
@@ -268,13 +268,13 @@ export function MerchantVerticalServicesPanel() {
                   placeholder="Prix (F CFA)"
                   value={form.price}
                   onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  className="flex-1 min-w-[140px] border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
+                  className="flex-1 min-w-[140px] border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
                 />
                 <button
                   type="button"
                   onClick={addService}
                   disabled={!form.name.trim() || saving}
-                  className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold flex items-center gap-1 disabled:opacity-50"
+                  className="px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold flex items-center gap-1 disabled:opacity-50"
                 >
                   <Plus size={14} /> Ajouter
                 </button>

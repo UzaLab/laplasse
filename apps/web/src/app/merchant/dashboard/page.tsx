@@ -56,7 +56,12 @@ function DashboardContent() {
   }, [isAuthenticated, router])
 
   const { data: myProfile, isLoading: loadingProfile } = useQuery<{
-    id: string; slug: string; business_name: string; subscription_plan: string
+    id: string
+    slug: string
+    business_name: string
+    subscription_plan: string
+    verification_status: string
+    is_active: boolean
   } | null>({
     queryKey: ['my-merchant-profile', user?.id, activeMerchantId],
     queryFn: async () => {
@@ -72,6 +77,12 @@ function DashboardContent() {
   const isLoading = loadingProfile || loadingMerchant
   const hasShop = (user?.shops?.length ?? 0) > 0
   const firstName = user?.full_name?.split(' ')[0] ?? 'Marchand'
+
+  const activeMerchantAccount = user?.merchants?.find(m => m.id === activeMerchantId)
+  const verificationStatus = myProfile?.verification_status ?? activeMerchantAccount?.verification_status
+  const isMerchantValidatedAndActive =
+    verificationStatus === 'VERIFIED' && myProfile?.is_active === true
+  const showCreatedBanner = isNew && !isMerchantValidatedAndActive
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) return
@@ -119,7 +130,7 @@ function DashboardContent() {
           </p>
           <Link
             href="/merchant/signup"
-            className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3.5 rounded-2xl hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3.5 rounded-full hover:bg-slate-800 transition-colors"
             style={{ textDecoration: 'none' }}
           >
             <Store size={18} /> Inscrire mon établissement
@@ -135,7 +146,7 @@ function DashboardContent() {
       merchantName={merchant?.business_name ?? myProfile?.business_name}
     >
       {/* Welcome banner */}
-      {isNew && (
+      {showCreatedBanner && (
         <div className="mb-8 bg-emerald-50 border border-emerald-200 rounded-[28px] p-6 flex items-start gap-4">
           <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shrink-0">
             <BadgeCheck size={24} className="text-white" />
@@ -158,7 +169,7 @@ function DashboardContent() {
           </div>
           <Link
             href="/merchant/onboarding"
-            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm transition-colors shrink-0"
+            className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-full text-sm transition-colors shrink-0"
             style={{ textDecoration: 'none' }}
           >
             Continuer →
@@ -182,7 +193,7 @@ function DashboardContent() {
           </div>
           <Link
             href="/merchant/verify-phone"
-            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs transition-colors shrink-0"
+            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-full text-xs transition-colors shrink-0"
             style={{ textDecoration: 'none' }}
           >
             Vérifier
@@ -243,7 +254,7 @@ function DashboardContent() {
               <div className="flex flex-wrap gap-2 mt-5">
                 <Link
                   href="/merchant/profile/edit"
-                  className="inline-flex items-center gap-1.5 text-sm font-bold bg-white text-slate-900 px-3.5 py-2 rounded-xl hover:bg-slate-100 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sm font-bold bg-white text-slate-900 px-3.5 py-2 rounded-full hover:bg-slate-100 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <Edit size={14} /> Modifier
@@ -251,7 +262,7 @@ function DashboardContent() {
                 {slug && (
                   <Link
                     href={`/m/${slug}`}
-                    className="inline-flex items-center gap-1.5 text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm font-bold bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-full transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     <Eye size={14} /> Voir la fiche
@@ -263,7 +274,7 @@ function DashboardContent() {
               <div className="grid grid-cols-2 gap-3 mt-6 pt-6 border-t border-slate-800">
                 <Link
                   href="/merchant/analytics"
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 transition-colors block"
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full p-4 transition-colors block"
                   style={{ textDecoration: 'none' }}
                 >
                   <p className="text-2xl font-extrabold text-white">
@@ -275,7 +286,7 @@ function DashboardContent() {
                 </Link>
                 <Link
                   href="/merchant/analytics"
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-2xl p-4 transition-colors block"
+                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full p-4 transition-colors block"
                   style={{ textDecoration: 'none' }}
                 >
                   <p className="text-2xl font-extrabold text-white">

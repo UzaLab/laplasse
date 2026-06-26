@@ -210,7 +210,7 @@ export function AddressLocationPicker({
             if (searchResults.length) setSearchOpen(true)
           }}
           placeholder={searchHint ? `Rechercher un lieu (${searchHint})…` : 'Rechercher une adresse ou un lieu…'}
-          className="w-full h-10 pl-9 pr-9 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 bg-white"
+          className="w-full h-10 pl-9 pr-9 text-sm border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 bg-white"
           autoComplete="off"
         />
         {placeQuery && (

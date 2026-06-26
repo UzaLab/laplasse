@@ -86,7 +86,7 @@ export default function ProfileSettingsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 shrink-0"
+                  className="px-4 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-full hover:bg-amber-600 transition-colors disabled:opacity-50 shrink-0"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : 'Sauver'}
                 </button>

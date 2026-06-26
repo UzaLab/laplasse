@@ -27,13 +27,13 @@ export function B2BSection() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
             <Link
               href="/pro/register"
-              className="bg-brand-500 text-slate-900 px-8 py-4 rounded-xl font-bold hover:bg-brand-400 transition-colors shadow-lg shadow-brand-500/20 text-center"
+              className="bg-brand-500 text-slate-900 px-8 py-4 rounded-full font-bold hover:bg-brand-400 transition-colors shadow-lg shadow-brand-500/20 text-center"
             >
               Inscrire mon établissement
             </Link>
             <Link
               href="/pro"
-              className="bg-white/10 text-white border border-white/20 px-8 py-4 rounded-xl font-bold hover:bg-white/20 transition-colors text-center"
+              className="bg-white/10 text-white border border-white/20 px-8 py-4 rounded-full font-bold hover:bg-white/20 transition-colors text-center"
             >
               Découvrir les offres Pro
             </Link>

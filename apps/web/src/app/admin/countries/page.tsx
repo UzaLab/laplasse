@@ -101,14 +101,14 @@ export default function AdminCountriesPage() {
                 <div className="px-5 pb-5 flex gap-2">
                   <Link
                     href={`/admin/geo?country=${c.code}`}
-                    className="flex-1 text-center text-xs font-bold py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    className="flex-1 text-center text-xs font-bold py-2 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     Geo
                   </Link>
                   <Link
                     href={`/admin/delivery?country=${c.code}`}
-                    className="flex-1 text-center text-xs font-bold py-2 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
+                    className="flex-1 text-center text-xs font-bold py-2 rounded-full bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     Livraison

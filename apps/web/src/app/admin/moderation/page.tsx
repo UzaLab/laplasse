@@ -16,6 +16,8 @@ interface ModerationSummary {
     courier_reviews_pending: number
     complaints_open: number
     couriers_kyc: number
+    shops_pending: number
+    products_pending: number
     disputes_open: number
   }
   recent: {
@@ -62,6 +64,20 @@ export default function AdminModerationPage() {
 
   const queueItems: ModerationQueueItem[] = data
     ? [
+        {
+          href: '/admin/shops',
+          label: 'Boutiques à valider',
+          count: data.counts.shops_pending,
+          icon: 'merchant',
+          accent: 'bg-teal-100 text-teal-700',
+        },
+        {
+          href: '/admin/products',
+          label: 'Produits à valider',
+          count: data.counts.products_pending,
+          icon: 'product',
+          accent: 'bg-cyan-100 text-cyan-700',
+        },
         {
           href: '/admin/merchants',
           label: 'Établissements',
@@ -141,7 +157,7 @@ export default function AdminModerationPage() {
                   <Link
                     key={m.id}
                     href="/admin/merchants"
-                    className="block bg-white border border-slate-100 rounded-2xl p-4 hover:border-violet-200 transition-colors"
+                    className="block bg-white border border-slate-100 rounded-full p-4 hover:border-violet-200 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     <p className="font-bold text-slate-900">{m.business_name}</p>
@@ -165,7 +181,7 @@ export default function AdminModerationPage() {
                   <Link
                     key={r.id}
                     href="/admin/reviews"
-                    className="block bg-white border border-slate-100 rounded-2xl p-4 hover:border-violet-200 transition-colors"
+                    className="block bg-white border border-slate-100 rounded-full p-4 hover:border-violet-200 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     <p className="font-bold text-slate-900">
@@ -191,7 +207,7 @@ export default function AdminModerationPage() {
                   <Link
                     key={c.id}
                     href="/admin/complaints"
-                    className="block bg-white border border-slate-100 rounded-2xl p-4 hover:border-violet-200 transition-colors"
+                    className="block bg-white border border-slate-100 rounded-full p-4 hover:border-violet-200 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     <p className="font-bold text-slate-900">{c.reason}</p>

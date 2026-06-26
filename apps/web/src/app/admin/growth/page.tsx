@@ -88,7 +88,7 @@ export default function AdminGrowthPage() {
           <button
             onClick={handleRecalculateTrust}
             disabled={recalculating}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 font-semibold text-sm rounded-xl hover:border-slate-300 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-600 font-semibold text-sm rounded-full hover:border-slate-300 transition-colors disabled:opacity-50"
             title="Recalculer tous les Trust Scores"
           >
             {recalculating

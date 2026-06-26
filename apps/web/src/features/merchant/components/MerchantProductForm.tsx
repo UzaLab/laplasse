@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import {
@@ -31,10 +31,16 @@ import {
   type ProductVariantInput,
 } from '@/lib/marketplaceApi'
 import { fetchShopProductCategories, getShopRoutesFromPathname, type ShopProductCategoryOption } from '@/lib/shopApi'
+import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
 import { notify } from '@/lib/notify'
 import { MerchantMediathequeField } from '@/features/merchant/components/MerchantMediathequeField'
 
-const EMPTY_VARIANT: ProductVariantInput = { name: '', price: 0, stock_quantity: 0 }
+const EMPTY_VARIANT: ProductVariantInput & { kind: 'TEXT' | 'COLOR' } = {
+  name: '',
+  price: 0,
+  stock_quantity: 0,
+  kind: 'TEXT',
+}
 const MAX_PRODUCT_IMAGES = 10
 
 const INPUT_CLASS =
@@ -108,6 +114,9 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
       price: v.price,
       stock_quantity: v.stock_quantity,
       sku: v.sku ?? undefined,
+      kind: v.kind ?? 'TEXT',
+      color_hex: v.color_hex ?? undefined,
+      image_url: v.image_url ?? undefined,
     })),
   }
 }
@@ -148,6 +157,11 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   const [notFound, setNotFound] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; label: string }[]>([])
 
+  const categorySelectOptions = useMemo(
+    () => categoryOptions.map(opt => ({ value: opt.id, label: opt.label })),
+    [categoryOptions],
+  )
+
   useEffect(() => {
     if (!activeShopId) return
     void fetchShopProductCategories(activeShopId).then(({ categories }) => {
@@ -183,7 +197,13 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
     }
 
     const variants = form.useVariants
-      ? form.variants.filter(v => v.name.trim())
+      ? form.variants
+          .map(v => ({
+            ...v,
+            name: v.name.trim()
+              || (v.kind === 'COLOR' && v.color_hex ? `Couleur ${v.color_hex.toUpperCase()}` : ''),
+          }))
+          .filter(v => v.name)
       : []
 
     if (form.useVariants) {
@@ -256,6 +276,18 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
     router.push(routes.products)
   }
 
+  const saveButton = (
+    <button
+      type="button"
+      onClick={handleSave}
+      disabled={saving}
+      className="bg-slate-900 text-white px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm shadow-md shadow-slate-900/10 hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 w-full sm:w-auto"
+    >
+      {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+      Enregistrer
+    </button>
+  )
+
   if (!hydrated || !isAuthenticated) return null
 
   if (loading) {
@@ -287,7 +319,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
 
   return (
     <ProductFormShell skipShellLayout={skipShellLayout}>
-      <div>
+      <div className={skipShellLayout ? 'pb-24 lg:pb-8' : undefined}>
         {/* En-tête sticky (maquette) */}
         <div className="sticky top-0 z-20 -mx-5 lg:-mx-8 px-5 lg:px-8 py-4 mb-6 bg-[#FAFAFA]/95 backdrop-blur-md border-b border-slate-200/80">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -319,24 +351,18 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <Link
-                href={routes.products}
-                className="text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm hidden sm:block"
-                style={{ textDecoration: 'none' }}
-              >
-                Annuler
-              </Link>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-slate-900 text-white px-5 sm:px-6 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-slate-900/10 hover:bg-slate-800 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                Enregistrer
-              </button>
-            </div>
+            {!skipShellLayout && (
+              <div className="flex items-center gap-3 shrink-0">
+                <Link
+                  href={routes.products}
+                  className="text-slate-500 hover:text-slate-900 transition-colors font-medium text-sm hidden sm:block"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Annuler
+                </Link>
+                {saveButton}
+              </div>
+            )}
           </div>
         </div>
 
@@ -386,6 +412,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
               <MerchantMediathequeField
                 mode="multiple"
                 merchantId={uploadMerchantId}
+                shopId={uploadMerchantId ? undefined : activeShopId}
                 values={form.images}
                 onChangeValues={urls => setForm(f => ({ ...f, images: urls }))}
                 max={MAX_PRODUCT_IMAGES}
@@ -453,97 +480,207 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                   </div>
                 </>
               ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-500 mb-4">
-                    Définissez les options (taille, format, couleur…) avec un prix et un stock par variante.
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-500">
+                    Texte libre (taille, format…) ou couleur avec aperçu. Image optionnelle par variante.
                   </p>
                   {form.variants.map((variant, index) => (
                     <div
                       key={index}
-                      className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-50 rounded-2xl border border-slate-100"
+                      className="p-4 bg-slate-50 rounded-full border border-slate-100 space-y-3"
                     >
-                      <input
-                        value={variant.name}
-                        onChange={e =>
-                          setForm(f => {
-                            const next = [...f.variants]
-                            next[index] = { ...next[index], name: e.target.value }
-                            return { ...f, variants: next }
-                          })
-                        }
-                        placeholder="Nom (ex. Taille M)"
-                        className="col-span-12 sm:col-span-4 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={variant.price || ''}
-                        onChange={e =>
-                          setForm(f => {
-                            const next = [...f.variants]
-                            next[index] = { ...next[index], price: parseInt(e.target.value, 10) || 0 }
-                            return { ...f, variants: next }
-                          })
-                        }
-                        placeholder="Prix FCFA"
-                        className="col-span-4 sm:col-span-2 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white font-bold"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={variant.stock_quantity ?? 0}
-                        onChange={e =>
-                          setForm(f => {
-                            const next = [...f.variants]
-                            next[index] = {
-                              ...next[index],
-                              stock_quantity: parseInt(e.target.value, 10) || 0,
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex gap-1 p-1 bg-white rounded-full border border-slate-200">
+                          {(['TEXT', 'COLOR'] as const).map(kind => (
+                            <button
+                              key={kind}
+                              type="button"
+                              onClick={() =>
+                                setForm(f => {
+                                  const next = [...f.variants]
+                                  next[index] = {
+                                    ...next[index],
+                                    kind,
+                                    color_hex: kind === 'COLOR' ? (next[index].color_hex ?? '#000000') : undefined,
+                                  }
+                                  return { ...f, variants: next }
+                                })
+                              }
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                (variant.kind ?? 'TEXT') === kind
+                                  ? 'bg-slate-900 text-white'
+                                  : 'text-slate-500 hover:text-slate-800'
+                              }`}
+                            >
+                              {kind === 'TEXT' ? 'Texte' : 'Couleur'}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm(f => ({
+                              ...f,
+                              variants: f.variants.filter((_, i) => i !== index),
+                            }))
+                          }
+                          className="text-slate-400 hover:text-red-500 p-1"
+                          aria-label="Supprimer la variante"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {(variant.kind ?? 'TEXT') === 'COLOR' ? (
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={variant.color_hex ?? '#000000'}
+                              onChange={e =>
+                                setForm(f => {
+                                  const next = [...f.variants]
+                                  next[index] = { ...next[index], color_hex: e.target.value }
+                                  return { ...f, variants: next }
+                                })
+                              }
+                              className="w-12 h-12 rounded-full border border-slate-200 cursor-pointer shrink-0"
+                            />
+                            <input
+                              value={variant.color_hex ?? ''}
+                              onChange={e =>
+                                setForm(f => {
+                                  const next = [...f.variants]
+                                  next[index] = { ...next[index], color_hex: e.target.value }
+                                  return { ...f, variants: next }
+                                })
+                              }
+                              placeholder="#000000"
+                              className="flex-1 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white font-mono"
+                            />
+                          </div>
+                          <input
+                            value={variant.name}
+                            onChange={e =>
+                              setForm(f => {
+                                const next = [...f.variants]
+                                next[index] = { ...next[index], name: e.target.value }
+                                return { ...f, variants: next }
+                              })
                             }
-                            return { ...f, variants: next }
-                          })
-                        }
-                        placeholder="Stock"
-                        className="col-span-4 sm:col-span-2 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                      />
-                      <input
-                        value={variant.sku ?? ''}
-                        onChange={e =>
-                          setForm(f => {
-                            const next = [...f.variants]
-                            next[index] = { ...next[index], sku: e.target.value || undefined }
-                            return { ...f, variants: next }
-                          })
-                        }
-                        placeholder="SKU"
-                        className="col-span-3 sm:col-span-3 border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm(f => ({
-                            ...f,
-                            variants: f.variants.filter((_, i) => i !== index),
-                          }))
-                        }
-                        className="col-span-1 text-slate-400 hover:text-red-500 flex justify-center"
-                        aria-label="Supprimer la variante"
-                      >
-                        <X size={18} />
-                      </button>
+                            placeholder="Libellé (ex. Rouge bordeaux)"
+                            className="flex-1 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          value={variant.name}
+                          onChange={e =>
+                            setForm(f => {
+                              const next = [...f.variants]
+                              next[index] = { ...next[index], name: e.target.value }
+                              return { ...f, variants: next }
+                            })
+                          }
+                          placeholder="Nom (ex. Taille M, 500 ml…)"
+                          className="w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                        />
+                      )}
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          value={variant.price || ''}
+                          onChange={e =>
+                            setForm(f => {
+                              const next = [...f.variants]
+                              next[index] = { ...next[index], price: parseInt(e.target.value, 10) || 0 }
+                              return { ...f, variants: next }
+                            })
+                          }
+                          placeholder="Prix FCFA"
+                          className="border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white font-bold"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          value={variant.stock_quantity ?? 0}
+                          onChange={e =>
+                            setForm(f => {
+                              const next = [...f.variants]
+                              next[index] = {
+                                ...next[index],
+                                stock_quantity: parseInt(e.target.value, 10) || 0,
+                              }
+                              return { ...f, variants: next }
+                            })
+                          }
+                          placeholder="Stock"
+                          className="border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                        />
+                        <input
+                          value={variant.sku ?? ''}
+                          onChange={e =>
+                            setForm(f => {
+                              const next = [...f.variants]
+                              next[index] = { ...next[index], sku: e.target.value || undefined }
+                              return { ...f, variants: next }
+                            })
+                          }
+                          placeholder="SKU"
+                          className="col-span-2 sm:col-span-2 border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
+                        />
+                      </div>
+
+                      {(uploadMerchantId || activeShopId) && (
+                        <div className="pt-1">
+                          <MerchantMediathequeField
+                            merchantId={uploadMerchantId}
+                            shopId={uploadMerchantId ? undefined : activeShopId}
+                            mode="single"
+                            label="Image de la variante (optionnel)"
+                            value={variant.image_url ?? ''}
+                            onChange={url =>
+                              setForm(f => {
+                                const next = [...f.variants]
+                                next[index] = { ...next[index], image_url: url || undefined }
+                                return { ...f, variants: next }
+                              })
+                            }
+                            disabled={saving}
+                            showUrlInput={false}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm(f => ({
-                        ...f,
-                        variants: [...f.variants, { ...EMPTY_VARIANT }],
-                      }))
-                    }
-                    className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-700 mt-2"
-                  >
-                    <Plus size={16} /> Ajouter une variante
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm(f => ({
+                          ...f,
+                          variants: [...f.variants, { ...EMPTY_VARIANT, kind: 'TEXT' }],
+                        }))
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-700 px-3 py-2 rounded-xl border border-brand-200 bg-brand-50/50"
+                    >
+                      <Plus size={16} /> Variante texte
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm(f => ({
+                          ...f,
+                          variants: [...f.variants, { ...EMPTY_VARIANT, kind: 'COLOR', color_hex: '#000000' }],
+                        }))
+                      }
+                      className="inline-flex items-center gap-2 text-sm font-bold text-violet-600 hover:text-violet-700 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50/50"
+                    >
+                      <Plus size={16} /> Variante couleur
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -583,22 +720,24 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                 Organisation
               </h2>
               <div>
-                <label className={LABEL_CLASS}>Catégorie produit</label>
-                <select
-                  required={categoryOptions.length > 0}
-                  value={form.category_id}
-                  onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-                  className={INPUT_CLASS}
-                >
-                  <option value="">
-                    {categoryOptions.length
-                      ? '— Choisir une catégorie —'
-                      : '— Activez des catégories dans l\'onglet Produits —'}
-                  </option>
-                  {categoryOptions.map(opt => (
-                    <option key={opt.id} value={opt.id}>{opt.label}</option>
-                  ))}
-                </select>
+                {categorySelectOptions.length > 0 ? (
+                  <FilterLiveMultiSelect
+                    label="Catégorie produit"
+                    placeholder="Choisir une catégorie"
+                    searchPlaceholder="Rechercher une catégorie…"
+                    options={categorySelectOptions}
+                    selected={form.category_id ? [form.category_id] : []}
+                    onChange={ids => {
+                      const nextId = ids.length > 1 ? ids[ids.length - 1] : (ids[0] ?? '')
+                      setForm(f => ({ ...f, category_id: nextId ?? '' }))
+                    }}
+                    emptyMessage="Aucune catégorie trouvée"
+                  />
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Activez des catégories dans l&apos;onglet Produits avant de créer un article.
+                  </p>
+                )}
                 <p className="text-xs text-slate-400 mt-2">
                   Seules les catégories activées pour votre boutique sont proposées ici.
                 </p>
@@ -683,6 +822,12 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
           </div>
         </div>
       </div>
+
+      {skipShellLayout && (
+        <div className="fixed bottom-16 inset-x-0 z-40 px-5 py-3 bg-white/95 backdrop-blur-md border-t border-slate-200 lg:bottom-0 lg:left-72 lg:right-0">
+          {saveButton}
+        </div>
+      )}
     </ProductFormShell>
   )
 }

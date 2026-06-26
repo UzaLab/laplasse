@@ -166,7 +166,7 @@ export function SearchResultCard({ merchant: m }: { merchant: SearchHit }) {
 
         <Link
           href={profileHref}
-          className="block text-center py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
+          className="block text-center py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
           style={{ textDecoration: 'none' }}
         >
           Voir le lieu

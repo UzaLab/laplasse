@@ -10,6 +10,10 @@ import { slugify } from '../marketplace/marketplace.util'
 import { CreateShopDto, LinkShopMerchantDto, UpdateShopDto } from './dto/shops.dto'
 import { SHOP_MINI_SELECT, shopAccessibleWhere } from './shop-access.util'
 import { CrmService } from '../crm/crm.service'
+import { StorageService } from '../storage/storage.service'
+
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 const SHOP_PUBLIC_SELECT = {
   id: true,
@@ -53,6 +57,7 @@ export class ShopsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crm: CrmService,
+    private readonly storage: StorageService,
   ) {}
 
   private async assertShopLimit(userId: string) {
@@ -186,6 +191,23 @@ export class ShopsService {
     return shop
   }
 
+  private async uniqueShopSlug(baseName: string, excludeShopId?: string): Promise<string> {
+    let baseSlug = slugify(baseName)
+    let slug = baseSlug
+    let n = 1
+    while (true) {
+      const existing = await this.prisma.shop.findFirst({
+        where: {
+          slug,
+          ...(excludeShopId ? { NOT: { id: excludeShopId } } : {}),
+        },
+        select: { id: true },
+      })
+      if (!existing) return slug
+      slug = `${baseSlug}-${n++}`
+    }
+  }
+
   async update(userId: string, shopId: string, dto: UpdateShopDto) {
     const shop = await this.resolveOwnerShop(userId, shopId)
 
@@ -211,10 +233,25 @@ export class ShopsService {
       districtName = geoCommune.name
     }
 
+    const trimmedName = dto.name?.trim()
+    let nextSlug: string | undefined
+    if (trimmedName && trimmedName !== shop.name) {
+      nextSlug = await this.uniqueShopSlug(trimmedName, shop.id)
+    }
+
+    let status = dto.status
+    if (status !== undefined) {
+      if (status === 'ACTIVE') status = 'PENDING_REVIEW'
+      if (status === 'SUSPENDED') {
+        throw new BadRequestException('Seul un administrateur peut suspendre une boutique')
+      }
+    }
+
     return this.prisma.shop.update({
       where: { id: shop.id },
       data: {
-        name: dto.name?.trim(),
+        name: trimmedName,
+        ...(nextSlug ? { slug: nextSlug } : {}),
         description: dto.description?.trim(),
         logo: dto.logo,
         cover_image: dto.cover_image,
@@ -229,7 +266,7 @@ export class ShopsService {
         latitude: dto.latitude,
         longitude: dto.longitude,
         has_physical_location: dto.has_physical_location,
-        status: dto.status,
+        status,
         enabled_modules: dto.enabled_modules,
         delivery_fulfilment_default: dto.delivery_fulfilment_default,
       },
@@ -355,23 +392,95 @@ export class ShopsService {
 
   async getCRM(userId: string, shopId: string) {
     const shop = await this.resolveOwnerShop(userId, shopId)
-    const includeMerchant = shop.merchant_id && shop.merchant?.subscription_plan
-      ? getPlanLimits(shop.merchant.subscription_plan).crm
-      : !!shop.merchant_id
-    return this.crm.getShopCRM(shop.id, { includeMerchantSignals: includeMerchant })
+    return this.crm.getShopCRM(shop.id, { includeMerchantSignals: true })
   }
 
   async getCRMDetail(userId: string, shopId: string, customerId: string) {
     const shop = await this.resolveOwnerShop(userId, shopId)
-    const includeMerchant = shop.merchant_id && shop.merchant?.subscription_plan
-      ? getPlanLimits(shop.merchant.subscription_plan).crm
-      : !!shop.merchant_id
     const detail = await this.crm.getCustomerDetail(customerId, {
-      merchantId: includeMerchant ? (shop.merchant_id ?? undefined) : undefined,
+      merchantId: shop.merchant_id ?? undefined,
       shopId: shop.id,
     })
     if (!detail) throw new NotFoundException('Contact introuvable')
     return detail
+  }
+
+  async uploadShopImage(userId: string, shopId: string, file: Express.Multer.File) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Fichier requis')
+    }
+    if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Format accepté : JPEG, PNG ou WebP')
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      throw new BadRequestException('Taille maximale : 5 Mo')
+    }
+
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const url = await this.storage.uploadImage(
+      file.buffer,
+      file.mimetype,
+      `shops/${shop.id}`,
+      'general',
+    )
+
+    const order = await this.prisma.shopMedia.count({ where: { shop_id: shop.id } })
+    const media = await this.prisma.shopMedia.create({
+      data: {
+        shop_id: shop.id,
+        url,
+        uploaded_by: userId,
+        order,
+      },
+      select: { id: true, url: true, type: true, order: true, created_at: true },
+    })
+
+    return { url: media.url, id: media.id, media }
+  }
+
+  async listShopMedia(
+    userId: string,
+    shopId: string,
+    opts?: { page?: number; limit?: number },
+  ) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const page = Math.max(1, opts?.page ?? 1)
+    const limit = Math.min(48, Math.max(1, opts?.limit ?? 24))
+    const skip = (page - 1) * limit
+
+    const where = { shop_id: shop.id, type: 'IMAGE' as const }
+    const [gallery, total] = await Promise.all([
+      this.prisma.shopMedia.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { created_at: 'desc' }],
+        skip,
+        take: limit,
+        select: { id: true, url: true, type: true, order: true, created_at: true },
+      }),
+      this.prisma.shopMedia.count({ where }),
+    ])
+
+    return {
+      logo: shop.logo,
+      cover_image: shop.cover_image,
+      gallery,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_more: skip + gallery.length < total,
+      },
+    }
+  }
+
+  async deleteShopMedia(userId: string, shopId: string, mediaId: string) {
+    const shop = await this.resolveOwnerShop(userId, shopId)
+    const media = await this.prisma.shopMedia.findFirst({
+      where: { id: mediaId, shop_id: shop.id },
+    })
+    if (!media) throw new NotFoundException('Image introuvable')
+    await this.prisma.shopMedia.delete({ where: { id: mediaId } })
+    return { deleted: true }
   }
 
   async assertProductCategoryAllowed(shopId: string, categoryId: string | null | undefined) {

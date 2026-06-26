@@ -1,23 +1,25 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import {
-  BarChart3, ExternalLink, FolderOpen, LayoutGrid, Lock,
-  Package, PackageX, Settings, ShoppingBag, Tag, Truck, Users,
+  BarChart3, ExternalLink, FolderOpen, LayoutGrid,
+  Package, Settings, ShoppingBag, Tag, Truck, Users,
 } from 'lucide-react'
 import { ShopShell } from '@/features/shop/components/ShopShell'
 import { useAuthStore } from '@/stores/authStore'
-import { getIndependentShops } from '@/lib/shopApi'
+import { getIndependentShops, getShopPublicHref } from '@/lib/shopApi'
 import { cn } from '@/lib/utils'
 
 const TABS = [
   { href: '/shop/manage', label: "Vue d'ensemble", icon: LayoutGrid, exact: true },
+  { href: '/shop/manage/analytics', label: 'Statistiques', icon: BarChart3 },
   { href: '/shop/manage/products', label: 'Produits', icon: Package },
   { href: '/shop/manage/orders', label: 'Commandes', icon: ShoppingBag },
   { href: '/shop/manage/crm', label: 'Clients CRM', icon: Users },
   { href: '/shop/manage/collections', label: 'Collections', icon: FolderOpen },
-  { href: '/shop/manage/promotions', label: 'Promotions', icon: Tag, locked: true },
+  { href: '/shop/manage/promotions', label: 'Promotions', icon: Tag },
   { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: Truck },
   { href: '/shop/manage/settings', label: 'Paramètres', icon: Settings },
 ] as const
@@ -32,9 +34,24 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
   const { user, activeShopId } = useAuthStore()
   const independentShops = getIndependentShops(user?.shops)
   const activeShop = independentShops.find(s => s.id === activeShopId) ?? independentShops[0] ?? null
+  const tabsNavRef = useRef<HTMLElement>(null)
+  const activeTabRef = useRef<HTMLAnchorElement>(null)
 
   const isTabActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
+
+  useEffect(() => {
+    if (hideTabs) return
+    const frame = requestAnimationFrame(() => {
+      const nav = tabsNavRef.current
+      const tab = activeTabRef.current
+      if (!nav || !tab) return
+
+      const targetLeft = tab.offsetLeft - nav.clientWidth / 2 + tab.clientWidth / 2
+      nav.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [pathname, hideTabs])
 
   return (
     <ShopShell>
@@ -72,7 +89,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
                     </span>
                     {activeShop.slug && (
                       <Link
-                        href={`/boutique/${activeShop.slug}`}
+                        href={getShopPublicHref(activeShop)}
                         target="_blank"
                         className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-bold transition-colors"
                         style={{ textDecoration: 'none' }}
@@ -89,29 +106,29 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
 
         {/* Tabs sub-nav */}
         {!hideTabs && activeShop && (
-          <nav className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl">
+          <nav
+            ref={tabsNavRef}
+            className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl scroll-smooth"
+          >
             {TABS.map(tab => {
               const { href, label, icon: Icon } = tab
               const exact = 'exact' in tab ? tab.exact : undefined
-              const locked = 'locked' in tab ? tab.locked : undefined
               const active = isTabActive(href, exact)
               return (
                 <Link
                   key={href}
+                  ref={active ? activeTabRef : undefined}
                   href={href}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all shrink-0',
+                    'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',
                     active
                       ? 'bg-white text-slate-900 shadow-sm'
-                      : locked
-                        ? 'text-slate-300 pointer-events-none'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
                   )}
                   style={{ textDecoration: 'none' }}
                 >
                   <Icon size={16} className={active ? 'text-brand-500' : undefined} />
                   {label}
-                  {locked && <Lock size={11} className="text-slate-300" />}
                 </Link>
               )
             })}
@@ -125,7 +142,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
             <p className="text-slate-500 font-semibold mb-4">Aucune boutique indépendante trouvée.</p>
             <Link
               href="/shop/create"
-              className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-2xl hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-full hover:bg-slate-800 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               Créer ma boutique

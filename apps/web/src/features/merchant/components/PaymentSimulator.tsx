@@ -114,7 +114,7 @@ export function PaymentSimulator({
             </p>
             <button
               onClick={initPayment}
-              className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-colors"
+              className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-colors"
             >
               Lancer le paiement simulé
             </button>

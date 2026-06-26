@@ -289,10 +289,10 @@ export function LogisticsSignupWizard({ resume = false }: LogisticsSignupWizardP
               <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
                 <Building2 size={22} className="text-indigo-600" /> Identité légale
               </h2>
-              <input required value={form.legal_name} onChange={e => setForm(f => ({ ...f, legal_name: e.target.value }))} placeholder="Raison sociale *" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-              <input value={form.trade_name} onChange={e => setForm(f => ({ ...f, trade_name: e.target.value }))} placeholder="Nom commercial" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-              <input value={form.rccm_number} onChange={e => setForm(f => ({ ...f, rccm_number: e.target.value }))} placeholder="N° RCCM / fiscal" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-              <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Adresse du siège" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+              <input required value={form.legal_name} onChange={e => setForm(f => ({ ...f, legal_name: e.target.value }))} placeholder="Raison sociale *" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
+              <input value={form.trade_name} onChange={e => setForm(f => ({ ...f, trade_name: e.target.value }))} placeholder="Nom commercial" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
+              <input value={form.rccm_number} onChange={e => setForm(f => ({ ...f, rccm_number: e.target.value }))} placeholder="N° RCCM / fiscal" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
+              <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Adresse du siège" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
               {citiesLoading ? (
                 <Loader2 className="animate-spin text-slate-300" size={20} />
               ) : (
@@ -303,15 +303,15 @@ export function LogisticsSignupWizard({ resume = false }: LogisticsSignupWizardP
                     const city = cities.find(c => c.slug === e.target.value)
                     if (city) setForm(f => ({ ...f, city: city.name }))
                   }}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                  className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm"
                 >
                   {cities.map(c => (
                     <option key={c.id} value={c.slug}>{c.name}</option>
                   ))}
                 </select>
               )}
-              <input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder={`Téléphone * (${phonePlaceholder})`} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
-              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email contact" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+              <input required value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder={`Téléphone * (${phonePlaceholder})`} className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
+              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email contact" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
               <div>
                 <input ref={kycInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void handleKycUpload(f) }} />
                 <button type="button" onClick={() => kycInputRef.current?.click()} disabled={uploadingKyc} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border border-slate-200 text-slate-700">
@@ -339,7 +339,7 @@ export function LogisticsSignupWizard({ resume = false }: LogisticsSignupWizardP
               <div>
                 <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1"><MapPin size={15} /> Communes couvertes *</p>
                 {communesLoading ? <Loader2 className="animate-spin text-slate-300" size={20} /> : (
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 space-y-1">
+                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-full p-3 space-y-1">
                     {communes.map(c => (
                       <label key={c.id} className="flex items-center gap-2 text-sm py-1 cursor-pointer">
                         <input type="checkbox" checked={form.commune_ids.includes(c.id)} onChange={() => setForm(f => ({ ...f, commune_ids: f.commune_ids.includes(c.id) ? f.commune_ids.filter(id => id !== c.id) : [...f.commune_ids, c.id] }))} />
@@ -366,10 +366,10 @@ export function LogisticsSignupWizard({ resume = false }: LogisticsSignupWizardP
                 <span className="text-sm font-semibold text-slate-800">Auto-dispatch par défaut</span>
                 <input type="checkbox" checked={form.auto_dispatch_default} onChange={e => setForm(f => ({ ...f, auto_dispatch_default: e.target.checked }))} className="w-5 h-5 accent-indigo-600" />
               </label>
-              <select value={form.payout_method} onChange={e => setForm(f => ({ ...f, payout_method: e.target.value }))} className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm">
+              <select value={form.payout_method} onChange={e => setForm(f => ({ ...f, payout_method: e.target.value }))} className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm">
                 {PAYOUT_METHODS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
-              <input value={form.payout_number} onChange={e => setForm(f => ({ ...f, payout_number: e.target.value }))} placeholder="Numéro de versement commissions" className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm" />
+              <input value={form.payout_number} onChange={e => setForm(f => ({ ...f, payout_number: e.target.value }))} placeholder="Numéro de versement commissions" className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm" />
             </>
           )}
 
@@ -383,7 +383,7 @@ export function LogisticsSignupWizard({ resume = false }: LogisticsSignupWizardP
                 <li>{form.commune_ids.length} commune(s) · SLA {form.sla_eta_default_minutes} min</li>
                 <li>Versement : {PAYOUT_METHODS.find(p => p.id === form.payout_method)?.label}</li>
               </ul>
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-900">
+              <div className="bg-amber-50 border border-amber-100 rounded-full p-4 text-sm text-amber-900">
                 Votre dossier passera en statut <strong>En validation</strong>. L&apos;équipe LaPlasse vérifie le KYC sous 48 h.
               </div>
             </>

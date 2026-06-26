@@ -120,7 +120,7 @@ function AdminDeliveryPageContent() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link
                 href="/admin/delivery/couriers"
-                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                className="flex items-center gap-3 bg-white rounded-full border border-slate-100 p-5 hover:border-brand-200 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Users size={22} className="text-brand-500 shrink-0" />
@@ -131,7 +131,7 @@ function AdminDeliveryPageContent() {
               </Link>
               <Link
                 href="/admin/delivery/assignments"
-                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                className="flex items-center gap-3 bg-white rounded-full border border-slate-100 p-5 hover:border-brand-200 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Truck size={22} className="text-brand-500 shrink-0" />
@@ -142,7 +142,7 @@ function AdminDeliveryPageContent() {
               </Link>
               <Link
                 href="/admin/delivery/disputes"
-                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                className="flex items-center gap-3 bg-white rounded-full border border-slate-100 p-5 hover:border-brand-200 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <AlertCircle size={22} className="text-amber-500 shrink-0" />
@@ -153,7 +153,7 @@ function AdminDeliveryPageContent() {
               </Link>
               <Link
                 href="/admin/delivery/partners"
-                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                className="flex items-center gap-3 bg-white rounded-full border border-slate-100 p-5 hover:border-brand-200 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Building2 size={22} className="text-indigo-500 shrink-0" />
@@ -164,7 +164,7 @@ function AdminDeliveryPageContent() {
               </Link>
               <Link
                 href="/admin/courier-reviews"
-                className="flex items-center gap-3 bg-white rounded-2xl border border-slate-100 p-5 hover:border-brand-200 transition-colors"
+                className="flex items-center gap-3 bg-white rounded-full border border-slate-100 p-5 hover:border-brand-200 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Star size={22} className="text-brand-500 shrink-0" />

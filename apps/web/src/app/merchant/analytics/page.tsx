@@ -114,14 +114,14 @@ function MerchantAnalyticsContent() {
             <div className="flex gap-2">
               <Link
                 href="/merchant/analytics"
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${!isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${!isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
                 style={{ textDecoration: 'none' }}
               >
                 Établissement
               </Link>
               <Link
                 href="/merchant/analytics?scope=organization"
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${isOrgScope ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}
                 style={{ textDecoration: 'none' }}
               >
                 Organisation

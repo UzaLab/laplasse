@@ -85,7 +85,7 @@ export function PwaInstallPrompt() {
               <button
                 type="button"
                 onClick={dismiss}
-                className="px-3 py-1.5 rounded-lg bg-white/10 text-xs font-semibold"
+                className="px-3 py-1.5 rounded-full bg-white/10 text-xs font-semibold"
               >
                 {t('pwa.later')}
               </button>
@@ -95,7 +95,7 @@ export function PwaInstallPrompt() {
             <button
               type="button"
               onClick={dismiss}
-              className="mt-3 px-3 py-1.5 rounded-lg bg-white/10 text-xs font-semibold"
+              className="mt-3 px-3 py-1.5 rounded-full bg-white/10 text-xs font-semibold"
             >
               {t('pwa.later')}
             </button>

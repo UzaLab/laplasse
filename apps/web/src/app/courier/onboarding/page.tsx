@@ -106,7 +106,7 @@ function OnboardingContent() {
 
         <Link
           href="/courier/dashboard"
-          className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+          className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 rounded-full font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
           style={{ textDecoration: 'none' }}
         >
           <MapPin size={18} /> Accéder à mon espace

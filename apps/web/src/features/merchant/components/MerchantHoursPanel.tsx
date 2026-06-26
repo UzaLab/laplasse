@@ -203,7 +203,7 @@ export function MerchantHoursPanel() {
           type="submit"
           form="hours-form"
           disabled={saving || !dirty}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shrink-0 self-start"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-full text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shrink-0 self-start"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           {saving ? 'Enregistrement…' : 'Enregistrer'}
@@ -262,14 +262,14 @@ export function MerchantHoursPanel() {
         <button
           type="button"
           onClick={applyWeekdayPreset}
-          className="text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
+          className="text-xs font-bold px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
         >
           Lun–Ven 8h–22h
         </button>
         <button
           type="button"
           onClick={copyMondayToAll}
-          className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-700 transition-colors"
         >
           <Copy size={13} /> Copier le lundi sur toute la semaine
         </button>
@@ -371,14 +371,14 @@ export function MerchantHoursPanel() {
           <button
             type="submit"
             disabled={saving || !dirty}
-            className="flex-1 py-3.5 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3.5 bg-slate-900 text-white font-extrabold rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {saving ? <><Loader2 size={18} className="animate-spin" /> Enregistrement…</> : <><Save size={18} /> Enregistrer les horaires</>}
           </button>
           {fromOnboarding && (
             <Link
               href="/merchant/onboarding"
-              className="py-3.5 px-6 border-2 border-slate-200 text-slate-700 font-bold rounded-2xl hover:bg-slate-50 transition-colors text-center text-sm"
+              className="py-3.5 px-6 border-2 border-slate-200 text-slate-700 font-bold rounded-full hover:bg-slate-50 transition-colors text-center text-sm"
               style={{ textDecoration: 'none' }}
             >
               Retour onboarding

@@ -26,7 +26,7 @@ export function VerticalPreviewSnippet({ item, merchantSlug, className = '' }: V
   return (
     <Link
       href={href}
-      className={`block bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-100 hover:border-brand-200 transition-colors group/vitrine ${className}`}
+      className={`block bg-slate-50 p-2.5 sm:p-3 rounded-full border border-slate-100 hover:border-brand-200 transition-colors group/vitrine ${className}`}
       style={{ textDecoration: 'none' }}
     >
       <div className="flex items-center gap-3">

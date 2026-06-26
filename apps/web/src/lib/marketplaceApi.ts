@@ -11,7 +11,7 @@ export type FetchResult<T> =
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ProductStatus = 'DRAFT' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
+export type ProductStatus = 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
 export type OrderStatus =
   | 'PENDING'
   | 'CONFIRMED'
@@ -75,6 +75,9 @@ export interface MerchantOrderReturn extends OrderReturnRequest {
 export interface ProductVariant {
   id: string
   name: string
+  kind?: 'TEXT' | 'COLOR'
+  color_hex?: string | null
+  image_url?: string | null
   price: number
   stock_quantity: number
   sku?: string | null
@@ -379,6 +382,9 @@ export interface ConfirmPaymentResult {
 
 export interface ProductVariantInput {
   name: string
+  kind?: 'TEXT' | 'COLOR'
+  color_hex?: string
+  image_url?: string
   price: number
   stock_quantity?: number
   sku?: string
@@ -1055,6 +1061,7 @@ export const ORDER_STATUS_STYLES: Record<string, string> = {
 
 export const PRODUCT_STATUS_LABELS: Record<ProductStatus, string> = {
   DRAFT: 'Brouillon',
+  PENDING_REVIEW: 'En validation',
   ACTIVE: 'Actif',
   OUT_OF_STOCK: 'Rupture',
   ARCHIVED: 'Archivé',

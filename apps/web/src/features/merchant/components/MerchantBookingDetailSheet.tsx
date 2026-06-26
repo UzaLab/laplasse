@@ -119,7 +119,7 @@ export function MerchantBookingDetailSheet({
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
+            className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 shrink-0"
             aria-label="Fermer"
           >
             <X size={18} />
@@ -157,7 +157,7 @@ export function MerchantBookingDetailSheet({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
             <a
               href={`tel:${booking.guest_phone}`}
-              className="flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="flex items-center justify-center gap-2 h-11 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
               style={{ textDecoration: 'none' }}
             >
               <Phone size={15} className="text-emerald-500" /> Appeler
@@ -165,7 +165,7 @@ export function MerchantBookingDetailSheet({
             {booking.guest_email ? (
               <a
                 href={`mailto:${booking.guest_email}`}
-                className="flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                className="flex items-center justify-center gap-2 h-11 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50"
                 style={{ textDecoration: 'none' }}
               >
                 <Mail size={15} className="text-sky-500" /> E-mail
@@ -174,7 +174,7 @@ export function MerchantBookingDetailSheet({
               <button
                 type="button"
                 disabled
-                className="flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-100 text-sm font-bold text-slate-300 cursor-not-allowed"
+                className="flex items-center justify-center gap-2 h-11 rounded-full border border-slate-100 text-sm font-bold text-slate-300 cursor-not-allowed"
               >
                 <Mail size={15} /> E-mail
               </button>
@@ -182,7 +182,7 @@ export function MerchantBookingDetailSheet({
             <button
               type="button"
               onClick={copyPhone}
-              className="flex items-center justify-center gap-2 h-11 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 col-span-2 sm:col-span-1"
+              className="flex items-center justify-center gap-2 h-11 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 col-span-2 sm:col-span-1"
             >
               <Copy size={15} className="text-slate-400" />
               {copied ? 'Copié !' : 'Copier tél.'}

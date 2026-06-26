@@ -74,7 +74,7 @@ export function CountrySuggestionBanner() {
             <button
               type="button"
               onClick={switchCountry}
-              className="px-3 py-1.5 bg-brand-500 hover:bg-brand-400 text-white text-xs font-bold rounded-lg transition-colors"
+              className="px-3 py-1.5 bg-brand-500 hover:bg-brand-400 text-white text-xs font-bold rounded-full transition-colors"
             >
               {t('geo.suggestSwitch', { country: label })}
             </button>

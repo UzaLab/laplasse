@@ -1,15 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
   ExternalLink,
   Eye,
   EyeOff,
+  Layers,
   Loader2,
   Pencil,
   Plus,
+  Search,
+  Settings2,
   Trash2,
   UtensilsCrossed,
   X,
@@ -18,17 +23,13 @@ import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { parseApiError, formatPrice } from '@/lib/marketplaceApi'
 import { notify } from '@/lib/notify'
+import { MenuItemThumb } from '@/features/merchant/components/MerchantMediathequeField'
 import {
-  MenuItemThumb,
-  MerchantMediathequeField,
-} from '@/features/merchant/components/MerchantMediathequeField'
-import { MenuModifiersEditor } from '@/features/merchant/components/MenuModifiersEditor'
-import {
-  modifierGroupsFromApi,
-  modifierGroupsToPayload,
-  type MenuModifierGroup,
-  type ModifierGroupDraft,
-} from '@/lib/menuModifiers'
+  EMPTY_MENU_ITEM_FORM,
+  MenuItemDrawer,
+  type MenuItemFormState,
+} from '@/features/merchant/components/menu/MenuItemDrawer'
+import { modifierGroupsToPayload, type MenuModifierGroup, type ModifierGroupDraft } from '@/lib/menuModifiers'
 
 interface MenuSection {
   id: string
@@ -51,44 +52,76 @@ interface MenuItem {
   modifier_groups: MenuModifierGroup[]
 }
 
-const INPUT =
-  'w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm bg-white outline-none focus:border-orange-400'
+type PageTab = 'menu' | 'settings'
+type VisibilityFilter = 'all' | 'visible' | 'hidden'
+type SectionFilter = 'all' | 'none' | string
 
-type ItemFormState = {
-  name: string
-  price: string
-  section_id: string
-  description: string
-  image_url: string
+const INPUT =
+  'w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-500/10'
+
+function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 px-4 py-3 min-w-[120px]">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="text-2xl font-extrabold text-slate-900 tabular-nums mt-0.5">{value}</p>
+      {hint && <p className="text-[11px] text-slate-400 mt-0.5">{hint}</p>}
+    </div>
+  )
 }
 
-const EMPTY_ITEM_FORM: ItemFormState = {
-  name: '',
-  price: '',
-  section_id: '',
-  description: '',
-  image_url: '',
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap transition-colors ${
+        active
+          ? 'bg-orange-600 text-white border-orange-600'
+          : 'bg-white text-slate-600 border-slate-200 hover:border-orange-200'
+      }`}
+    >
+      {children}
+    </button>
+  )
 }
 
 export function MerchantMenuPanel() {
   const { activeMerchantId, user } = useAuthStore()
   const activeMerchant = user?.merchants?.find(m => m.id === activeMerchantId)
+
   const [sections, setSections] = useState<MenuSection[]>([])
   const [items, setItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [pageTab, setPageTab] = useState<PageTab>('menu')
+
+  const [search, setSearch] = useState('')
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all')
+  const [sectionFilter, setSectionFilter] = useState<SectionFilter>('all')
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+
   const [sectionName, setSectionName] = useState('')
-  const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<ItemFormState>(EMPTY_ITEM_FORM)
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
   const [sectionEditName, setSectionEditName] = useState('')
+
   const [foodPrepMinutes, setFoodPrepMinutes] = useState('25')
   const [savingPrep, setSavingPrep] = useState(false)
-  const [editPrepMinutes, setEditPrepMinutes] = useState('')
-  const [editModifierGroups, setEditModifierGroups] = useState<ModifierGroupDraft[]>([])
 
-  const load = async () => {
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create')
+  const [drawerForm, setDrawerForm] = useState<MenuItemFormState>(EMPTY_MENU_ITEM_FORM)
+  const [drawerModifiers, setDrawerModifiers] = useState<MenuModifierGroup[]>([])
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
     if (!activeMerchantId) return
     setLoading(true)
     const res = await merchantApiFetch('/merchant-menu/mine', activeMerchantId)
@@ -99,12 +132,78 @@ export function MerchantMenuPanel() {
       setFoodPrepMinutes(String(data.food_prep_minutes ?? 25))
     }
     setLoading(false)
-  }
+  }, [activeMerchantId])
 
   useEffect(() => {
     void load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMerchantId])
+  }, [load])
+
+  const stats = useMemo(() => ({
+    total: items.length,
+    visible: items.filter(i => i.is_available).length,
+    hidden: items.filter(i => !i.is_available).length,
+    withOptions: items.filter(i => (i.modifier_groups?.length ?? 0) > 0).length,
+    sectionsActive: sections.filter(s => s.is_active).length,
+  }), [items, sections])
+
+  const uncategorizedCount = useMemo(
+    () => items.filter(i => !i.section_id).length,
+    [items],
+  )
+
+  const filteredItems = useMemo(() => {
+    let list = [...items]
+    if (sectionFilter === 'none') {
+      list = list.filter(i => !i.section_id)
+    } else if (sectionFilter !== 'all') {
+      list = list.filter(i => i.section_id === sectionFilter)
+    }
+    if (visibilityFilter === 'visible') list = list.filter(i => i.is_available)
+    if (visibilityFilter === 'hidden') list = list.filter(i => !i.is_available)
+    const q = search.trim().toLowerCase()
+    if (q) {
+      list = list.filter(
+        i =>
+          i.name.toLowerCase().includes(q) ||
+          (i.description?.toLowerCase().includes(q) ?? false),
+      )
+    }
+    return list.sort((a, b) => a.sort_order - b.sort_order)
+  }, [items, sectionFilter, visibilityFilter, search])
+
+  const itemsBySection = useMemo(() => {
+    const map = new Map<string | 'none', MenuItem[]>()
+    for (const item of filteredItems) {
+      const key = item.section_id ?? 'none'
+      const list = map.get(key) ?? []
+      list.push(item)
+      map.set(key, list)
+    }
+    return map
+  }, [filteredItems])
+
+  const openCreateDrawer = (sectionId?: string) => {
+    setDrawerMode('create')
+    setEditingItemId(null)
+    setDrawerForm({ ...EMPTY_MENU_ITEM_FORM, section_id: sectionId ?? '' })
+    setDrawerModifiers([])
+    setDrawerOpen(true)
+  }
+
+  const openEditDrawer = (item: MenuItem) => {
+    setDrawerMode('edit')
+    setEditingItemId(item.id)
+    setDrawerForm({
+      name: item.name,
+      price: String(item.price),
+      section_id: item.section_id ?? '',
+      description: item.description ?? '',
+      image_url: item.image_url ?? '',
+      prep_minutes: item.prep_minutes != null ? String(item.prep_minutes) : '',
+    })
+    setDrawerModifiers(item.modifier_groups ?? [])
+    setDrawerOpen(true)
+  }
 
   const addSection = async () => {
     if (!sectionName.trim()) return
@@ -136,7 +235,7 @@ export function MerchantMenuPanel() {
       return
     }
     setEditingSectionId(null)
-    notify.success('Section mise à jour')
+    notify.success('Section renommée')
     void load()
   }
 
@@ -152,7 +251,7 @@ export function MerchantMenuPanel() {
       notify.error(await parseApiError(res))
       return
     }
-    notify.success(section.is_active ? 'Section masquée' : 'Section activée')
+    notify.success(section.is_active ? 'Section masquée' : 'Section visible')
     void load()
   }
 
@@ -164,79 +263,98 @@ export function MerchantMenuPanel() {
     if (!res.ok) notify.error(await parseApiError(res))
     else {
       notify.success('Section supprimée')
+      if (sectionFilter === sectionId) setSectionFilter('all')
       void load()
     }
   }
 
-  const addItem = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const res = await merchantApiFetch('/merchant-menu/items', activeMerchantId, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: itemForm.name.trim(),
-        price: Number(itemForm.price),
-        section_id: itemForm.section_id || undefined,
-        description: itemForm.description.trim() || undefined,
-        image_url: itemForm.image_url.trim() || undefined,
+  const moveSection = async (section: MenuSection, direction: 'up' | 'down') => {
+    const sorted = [...sections].sort((a, b) => a.sort_order - b.sort_order)
+    const idx = sorted.findIndex(s => s.id === section.id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sorted.length) return
+    const other = sorted[swapIdx]
+    setSavingId(section.id)
+    const [resA, resB] = await Promise.all([
+      merchantApiFetch(`/merchant-menu/sections/${section.id}`, activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: other.sort_order }),
       }),
-    })
-    if (!res.ok) {
-      notify.error(await parseApiError(res))
-      return
-    }
-    setItemForm(EMPTY_ITEM_FORM)
-    notify.success('Plat ajouté')
-    void load()
+      merchantApiFetch(`/merchant-menu/sections/${other.id}`, activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: section.sort_order }),
+      }),
+    ])
+    setSavingId(null)
+    if (!resA.ok || !resB.ok) notify.error('Réorganisation impossible')
+    else void load()
   }
 
-  const saveFoodPrepMinutes = async () => {
-    const minutes = Number(foodPrepMinutes)
-    if (!Number.isFinite(minutes) || minutes < 5) {
-      notify.error('Délai de préparation invalide (min. 5 min)')
-      return
-    }
-    setSavingPrep(true)
-    const res = await merchantApiFetch('/merchant-menu/settings', activeMerchantId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ food_prep_minutes: minutes }),
-    })
-    setSavingPrep(false)
-    if (!res.ok) {
-      notify.error(await parseApiError(res))
-      return
-    }
-    notify.success('Délai de préparation enregistré')
+  const moveItem = async (item: MenuItem, siblings: MenuItem[], direction: 'up' | 'down') => {
+    const sorted = [...siblings].sort((a, b) => a.sort_order - b.sort_order)
+    const idx = sorted.findIndex(i => i.id === item.id)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= sorted.length) return
+    const other = sorted[swapIdx]
+    setSavingId(item.id)
+    const [resA, resB] = await Promise.all([
+      merchantApiFetch(`/merchant-menu/items/${item.id}`, activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: other.sort_order }),
+      }),
+      merchantApiFetch(`/merchant-menu/items/${other.id}`, activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sort_order: item.sort_order }),
+      }),
+    ])
+    setSavingId(null)
+    if (!resA.ok || !resB.ok) notify.error('Réorganisation impossible')
+    else void load()
   }
 
-  const startEditItem = (item: MenuItem) => {
-    setEditingItemId(item.id)
-    setEditForm({
-      name: item.name,
-      price: String(item.price),
-      section_id: item.section_id ?? '',
-      description: item.description ?? '',
-      image_url: item.image_url ?? '',
-    })
-    setEditPrepMinutes(item.prep_minutes != null ? String(item.prep_minutes) : '')
-    setEditModifierGroups(modifierGroupsFromApi(item.modifier_groups ?? []))
-  }
+  const submitDrawer = async (form: MenuItemFormState, modifiers: ModifierGroupDraft[]) => {
+    if (drawerMode === 'create') {
+      setSavingId('create')
+      const res = await merchantApiFetch('/merchant-menu/items', activeMerchantId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          price: Number(form.price),
+          section_id: form.section_id || undefined,
+          description: form.description.trim() || undefined,
+          image_url: form.image_url.trim() || undefined,
+          prep_minutes: form.prep_minutes.trim() ? Number(form.prep_minutes) : undefined,
+        }),
+      })
+      setSavingId(null)
+      if (!res.ok) {
+        notify.error(await parseApiError(res))
+        return
+      }
+      notify.success('Plat ajouté — ajoutez des options via « Modifier »')
+      setDrawerOpen(false)
+      void load()
+      return
+    }
 
-  const saveEditItem = async () => {
     if (!editingItemId) return
     setSavingId(editingItemId)
     const res = await merchantApiFetch(`/merchant-menu/items/${editingItemId}`, activeMerchantId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: editForm.name.trim(),
-        price: Number(editForm.price),
-        section_id: editForm.section_id || null,
-        description: editForm.description.trim() || undefined,
-        image_url: editForm.image_url.trim() || null,
-        prep_minutes: editPrepMinutes.trim() ? Number(editPrepMinutes) : null,
-        modifier_groups: modifierGroupsToPayload(editModifierGroups),
+        name: form.name.trim(),
+        price: Number(form.price),
+        section_id: form.section_id || null,
+        description: form.description.trim() || undefined,
+        image_url: form.image_url.trim() || null,
+        prep_minutes: form.prep_minutes.trim() ? Number(form.prep_minutes) : null,
+        modifier_groups: modifierGroupsToPayload(modifiers),
       }),
     })
     setSavingId(null)
@@ -244,8 +362,8 @@ export function MerchantMenuPanel() {
       notify.error(await parseApiError(res))
       return
     }
-    setEditingItemId(null)
     notify.success('Plat mis à jour')
+    setDrawerOpen(false)
     void load()
   }
 
@@ -257,11 +375,8 @@ export function MerchantMenuPanel() {
       body: JSON.stringify({ is_available: !item.is_available }),
     })
     setSavingId(null)
-    if (!res.ok) {
-      notify.error(await parseApiError(res))
-      return
-    }
-    void load()
+    if (!res.ok) notify.error(await parseApiError(res))
+    else void load()
   }
 
   const removeItem = async (id: string) => {
@@ -275,124 +390,57 @@ export function MerchantMenuPanel() {
     } else notify.error(await parseApiError(res))
   }
 
-  const itemsBySection = useMemo(() => {
-    const map = new Map<string | 'none', MenuItem[]>()
-    for (const item of items) {
-      const key = item.section_id ?? 'none'
-      const list = map.get(key) ?? []
-      list.push(item)
-      map.set(key, list)
+  const saveFoodPrepMinutes = async () => {
+    const minutes = Number(foodPrepMinutes)
+    if (!Number.isFinite(minutes) || minutes < 5) {
+      notify.error('Délai invalide (minimum 5 min)')
+      return
     }
-    return map
-  }, [items])
+    setSavingPrep(true)
+    const res = await merchantApiFetch('/merchant-menu/settings', activeMerchantId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ food_prep_minutes: minutes }),
+    })
+    setSavingPrep(false)
+    if (!res.ok) notify.error(await parseApiError(res))
+    else notify.success('Paramètres enregistrés')
+  }
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    visible: items.filter(i => i.is_available).length,
-    sectionsActive: sections.filter(s => s.is_active).length,
-  }), [items, sections])
+  const toggleSectionCollapsed = (key: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
-  const renderItemRow = (item: MenuItem) => {
-    if (editingItemId === item.id) {
-      return (
-        <div key={item.id} className="bg-orange-50/50 rounded-2xl border border-orange-200 p-4 space-y-3">
-          <p className="text-xs font-bold text-orange-800 uppercase tracking-wide">Modifier le plat</p>
-          <input
-            required
-            value={editForm.name}
-            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-            className={INPUT}
-            placeholder="Nom du plat"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              required
-              type="number"
-              min={0}
-              value={editForm.price}
-              onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
-              className={INPUT}
-              placeholder="Prix FCFA"
-            />
-            <select
-              value={editForm.section_id}
-              onChange={e => setEditForm(f => ({ ...f, section_id: e.target.value }))}
-              className={INPUT}
-            >
-              <option value="">Sans section</option>
-              {sections.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <input
-            value={editForm.description}
-            onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-            className={INPUT}
-            placeholder="Description"
-          />
-          <MerchantMediathequeField
-            mode="single"
-            merchantId={activeMerchantId}
-            value={editForm.image_url}
-            onChange={url => setEditForm(f => ({ ...f, image_url: url }))}
-            label="Photo du plat"
-          />
-          <label className="block text-xs">
-            <span className="font-bold text-slate-500">Préparation (min, optionnel)</span>
-            <input
-              type="number"
-              min={1}
-              value={editPrepMinutes}
-              onChange={e => setEditPrepMinutes(e.target.value)}
-              placeholder="Hérite du délai restaurant"
-              className={`mt-1 ${INPUT}`}
-            />
-          </label>
-          <MenuModifiersEditor groups={editModifierGroups} onChange={setEditModifierGroups} />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => void saveEditItem()}
-              disabled={savingId === item.id}
-              className="inline-flex items-center gap-1 px-4 py-2 bg-orange-600 text-white rounded-xl text-sm font-bold"
-            >
-              {savingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              Enregistrer
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingItemId(null)}
-              className="inline-flex items-center gap-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600"
-            >
-              <X size={14} /> Annuler
-            </button>
-          </div>
-        </div>
-      )
-    }
+  const renderItemCard = (item: MenuItem, siblings: MenuItem[]) => {
+    const sorted = [...siblings].sort((a, b) => a.sort_order - b.sort_order)
+    const idx = sorted.findIndex(i => i.id === item.id)
 
     return (
       <div
         key={item.id}
-        className={`flex items-start gap-3 rounded-2xl border p-3 sm:p-4 transition-opacity ${
+        className={`group flex items-start gap-3 rounded-2xl border p-3 sm:p-4 transition-all ${
           item.is_available
-            ? 'bg-white border-slate-100'
-            : 'bg-slate-50 border-slate-200 opacity-75'
+            ? 'bg-white border-slate-100 hover:border-orange-100 hover:shadow-sm'
+            : 'bg-slate-50/80 border-slate-200 opacity-80'
         }`}
       >
         <MenuItemThumb url={item.image_url} name={item.name} />
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-bold text-slate-900 text-sm sm:text-base">{item.name}</p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="font-bold text-slate-900 text-sm sm:text-base leading-tight">{item.name}</p>
             {!item.is_available && (
-              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
                 Masqué
               </span>
             )}
             {(item.modifier_groups?.length ?? 0) > 0 && (
-              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                Options
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                {item.modifier_groups.length} option{item.modifier_groups.length > 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -400,13 +448,38 @@ export function MerchantMenuPanel() {
             {formatPrice(item.price, item.currency)}
           </p>
           {item.description && (
-            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{item.description}</p>
+            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.description}</p>
+          )}
+          {item.prep_minutes != null && (
+            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <Clock size={11} /> {item.prep_minutes} min
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0 self-center">
+        <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1 shrink-0">
+          <div className="hidden sm:flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              disabled={savingId === item.id || idx <= 0}
+              onClick={() => void moveItem(item, sorted, 'up')}
+              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+              title="Monter"
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={savingId === item.id || idx >= sorted.length - 1}
+              onClick={() => void moveItem(item, sorted, 'down')}
+              className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+              title="Descendre"
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
           <button
             type="button"
-            title={item.is_available ? 'Masquer le plat' : 'Afficher le plat'}
+            title={item.is_available ? 'Masquer' : 'Afficher'}
             disabled={savingId === item.id}
             onClick={() => void toggleItemAvailable(item)}
             className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
@@ -426,7 +499,7 @@ export function MerchantMenuPanel() {
           <button
             type="button"
             title="Modifier"
-            onClick={() => startEditItem(item)}
+            onClick={() => openEditDrawer(item)}
             className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
           >
             <Pencil size={15} />
@@ -444,62 +517,96 @@ export function MerchantMenuPanel() {
     )
   }
 
-  const renderSectionBlock = (section: MenuSection) => {
-    const sectionItems = itemsBySection.get(section.id) ?? []
+  const renderSectionHeader = (section: MenuSection, count: number) => {
+    const isCollapsed = collapsedSections.has(section.id)
+
     return (
-      <section
-        key={section.id}
-        className={`rounded-2xl border p-4 sm:p-5 ${
-          section.is_active ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-200'
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          {editingSectionId === section.id ? (
-            <div className="flex flex-1 gap-2 min-w-[200px]">
-              <input
-                value={sectionEditName}
-                onChange={e => setSectionEditName(e.target.value)}
-                className={`${INPUT} flex-1`}
-              />
-              <button
-                type="button"
-                onClick={() => void saveSectionName(section.id)}
-                className="px-3 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold"
-              >
-                <Check size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingSectionId(null)}
-                className="px-3 py-2 border border-slate-200 rounded-xl"
-              >
-                <X size={14} />
-              </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        {editingSectionId === section.id ? (
+          <div className="flex flex-1 gap-2 min-w-[200px]">
+            <input
+              value={sectionEditName}
+              onChange={e => setSectionEditName(e.target.value)}
+              className={`${INPUT} flex-1`}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => void saveSectionName(section.id)}
+              className="px-3 py-2 bg-orange-600 text-white rounded-xl text-sm font-bold"
+            >
+              OK
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingSectionId(null)}
+              className="px-3 py-2 border border-slate-200 rounded-xl"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => toggleSectionCollapsed(section.id)}
+            className="flex items-center gap-2 min-w-0 text-left"
+          >
+            <ChevronDown
+              size={18}
+              className={`text-slate-400 shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+            />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">{section.name}</h3>
+                {!section.is_active && (
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Masquée
+                  </span>
+                )}
+                <span className="text-xs font-bold text-slate-400 tabular-nums">{count}</span>
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-lg font-extrabold text-slate-900 truncate">{section.name}</h3>
-              {!section.is_active && (
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                  Section masquée
-                </span>
-              )}
-              <span className="text-xs text-slate-400">{sectionItems.length} plat(s)</span>
-            </div>
-          )}
+          </button>
+        )}
+
+        {editingSectionId !== section.id && (
           <div className="flex items-center gap-1">
             <button
               type="button"
-              title={section.is_active ? 'Masquer la section' : 'Activer la section'}
+              onClick={() => openCreateDrawer(section.id)}
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-orange-700 bg-orange-50 hover:bg-orange-100"
+            >
+              <Plus size={12} /> Plat
+            </button>
+            <button
+              type="button"
+              disabled={savingId === section.id}
+              onClick={() => void moveSection(section, 'up')}
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+              title="Monter la section"
+            >
+              <ChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={savingId === section.id}
+              onClick={() => void moveSection(section, 'down')}
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+              title="Descendre la section"
+            >
+              <ChevronDown size={14} />
+            </button>
+            <button
+              type="button"
               disabled={savingId === section.id}
               onClick={() => void toggleSectionActive(section)}
-              className={`w-9 h-9 rounded-xl border flex items-center justify-center ${
+              className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
                 section.is_active
                   ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
                   : 'border-slate-200 text-slate-400'
               }`}
             >
-              {section.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
+              {section.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
             </button>
             <button
               type="button"
@@ -507,169 +614,342 @@ export function MerchantMenuPanel() {
                 setEditingSectionId(section.id)
                 setSectionEditName(section.name)
               }}
-              className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
             >
-              <Pencil size={15} />
+              <Pencil size={14} />
             </button>
             <button
               type="button"
               onClick={() => void removeSection(section.id)}
-              className="w-9 h-9 rounded-xl border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
+              className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50"
             >
-              <Trash2 size={15} />
+              <Trash2 size={14} />
             </button>
           </div>
-        </div>
-        {sectionItems.length === 0 ? (
-          <p className="text-sm text-slate-400 italic">Aucun plat dans cette section.</p>
-        ) : (
-          <div className="space-y-2">{sectionItems.map(renderItemRow)}</div>
         )}
-      </section>
+      </div>
+    )
+  }
+
+  const renderMenuContent = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center py-16">
+          <Loader2 className="animate-spin text-slate-300" size={32} />
+        </div>
+      )
+    }
+
+    if (items.length === 0 && sections.length === 0) {
+      return (
+        <div className="text-center py-16 px-6 bg-white rounded-2xl border border-dashed border-slate-200">
+          <UtensilsCrossed size={40} className="mx-auto text-slate-200 mb-3" />
+          <p className="font-bold text-slate-700">Votre carte est vide</p>
+          <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+            Créez une section puis ajoutez vos premiers plats. Ils apparaîtront sur votre fiche établissement.
+          </p>
+          <button
+            type="button"
+            onClick={() => openCreateDrawer()}
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold"
+          >
+            <Plus size={16} /> Ajouter un plat
+          </button>
+        </div>
+      )
+    }
+
+    if (filteredItems.length === 0) {
+      return (
+        <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
+          <Search size={32} className="mx-auto text-slate-200 mb-2" />
+          <p className="font-bold text-slate-600">Aucun plat trouvé</p>
+          <p className="text-sm text-slate-400 mt-1">Modifiez la recherche ou les filtres.</p>
+        </div>
+      )
+    }
+
+    if (sectionFilter !== 'all') {
+      const key = sectionFilter === 'none' ? 'none' : sectionFilter
+      const sectionItems = itemsBySection.get(key) ?? []
+      const section = sections.find(s => s.id === sectionFilter)
+
+      return (
+        <div className="space-y-2">
+          {section && renderSectionHeader(section, sectionItems.length)}
+          {sectionItems.map(item => renderItemCard(item, sectionItems))}
+        </div>
+      )
+    }
+
+    const sortedSections = [...sections].sort((a, b) => a.sort_order - b.sort_order)
+
+    return (
+      <div className="space-y-6">
+        {sortedSections.map(section => {
+          const sectionItems = itemsBySection.get(section.id) ?? []
+          if (sectionItems.length === 0 && search.trim()) return null
+          const isCollapsed = collapsedSections.has(section.id)
+
+          return (
+            <section
+              key={section.id}
+              className={`rounded-2xl border p-4 sm:p-5 ${
+                section.is_active ? 'bg-white border-slate-100' : 'bg-slate-50 border-slate-200'
+              }`}
+            >
+              {renderSectionHeader(section, sectionItems.length)}
+              {!isCollapsed && (
+                sectionItems.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic pl-7">Aucun plat — ajoutez-en un à cette section.</p>
+                ) : (
+                  <div className="space-y-2 pl-0 sm:pl-7">
+                    {sectionItems.map(item => renderItemCard(item, sectionItems))}
+                  </div>
+                )
+              )}
+            </section>
+          )
+        })}
+
+        {(itemsBySection.get('none')?.length ?? 0) > 0 && (
+          <section className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5">
+            <button
+              type="button"
+              onClick={() => toggleSectionCollapsed('none')}
+              className="flex items-center gap-2 mb-3 w-full text-left"
+            >
+              <ChevronDown
+                size={18}
+                className={`text-slate-400 transition-transform ${collapsedSections.has('none') ? '-rotate-90' : ''}`}
+              />
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-900">Sans section</h3>
+              <span className="text-xs font-bold text-slate-400">{itemsBySection.get('none')!.length}</span>
+            </button>
+            {!collapsedSections.has('none') && (
+              <div className="space-y-2 pl-7">
+                {itemsBySection.get('none')!.map(item =>
+                  renderItemCard(item, itemsBySection.get('none')!),
+                )}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     )
   }
 
   if (!activeMerchantId) {
-    return (
-      <p className="text-slate-500 text-sm">Sélectionnez un établissement pour gérer le menu.</p>
-    )
+    return <p className="text-slate-500 text-sm">Sélectionnez un établissement pour gérer le menu.</p>
   }
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="w-full min-w-0 pb-8">
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-2">
-            <UtensilsCrossed size={24} className="text-orange-500" /> Menu & carte
+            <UtensilsCrossed size={26} className="text-orange-500" />
+            Menu & carte
           </h1>
-          <p className="text-slate-500 text-sm mt-1 max-w-xl">
-            Carte visible sur la fiche établissement — sans boutique e-commerce requise.
-          </p>
-          <p className="text-xs text-slate-400 mt-2">
-            {stats.visible}/{stats.total} plats visibles · {stats.sectionsActive}/{sections.length} sections actives
+          <p className="text-slate-500 text-sm mt-1 max-w-lg">
+            Gérez la carte affichée sur votre fiche établissement — indépendamment de la boutique en ligne.
           </p>
         </div>
-        {activeMerchant?.slug && (
-          <Link
-            href={`/m/${activeMerchant.slug}?tab=menu#profile-tabs`}
-            target="_blank"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50"
-            style={{ textDecoration: 'none' }}
-          >
-            Voir le menu public <ExternalLink size={14} />
-          </Link>
-        )}
-      </div>
-
-      <div className="mb-6 bg-white rounded-2xl border border-slate-100 p-4 flex flex-wrap items-end gap-3">
-        <label className="block flex-1 min-w-[180px]">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-            Délai préparation par défaut (min)
-          </span>
-          <input
-            type="number"
-            min={5}
-            value={foodPrepMinutes}
-            onChange={e => setFoodPrepMinutes(e.target.value)}
-            className={`mt-1 ${INPUT}`}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={savingPrep}
-          onClick={() => void saveFoodPrepMinutes()}
-          className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60"
-        >
-          {savingPrep ? 'Enregistrement…' : 'Enregistrer délai'}
-        </button>
-      </div>
-
-      <div className="flex gap-2 mb-6">
-        <input
-          value={sectionName}
-          onChange={e => setSectionName(e.target.value)}
-          placeholder="Nouvelle section (ex. Plats du terroir)"
-          className={`${INPUT} flex-1`}
-          onKeyDown={e => { if (e.key === 'Enter') void addSection() }}
-        />
-        <button
-          type="button"
-          onClick={() => void addSection()}
-          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold flex items-center gap-1 shrink-0"
-        >
-          <Plus size={14} /> Section
-        </button>
-      </div>
-
-      <form onSubmit={addItem} className="bg-white rounded-2xl border border-slate-100 p-5 mb-8 space-y-4">
-        <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Plus size={16} className="text-orange-500" /> Nouveau plat
-        </p>
-        <input
-          required
-          placeholder="Nom du plat *"
-          value={itemForm.name}
-          onChange={e => setItemForm(f => ({ ...f, name: e.target.value }))}
-          className={INPUT}
-        />
-        <div className="grid sm:grid-cols-2 gap-3">
-          <input
-            required
-            type="number"
-            min={0}
-            placeholder="Prix FCFA *"
-            value={itemForm.price}
-            onChange={e => setItemForm(f => ({ ...f, price: e.target.value }))}
-            className={INPUT}
-          />
-          <select
-            value={itemForm.section_id}
-            onChange={e => setItemForm(f => ({ ...f, section_id: e.target.value }))}
-            className={INPUT}
-          >
-            <option value="">Sans section</option>
-            {sections.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-        <input
-          placeholder="Description (optionnel)"
-          value={itemForm.description}
-          onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))}
-          className={INPUT}
-        />
-        <MerchantMediathequeField
-          mode="single"
-          merchantId={activeMerchantId}
-          value={itemForm.image_url}
-          onChange={url => setItemForm(f => ({ ...f, image_url: url }))}
-          label="Photo du plat"
-        />
-        <button type="submit" className="px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold hover:bg-orange-700">
-          Ajouter le plat
-        </button>
-      </form>
-
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="animate-spin text-slate-400" />
-        </div>
-      ) : items.length === 0 && sections.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-8 bg-white rounded-2xl border border-slate-100">
-          Aucun plat — composez votre carte.
-        </p>
-      ) : (
-        <div className="space-y-6">
-          {sections.map(renderSectionBlock)}
-          {(itemsBySection.get('none')?.length ?? 0) > 0 && (
-            <section className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5">
-              <h3 className="text-lg font-extrabold text-slate-900 mb-4">Sans section</h3>
-              <div className="space-y-2">{itemsBySection.get('none')!.map(renderItemRow)}</div>
-            </section>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {activeMerchant?.slug && (
+            <Link
+              href={`/m/${activeMerchant.slug}?tab=menu#profile-tabs`}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-bold text-slate-700 hover:bg-slate-50"
+              style={{ textDecoration: 'none' }}
+            >
+              Voir en ligne <ExternalLink size={14} />
+            </Link>
           )}
+          <button
+            type="button"
+            onClick={() => openCreateDrawer(sectionFilter !== 'all' && sectionFilter !== 'none' ? sectionFilter : undefined)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold hover:bg-orange-700"
+          >
+            <Plus size={16} /> Nouveau plat
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Plats" value={stats.total} hint={`${stats.visible} visibles`} />
+        <StatCard label="Sections" value={sections.length} hint={`${stats.sectionsActive} actives`} />
+        <StatCard label="Masqués" value={stats.hidden} />
+        <StatCard label="Avec options" value={stats.withOptions} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 rounded-2xl p-1 w-fit mb-6">
+        {([
+          { id: 'menu' as const, label: 'Carte', icon: Layers },
+          { id: 'settings' as const, label: 'Paramètres', icon: Settings2 },
+        ]).map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setPageTab(t.id)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              pageTab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <t.icon size={15} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {pageTab === 'settings' ? (
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 max-w-lg">
+          <h2 className="text-lg font-extrabold text-slate-900 mb-1">Délai de préparation</h2>
+          <p className="text-sm text-slate-500 mb-4">
+            Délai par défaut affiché aux clients pour les plats sans temps de préparation spécifique.
+          </p>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Minutes</span>
+            <input
+              type="number"
+              min={5}
+              value={foodPrepMinutes}
+              onChange={e => setFoodPrepMinutes(e.target.value)}
+              className={`mt-1.5 ${INPUT}`}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={savingPrep}
+            onClick={() => void saveFoodPrepMinutes()}
+            className="mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60"
+          >
+            {savingPrep ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-[240px_1fr] gap-6">
+          {/* Sidebar sections */}
+          <aside className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-100 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Sections</p>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setSectionFilter('all')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                    sectionFilter === 'all'
+                      ? 'bg-orange-50 text-orange-800'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>Toute la carte</span>
+                  <span className="text-xs tabular-nums opacity-60">{items.length}</span>
+                </button>
+                {[...sections]
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .map(section => {
+                    const count = items.filter(i => i.section_id === section.id).length
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setSectionFilter(section.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                          sectionFilter === section.id
+                            ? 'bg-orange-50 text-orange-800'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="truncate text-left flex items-center gap-1.5 min-w-0">
+                          {!section.is_active && <EyeOff size={12} className="shrink-0 text-slate-400" />}
+                          <span className="truncate">{section.name}</span>
+                        </span>
+                        <span className="text-xs tabular-nums opacity-60 shrink-0 ml-2">{count}</span>
+                      </button>
+                    )
+                  })}
+                {uncategorizedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSectionFilter('none')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-bold transition-colors ${
+                      sectionFilter === 'none'
+                        ? 'bg-orange-50 text-orange-800'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Sans section</span>
+                    <span className="text-xs tabular-nums opacity-60">{uncategorizedCount}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+                <input
+                  value={sectionName}
+                  onChange={e => setSectionName(e.target.value)}
+                  placeholder="Nouvelle section"
+                  className={`${INPUT} text-xs py-2`}
+                  onKeyDown={e => { if (e.key === 'Enter') void addSection() }}
+                />
+                <button
+                  type="button"
+                  onClick={() => void addSection()}
+                  className="shrink-0 w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center"
+                  title="Créer section"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main content */}
+          <div className="min-w-0 space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Rechercher un plat…"
+                  className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none focus:border-orange-400"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <FilterChip active={visibilityFilter === 'all'} onClick={() => setVisibilityFilter('all')}>
+                  Tous
+                </FilterChip>
+                <FilterChip active={visibilityFilter === 'visible'} onClick={() => setVisibilityFilter('visible')}>
+                  Visibles ({stats.visible})
+                </FilterChip>
+                <FilterChip active={visibilityFilter === 'hidden'} onClick={() => setVisibilityFilter('hidden')}>
+                  Masqués ({stats.hidden})
+                </FilterChip>
+              </div>
+            </div>
+
+            {renderMenuContent()}
+          </div>
         </div>
       )}
+
+      <MenuItemDrawer
+        open={drawerOpen}
+        mode={drawerMode}
+        merchantId={activeMerchantId}
+        sections={sections}
+        initialForm={drawerForm}
+        initialModifiers={drawerModifiers}
+        saving={savingId === 'create' || savingId === editingItemId}
+        onClose={() => setDrawerOpen(false)}
+        onSubmit={submitDrawer}
+      />
     </div>
   )
 }

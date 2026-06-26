@@ -147,7 +147,7 @@ export default function AdminMarketplacePage() {
                   max={24}
                   value={limitDraft}
                   onChange={e => setLimitDraft(Number(e.target.value))}
-                  className="w-20 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold"
+                  className="w-20 px-3 py-2 border border-slate-200 rounded-full text-sm font-bold"
                 />
                 <button
                   type="button"
@@ -184,7 +184,7 @@ export default function AdminMarketplacePage() {
                       <Link
                         href={`/shop/${shop.slug}`}
                         target="_blank"
-                        className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                        className="p-2 rounded-full text-slate-400 hover:text-violet-600 hover:bg-violet-50"
                         style={{ textDecoration: 'none' }}
                         title="Voir la boutique"
                       >
@@ -219,7 +219,7 @@ export default function AdminMarketplacePage() {
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
                 placeholder="Rechercher par nom ou slug…"
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm"
               />
             </div>
             {searching ? (
@@ -229,7 +229,7 @@ export default function AdminMarketplacePage() {
                 {searchResults.map(shop => (
                   <div
                     key={shop.id}
-                    className="flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-2xl p-4"
+                    className="flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-full p-4"
                   >
                     <div className="min-w-0">
                       <p className="font-bold text-slate-900 truncate">{shop.name}</p>

@@ -102,7 +102,7 @@ export default function CourierDashboardPage() {
               type="button"
               disabled={!canGoOnline || toggling}
               onClick={handleToggleOnline}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-colors disabled:opacity-50 ${
+              className={`flex items-center gap-2 px-5 py-3 rounded-full font-bold transition-colors disabled:opacity-50 ${
                 isOnline
                   ? 'bg-emerald-600 text-white hover:bg-emerald-500'
                   : 'bg-slate-900 text-white hover:bg-slate-800'
@@ -162,7 +162,7 @@ export default function CourierDashboardPage() {
               </p>
               <Link
                 href="/courier/missions"
-                className="inline-flex mt-4 px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm hover:bg-emerald-400 transition-colors"
+                className="inline-flex mt-4 px-5 py-2.5 rounded-full bg-emerald-500 text-slate-900 font-bold text-sm hover:bg-emerald-400 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 Gérer la mission
@@ -177,7 +177,7 @@ export default function CourierDashboardPage() {
               </p>
               <Link
                 href="/courier/missions"
-                className="inline-flex mt-4 px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold text-sm hover:bg-emerald-400 transition-colors"
+                className="inline-flex mt-4 px-5 py-2.5 rounded-full bg-emerald-500 text-slate-900 font-bold text-sm hover:bg-emerald-400 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 Voir les missions

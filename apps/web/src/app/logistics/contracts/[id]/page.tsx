@@ -205,7 +205,7 @@ export default function LogisticsContractDetailPage() {
                   max={180}
                   value={form.sla_eta_max_minutes}
                   onChange={e => setForm(f => ({ ...f, sla_eta_max_minutes: Number(e.target.value) }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                  className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm"
                 />
               </label>
               <label className="block space-y-1.5">
@@ -216,11 +216,11 @@ export default function LogisticsContractDetailPage() {
                   placeholder="Tarif plateforme par défaut"
                   value={form.fee_override}
                   onChange={e => setForm(f => ({ ...f, fee_override: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                  className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm"
                 />
               </label>
             </div>
-            <label className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
+            <label className="flex items-center justify-between gap-4 p-4 rounded-full bg-slate-50 border border-slate-100 cursor-pointer">
               <div>
                 <p className="font-semibold text-slate-900">Auto-dispatch pour ce contrat</p>
                 <p className="text-sm text-slate-500">Assigner automatiquement les courses de cette boutique.</p>

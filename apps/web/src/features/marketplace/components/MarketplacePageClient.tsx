@@ -134,7 +134,7 @@ function MarketplaceFiltersPanel({
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             placeholder={t('marketplace.searchPlaceholder')}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
+            className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
       )}
@@ -147,7 +147,7 @@ function MarketplaceFiltersPanel({
           <select
             value={sort}
             onChange={e => onSortChange(e.target.value as SortOption)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
+            className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
           >
             {SORT_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>
@@ -170,7 +170,7 @@ function MarketplaceFiltersPanel({
           onSearchQueryChange={setCategoryQuery}
           emptyMessage="Aucune catégorie trouvée"
         >
-          <label className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-lg hover:bg-white">
+          <label className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-full hover:bg-white">
             <button
               type="button"
               onClick={() => onCategoryChange('')}
@@ -649,7 +649,7 @@ export function MarketplacePageClient() {
                       type="button"
                       onClick={loadMore}
                       disabled={loadingMore}
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
                     >
                       {loadingMore && <Loader2 size={16} className="animate-spin" />}
                       Voir plus de produits

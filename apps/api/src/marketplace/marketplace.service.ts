@@ -943,7 +943,7 @@ export class MarketplaceService {
     const price = hasVariants
       ? Math.min(...dto.variants!.map(v => v.price))
       : dto.price
-    const status = dto.status ?? (stock > 0 ? 'ACTIVE' : 'DRAFT')
+    const status = dto.status === 'ACTIVE' ? 'PENDING_REVIEW' : (dto.status ?? 'DRAFT')
     this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
     const imageUrls = this.resolveImageUrls(dto)
     const categoryId = await this.resolveProductCategoryId(dto)
@@ -972,6 +972,9 @@ export class MarketplaceService {
           ? {
               create: dto.variants!.map((v, index) => ({
                 name: v.name,
+                kind: v.kind ?? 'TEXT',
+                color_hex: v.color_hex ?? null,
+                image_url: v.image_url ?? null,
                 price: v.price,
                 stock_quantity: v.stock_quantity ?? 0,
                 sku: v.sku,
@@ -999,6 +1002,10 @@ export class MarketplaceService {
     if (!existing) throw new NotFoundException('Produit introuvable')
 
     let status = dto.status
+    if (status === 'ACTIVE' && existing.status !== 'ACTIVE') {
+      status = 'PENDING_REVIEW'
+    }
+
     let stock = dto.stock_quantity
     let price = dto.price
 
@@ -1009,6 +1016,9 @@ export class MarketplaceService {
           data: dto.variants.map((v, index) => ({
             product_id: productId,
             name: v.name,
+            kind: v.kind ?? 'TEXT',
+            color_hex: v.color_hex ?? null,
+            image_url: v.image_url ?? null,
             price: v.price,
             stock_quantity: v.stock_quantity ?? 0,
             sku: v.sku,
@@ -1531,14 +1541,33 @@ export class MarketplaceService {
       if (shopIdFilter && shopId !== shopIdFilter) continue
 
       if (!group.merchantId) {
+        const shopLineItems = cart.items
+          .filter(i => i.product.shop_id === shopId)
+          .map(i => ({
+            product_id: i.product.id,
+            category_id: i.product.category_id ?? null,
+            line_total: i.line_total,
+          }))
+
+        const result = await this.promotionsService.validateForShop({
+          code,
+          merchantId: null,
+          shopId,
+          subtotal: group.subtotal,
+          userId,
+          lineItems: shopLineItems,
+        })
+
         applications.push({
           shop_id: shopId,
           shop_name: group.name,
-          valid: false,
+          valid: result.valid,
           code: code.trim().toUpperCase(),
-          discount: 0,
-          free_delivery: false,
-          message: 'Promotions indisponibles pour cette boutique',
+          promotion_id: result.valid ? result.promotion.id : undefined,
+          promotion_title: result.valid ? result.promotion.title : undefined,
+          discount: result.valid ? result.discount : 0,
+          free_delivery: result.valid ? result.free_delivery : false,
+          message: result.message,
         })
         continue
       }
@@ -1843,7 +1872,7 @@ export class MarketplaceService {
         let promotionId: string | null = null
         const applied = promoByShop.get(groupShopId)
 
-        if (applied && linkedMerchantId) {
+        if (applied) {
           const shopLineItems = items.map(i => ({
             product_id: i.product.id,
             category_id: i.product.category_id ?? null,

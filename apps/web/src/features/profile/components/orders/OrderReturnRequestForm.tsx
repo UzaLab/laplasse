@@ -144,14 +144,14 @@ export function OrderReturnRequestForm({
         <button
           type="button"
           onClick={close}
-          className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50"
+          className="px-4 py-2.5 border border-slate-200 rounded-full text-sm font-bold text-slate-600 hover:bg-slate-50"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 disabled:opacity-60"
+          className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-full text-sm font-bold hover:bg-amber-600 disabled:opacity-60"
         >
           {submitting ? <Loader2 size={16} className="animate-spin" /> : 'Envoyer la demande'}
         </button>

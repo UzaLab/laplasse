@@ -65,7 +65,7 @@ export function MerchantListToolbar({
             value={value}
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder}
-            className="w-full pl-10 pr-10 py-2.5 rounded-xl border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 outline-none focus:border-amber-400 placeholder:text-slate-400"
+            className="w-full pl-10 pr-10 py-2.5 rounded-full border-2 border-slate-200 bg-white text-sm font-medium text-slate-900 outline-none focus:border-amber-400 placeholder:text-slate-400"
           />
           {hasQuery && (
             <button
@@ -82,7 +82,7 @@ export function MerchantListToolbar({
           <button
             type="button"
             onClick={onReset}
-            className="shrink-0 px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+            className="shrink-0 px-4 py-2.5 rounded-full border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
           >
             Réinitialiser les filtres
           </button>

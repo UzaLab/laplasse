@@ -17,9 +17,12 @@ import {
   isAdminNavActive,
   type AdminNavBadges,
 } from '@/features/admin/adminNav'
+import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 
 interface AdminStats {
   merchants: { total: number; pending: number; verified: number }
+  shops?: { pending: number }
+  products?: { pending: number }
   users: number
   reviews: { total: number; pending: number }
   product_reviews?: { pending: number }
@@ -136,15 +139,27 @@ export function AdminShell({ children }: AdminShellProps) {
         <p className="text-[10px] font-bold text-violet-500 uppercase mt-0.5">{user.role}</p>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
-        {ADMIN_NAV_GROUPS.map(group => (
-          <div key={group.id}>
-            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              {group.label}
-            </p>
-            <div className="space-y-0.5">{group.items.map(navLink)}</div>
-          </div>
-        ))}
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-2">
+        {ADMIN_NAV_GROUPS.map(group => {
+          const containsActive = group.items.some(item =>
+            isAdminNavActive(pathname, item.href, item.exact),
+          )
+          const groupBadge = group.items.reduce((sum, item) => {
+            if (!item.badgeKey) return sum
+            return sum + (badges[item.badgeKey] ?? 0)
+          }, 0)
+          return (
+            <SidebarNavGroup
+              key={group.id}
+              id={`admin-${group.id}`}
+              label={group.label}
+              containsActive={containsActive}
+              badge={groupBadge}
+            >
+              {group.items.map(navLink)}
+            </SidebarNavGroup>
+          )
+        })}
 
         <div className="h-px bg-slate-100 mx-2" />
         <Link
@@ -161,7 +176,7 @@ export function AdminShell({ children }: AdminShellProps) {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
         >
           <LogOut size={17} /> Déconnexion
         </button>

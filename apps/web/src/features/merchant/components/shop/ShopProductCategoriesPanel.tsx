@@ -168,15 +168,15 @@ export function ShopProductCategoriesPanel() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Rechercher une catégorie ou sous-catégorie…"
-            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-amber-400"
+            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-full text-sm outline-none focus:border-amber-400"
           />
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={selectAllVisible} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={selectAllVisible} className="text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
             Tout sélectionner
           </button>
-          <button type="button" onClick={clearAll} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={clearAll} className="text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50">
             Tout désélectionner
           </button>
           <span className="text-xs text-slate-400 self-center ml-auto">
@@ -227,7 +227,7 @@ export function ShopProductCategoriesPanel() {
                         onChange={() => (kids.length ? toggleRootWithChildren(root.id, kids) : toggle(root.id))}
                         className="rounded border-slate-300 text-amber-500 focus:ring-amber-400 shrink-0"
                       />
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center shrink-0">
                         <CategoryIcon name={root.icon} slug={root.slug} size={20} className="text-amber-600" />
                       </div>
                       <div className="min-w-0">
@@ -245,7 +245,7 @@ export function ShopProductCategoriesPanel() {
                       {visibleKids.map(child => (
                         <label
                           key={child.id}
-                          className={`flex items-center gap-3 pl-10 pr-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
+                          className={`flex items-center gap-3 pl-10 pr-3 py-2.5 rounded-full cursor-pointer transition-colors ${
                             selected.has(child.id) ? 'bg-amber-50 border border-amber-200' : 'hover:bg-white border border-transparent'
                           }`}
                         >
@@ -271,7 +271,7 @@ export function ShopProductCategoriesPanel() {
           type="button"
           onClick={save}
           disabled={saving || !!loadError || loading}
-          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           Enregistrer les catégories

@@ -9,6 +9,9 @@ export function AppToaster() {
       richColors
       closeButton
       toastOptions={{
+        style: {
+          fontFamily: 'var(--font-outfit, "Outfit", system-ui, sans-serif)',
+        },
         classNames: {
           toast: 'font-medium shadow-lg border border-slate-200',
           title: 'font-bold text-sm',

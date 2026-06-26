@@ -60,7 +60,7 @@ export function LogisticsFleetInviteCard({ partnerName, url }: LogisticsFleetInv
             id="fleet-invite-url"
             readOnly
             value={url}
-            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+            className="flex-1 min-w-0 border border-slate-200 rounded-full px-4 py-3 text-sm text-slate-600 bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
           />
           <div className="flex gap-2 shrink-0">
             <button

@@ -242,7 +242,7 @@ export default function ProfileOrderDetailPage() {
                 {pendingPayment && (
                   <Link
                     href={`/checkout/payment?orderIds=${order.id}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-full text-xs sm:text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm"
                     style={{ textDecoration: 'none' }}
                   >
                     <CreditCard size={15} />
@@ -252,7 +252,7 @@ export default function ProfileOrderDetailPage() {
                 {showTrack && trackingHref && (
                   <Link
                     href={trackingHref}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-full text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
                     style={{ textDecoration: 'none' }}
                   >
                     Suivre
@@ -261,7 +261,7 @@ export default function ProfileOrderDetailPage() {
                 {order.merchant?.slug && (
                   <Link
                     href={`/m/${order.merchant.slug}`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-full text-xs sm:text-sm font-bold hover:bg-slate-50 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     Voir la boutique

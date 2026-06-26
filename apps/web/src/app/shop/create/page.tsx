@@ -265,7 +265,7 @@ export default function CreateShopPage() {
 
           {form.city_id && form.commune_id && (
             <>
-              <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+              <label className="flex items-start gap-3 p-4 rounded-full border border-slate-200 bg-slate-50 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={form.has_precise_location}
@@ -328,7 +328,7 @@ export default function CreateShopPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-12 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             Créer la boutique

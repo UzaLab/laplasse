@@ -61,7 +61,7 @@ export function MerchantActions({ merchantId, merchantName, merchantSlug, varian
         <button
           type="button"
           onClick={handleShare}
-          className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-2xl font-semibold text-slate-700 hover:border-slate-400 transition-colors text-sm shadow-sm"
+          className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-full font-semibold text-slate-700 hover:border-slate-400 transition-colors text-sm shadow-sm"
         >
           <Share2 size={16} /> Partager
         </button>
@@ -69,7 +69,7 @@ export function MerchantActions({ merchantId, merchantName, merchantSlug, varian
           type="button"
           onClick={handleFav}
           disabled={loading}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 bg-white border rounded-2xl font-semibold transition-colors text-sm shadow-sm disabled:opacity-60 ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 bg-white border rounded-full font-semibold transition-colors text-sm shadow-sm disabled:opacity-60 ${
             isFav
               ? 'border-red-300 text-red-500 bg-red-50'
               : 'border-slate-200 text-slate-700 hover:border-red-300 hover:text-red-500'

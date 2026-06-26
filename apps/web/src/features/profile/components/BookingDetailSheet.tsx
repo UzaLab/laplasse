@@ -165,7 +165,7 @@ export function BookingDetailSheet({
             {booking.merchant?.slug && (
               <Link
                 href={`/m/${booking.merchant.slug}`}
-                className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl font-bold text-sm bg-slate-900 text-white hover:bg-slate-800"
+                className="flex items-center justify-center gap-2 w-full h-12 rounded-full font-bold text-sm bg-slate-900 text-white hover:bg-slate-800"
                 style={{ textDecoration: 'none' }}
                 onClick={onClose}
               >
@@ -190,7 +190,7 @@ export function BookingDetailSheet({
                     type="button"
                     onClick={onCancel}
                     disabled={cancelling}
-                    className="h-12 rounded-2xl font-bold text-sm border-2 border-red-100 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="h-12 rounded-full font-bold text-sm border-2 border-red-100 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {cancelling ? <Loader2 size={16} className="animate-spin" /> : null}
                     {cancelling ? 'Annulation…' : 'Annuler'}

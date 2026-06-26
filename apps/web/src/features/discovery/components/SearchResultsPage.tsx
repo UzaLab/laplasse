@@ -46,7 +46,7 @@ function FilterPill({
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 px-3 py-1.5 rounded-xl text-sm font-bold transition-colors border ${
+      className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-bold transition-colors border ${
         active
           ? 'bg-slate-900 text-white border-slate-900'
           : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300'
@@ -77,7 +77,7 @@ function LoadMoreButton({
         type="button"
         onClick={onClick}
         disabled={loading}
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
       >
         {loading ? <Loader2 size={16} className="animate-spin" /> : null}
         {label}
@@ -270,7 +270,7 @@ export function SearchResultsPage() {
                 {hasFilters && (
                   <button
                     onClick={clearAll}
-                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-colors"
+                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-full hover:bg-red-100 transition-colors"
                   >
                     <X size={12} /> Tout effacer
                   </button>

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsIn,
   IsInt,
   IsNumber,
@@ -14,11 +15,30 @@ import {
   ValidateNested,
 } from 'class-validator'
 import { OrderStatus } from '../../../generated/prisma/client'
+
+export enum ProductVariantKindDto {
+  TEXT = 'TEXT',
+  COLOR = 'COLOR',
+}
+
 export class ProductVariantInputDto {
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   name!: string
+
+  @IsOptional()
+  @IsEnum(ProductVariantKindDto)
+  kind?: ProductVariantKindDto
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(7)
+  color_hex?: string
+
+  @IsOptional()
+  @IsString()
+  image_url?: string
 
   @IsInt()
   @Min(0)
@@ -79,7 +99,7 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'OUT_OF_STOCK', 'ARCHIVED'])
-  status?: 'DRAFT' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
+  status?: 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
 
   @IsOptional()
   @IsArray()
@@ -143,7 +163,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsIn(['DRAFT', 'ACTIVE', 'OUT_OF_STOCK', 'ARCHIVED'])
-  status?: 'DRAFT' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
+  status?: 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'OUT_OF_STOCK' | 'ARCHIVED'
 
   @IsOptional()
   @IsArray()

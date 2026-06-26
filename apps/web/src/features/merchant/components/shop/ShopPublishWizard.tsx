@@ -18,6 +18,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { fetchMyProducts } from '@/lib/marketplaceApi'
 import {
   fetchShopForManage,
+  getShopPublicHref,
   getShopRoutesFromPathname,
   updateShop,
   type ShopStatus,
@@ -62,7 +63,7 @@ export function ShopPublishWizard() {
       setLogo(shop.logo ?? null)
       setStatus(shop.status)
     }
-    setActiveProducts(products.filter(p => p.status === 'ACTIVE').length)
+    setActiveProducts(products.filter(p => p.status === 'ACTIVE' || p.status === 'PENDING_REVIEW').length)
     setLoading(false)
   }, [activeShopId])
 
@@ -71,28 +72,29 @@ export function ShopPublishWizard() {
   const hasLogo = !!logo
   const hasEnoughProducts = activeProducts >= MIN_PRODUCTS
   const isActive = status === 'ACTIVE'
+  const isPendingReview = status === 'PENDING_REVIEW'
 
   const boutiqueUrl = useMemo(() => {
     if (typeof window === 'undefined' || !activeShop?.slug) return ''
-    return `${window.location.origin}/boutique/${activeShop.slug}`
-  }, [activeShop?.slug])
+    return `${window.location.origin}${getShopPublicHref(activeShop)}`
+  }, [activeShop])
 
   const activateShop = async () => {
     if (!activeShopId || !hasLogo || !hasEnoughProducts) return
     setActivating(true)
-    const { shop, error } = await updateShop(activeShopId, { status: 'ACTIVE' })
+    const { shop, error } = await updateShop(activeShopId, { status: 'PENDING_REVIEW' })
     setActivating(false)
     if (error || !shop) {
-      notify.error(error ?? 'Impossible d\'activer la boutique')
+      notify.error(error ?? 'Impossible de soumettre la boutique')
       return
     }
-    setStatus('ACTIVE')
+    setStatus('PENDING_REVIEW')
     updateUser({
       shops: (user?.shops ?? []).map(s =>
         s.id === shop.id ? { ...s, status: shop.status } : s,
       ),
     })
-    notify.success('Boutique activée — visible sur le marketplace')
+    notify.success('Boutique soumise — validation admin en cours')
   }
 
   const copyLink = async () => {
@@ -126,11 +128,13 @@ export function ShopPublishWizard() {
     },
     {
       id: 'activate',
-      label: 'Activer la boutique',
-      desc: 'Rendre la vitrine visible sur LaPlasse',
+      label: isPendingReview ? 'Validation en cours' : 'Soumettre la boutique',
+      desc: isPendingReview
+        ? 'Notre équipe examine votre vitrine'
+        : 'Demander la mise en ligne sur LaPlasse',
       done: isActive,
-      action: hasLogo && hasEnoughProducts && !isActive ? activateShop : undefined,
-      actionLabel: activating ? 'Activation…' : 'Activer ma boutique',
+      action: hasLogo && hasEnoughProducts && !isActive && !isPendingReview ? activateShop : undefined,
+      actionLabel: activating ? 'Envoi…' : isPendingReview ? 'En attente' : 'Soumettre à validation',
     },
     {
       id: 'share',
@@ -155,6 +159,22 @@ export function ShopPublishWizard() {
 
   if (!activeShop) return null
 
+  if (isPendingReview && !isActive) {
+    return (
+      <div className="bg-amber-50 border border-amber-100 rounded-[28px] p-6 sm:p-8">
+        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">
+          Validation en cours
+        </p>
+        <h2 className="text-xl font-extrabold text-slate-900 mb-2">
+          {activeShop.name} est en examen
+        </h2>
+        <p className="text-sm text-amber-800/80">
+          Notre équipe vérifie votre boutique. Vous serez notifié dès qu&apos;elle sera en ligne.
+        </p>
+      </div>
+    )
+  }
+
   if (allDone) {
     return (
       <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-[28px] p-6 sm:p-8">
@@ -172,16 +192,16 @@ export function ShopPublishWizard() {
             <button
               type="button"
               onClick={copyLink}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
             >
               {copied ? <Check size={16} /> : <Copy size={16} />}
               {copied ? 'Copié' : 'Copier le lien'}
             </button>
             {boutiqueUrl && (
               <Link
-                href={`/boutique/${activeShop.slug}`}
+                href={getShopPublicHref(activeShop)}
                 target="_blank"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <ExternalLink size={16} /> Voir
@@ -252,7 +272,7 @@ export function ShopPublishWizard() {
                     type="button"
                     onClick={step.action}
                     disabled={step.id === 'activate' && (activating || !hasLogo || !hasEnoughProducts)}
-                    className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-brand-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="text-xs font-bold px-3 py-2 rounded-full bg-slate-900 text-white hover:bg-brand-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {step.id === 'activate' && activating ? (
                       <span className="inline-flex items-center gap-1.5">
@@ -265,7 +285,7 @@ export function ShopPublishWizard() {
                 ) : step.href ? (
                   <Link
                     href={step.href}
-                    className="text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 text-slate-700 hover:border-brand-300 transition-colors inline-block"
+                    className="text-xs font-bold px-3 py-2 rounded-full border border-slate-200 text-slate-700 hover:border-brand-300 transition-colors inline-block"
                     style={{ textDecoration: 'none' }}
                   >
                     {step.actionLabel}

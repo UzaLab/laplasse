@@ -30,6 +30,8 @@ export interface AdminNavItem {
 
 export interface AdminNavBadges {
   merchantsPending: number
+  shopsPending: number
+  productsPending: number
   reviewsPending: number
   productReviewsPending: number
   courierReviewsPending: number
@@ -58,6 +60,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     label: 'Catalogue & geo',
     items: [
       { href: '/admin/merchants', label: 'Établissements', icon: Store, badgeKey: 'merchantsPending' },
+      { href: '/admin/shops', label: 'Boutiques', icon: Building2, badgeKey: 'shopsPending' },
+      { href: '/admin/products', label: 'Produits', icon: ShoppingCart, badgeKey: 'productsPending' },
       { href: '/admin/catalogue', label: 'Catalogue', icon: Tags },
       { href: '/admin/ads', label: 'Publicités', icon: Megaphone },
       { href: '/admin/geo', label: 'Géographie', icon: MapPin },
@@ -129,6 +133,8 @@ export function getAdminNavBreadcrumb(pathname: string): { group: string; label:
 
 export function badgesFromStats(stats: {
   merchants?: { pending: number }
+  shops?: { pending: number }
+  products?: { pending: number }
   reviews?: { pending: number }
   product_reviews?: { pending: number }
   courier_reviews?: { pending: number }
@@ -137,6 +143,8 @@ export function badgesFromStats(stats: {
 } | null): AdminNavBadges {
   return {
     merchantsPending: stats?.merchants?.pending ?? 0,
+    shopsPending: stats?.shops?.pending ?? 0,
+    productsPending: stats?.products?.pending ?? 0,
     reviewsPending: stats?.reviews?.pending ?? 0,
     productReviewsPending: stats?.product_reviews?.pending ?? 0,
     courierReviewsPending: stats?.courier_reviews?.pending ?? 0,

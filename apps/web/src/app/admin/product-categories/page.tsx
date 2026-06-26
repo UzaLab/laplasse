@@ -79,19 +79,19 @@ export default function AdminProductCategoriesPage() {
             value={form.name}
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
             placeholder="Nom"
-            className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm"
+            className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm"
           />
           <select
             value={form.parent_id}
             onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}
-            className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm"
+            className="w-full border border-slate-200 rounded-full px-4 py-2 text-sm"
           >
             <option value="">— Catégorie racine —</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl">
+          <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-full">
             <Plus size={14} /> Créer
           </button>
         </form>

@@ -109,7 +109,7 @@ export default function LogisticsOrderDetailPage() {
             <Link
               href={`/delivery/track/${job.tracking_token}`}
               target="_blank"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 mb-6"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-500 mb-6"
               style={{ textDecoration: 'none' }}
             >
               <Truck size={16} /> Ouvrir le suivi en direct

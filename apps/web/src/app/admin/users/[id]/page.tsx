@@ -126,16 +126,16 @@ function ResetPasswordModal({ email, onClose, onSave }: { email: string; onClose
           placeholder="Nouveau mot de passe"
           value={pw}
           onChange={e => setPw(e.target.value)}
-          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm mb-4"
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm mb-4"
         />
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-full border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
             Annuler
           </button>
           <button
             disabled={!pw.trim() || loading}
             onClick={async () => { setLoading(true); await onSave(pw); setLoading(false) }}
-            className="flex-1 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
             Enregistrer
@@ -230,7 +230,7 @@ export default function AdminUserDetailPage() {
         {/* Header */}
         <div className="flex items-start gap-4">
           <button onClick={() => router.back()}
-            className="mt-1 p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-500 shrink-0">
+            className="mt-1 p-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-500 shrink-0">
             <ArrowLeft size={16} />
           </button>
           <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -305,7 +305,7 @@ export default function AdminUserDetailPage() {
               <button
                 disabled={saving}
                 onClick={() => patch({ is_active: !user.is_active })}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
                   user.is_active
                     ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
@@ -324,7 +324,7 @@ export default function AdminUserDetailPage() {
               <button
                 disabled={saving}
                 onClick={() => patch({ is_verified: !user.is_verified })}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${
                   user.is_verified
                     ? 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
                     : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'

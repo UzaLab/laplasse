@@ -114,7 +114,7 @@ export function ComplaintModal({ merchantId, merchantName, onClose }: ComplaintM
                   placeholder="Décrivez le problème…"
                   rows={3}
                   maxLength={500}
-                  className="w-full border-2 border-slate-200 focus:border-red-300 rounded-xl px-4 py-2.5 text-sm outline-none resize-none"
+                  className="w-full border-2 border-slate-200 focus:border-red-300 rounded-full px-4 py-2.5 text-sm outline-none resize-none"
                 />
               </div>
 
@@ -123,7 +123,7 @@ export function ComplaintModal({ merchantId, merchantName, onClose }: ComplaintM
               <button
                 type="submit"
                 disabled={loading || !reason}
-                className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-full transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? <><Loader2 size={16} className="animate-spin" /> Envoi…</> : 'Envoyer le signalement'}
               </button>

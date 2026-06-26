@@ -217,9 +217,6 @@ export default function ProductDetailPage() {
   const outOfStock = displayStock <= 0 || product.status === 'OUT_OF_STOCK'
   const allowPickup = product.allow_pickup !== false
   const allowDelivery = product.allow_delivery !== false
-  const shortDescription = product.description
-    ? stripHtml(product.description).slice(0, 220)
-    : ''
   const galleryImages = getProductGallery(product)
   const image = selectedImage || galleryImages[0]
   const thumbnails = galleryImages
@@ -234,6 +231,16 @@ export default function ProductDetailPage() {
     setActiveTab('reviews')
     document.getElementById('product-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  const scrollToDescription = () => {
+    setActiveTab('description')
+    document.getElementById('product-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const SHORT_DESC_LIMIT = 90
+  const plainDescription = product.description ? stripHtml(product.description) : ''
+  const shortDescription = plainDescription.slice(0, SHORT_DESC_LIMIT)
+  const hasMoreDescription = plainDescription.length > SHORT_DESC_LIMIT
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -329,7 +336,7 @@ export default function ProductDetailPage() {
             <div className="lg:col-span-5 flex flex-col h-full">
               {merchant && (
                 <Link
-                  href={`/m/${slug}`}
+                  href={`/m/${slug}/boutique`}
                   className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-brand-600 transition-colors mb-4 w-max"
                   style={{ textDecoration: 'none' }}
                 >
@@ -422,10 +429,21 @@ export default function ProductDetailPage() {
               </div>
 
               {hasHtmlContent(product.description) && (
-                <p className="text-slate-600 leading-relaxed text-base mb-8 line-clamp-3">
-                  {shortDescription}
-                  {(product.description && stripHtml(product.description).length > 220) ? '…' : ''}
-                </p>
+                <div className="mb-8">
+                  <p className="text-slate-600 leading-relaxed text-sm line-clamp-2">
+                    {shortDescription}
+                    {hasMoreDescription ? '…' : ''}
+                  </p>
+                  {hasMoreDescription && (
+                    <button
+                      type="button"
+                      onClick={scrollToDescription}
+                      className="mt-2 text-sm font-bold text-brand-600 hover:text-brand-700 underline"
+                    >
+                      Voir plus
+                    </button>
+                  )}
+                </div>
               )}
 
               <div className="h-px w-full bg-slate-100 mb-8" />
@@ -461,7 +479,23 @@ export default function ProductDetailPage() {
                                     : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'
                               }`}
                             >
-                              {variant.name}
+                              <span className="flex items-center justify-center gap-2">
+                                {variant.kind === 'COLOR' && variant.color_hex && (
+                                  <span
+                                    className="w-4 h-4 rounded-full border border-white/30 shrink-0"
+                                    style={{ backgroundColor: variant.color_hex }}
+                                  />
+                                )}
+                                {variant.image_url && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={variant.image_url}
+                                    alt=""
+                                    className="w-5 h-5 rounded object-cover shrink-0"
+                                  />
+                                )}
+                                <span>{variant.name}</span>
+                              </span>
                               <span className="block text-[10px] font-medium opacity-80 mt-0.5">
                                 {(() => {
                                   const vp = product.promotion && product.promotion.type !== 'FREE_DELIVERY'

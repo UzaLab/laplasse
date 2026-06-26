@@ -1,59 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, Image as ImageIcon, Loader2, Search, Trash2, UploadCloud, X, ZoomIn } from 'lucide-react'
-import { merchantApiFetch } from '@/lib/merchantApi'
-import { notify } from '@/lib/notify'
+import { useState } from 'react'
+import { Plus, Trash2, ZoomIn, Image as ImageIcon } from 'lucide-react'
 import { ImageGalleryViewer } from '@/components/ui/ImageGalleryViewer'
-
-const INPUT_CLASS =
-  'w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 font-medium outline-none focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all text-sm'
+import { MediathequeModal } from '@/features/merchant/components/MediathequeModal'
 
 const LABEL_CLASS = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2'
-
-const LIBRARY_PAGE_SIZE = 20
-
-interface MediaItem {
-  id: string
-  url: string
-}
-
-interface MediaData {
-  logo: string | null
-  cover_image: string | null
-  gallery: MediaItem[]
-  limits?: {
-    can_add: boolean
-    max_photos: number
-    current_photos: number
-    plan: string
-  }
-}
-
-interface LibraryEntry {
-  id?: string
-  url: string
-  deletable: boolean
-}
-
-function collectLibraryEntries(data: MediaData): LibraryEntry[] {
-  const entries: LibraryEntry[] = []
-  const seen = new Set<string>()
-
-  for (const url of [data.logo, data.cover_image]) {
-    if (url && !seen.has(url)) {
-      seen.add(url)
-      entries.push({ url, deletable: false })
-    }
-  }
-  for (const item of data.gallery) {
-    if (!seen.has(item.url)) {
-      seen.add(item.url)
-      entries.push({ id: item.id, url: item.url, deletable: true })
-    }
-  }
-  return entries
-}
 
 type SingleProps = {
   mode: 'single'
@@ -76,12 +28,12 @@ type MultipleProps = {
 }
 
 type BaseProps = {
-  merchantId: string | null | undefined
+  merchantId?: string | null
+  shopId?: string | null
   label?: string
   hint?: string
   disabled?: boolean
   className?: string
-  /** Afficher le champ « URL de l'image » (désactivé dans les formulaires produits) */
   showUrlInput?: boolean
 }
 
@@ -90,11 +42,12 @@ export type MerchantMediathequeFieldProps = BaseProps & (SingleProps | MultipleP
 export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
   const {
     merchantId,
+    shopId,
     label = 'Image',
     hint,
     disabled = false,
     className = '',
-    showUrlInput = true,
+    showPrimaryBadge = true,
   } = props
 
   const isSingle = props.mode === 'single'
@@ -104,128 +57,21 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
     : props.values
 
   const canAddMore = currentUrls.length < maxImages
-
-  const [uploading, setUploading] = useState(false)
-  const [loadingLibrary, setLoadingLibrary] = useState(false)
-  const [libraryEntries, setLibraryEntries] = useState<LibraryEntry[]>([])
-  const [imageUrlDraft, setImageUrlDraft] = useState('')
+  const hasScope = !!(merchantId || shopId)
+  const [modalOpen, setModalOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
-  const [librarySearch, setLibrarySearch] = useState('')
-  const [libraryPage, setLibraryPage] = useState(0)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const loadLibrary = useCallback(async () => {
-    if (!merchantId) return
-    setLoadingLibrary(true)
-    try {
-      const res = await merchantApiFetch('/merchants/me/media', merchantId)
-      if (res.ok) {
-        const data = (await res.json()) as MediaData
-        setLibraryEntries(collectLibraryEntries(data))
-      }
-    } finally {
-      setLoadingLibrary(false)
-    }
-  }, [merchantId])
-
-  useEffect(() => {
-    void loadLibrary()
-  }, [loadLibrary])
-
-  useEffect(() => {
-    setLibraryPage(0)
-  }, [librarySearch])
-
-  const filteredLibrary = useMemo(() => {
-    const q = librarySearch.trim().toLowerCase()
-    if (!q) return libraryEntries
-    return libraryEntries.filter(e => e.url.toLowerCase().includes(q))
-  }, [libraryEntries, librarySearch])
-
-  const totalPages = Math.max(1, Math.ceil(filteredLibrary.length / LIBRARY_PAGE_SIZE))
-  const pagedLibrary = useMemo(() => {
-    const start = libraryPage * LIBRARY_PAGE_SIZE
-    return filteredLibrary.slice(start, start + LIBRARY_PAGE_SIZE)
-  }, [filteredLibrary, libraryPage])
+  const scope = merchantId
+    ? { type: 'merchant' as const, merchantId }
+    : shopId
+      ? { type: 'shop' as const, shopId }
+      : null
 
   const applyUrls = (next: string[]) => {
     if (isSingle) {
       props.onChange(next[0] ?? '')
     } else {
       props.onChangeValues(next)
-    }
-  }
-
-  const tryAddUrl = (raw: string) => {
-    const trimmed = raw.trim()
-    if (!trimmed) {
-      notify.error('URL invalide')
-      return false
-    }
-    if (currentUrls.includes(trimmed)) {
-      notify.error('Cette image est déjà sélectionnée')
-      return false
-    }
-    if (!canAddMore) {
-      notify.error(isSingle ? 'Une seule image autorisée' : `Maximum ${maxImages} images`)
-      return false
-    }
-    if (isSingle) {
-      applyUrls([trimmed])
-    } else {
-      applyUrls([...currentUrls, trimmed])
-    }
-    return true
-  }
-
-  const uploadImage = async (file: File) => {
-    if (!merchantId) {
-      notify.error('Établissement requis pour téléverser une image')
-      return
-    }
-    if (!canAddMore) return
-
-    setUploading(true)
-    const body = new FormData()
-    body.append('file', file)
-    try {
-      const res = await merchantApiFetch('/merchants/me/media/upload', merchantId, {
-        method: 'POST',
-        body,
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        notify.error((d as { message?: string }).message ?? 'Erreur lors de l\'upload')
-        return
-      }
-      const media = (await res.json()) as { url: string }
-      if (tryAddUrl(media.url)) {
-        notify.success('Image ajoutée')
-        void loadLibrary()
-      }
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) void uploadImage(file)
-    e.target.value = ''
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    if (disabled || uploading || !canAddMore) return
-    const file = e.dataTransfer.files?.[0]
-    if (file?.type.startsWith('image/')) void uploadImage(file)
-  }
-
-  const addImageFromUrl = () => {
-    if (tryAddUrl(imageUrlDraft)) {
-      setImageUrlDraft('')
-      notify.success('Image ajoutée')
     }
   }
 
@@ -241,297 +87,89 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
     applyUrls(next)
   }
 
-  const pickFromLibrary = (url: string) => {
-    if (isSingle) {
-      applyUrls([url])
-      notify.success('Image sélectionnée')
-      return
-    }
-    if (currentUrls.includes(url)) {
-      notify.error('Cette image est déjà sélectionnée')
-      return
-    }
-    if (!canAddMore) {
-      notify.error(`Maximum ${maxImages} images`)
-      return
-    }
-    applyUrls([...currentUrls, url])
-    notify.success('Image ajoutée')
-  }
-
-  const deleteFromLibrary = async (entry: LibraryEntry, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!entry.deletable || !entry.id || !merchantId) return
-    if (!confirm('Supprimer cette image de la médiathèque ?')) return
-
-    setDeletingId(entry.id)
-    try {
-      const res = await merchantApiFetch(`/merchants/me/media/${entry.id}`, merchantId, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        notify.error((d as { message?: string }).message ?? 'Erreur lors de la suppression')
-        return
-      }
-      if (currentUrls.includes(entry.url)) {
-        applyUrls(currentUrls.filter(u => u !== entry.url))
-      }
-      notify.success('Image supprimée')
-      void loadLibrary()
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   return (
     <div className={className}>
       {label && <p className={LABEL_CLASS}>{label}</p>}
       {hint && <p className="text-xs text-slate-500 mb-3">{hint}</p>}
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        disabled={disabled || uploading || !canAddMore}
-        onChange={handleFileChange}
-      />
-
-      {canAddMore && (
-        <div
-          role="button"
-          tabIndex={disabled ? -1 : 0}
-          onKeyDown={e => { if (e.key === 'Enter' && !disabled) fileInputRef.current?.click() }}
-          onClick={() => !disabled && !uploading && fileInputRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center transition-colors ${
-            disabled
-              ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed'
-              : uploading
-                ? 'border-brand-300 bg-brand-50 cursor-wait'
-                : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-brand-300 cursor-pointer group'
-          }`}
-        >
-          {uploading ? (
-            <Loader2 size={28} className="animate-spin text-brand-500 mb-3" />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-brand-500 mb-3 shadow-sm group-hover:scale-105 transition-transform">
-              <UploadCloud size={28} />
-            </div>
-          )}
-          <h3 className="font-bold text-slate-900 text-sm mb-1">
-            {uploading ? 'Envoi en cours…' : 'Ajouter une image'}
-          </h3>
-          <p className="text-xs text-slate-500 mb-3">Glissez-déposez ou cliquez pour parcourir</p>
-          <span className="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
-            JPG, PNG, WEBP
-          </span>
-        </div>
-      )}
-
-      {showUrlInput && (
-        <div className="mt-4">
-          <label className={LABEL_CLASS}>Ou URL de l&apos;image</label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="url"
-              value={imageUrlDraft}
-              onChange={e => setImageUrlDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addImageFromUrl() } }}
-              placeholder="https://…"
-              className={`${INPUT_CLASS} flex-1`}
-              disabled={disabled || !canAddMore}
-            />
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+        {currentUrls.map((url, index) => (
+          <div key={`${url}-${index}`} className="relative group">
             <button
               type="button"
-              onClick={addImageFromUrl}
-              disabled={disabled || !canAddMore || !imageUrlDraft.trim()}
-              className="shrink-0 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => setViewerIndex(index)}
+              className="relative w-full aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-50"
             >
-              Ajouter
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-6">
-        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <p className={LABEL_CLASS + ' mb-0'}>
-            Médiathèque
-            {libraryEntries.length > 0 && (
-              <span className="ml-2 normal-case font-medium text-slate-400">
-                ({libraryEntries.length} image{libraryEntries.length > 1 ? 's' : ''})
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="w-full h-full object-cover" />
+              <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <ZoomIn size={18} className="text-white" />
               </span>
-            )}
-          </p>
-          {libraryEntries.length > LIBRARY_PAGE_SIZE && (
-            <div className="relative flex-1 min-w-[140px] max-w-xs">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="search"
-                value={librarySearch}
-                onChange={e => setLibrarySearch(e.target.value)}
-                placeholder="Rechercher…"
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-brand-400"
-              />
-            </div>
-          )}
-        </div>
-
-        {loadingLibrary ? (
-          <div className="flex justify-center py-8">
-            <Loader2 size={22} className="animate-spin text-slate-300" />
-          </div>
-        ) : libraryEntries.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-8 text-center">
-            <ImageIcon size={28} className="text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-400">Aucune photo dans la médiathèque</p>
-          </div>
-        ) : filteredLibrary.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-6 text-center">
-            <p className="text-sm text-slate-400">Aucun résultat pour « {librarySearch} »</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
-              {pagedLibrary.map(entry => {
-                const selected = currentUrls.includes(entry.url)
-                return (
-                  <div key={entry.id ?? entry.url} className="relative group/item">
-                    <button
-                      type="button"
-                      disabled={disabled || (selected && !isSingle)}
-                      onClick={() => pickFromLibrary(entry.url)}
-                      className={`relative w-full aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                        selected
-                          ? 'border-brand-500 ring-2 ring-brand-100 opacity-90'
-                          : 'border-slate-200 hover:border-brand-300 hover:ring-2 hover:ring-brand-50'
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={entry.url} alt="" className="w-full h-full object-cover" />
-                      {selected && (
-                        <span className="absolute inset-0 bg-brand-500/20 flex items-center justify-center">
-                          <span className="bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            Sélectionnée
-                          </span>
-                        </span>
-                      )}
-                    </button>
-                    {entry.deletable && entry.id && !disabled && (
-                      <button
-                        type="button"
-                        onClick={e => void deleteFromLibrary(entry, e)}
-                        disabled={deletingId === entry.id}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/95 text-slate-400 hover:text-red-500 flex items-center justify-center shadow-sm opacity-0 group-hover/item:opacity-100 transition-opacity"
-                        aria-label="Supprimer de la médiathèque"
-                      >
-                        {deletingId === entry.id
-                          ? <Loader2 size={12} className="animate-spin" />
-                          : <Trash2 size={12} />}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-3 text-xs text-slate-500">
-                <span>
-                  {libraryPage * LIBRARY_PAGE_SIZE + 1}–{Math.min((libraryPage + 1) * LIBRARY_PAGE_SIZE, filteredLibrary.length)} sur {filteredLibrary.length}
+              {!isSingle && showPrimaryBadge && index === 0 && (
+                <span className="absolute bottom-1 left-1 bg-brand-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+                  Principale
                 </span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    disabled={libraryPage === 0}
-                    onClick={() => setLibraryPage(p => p - 1)}
-                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                    aria-label="Page précédente"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={libraryPage >= totalPages - 1}
-                    onClick={() => setLibraryPage(p => p + 1)}
-                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                    aria-label="Page suivante"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {currentUrls.length > 0 ? (
-        <div className={`mt-6 ${isSingle ? 'max-w-[200px]' : ''}`}>
-          <p className={`${LABEL_CLASS} mb-2`}>Sélection ({currentUrls.length}/{maxImages})</p>
-          <div className={`flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide ${
-            isSingle ? 'flex-col max-w-[200px]' : ''
-          }`}>
-            {currentUrls.map((url, index) => (
-              <div
-                key={`${url}-${index}`}
-                className={`relative shrink-0 snap-start rounded-xl border overflow-hidden bg-slate-50 aspect-square w-28 h-28 sm:w-32 sm:h-32 ${
-                  !isSingle && index === 0 && props.showPrimaryBadge !== false
-                    ? 'border-brand-400 ring-2 ring-brand-100'
-                    : 'border-slate-200'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setViewerIndex(index)}
-                  className="w-full h-full group"
-                  aria-label="Voir l'image en grand"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                  <span className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                    <ZoomIn size={18} className="text-white opacity-0 group-hover:opacity-100 drop-shadow" />
-                  </span>
-                </button>
-                {!isSingle && index === 0 && props.showPrimaryBadge !== false && (
-                  <span className="absolute top-1.5 left-1.5 bg-brand-500 text-white text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full pointer-events-none">
-                    Principale
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeAt(index)}
-                  disabled={disabled}
-                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/95 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
-                  aria-label="Retirer l'image"
-                >
-                  <X size={14} />
-                </button>
+              )}
+            </button>
+            {!disabled && (
+              <div className="absolute top-1 right-1 flex gap-1">
                 {!isSingle && index > 0 && (
                   <button
                     type="button"
                     onClick={() => setPrimary(index)}
-                    disabled={disabled}
-                    className="absolute bottom-1.5 left-1.5 right-1.5 py-1 rounded-lg bg-white/95 text-[9px] font-bold text-slate-700 hover:text-brand-600 shadow-sm"
+                    className="w-7 h-7 rounded-full bg-white/95 text-[9px] font-bold text-slate-600 shadow-md"
+                    title="Définir comme principale"
                   >
-                    Principale
+                    1°
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => removeAt(index)}
+                  className="w-7 h-7 rounded-full bg-white/95 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-md"
+                  aria-label="Retirer"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      ) : (
-        <div className="mt-6 w-full aspect-[2/1] max-h-32 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center text-slate-300">
-          <ImageIcon size={28} className="opacity-50 mb-2" />
-          <span className="text-sm font-medium text-slate-400">Aucune image sélectionnée</span>
-        </div>
+        ))}
+
+        {canAddMore && (
+          <button
+            type="button"
+            disabled={disabled || !hasScope}
+            onClick={() => {
+              if (!hasScope) return
+              setModalOpen(true)
+            }}
+            className="aspect-square rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 text-slate-400 hover:border-brand-300 hover:text-brand-500 hover:bg-brand-50/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus size={22} />
+            <span className="text-[10px] font-bold">Ajouter</span>
+          </button>
+        )}
+      </div>
+
+      {!hasScope && (
+        <p className="text-xs text-amber-600 mt-2">
+          Boutique ou établissement requis pour gérer la médiathèque.
+        </p>
       )}
 
-      {viewerIndex != null && currentUrls.length > 0 && (
+      <MediathequeModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        scope={scope}
+        mode={isSingle ? 'pick-single' : 'pick-multiple'}
+        selectedUrls={currentUrls}
+        onSelect={applyUrls}
+        maxSelect={maxImages}
+        disabled={disabled}
+      />
+
+      {viewerIndex !== null && currentUrls.length > 0 && (
         <ImageGalleryViewer
           images={currentUrls}
           initialIndex={viewerIndex}
@@ -542,7 +180,6 @@ export function MerchantMediathequeField(props: MerchantMediathequeFieldProps) {
   )
 }
 
-/** Vignette liste — sans image placeholder par défaut */
 export function MenuItemThumb({ url, name }: { url?: string | null; name: string }) {
   if (url) {
     return (

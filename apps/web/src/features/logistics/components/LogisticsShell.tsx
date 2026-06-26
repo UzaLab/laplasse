@@ -7,6 +7,7 @@ import { Building2, Compass, FileText, LayoutDashboard, LogOut, Menu, Package, B
   Wallet, AlertTriangle, Settings, Target,
 } from 'lucide-react'
 import { LogisticsMobileNav } from '@/features/logistics/components/LogisticsMobileNav'
+import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import { authApiFetch } from '@/lib/authFetch'
@@ -146,20 +147,22 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Opérations
-          </p>
-          <div className="space-y-0.5">{mainNav.map(navLink)}</div>
-        </div>
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-2">
+        <SidebarNavGroup
+          id="logistics-ops"
+          label="Opérations"
+          containsActive={mainNav.some(n => isActive(n.href))}
+        >
+          {mainNav.map(navLink)}
+        </SidebarNavGroup>
         <div className="h-px bg-slate-100 mx-2" />
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Compte
-          </p>
-          <div className="space-y-0.5">{navLink({ href: '/logistics/settings', label: 'Paramètres', icon: <Settings size={17} /> })}</div>
-        </div>
+        <SidebarNavGroup
+          id="logistics-account"
+          label="Compte"
+          containsActive={isActive('/logistics/settings')}
+        >
+          {navLink({ href: '/logistics/settings', label: 'Paramètres', icon: <Settings size={17} /> })}
+        </SidebarNavGroup>
         <div className="h-px bg-slate-100 mx-2" />
         <div className="space-y-0.5">
           <Link

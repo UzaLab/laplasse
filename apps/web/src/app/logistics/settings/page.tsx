@@ -284,7 +284,7 @@ export default function LogisticsSettingsPage() {
               <input
                 value={form.legal_name}
                 onChange={e => setForm(f => ({ ...f, legal_name: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -292,7 +292,7 @@ export default function LogisticsSettingsPage() {
               <input
                 value={form.trade_name}
                 onChange={e => setForm(f => ({ ...f, trade_name: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -300,7 +300,7 @@ export default function LogisticsSettingsPage() {
               <input
                 value={form.rccm_number}
                 onChange={e => setForm(f => ({ ...f, rccm_number: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -312,7 +312,7 @@ export default function LogisticsSettingsPage() {
                   const city = cities.find(c => c.slug === e.target.value)
                   if (city) setForm(f => ({ ...f, city: city.name }))
                 }}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
               >
                 {cities.map(c => (
                   <option key={c.id} value={c.slug}>{c.name}</option>
@@ -325,7 +325,7 @@ export default function LogisticsSettingsPage() {
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder={phonePlaceholder}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500 sm:col-span-2">
@@ -334,7 +334,7 @@ export default function LogisticsSettingsPage() {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
           </div>
@@ -442,7 +442,7 @@ export default function LogisticsSettingsPage() {
                 max={180}
                 value={form.sla_eta_default_minutes}
                 onChange={e => setForm(f => ({ ...f, sla_eta_default_minutes: Number(e.target.value) }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -453,7 +453,7 @@ export default function LogisticsSettingsPage() {
                 max={60}
                 value={form.dispatch_pending_alert_minutes}
                 onChange={e => setForm(f => ({ ...f, dispatch_pending_alert_minutes: Number(e.target.value) }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -461,7 +461,7 @@ export default function LogisticsSettingsPage() {
               <input
                 value={`${Math.round(settings.commission_rate * 100)} % (fixe)`}
                 disabled
-                className="mt-1 w-full border border-slate-100 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-500"
+                className="mt-1 w-full border border-slate-100 rounded-full px-3 py-2.5 text-sm bg-slate-50 text-slate-500"
               />
             </label>
             <label className="block text-xs font-bold text-slate-500">
@@ -469,7 +469,7 @@ export default function LogisticsSettingsPage() {
               <select
                 value={form.payout_method}
                 onChange={e => setForm(f => ({ ...f, payout_method: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm bg-white"
               >
                 {PAYOUT_METHODS.map(m => (
                   <option key={m.id} value={m.id}>{m.label}</option>
@@ -481,7 +481,7 @@ export default function LogisticsSettingsPage() {
               <input
                 value={form.payout_number}
                 onChange={e => setForm(f => ({ ...f, payout_number: e.target.value }))}
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+                className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2.5 text-sm"
               />
             </label>
           </div>

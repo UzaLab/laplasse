@@ -207,7 +207,7 @@ export function DeliveryTrackClient({ token }: Props) {
               {data.courier.phone && (
                 <a
                   href={`tel:${data.courier.phone}`}
-                  className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-sm hover:bg-emerald-100"
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-50 text-emerald-800 font-bold text-sm hover:bg-emerald-100"
                 >
                   <Phone size={16} /> Appeler le livreur
                 </a>

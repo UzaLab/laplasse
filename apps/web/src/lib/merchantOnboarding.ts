@@ -1,4 +1,7 @@
 import { getMerchantVertical } from './merchantVertical'
+import { merchantApiFetch } from './merchantApi'
+import { fetchMyProducts } from './marketplaceApi'
+import { getShopsForMerchant, shopApiFetch, type ShopSummary } from './shopApi'
 
 export interface OnboardingStep {
   id: string
@@ -139,4 +142,124 @@ export function isOnboardingDismissed(merchantId: string): boolean {
 export function dismissOnboarding(merchantId: string) {
   if (typeof window === 'undefined') return
   localStorage.setItem(`${STORAGE_PREFIX}${merchantId}`, '1')
+}
+
+type BookingSettingsShape = {
+  auto_confirm?: boolean
+  require_payment?: boolean
+  cancellation_policy?: string | null
+  no_show_policy?: string | null
+}
+
+export function isBookingSettingsConfigured(settings: BookingSettingsShape | null | undefined): boolean {
+  if (!settings) return false
+  return !!(
+    settings.auto_confirm
+    || settings.require_payment
+    || settings.cancellation_policy?.trim()
+    || settings.no_show_policy?.trim()
+  )
+}
+
+interface MerchantProfileShape {
+  description?: string | null
+  cover_image?: string | null
+  logo?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  email?: string | null
+}
+
+interface MerchantServiceShape {
+  service_kind?: string
+  is_active?: boolean
+  image_urls?: string[]
+  nightly_rate?: number | null
+  price?: number | null
+}
+
+function isProfileComplete(profile: MerchantProfileShape | null): boolean {
+  if (!profile) return false
+  const hasVisual = !!(profile.cover_image || profile.logo)
+  const hasText = !!profile.description?.trim()
+  const hasContact = !!(profile.phone?.trim() || profile.whatsapp?.trim() || profile.email?.trim())
+  return hasVisual && hasText && hasContact
+}
+
+function isRoomServiceComplete(service: MerchantServiceShape): boolean {
+  const hasImage = (service.image_urls?.length ?? 0) > 0
+  const hasRate = service.nightly_rate != null || service.price != null
+  return hasImage && hasRate
+}
+
+/** Évalue la complétion de chaque étape onboarding (API authentifiées marchand). */
+export async function evaluateMerchantOnboardingProgress(
+  merchantId: string,
+  shops: ShopSummary[] | undefined,
+  categorySlug?: string,
+): Promise<Record<string, boolean>> {
+  const linkedShops = getShopsForMerchant(shops, merchantId)
+  const shopId = linkedShops[0]?.id
+
+  const [
+    profileRes,
+    hoursRes,
+    menuRes,
+    servicesRes,
+    staffRes,
+    bookingSettingsRes,
+  ] = await Promise.all([
+    merchantApiFetch('/merchants/me/profile', merchantId),
+    merchantApiFetch('/merchants/me/hours', merchantId),
+    merchantApiFetch('/merchant-menu/mine', merchantId).catch(() => null),
+    merchantApiFetch('/merchants/me/services', merchantId).catch(() => null),
+    merchantApiFetch('/merchants/me/staff', merchantId).catch(() => null),
+    merchantApiFetch('/merchants/me/booking-settings', merchantId).catch(() => null),
+  ])
+
+  const profile = profileRes.ok ? ((await profileRes.json()) as MerchantProfileShape) : null
+  const hours = hoursRes.ok ? ((await hoursRes.json()) as Array<{ is_closed?: boolean }>) : []
+  const menu = menuRes?.ok ? ((await menuRes.json()) as { items?: unknown[]; sections?: unknown[] }) : null
+  const services = servicesRes?.ok ? ((await servicesRes.json()) as MerchantServiceShape[]) : []
+  const staff = staffRes?.ok ? ((await staffRes.json()) as unknown[]) : []
+  const bookingSettings = bookingSettingsRes?.ok
+    ? ((await bookingSettingsRes.json()) as BookingSettingsShape)
+    : null
+
+  const products = shopId ? await fetchMyProducts(shopId) : []
+
+  let deliveryZonesDone = false
+  if (shopId) {
+    const zonesRes = await shopApiFetch(`/shops/${shopId}/delivery-zones`, shopId).catch(() => null)
+    if (zonesRes?.ok) {
+      const zones = (await zonesRes.json()) as unknown[]
+      deliveryZonesDone = Array.isArray(zones) && zones.length > 0
+    }
+  }
+
+  const activeServices = services.filter(s => s.is_active !== false)
+  const roomServices = activeServices.filter(s => s.service_kind === 'ROOM_TYPE')
+  const bookingSettingsDone = isBookingSettingsConfigured(bookingSettings)
+  const vertical = getMerchantVertical(categorySlug ?? '')
+
+  const staffDone = Array.isArray(staff) && staff.length > 0
+  const bookingsDone =
+    vertical === 'appointment'
+      ? bookingSettingsDone && activeServices.length > 0 && staffDone
+      : bookingSettingsDone
+
+  return {
+    profile: isProfileComplete(profile),
+    hours: Array.isArray(hours) && hours.some(h => !h.is_closed),
+    menu: Array.isArray(menu?.items) && menu.items.length > 0,
+    services: activeServices.length > 0,
+    staff: staffDone,
+    shop: linkedShops.length > 0,
+    products: products.filter(p => p.status === 'ACTIVE').length >= 3,
+    delivery: deliveryZonesDone,
+    settings: bookingSettingsDone,
+    bookings: bookingsDone,
+    rooms: roomServices.some(isRoomServiceComplete),
+    offerings: activeServices.length > 0,
+  }
 }

@@ -83,6 +83,14 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   },
 }
 
+/** Limites effectives en phase lancement. Voir Docs/MONETISATION_PHASE_LANCEMENT.md */
+export const PLANS_GATING_ENABLED = false
+
+export function getEffectivePlanLimits(_plan?: SubscriptionPlan): PlanLimits {
+  if (!PLANS_GATING_ENABLED) return PLAN_LIMITS.PREMIUM
+  return PLAN_LIMITS[_plan ?? 'FREE']
+}
+
 export function getHighestPlan(
   merchants: Array<{ subscription_plan?: string }>,
 ): SubscriptionPlan {
@@ -101,6 +109,14 @@ export function getMerchantPlan(
 ): SubscriptionPlan {
   const m = merchants.find(x => x.id === merchantId) ?? merchants[0]
   return (m?.subscription_plan ?? 'FREE') as SubscriptionPlan
+}
+
+/** Alias pratique — retourne les limites réellement appliquées (phase lancement = tout ouvert). */
+export function getPlanLimitsForMerchant(
+  merchants: Array<{ id: string; subscription_plan?: string }>,
+  merchantId?: string | null,
+): PlanLimits {
+  return getEffectivePlanLimits(getMerchantPlan(merchants, merchantId))
 }
 
 export function formatPhotoLimit(max: number): string {

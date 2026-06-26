@@ -98,7 +98,14 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   },
 }
 
+/** Limites effectives en phase lancement (tout débloqué). Voir Docs/MONETISATION_PHASE_LANCEMENT.md */
+const UNLOCKED_PLAN_LIMITS: PlanLimits = PLAN_LIMITS.PREMIUM
+
+/** Désactivé volontairement avant communication commerciale sur les plans. */
+export const PLANS_GATING_ENABLED = false
+
 export function getPlanLimits(plan: SubscriptionPlan): PlanLimits {
+  if (!PLANS_GATING_ENABLED) return UNLOCKED_PLAN_LIMITS
   return PLAN_LIMITS[plan] ?? PLAN_LIMITS.FREE
 }
 

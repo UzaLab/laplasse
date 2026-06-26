@@ -178,7 +178,7 @@ export function RoomBookingWidget({
               className="w-full bg-transparent font-bold text-slate-900 text-sm outline-none cursor-pointer"
             />
           </label>
-          <label className="bg-slate-50 border border-slate-200 p-3 rounded-2xl cursor-pointer hover:border-brand-300 transition-colors block">
+          <label className="bg-slate-50 border border-slate-200 p-3 rounded-full cursor-pointer hover:border-brand-300 transition-colors block">
             <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Départ</p>
             <input
               type="date"
@@ -191,7 +191,7 @@ export function RoomBookingWidget({
           </label>
         </div>
 
-        <label className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-2xl cursor-pointer hover:border-brand-300 transition-colors">
+        <label className="flex items-center justify-between bg-slate-50 border border-slate-200 p-3 rounded-full cursor-pointer hover:border-brand-300 transition-colors">
           <div>
             <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Voyageurs</p>
             <select
@@ -233,20 +233,20 @@ export function RoomBookingWidget({
             placeholder="Nom complet *"
             value={guestName}
             onChange={e => setGuestName(e.target.value)}
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+            className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
           />
           <input
             placeholder="Téléphone *"
             value={guestPhone}
             onChange={e => setGuestPhone(e.target.value)}
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+            className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
           />
           <input
             type="email"
             placeholder="Email (optionnel)"
             value={guestEmail}
             onChange={e => setGuestEmail(e.target.value)}
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+            className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
           />
         </div>
       )}

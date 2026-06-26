@@ -44,7 +44,7 @@ export function AdminModerationQueue({ items }: AdminModerationQueueProps) {
           <Link
             key={item.href}
             href={item.href}
-            className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl p-4 hover:border-violet-200 hover:shadow-sm transition-all group"
+            className="flex items-center gap-3 bg-white border border-slate-100 rounded-full p-4 hover:border-violet-200 hover:shadow-sm transition-all group"
             style={{ textDecoration: 'none' }}
           >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.accent}`}>

@@ -23,8 +23,11 @@ export class StorageService {
     private readonly imageProcessor: ImageProcessorService,
   ) {
     const resolved = resolveStorageConfig(config)
+    const forceLocal =
+      process.env.STORAGE_FORCE_LOCAL === 'true' ||
+      (process.env.NODE_ENV !== 'production' && process.env.STORAGE_FORCE_LOCAL !== 'false')
 
-    if (resolved) {
+    if (resolved && !forceLocal) {
       this.s3Client = new S3Client({
         region: resolved.region,
         endpoint: resolved.endpoint,
@@ -38,6 +41,10 @@ export class StorageService {
       this.publicUrlBase = resolved.publicUrlBase
       this.providerLabel = resolved.provider === 'r2' ? 'Cloudflare R2' : 'S3 (Hetzner)'
       this.logger.log(`${this.providerLabel} storage initialized — bucket=${resolved.bucket}`)
+    } else if (resolved && forceLocal) {
+      this.logger.warn(
+        'STORAGE_FORCE_LOCAL actif — stockage distant ignoré, utilisation du disque local (dev)',
+      )
     } else {
       const missing = storageConfigDiagnostics(config)
       this.logger.warn(

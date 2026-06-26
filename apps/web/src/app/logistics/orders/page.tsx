@@ -56,7 +56,7 @@ function JobRow({ job }: { job: PartnerDeliveryJob }) {
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/logistics/orders/${job.id}`}
-              className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+              className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-900 text-white hover:bg-slate-800"
               style={{ textDecoration: 'none' }}
             >
               Détail
@@ -65,7 +65,7 @@ function JobRow({ job }: { job: PartnerDeliveryJob }) {
               <Link
                 href={`/delivery/track/${job.tracking_token}`}
                 target="_blank"
-                className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
+                className="text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1"
                 style={{ textDecoration: 'none' }}
               >
                 Suivi <ExternalLink size={12} />
@@ -137,7 +137,7 @@ export default function LogisticsOrdersPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Commerce, adresse, livreur…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm"
           />
         </div>
 

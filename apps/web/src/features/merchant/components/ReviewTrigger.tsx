@@ -25,7 +25,7 @@ export function ReviewTrigger({ merchantId, merchantName }: ReviewTriggerProps) 
     <>
       <button
         onClick={handleClick}
-        className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-2xl transition-colors text-sm shadow-lg shadow-brand-500/20"
+        className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-full transition-colors text-sm shadow-lg shadow-brand-500/20"
       >
         <Star size={15} className="fill-white" />
         Laisser un avis

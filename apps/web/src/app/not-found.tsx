@@ -37,7 +37,7 @@ export default function NotFound() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-6">
               <Link
                 href="/"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-colors shadow-sm"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-colors shadow-sm"
                 style={{ textDecoration: 'none' }}
               >
                 <Home size={18} />
@@ -45,7 +45,7 @@ export default function NotFound() {
               </Link>
               <Link
                 href="/search"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-slate-200 text-slate-800 font-bold rounded-2xl hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-slate-200 text-slate-800 font-bold rounded-full hover:bg-slate-50 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Search size={18} />

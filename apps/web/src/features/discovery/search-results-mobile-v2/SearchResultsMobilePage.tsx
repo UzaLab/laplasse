@@ -293,7 +293,7 @@ export function SearchResultsMobilePage({
                   type="button"
                   onClick={loadMoreMerchants}
                   disabled={loadingMore === 'merchants'}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
                 >
                   {loadingMore === 'merchants' && <Loader2 size={16} className="animate-spin" />}
                   Voir plus d&apos;établissements
@@ -314,7 +314,7 @@ export function SearchResultsMobilePage({
                   type="button"
                   onClick={loadMoreProducts}
                   disabled={loadingMore === 'products'}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-brand-300 hover:text-brand-600 transition-colors disabled:opacity-60"
                 >
                   {loadingMore === 'products' && <Loader2 size={16} className="animate-spin" />}
                   Voir plus de produits

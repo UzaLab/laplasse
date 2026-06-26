@@ -71,7 +71,7 @@ export function WebPushToggle({ compact, variant = 'default', description }: Pro
         type="button"
         disabled={loading}
         onClick={enabled ? handleDisable : handleEnable}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
       >
         {loading ? <Loader2 size={16} className="animate-spin" /> : enabled ? <BellRing size={16} /> : <Bell size={16} />}
         {enabled ? 'Push actif' : 'Activer le push'}
@@ -127,7 +127,7 @@ export function WebPushToggle({ compact, variant = 'default', description }: Pro
               disabled={loading || permission === 'denied'}
               onClick={enabled ? handleDisable : handleEnable}
               className={cn(
-                'inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-50',
+                'inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-colors disabled:opacity-50',
                 enabled
                   ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   : 'bg-slate-900 text-white hover:bg-slate-800',
@@ -160,7 +160,7 @@ export function WebPushToggle({ compact, variant = 'default', description }: Pro
         type="button"
         disabled={loading}
         onClick={enabled ? handleDisable : handleEnable}
-        className="w-full py-3 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-full font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {loading && <Loader2 size={18} className="animate-spin" />}
         {enabled ? 'Désactiver les notifications push' : 'Activer les notifications push'}

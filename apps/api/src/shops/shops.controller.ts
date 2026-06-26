@@ -8,8 +8,13 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
@@ -104,6 +109,51 @@ export class ShopsController {
     @Param('shopId') shopId: string,
   ) {
     return this.svc.getForOwner(userId, shopId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':shopId/media')
+  listShopMedia(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.svc.listShopMedia(userId, shopId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    })
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':shopId/media/:mediaId')
+  deleteShopMedia(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+    @Param('mediaId') mediaId: string,
+  ) {
+    return this.svc.deleteShopMedia(userId, shopId, mediaId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':shopId/media/upload')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+        cb(new BadRequestException('Format accepté : JPEG, PNG ou WebP'), false)
+        return
+      }
+      cb(null, true)
+    },
+  }))
+  uploadShopMedia(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.svc.uploadShopImage(userId, shopId, file)
   }
 
   @UseGuards(JwtAuthGuard)

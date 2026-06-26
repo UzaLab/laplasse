@@ -376,6 +376,21 @@ model MerchantMedia {
   @@index([merchant_id])
 }
 
+model ShopMedia {
+  id          String    @id @default(cuid())
+  shop_id     String
+  type        MediaType @default(IMAGE)
+  url         String
+  thumbnail   String?
+  order       Int       @default(0)
+  uploaded_by String
+  created_at  DateTime  @default(now())
+
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@index([shop_id])
+}
+
 // ─── TAGS ──────────────────────────────────────────────────────────────────────
 
 model Tag {
@@ -696,7 +711,7 @@ enum PromotionType {
 
 model Promotion {
   id               String        @id @default(cuid())
-  merchant_id      String
+  merchant_id      String?
   shop_id          String?
   category_id      String?
   title            String
@@ -713,7 +728,7 @@ model Promotion {
   uses_count       Int           @default(0)
   created_at       DateTime      @default(now())
 
-  merchant    Merchant              @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  merchant    Merchant?             @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
   shop        Shop?                 @relation(fields: [shop_id], references: [id], onDelete: SetNull)
   category    ProductCategory?      @relation(fields: [category_id], references: [id], onDelete: SetNull)
   orders      Order[]
@@ -1183,6 +1198,7 @@ enum DeliveryVehicle {
 
 enum ShopStatus {
   DRAFT
+  PENDING_REVIEW
   ACTIVE
   SUSPENDED
 }
@@ -1233,6 +1249,7 @@ model Shop {
   delivery_contracts DeliveryPartnerContract[]
   staff_couriers   CourierProfile[] @relation("ShopStaffCouriers")
   ad_campaigns     AdCampaign[]
+  media            ShopMedia[]
 
   @@index([owner_id])
   @@index([slug])
@@ -1243,6 +1260,7 @@ model Shop {
 
 enum ProductStatus {
   DRAFT
+  PENDING_REVIEW
   ACTIVE
   OUT_OF_STOCK
   ARCHIVED
@@ -1405,16 +1423,24 @@ model ProductImage {
   @@index([product_id, sort_order])
 }
 
+enum ProductVariantKind {
+  TEXT
+  COLOR
+}
+
 model ProductVariant {
-  id             String   @id @default(cuid())
+  id             String             @id @default(cuid())
   product_id     String
   name           String
+  kind           ProductVariantKind @default(TEXT)
+  color_hex      String?
+  image_url      String?
   price          Int
-  stock_quantity Int      @default(0)
+  stock_quantity Int                @default(0)
   sku            String?
-  sort_order     Int      @default(0)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  sort_order     Int                @default(0)
+  created_at     DateTime           @default(now())
+  updated_at     DateTime           @updatedAt
 
   product     Product     @relation(fields: [product_id], references: [id], onDelete: Cascade)
   cart_items  CartItem[]

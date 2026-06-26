@@ -42,7 +42,7 @@ export function AddressForm({
           value={values.label ?? ''}
           onChange={e => onChange({ ...values, label: e.target.value })}
           placeholder="Maison, Bureau…"
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+          className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
         />
       </div>
 
@@ -59,7 +59,7 @@ export function AddressForm({
               longitude: null,
             })}
             required
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+            className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
           >
             <option value="">Choisir</option>
             {cities.map(c => (
@@ -79,7 +79,7 @@ export function AddressForm({
             })}
             required
             disabled={!values.city_id}
-            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400 disabled:opacity-50"
+            className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400 disabled:opacity-50"
           >
             <option value="">Choisir</option>
             {communes.map(c => (
@@ -97,7 +97,7 @@ export function AddressForm({
           onChange={e => onChange({ ...values, district: e.target.value })}
           required
           placeholder="ex. près du marché…"
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+          className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
         />
       </div>
 
@@ -108,7 +108,7 @@ export function AddressForm({
           value={values.address_detail ?? ''}
           onChange={e => onChange({ ...values, address_detail: e.target.value })}
           placeholder="Immeuble, porte, repères…"
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+          className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
         />
       </div>
 
@@ -130,7 +130,7 @@ export function AddressForm({
         <button
           type="submit"
           disabled={submitting}
-          className="px-5 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 disabled:opacity-50"
+          className="px-5 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-full hover:bg-amber-600 disabled:opacity-50"
         >
           {submitting
             ? <Loader2 size={16} className="animate-spin" />

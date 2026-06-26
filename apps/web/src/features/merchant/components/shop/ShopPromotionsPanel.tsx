@@ -24,7 +24,8 @@ import { merchantApiFetch } from '@/lib/merchantApi'
 import { fetchMyProducts, parseApiError, type MarketplaceProduct } from '@/lib/marketplaceApi'
 import {
   fetchShopProductCategories,
-  getActiveMerchantShopId,
+  getActiveShopIdForManage,
+  shopApiFetch,
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
 import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
@@ -203,11 +204,11 @@ function promoToForm(p: Promotion, mode: PromoMode) {
 
 function PromoCodeUsageModal({
   promo,
-  merchantId,
+  promoFetch,
   onClose,
 }: {
   promo: Promotion
-  merchantId: string | null | undefined
+  promoFetch: (path: string, init?: RequestInit) => Promise<Response>
   onClose: () => void
 }) {
   const [data, setData] = useState<PromoUsageData | null>(null)
@@ -216,7 +217,7 @@ function PromoCodeUsageModal({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    void merchantApiFetch(`/promotions/${promo.id}/redemptions`, merchantId)
+    void promoFetch(`/promotions/${promo.id}/redemptions`)
       .then(async res => {
         if (cancelled) return
         if (res.ok) setData(await res.json())
@@ -224,7 +225,7 @@ function PromoCodeUsageModal({
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [promo.id, merchantId])
+  }, [promo.id, promoFetch])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40" onClick={onClose}>
@@ -238,7 +239,7 @@ function PromoCodeUsageModal({
             <h3 className="font-extrabold text-slate-900 mt-0.5">{promo.title}</h3>
             <p className="font-mono text-sm font-bold text-slate-700 mt-1">{promo.code}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+          <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 text-slate-400">
             <X size={18} />
           </button>
         </div>
@@ -460,7 +461,20 @@ function PromoList({
 
 export function ShopPromotionsPanel() {
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveMerchantShopId(user?.shops, activeMerchantId, activeShopId)
+  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
+  const isStandaloneShop = useMemo(() => {
+    const shop = user?.shops?.find(s => s.id === shopId)
+    return !!shop && !shop.merchant_id
+  }, [user?.shops, shopId])
+
+  const promoFetch = useCallback(
+    (path: string, init?: RequestInit) =>
+      isStandaloneShop
+        ? shopApiFetch(path, shopId, init)
+        : merchantApiFetch(path, activeMerchantId, init),
+    [isStandaloneShop, shopId, activeMerchantId],
+  )
+
   const minStart = useMemo(() => minDatetimeLocalValue(), [])
 
   const [promos, setPromos] = useState<Promotion[]>([])
@@ -476,10 +490,10 @@ export function ShopPromotionsPanel() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const res = await merchantApiFetch('/promotions/mine', activeMerchantId)
+    const res = await promoFetch('/promotions/mine')
     if (res.ok) setPromos(await res.json())
     setLoading(false)
-  }, [activeMerchantId])
+  }, [promoFetch])
 
   useEffect(() => { void load() }, [load])
 
@@ -567,12 +581,12 @@ export function ShopPromotionsPanel() {
     setCreating(true)
     const payload = buildPayload()
     const res = isEditing
-      ? await merchantApiFetch(`/promotions/${editingId}`, activeMerchantId, {
+      ? await promoFetch(`/promotions/${editingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-      : await merchantApiFetch('/promotions', activeMerchantId, {
+      : await promoFetch('/promotions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -594,14 +608,14 @@ export function ShopPromotionsPanel() {
   }
 
   const toggle = async (id: string) => {
-    const res = await merchantApiFetch(`/promotions/${id}/toggle`, activeMerchantId, { method: 'PATCH' })
+    const res = await promoFetch(`/promotions/${id}/toggle`, { method: 'PATCH' })
     if (res.ok) void load()
     else notify.error(await parseApiError(res))
   }
 
   const remove = async (id: string) => {
     if (!confirm('Supprimer cette promotion ?')) return
-    const res = await merchantApiFetch(`/promotions/${id}`, activeMerchantId, { method: 'DELETE' })
+    const res = await promoFetch(`/promotions/${id}`, { method: 'DELETE' })
     if (res.ok) {
       notify.success('Promotion supprimée')
       void load()
@@ -713,7 +727,7 @@ export function ShopPromotionsPanel() {
                 placeholder={formMode === 'code' ? 'Ex. Offre BIENVENUE15' : 'Ex. Soldes été -20%'}
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
             <div className="sm:col-span-2">
@@ -722,7 +736,7 @@ export function ShopPromotionsPanel() {
                 rows={2}
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400 resize-none"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400 resize-none"
               />
             </div>
 
@@ -736,7 +750,7 @@ export function ShopPromotionsPanel() {
                     value={form.code}
                     readOnly={isEditing && (promos.find(p => p.id === editingId)?.uses_count ?? 0) > 0}
                     onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400 font-mono uppercase disabled:bg-slate-50 disabled:text-slate-500"
+                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400 font-mono uppercase disabled:bg-slate-50 disabled:text-slate-500"
                   />
                   {isEditing && (promos.find(p => p.id === editingId)?.uses_count ?? 0) > 0 && (
                     <p className="text-[10px] text-slate-400 mt-1">Code verrouillé après la première utilisation.</p>
@@ -750,7 +764,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Optionnel — par commande"
                     value={form.min_order_amount}
                     onChange={e => setForm(f => ({ ...f, min_order_amount: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
                 <div>
@@ -761,7 +775,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Illimité"
                     value={form.max_uses}
                     onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
                 <div>
@@ -772,7 +786,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Illimité — 1 commande = 1 utilisation"
                     value={form.max_uses_per_user}
                     onChange={e => setForm(f => ({ ...f, max_uses_per_user: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
               </>
@@ -783,7 +797,7 @@ export function ShopPromotionsPanel() {
               <select
                 value={form.type}
                 onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               >
                 <option value="PERCENTAGE">Pourcentage</option>
                 <option value="FIXED">Montant fixe</option>
@@ -798,7 +812,7 @@ export function ShopPromotionsPanel() {
                 min={0}
                 value={form.value}
                 onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                 disabled={form.type === 'FREE_DELIVERY'}
               />
             </div>
@@ -810,7 +824,7 @@ export function ShopPromotionsPanel() {
                 min={isEditing ? undefined : minStart}
                 value={form.starts_at}
                 onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
             <div>
@@ -821,12 +835,12 @@ export function ShopPromotionsPanel() {
                 min={form.starts_at || minStart}
                 value={form.ends_at}
                 onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-4">
+          <div className="rounded-full border border-slate-100 bg-slate-50/80 p-4 space-y-4">
             <div>
               <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <MapPin size={16} className="text-slate-400" />
@@ -869,7 +883,7 @@ export function ShopPromotionsPanel() {
           <button
             type="submit"
             disabled={creating}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-bold rounded-xl disabled:opacity-50 ${
+            className={`inline-flex items-center gap-2 px-5 py-2.5 text-white text-sm font-bold rounded-full disabled:opacity-50 ${
               formMode === 'code' ? 'bg-violet-600 hover:bg-violet-700' : 'bg-amber-500 hover:bg-amber-600'
             }`}
           >
@@ -930,7 +944,7 @@ export function ShopPromotionsPanel() {
       {usagePromo && (
         <PromoCodeUsageModal
           promo={usagePromo}
-          merchantId={activeMerchantId}
+          promoFetch={promoFetch}
           onClose={() => setUsagePromo(null)}
         />
       )}

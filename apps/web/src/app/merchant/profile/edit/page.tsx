@@ -244,7 +244,7 @@ export default function EditMerchantProfilePage() {
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <h2 className="text-xl font-bold text-slate-900 mb-3">Aucun établissement trouvé</h2>
           <p className="text-slate-500 mb-6">Vous devez d&apos;abord créer votre fiche marchand.</p>
-          <Link href="/merchant/signup" className="px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-colors" style={{ textDecoration: 'none' }}>
+          <Link href="/merchant/signup" className="px-6 py-3 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-colors" style={{ textDecoration: 'none' }}>
             Créer ma fiche
           </Link>
         </div>
@@ -269,7 +269,7 @@ export default function EditMerchantProfilePage() {
             form="edit-form"
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-full text-sm hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 size={15} className="animate-spin" /> : <SaveIcon size={15} />}
             Sauvegarder
@@ -412,7 +412,7 @@ export default function EditMerchantProfilePage() {
               />
             </div>
 
-            <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-full border border-slate-200 bg-slate-50 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.has_precise_location}
@@ -454,7 +454,7 @@ export default function EditMerchantProfilePage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-2xl hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-4 bg-slate-900 text-white font-extrabold rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving ? <><Loader2 size={18} className="animate-spin" /> Sauvegarde…</> : <><SaveIcon size={18} /> Sauvegarder les modifications</>}
             </button>

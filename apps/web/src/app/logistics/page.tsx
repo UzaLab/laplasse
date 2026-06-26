@@ -89,7 +89,7 @@ export default function LogisticsDashboardPage() {
             {verification === 'VERIFIED' && (
               <Link
                 href="/logistics/dispatch"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors text-sm"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors text-sm"
                 style={{ textDecoration: 'none' }}
               >
                 Ouvrir le dispatch
@@ -122,28 +122,28 @@ export default function LogisticsDashboardPage() {
               <div className="flex flex-wrap gap-3 mt-4">
                 <Link
                   href="/logistics/orders"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-500 text-white font-bold text-sm hover:bg-indigo-400 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-indigo-500 text-white font-bold text-sm hover:bg-indigo-400 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <Package size={16} /> Commandes
                 </Link>
                 <Link
                   href="/logistics/dispatch"
-                  className="inline-flex px-5 py-2.5 rounded-xl bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
+                  className="inline-flex px-5 py-2.5 rounded-full bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   Dispatch
                 </Link>
                 <Link
                   href="/logistics/fleet"
-                  className="inline-flex px-5 py-2.5 rounded-xl bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
+                  className="inline-flex px-5 py-2.5 rounded-full bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   Flotte
                 </Link>
                 <Link
                   href="/logistics/stats"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 text-white border border-white/20 font-bold text-sm hover:bg-white/20 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <BarChart3 size={16} /> Stats
@@ -162,7 +162,7 @@ export default function LogisticsDashboardPage() {
               </p>
               <Link
                 href="/logistics/contracts"
-                className="inline-flex mt-4 px-5 py-2.5 rounded-xl bg-indigo-500 text-white font-bold text-sm hover:bg-indigo-400 transition-colors"
+                className="inline-flex mt-4 px-5 py-2.5 rounded-full bg-indigo-500 text-white font-bold text-sm hover:bg-indigo-400 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 Voir les demandes de contrat

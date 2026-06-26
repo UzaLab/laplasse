@@ -12,13 +12,10 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAuthReady } from '@/hooks/useAuthReady'
-import { merchantApiFetch } from '@/lib/merchantApi'
-import { fetchMyProducts } from '@/lib/marketplaceApi'
-import { getShopsForMerchant } from '@/lib/shopApi'
-import { shopApiFetch } from '@/lib/shopApi'
 import { getCategoryModuleHints } from '@/lib/merchantCategoryHints'
 import {
   dismissOnboarding,
+  evaluateMerchantOnboardingProgress,
   getVerticalOnboardingSteps,
   isOnboardingDismissed,
 } from '@/lib/merchantOnboarding'
@@ -49,84 +46,19 @@ export function MerchantVerticalOnboarding() {
       return
     }
 
-    const merchantId = activeMerchant.id
-    const linkedShops = getShopsForMerchant(user?.shops, merchantId)
-    const shopId = linkedShops[0]?.id
-
-    const [profileRes, hoursRes, menuRes, servicesRes, staffRes, bookingConfigRes] = await Promise.all([
-      merchantApiFetch('/merchants/me/profile', merchantId),
-      merchantApiFetch('/merchants/me/hours', merchantId),
-      merchantApiFetch('/merchants/me/menu', merchantId).catch(() => null),
-      merchantApiFetch('/staff/services', merchantId).catch(() => null),
-      merchantApiFetch('/staff/members', merchantId).catch(() => null),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/bookings/merchant/${merchantId}/config`).catch(() => null),
-    ])
-
-    const profile = profileRes.ok ? await profileRes.json() : null
-    const hours = hoursRes.ok ? await hoursRes.json() : []
-    const menu = menuRes?.ok ? await menuRes.json() : null
-    const services = servicesRes?.ok ? await servicesRes.json() : []
-    const staff = staffRes?.ok ? await staffRes.json() : []
-    const bookingConfig = bookingConfigRes?.ok ? await bookingConfigRes.json() : null
-    const products = shopId ? await fetchMyProducts(shopId) : []
-
-    let deliveryZonesDone = false
-    if (shopId) {
-      const zonesRes = await shopApiFetch(`/shops/${shopId}/delivery-zones`, shopId).catch(() => null)
-      if (zonesRes?.ok) {
-        const zones = await zonesRes.json() as unknown[]
-        deliveryZonesDone = Array.isArray(zones) && zones.length > 0
-      }
+    setLoading(true)
+    try {
+      const doneMap = await evaluateMerchantOnboardingProgress(
+        activeMerchant.id,
+        user?.shops,
+        categorySlug,
+      )
+      setProgress(steps.map(s => ({ id: s.id, done: doneMap[s.id] ?? false })))
+    } catch {
+      setProgress(steps.map(s => ({ id: s.id, done: false })))
+    } finally {
+      setLoading(false)
     }
-
-    const profileDone = !!(profile?.description && (profile?.cover_image || profile?.logo))
-    const hoursDone = Array.isArray(hours) && hours.some((h: { is_closed?: boolean }) => !h.is_closed)
-    const menuDone = Array.isArray(menu?.sections)
-      ? menu.sections.some((s: { items?: unknown[] }) => (s.items?.length ?? 0) > 0)
-      : false
-    const servicesDone = Array.isArray(services) && services.length > 0
-    const staffDone = Array.isArray(staff) && staff.length > 0
-    const shopDone = linkedShops.length > 0
-    const productsDone = products.filter(p => p.status === 'ACTIVE').length >= 3
-
-    const roomServices = (bookingConfig?.room_services ?? []) as Array<{
-      image_urls?: string[]
-      nightly_rate?: number | null
-      price?: number | null
-    }>
-    const roomsDone = roomServices.some(
-      r => (r.image_urls?.length ?? 0) > 0 && (r.nightly_rate ?? r.price) != null,
-    )
-
-    const settings = bookingConfig?.booking_settings as {
-      auto_confirm?: boolean
-      require_payment?: boolean
-      cancellation_policy?: string | null
-      no_show_policy?: string | null
-    } | undefined
-    const bookingsDone = !!(
-      settings?.auto_confirm
-      || settings?.require_payment
-      || settings?.cancellation_policy?.trim()
-      || settings?.no_show_policy?.trim()
-    )
-
-    const doneMap: Record<string, boolean> = {
-      profile: profileDone,
-      hours: hoursDone,
-      menu: menuDone,
-      services: servicesDone,
-      staff: staffDone,
-      shop: shopDone,
-      products: productsDone,
-      delivery: deliveryZonesDone,
-      bookings: bookingsDone,
-      rooms: roomsDone,
-      offerings: servicesDone,
-    }
-
-    setProgress(steps.map(s => ({ id: s.id, done: doneMap[s.id] ?? false })))
-    setLoading(false)
   }, [activeMerchant?.id, steps, user?.shops])
 
   useEffect(() => {
@@ -141,6 +73,16 @@ export function MerchantVerticalOnboarding() {
     }
     void evaluateProgress()
   }, [hydrated, isAuthenticated, activeMerchant?.id, isNew, router, evaluateProgress])
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && activeMerchant?.id) {
+        void evaluateProgress()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [activeMerchant?.id, evaluateProgress])
 
   const completedCount = progress.filter(p => p.done).length
   const allDone = progress.length > 0 && completedCount === progress.length
@@ -241,14 +183,14 @@ export function MerchantVerticalOnboarding() {
             type="button"
             onClick={() => void evaluateProgress()}
             disabled={loading}
-            className="px-5 py-3 border-2 border-slate-200 rounded-2xl font-bold text-slate-700 text-sm hover:border-slate-300 disabled:opacity-60"
+            className="px-5 py-3 border-2 border-slate-200 rounded-full font-bold text-slate-700 text-sm hover:border-slate-300 disabled:opacity-60"
           >
             Actualiser la progression
           </button>
           <button
             type="button"
             onClick={handleFinish}
-            className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 text-white font-bold rounded-2xl text-sm hover:bg-slate-800"
+            className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 text-white font-bold rounded-full text-sm hover:bg-slate-800"
           >
             <Rocket size={16} />
             {allDone ? 'Accéder au tableau de bord' : 'Continuer plus tard'}

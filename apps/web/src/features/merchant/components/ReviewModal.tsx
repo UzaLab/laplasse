@@ -127,7 +127,7 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Résumez votre expérience"
                   maxLength={100}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-2.5 text-sm outline-none transition-all"
                 />
               </div>
 
@@ -142,13 +142,13 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
                   placeholder="Décrivez votre expérience : ambiance, service, rapport qualité/prix…"
                   rows={3}
                   maxLength={1000}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-2.5 text-sm outline-none transition-all resize-none"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-2.5 text-sm outline-none transition-all resize-none"
                 />
                 <p className="text-xs text-slate-400 mt-1 text-right">{content.length}/1000</p>
               </div>
 
               {!isAuthenticated && (
-                <div className="px-4 py-3 bg-brand-50 border border-brand-200 rounded-xl text-sm text-brand-800 font-medium">
+                <div className="px-4 py-3 bg-brand-50 border border-brand-200 rounded-full text-sm text-brand-800 font-medium">
                   Vous devez être{' '}
                   <a href="/login" className="font-bold underline">connecté</a>
                   {' '}pour laisser un avis.
@@ -163,14 +163,14 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-3 border-2 border-slate-200 rounded-2xl font-bold text-slate-700 hover:border-slate-400 transition-colors text-sm"
+                  className="flex-1 py-3 border-2 border-slate-200 rounded-full font-bold text-slate-700 hover:border-slate-400 transition-colors text-sm"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={loading || rating === 0}
-                  className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? <><Loader2 size={16} className="animate-spin" /> Envoi…</> : 'Envoyer mon avis'}
                 </button>

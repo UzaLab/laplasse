@@ -138,8 +138,8 @@ export class UpdateShopDto {
   has_physical_location?: boolean
 
   @IsOptional()
-  @IsIn(['DRAFT', 'ACTIVE', 'SUSPENDED'])
-  status?: 'DRAFT' | 'ACTIVE' | 'SUSPENDED'
+  @IsIn(['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'SUSPENDED'])
+  status?: 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'SUSPENDED'
 
   @IsOptional()
   @IsArray()

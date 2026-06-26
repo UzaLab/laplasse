@@ -72,7 +72,7 @@ export function MenuModifiersEditor({ groups, onChange }: Props) {
         <button
           type="button"
           onClick={addGroup}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-orange-200 text-orange-700 text-xs font-bold"
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-orange-200 text-orange-700 text-xs font-bold"
         >
           <Plus size={14} /> Groupe
         </button>

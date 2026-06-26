@@ -131,7 +131,7 @@ export default function FoodOrderCartPage() {
             </p>
             <Link
               href="/search?category=restaurants"
-              className="inline-flex items-center gap-2 bg-orange-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-orange-700 transition-colors text-sm"
+              className="inline-flex items-center gap-2 bg-orange-600 text-white font-bold px-6 py-3 rounded-full hover:bg-orange-700 transition-colors text-sm"
               style={{ textDecoration: 'none' }}
             >
               Trouver un restaurant

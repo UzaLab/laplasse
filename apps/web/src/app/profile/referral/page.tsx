@@ -95,12 +95,12 @@ export default function ReferralPage() {
               <div className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl px-5 py-4 text-center">
                 <p className="text-3xl font-black text-slate-800 tracking-widest font-mono">{code}</p>
               </div>
-              <button onClick={copyCode} className="w-14 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0 transition-colors">
+              <button onClick={copyCode} className="w-14 h-14 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center shrink-0 transition-colors">
                 {copied ? <Check size={20} className="text-emerald-600" /> : <Copy size={20} className="text-slate-600" />}
               </button>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <button onClick={shareWhatsApp} className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#25D366] text-white font-bold text-sm hover:opacity-90 transition-opacity">
+              <button onClick={shareWhatsApp} className="flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-[#25D366] text-white font-bold text-sm hover:opacity-90 transition-opacity">
                 <span>💬</span> WhatsApp
               </button>
               <button

@@ -20,7 +20,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { merchantApiFetch } from '@/lib/merchantApi'
-import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
+import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { formatPrice } from '@/lib/bookingConfig'
 import { getVerticalModuleCopy } from '@/lib/merchantVertical'
 import {
@@ -165,8 +165,9 @@ export function MerchantPrestationsPanel({ expectedServiceKind }: Props) {
   })
 
   const plan = getMerchantPlan(user?.merchants ?? [], activeMerchantId)
-  const canOfferings = PLAN_LIMITS[plan]?.offeringsManagement ?? false
-  const canStaff = PLAN_LIMITS[plan]?.staffManagement ?? false
+  const planLimits = getPlanLimitsForMerchant(user?.merchants ?? [], activeMerchantId)
+  const canOfferings = planLimits.offeringsManagement
+  const canStaff = planLimits.staffManagement
 
   const load = useCallback(async () => {
     if (!activeMerchantId || !canOfferings) {
@@ -409,7 +410,7 @@ export function MerchantPrestationsPanel({ expectedServiceKind }: Props) {
         max={MAX_SERVICE_IMAGES}
         showPrimaryBadge
       />
-      <button type="button" onClick={onSubmit} disabled={!form.name.trim() || saving} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-1">
+      <button type="button" onClick={onSubmit} disabled={!form.name.trim() || saving} className="px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold disabled:opacity-50 flex items-center gap-1">
         {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {submitLabel}
       </button>
     </div>
@@ -423,7 +424,7 @@ export function MerchantPrestationsPanel({ expectedServiceKind }: Props) {
           <p className="text-sm text-slate-500">{moduleCopy.subtitle}</p>
         </div>
         {publicHref && (
-          <Link href={publicHref} target="_blank" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300" style={{ textDecoration: 'none' }}>
+          <Link href={publicHref} target="_blank" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300" style={{ textDecoration: 'none' }}>
             Voir la fiche <ExternalLink size={14} />
           </Link>
         )}
@@ -445,15 +446,15 @@ export function MerchantPrestationsPanel({ expectedServiceKind }: Props) {
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">
               <span className="text-xs font-bold text-slate-500">Durée créneau (min)</span>
-              <input type="number" min={15} step={15} value={settings.slot_duration_min} onChange={e => setSettings(s => s ? { ...s, slot_duration_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+              <input type="number" min={15} step={15} value={settings.slot_duration_min} onChange={e => setSettings(s => s ? { ...s, slot_duration_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-full px-3 py-2 text-sm" />
             </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-500">Tampon entre RDV (min)</span>
-              <input type="number" min={0} value={settings.buffer_min} onChange={e => setSettings(s => s ? { ...s, buffer_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+              <input type="number" min={0} value={settings.buffer_min} onChange={e => setSettings(s => s ? { ...s, buffer_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-full px-3 py-2 text-sm" />
             </label>
             <label className="block">
               <span className="text-xs font-bold text-slate-500">Fenêtre réservation (jours)</span>
-              <input type="number" min={1} value={settings.booking_window_days} onChange={e => setSettings(s => s ? { ...s, booking_window_days: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+              <input type="number" min={1} value={settings.booking_window_days} onChange={e => setSettings(s => s ? { ...s, booking_window_days: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-full px-3 py-2 text-sm" />
             </label>
           </div>
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
@@ -463,11 +464,11 @@ export function MerchantPrestationsPanel({ expectedServiceKind }: Props) {
           <BookingPaymentSettingsFields settings={settings} onChange={patch => setSettings(s => s ? { ...s, ...patch } : s)} />
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
-            <textarea rows={3} value={settings.cancellation_policy ?? ''} onChange={e => setSettings(s => s ? { ...s, cancellation_policy: e.target.value || null } : s)} placeholder="Ex. Annulation gratuite jusqu'à 24 h avant le créneau." className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm resize-y" />
+            <textarea rows={3} value={settings.cancellation_policy ?? ''} onChange={e => setSettings(s => s ? { ...s, cancellation_policy: e.target.value || null } : s)} placeholder="Ex. Annulation gratuite jusqu'à 24 h avant le créneau." className="mt-1 w-full border-2 border-slate-200 rounded-full px-3 py-2 text-sm resize-y" />
           </label>
           <label className="block">
             <span className="text-xs font-bold text-slate-500">Politique no-show</span>
-            <textarea rows={2} value={settings.no_show_policy ?? ''} onChange={e => setSettings(s => s ? { ...s, no_show_policy: e.target.value || null } : s)} placeholder="Ex. Absence sans prévenir : acompte non remboursé." className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm resize-y" />
+            <textarea rows={2} value={settings.no_show_policy ?? ''} onChange={e => setSettings(s => s ? { ...s, no_show_policy: e.target.value || null } : s)} placeholder="Ex. Absence sans prévenir : acompte non remboursé." className="mt-1 w-full border-2 border-slate-200 rounded-full px-3 py-2 text-sm resize-y" />
           </label>
           <button type="button" onClick={() => void saveSettings()} disabled={saving} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60">
             {saving ? 'Enregistrement…' : 'Enregistrer'}

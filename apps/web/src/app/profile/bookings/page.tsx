@@ -206,7 +206,7 @@ export default function ProfileBookingsPage() {
               </p>
               <Link
                 href="/search"
-                className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-5 py-2.5 rounded-xl hover:bg-slate-800 transition-colors text-sm"
+                className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-5 py-2.5 rounded-full hover:bg-slate-800 transition-colors text-sm"
                 style={{ textDecoration: 'none' }}
               >
                 Explorer les adresses

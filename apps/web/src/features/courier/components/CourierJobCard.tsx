@@ -172,7 +172,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
               type="button"
               disabled={busy}
               onClick={handleReject}
-              className="px-4 py-3 rounded-xl font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center"
+              className="px-4 py-3 rounded-full font-bold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 flex items-center justify-center"
               aria-label="Refuser"
             >
               <X size={18} />
@@ -182,7 +182,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
             type="button"
             disabled={busy || (job.offered_to_me && secondsLeft === 0)}
             onClick={handleAccept}
-            className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 py-3 rounded-full font-bold bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
             Accepter la mission
@@ -207,7 +207,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
                   </label>
                 </div>
               ) : (
-                <label className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-slate-300 text-sm font-bold text-slate-600 cursor-pointer hover:bg-white">
+                <label className="flex items-center justify-center gap-2 py-3 rounded-full border border-dashed border-slate-300 text-sm font-bold text-slate-600 cursor-pointer hover:bg-white">
                   {uploadingPhoto ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                   {uploadingPhoto ? 'Envoi en cours…' : 'Ajouter une photo'}
                   <input type="file" accept="image/*" className="sr-only" onChange={handlePhotoChange} disabled={uploadingPhoto} />
@@ -216,7 +216,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
             </div>
           )}
           {needsProofOtp && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 space-y-2">
+            <div className="rounded-full border border-amber-100 bg-amber-50 p-4 space-y-2">
               <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                 Code client requis
               </p>
@@ -234,14 +234,14 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
                   if (otpError) setOtpError('')
                 }}
                 placeholder="0000"
-                className={`w-full text-center text-2xl font-black tracking-[0.4em] border rounded-xl py-3 bg-white text-slate-900 ${
+                className={`w-full text-center text-2xl font-black tracking-[0.4em] border rounded-full py-3 bg-white text-slate-900 ${
                   otpError ? 'border-red-300 ring-2 ring-red-100' : 'border-amber-200'
                 }`}
                 aria-label="Code de livraison client"
                 aria-invalid={!!otpError}
               />
               {otpError && (
-                <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-3 py-2">
                   {otpError}
                 </p>
               )}
@@ -251,7 +251,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
             type="button"
             disabled={busy || (needsProofOtp && proofOtp.length !== 4)}
             onClick={handleAdvance}
-            className="w-full py-3 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-full font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
             {next.label}

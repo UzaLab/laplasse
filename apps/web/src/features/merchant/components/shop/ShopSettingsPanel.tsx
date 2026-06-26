@@ -9,8 +9,10 @@ import { merchantApiFetch } from '@/lib/merchantApi'
 import {
   fetchShopForManage,
   getShopManageHref,
+  getShopPublicHref,
   linkShopToMerchant,
   updateShop,
+  uploadShopImage,
   type ShopStatus,
 } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
@@ -21,6 +23,32 @@ import { AddressLocationPickerLazy } from '@/features/addresses/components/Addre
 const INPUT =
   'w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all'
 const LABEL = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2'
+
+type SettingsForm = {
+  name: string
+  description: string
+  phone: string
+  whatsapp: string
+  email: string
+  city_id: string
+  commune_id: string
+  district: string
+  address: string
+  has_physical_location: boolean
+  latitude: number | null
+  longitude: number | null
+  status: ShopStatus
+  logo: string
+  cover_image: string
+}
+
+function serializeSettingsForm(f: SettingsForm) {
+  return JSON.stringify(f)
+}
+
+function scrollShopManageToTop() {
+  document.getElementById('shop-manage-scroll')?.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 export function ShopSettingsPanel() {
   const router = useRouter()
@@ -40,7 +68,7 @@ export function ShopSettingsPanel() {
   const isIndependentShop = !activeShop?.merchant_id
   const logoInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<SettingsForm>({
     name: '',
     description: '',
     phone: '',
@@ -51,12 +79,18 @@ export function ShopSettingsPanel() {
     district: '',
     address: '',
     has_physical_location: false,
-    latitude: null as number | null,
-    longitude: null as number | null,
-    status: 'DRAFT' as ShopStatus,
+    latitude: null,
+    longitude: null,
+    status: 'DRAFT',
     logo: '',
     cover_image: '',
   })
+  const [baseline, setBaseline] = useState('')
+
+  const isDirty = useMemo(
+    () => baseline !== '' && serializeSettingsForm(form) !== baseline,
+    [form, baseline],
+  )
 
   const selectedCity = useMemo(
     () => cities.find(c => c.id === form.city_id) ?? null,
@@ -90,7 +124,7 @@ export function ShopSettingsPanel() {
     setLoading(true)
     const shop = await fetchShopForManage(activeShopId)
     if (shop) {
-      setForm({
+      const next: SettingsForm = {
         name: shop.name ?? '',
         description: shop.description ?? '',
         phone: shop.phone ?? '',
@@ -106,7 +140,9 @@ export function ShopSettingsPanel() {
         status: shop.status,
         logo: shop.logo ?? '',
         cover_image: shop.cover_image ?? '',
-      })
+      }
+      setForm(next)
+      setBaseline(serializeSettingsForm(next))
     }
     setLoading(false)
   }, [activeShopId])
@@ -129,12 +165,25 @@ export function ShopSettingsPanel() {
 
   const uploadImage = async (file: File, field: 'logo' | 'cover_image') => {
     if (!activeShopId) return
-    const uploadMerchantId = activeShop?.merchant_id ?? activeMerchantId
-    if (!uploadMerchantId) {
-      notify.error('Liez la boutique à un établissement pour uploader des images')
+    setUploading(field === 'logo' ? 'logo' : 'cover')
+
+    if (isIndependentShop) {
+      const result = await uploadShopImage(activeShopId, file)
+      setUploading(null)
+      if ('error' in result) {
+        notify.error(result.error)
+        return
+      }
+      setForm(f => ({ ...f, [field]: result.url }))
       return
     }
-    setUploading(field === 'logo' ? 'logo' : 'cover')
+
+    const uploadMerchantId = activeShop?.merchant_id ?? activeMerchantId
+    if (!uploadMerchantId) {
+      setUploading(null)
+      notify.error('Établissement marchand requis pour uploader des images')
+      return
+    }
     const body = new FormData()
     body.append('file', file)
     const res = await merchantApiFetch('/merchants/me/media/upload', uploadMerchantId, {
@@ -183,7 +232,17 @@ export function ShopSettingsPanel() {
           : s,
       ),
     })
+    const saved: SettingsForm = {
+      ...form,
+      name: shop.name,
+      status: shop.status,
+      logo: form.logo,
+      cover_image: form.cover_image,
+    }
+    setForm(saved)
+    setBaseline(serializeSettingsForm(saved))
     notify.success('Boutique mise à jour')
+    scrollShopManageToTop()
   }
 
   if (loading) {
@@ -205,85 +264,78 @@ export function ShopSettingsPanel() {
       </div>
 
       {/* Visuel */}
-      <div className="bg-white border border-slate-100 rounded-[28px] p-6 space-y-5">
+      <div className="bg-white border border-slate-100 rounded-[28px] p-6 space-y-6">
         <p className="text-sm font-extrabold text-slate-900">Identité visuelle</p>
-        <div className="grid sm:grid-cols-2 gap-5">
-          <div>
-            <label className={LABEL}>Logo</label>
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                {form.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.logo} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon size={24} className="text-slate-300" />
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                disabled={uploading === 'logo'}
-                className="flex items-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                {uploading === 'logo'
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : <UploadCloud size={14} />}
-                Changer
-              </button>
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (f) uploadImage(f, 'logo')
-                }}
-              />
+
+        <div>
+          <label className={LABEL}>Logo</label>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-24 h-24 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 mx-auto sm:mx-0">
+              {form.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.logo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon size={28} className="text-slate-300" />
+              )}
             </div>
-            {isIndependentShop && (
-              <input
-                type="url"
-                value={form.logo}
-                onChange={e => setForm(f => ({ ...f, logo: e.target.value }))}
-                placeholder="Ou collez l'URL de votre logo (https://…)"
-                className={`${INPUT} mt-2`}
-              />
-            )}
+            <button
+              type="button"
+              onClick={() => logoInputRef.current?.click()}
+              disabled={uploading === 'logo'}
+              className="flex w-full sm:w-auto items-center justify-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 rounded-xl px-4 py-3 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              {uploading === 'logo'
+                ? <Loader2 size={14} className="animate-spin" />
+                : <UploadCloud size={14} />}
+              {form.logo ? 'Changer le logo' : 'Ajouter un logo'}
+            </button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (f) uploadImage(f, 'logo')
+                e.target.value = ''
+              }}
+            />
           </div>
-          <div>
-            <label className={LABEL}>Image de couverture</label>
-            <div className="flex items-center gap-4">
-              <div className="w-full h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                {form.cover_image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.cover_image} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon size={24} className="text-slate-300" />
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => coverInputRef.current?.click()}
-                disabled={uploading === 'cover'}
-                className="flex items-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 rounded-xl px-4 py-2 hover:bg-slate-50 transition-colors disabled:opacity-50 shrink-0"
-              >
-                {uploading === 'cover'
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : <UploadCloud size={14} />}
-                Changer
-              </button>
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (f) uploadImage(f, 'cover_image')
-                }}
-              />
+        </div>
+
+        <div>
+          <label className={LABEL}>Image de couverture</label>
+          <div className="space-y-3">
+            <div className="w-full aspect-[2.4/1] max-h-40 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+              {form.cover_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.cover_image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ImageIcon size={32} className="text-slate-300" />
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={uploading === 'cover'}
+              className="flex w-full sm:w-auto items-center justify-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 rounded-xl px-4 py-3 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              {uploading === 'cover'
+                ? <Loader2 size={14} className="animate-spin" />
+                : <UploadCloud size={14} />}
+              {form.cover_image ? 'Changer la couverture' : 'Ajouter une couverture'}
+            </button>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (f) uploadImage(f, 'cover_image')
+                e.target.value = ''
+              }}
+            />
           </div>
         </div>
       </div>
@@ -409,7 +461,7 @@ export function ShopSettingsPanel() {
           />
         </div>
 
-        <label className="flex items-start gap-3 p-4 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+        <label className="flex items-start gap-3 p-4 rounded-full border border-slate-200 bg-slate-50 cursor-pointer">
           <input
             type="checkbox"
             checked={form.has_physical_location}
@@ -449,8 +501,8 @@ export function ShopSettingsPanel() {
 
       <button
         type="submit"
-        disabled={saving}
-        className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50"
+        disabled={saving || !isDirty}
+        className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-full hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
         Enregistrer les modifications
@@ -513,7 +565,7 @@ export function ShopSettingsPanel() {
               </button>
               <Link
                 href="/merchant/signup"
-                className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 hover:text-amber-800 px-4 py-2.5 rounded-xl border border-amber-200 hover:bg-amber-100 transition-colors"
+                className="inline-flex items-center gap-2 text-sm font-bold text-amber-700 hover:text-amber-800 px-4 py-2.5 rounded-full border border-amber-200 hover:bg-amber-100 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 <Building2 size={14} /> Créer un établissement
@@ -523,7 +575,7 @@ export function ShopSettingsPanel() {
         ) : (
           <Link
             href="/merchant/signup"
-            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2.5 rounded-full text-sm transition-colors"
             style={{ textDecoration: 'none' }}
           >
             <Building2 size={14} /> Créer un établissement

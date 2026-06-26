@@ -284,7 +284,7 @@ export function MerchantHotelTab({ merchantId, merchantSlug, categorySlug }: Pro
               <button
                 type="button"
                 onClick={prevMonth}
-                className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"
+                className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50"
                 aria-label="Mois précédent"
               >
                 <ChevronLeft size={18} />
@@ -292,7 +292,7 @@ export function MerchantHotelTab({ merchantId, merchantSlug, categorySlug }: Pro
               <button
                 type="button"
                 onClick={nextMonth}
-                className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50"
+                className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50"
                 aria-label="Mois suivant"
               >
                 <ChevronRight size={18} />
@@ -405,7 +405,7 @@ export function MerchantHotelTab({ merchantId, merchantSlug, categorySlug }: Pro
             <button
               type="button"
               onClick={handleReserve}
-              className="flex-1 sm:flex-none px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-colors"
+              className="flex-1 sm:flex-none px-8 py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-colors"
             >
               Réserver{staySummary ? ` · ${formatPrice(staySummary.total)}` : ''}
             </button>

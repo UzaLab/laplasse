@@ -25,7 +25,7 @@ function MerchantVerticalServicesPage({ expectedHref }: Props) {
           </p>
           <Link
             href={moduleCopy.href}
-            className="inline-flex px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold"
+            className="inline-flex px-4 py-2 bg-slate-900 text-white rounded-full text-sm font-bold"
             style={{ textDecoration: 'none' }}
           >
             Ouvrir {moduleCopy.sidebarLabel}

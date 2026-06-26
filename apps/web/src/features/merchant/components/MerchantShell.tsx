@@ -9,9 +9,10 @@ import {
   ChevronDown, Plus, Building2, Network, Calendar, Megaphone,
   ShoppingBag, UtensilsCrossed, BedDouble, Sparkles, Dumbbell, Stethoscope,
 } from 'lucide-react'
-import { getMerchantPlan, PLAN_LIMITS } from '@/lib/planLimits'
+import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
@@ -92,7 +93,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
               id: s.id,
               name: s.name,
               slug: s.slug,
-              status: s.status as 'DRAFT' | 'ACTIVE' | 'SUSPENDED',
+              status: s.status as 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'SUSPENDED',
               merchant_id: s.merchant_id,
             }))
             updateUser({ shops: mappedShops })
@@ -124,7 +125,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   type NavItem = { href: string; label: string; icon: React.ReactNode }
 
   const activeMerchantPlan = getMerchantPlan(merchants, activeMerchantId)
-  const canOfferings = PLAN_LIMITS[activeMerchantPlan]?.offeringsManagement ?? false
+  const canOfferings = getPlanLimitsForMerchant(merchants, activeMerchantId).offeringsManagement
   const hasLinkedShop = linkedShops.length > 0
   const independentShops = getIndependentShops(shops)
   const categorySlug = activeMerchant?.category_slug
@@ -345,39 +346,44 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Tableau de bord
-          </p>
-          <div className="space-y-0.5">{mainNav.map(navLink)}</div>
-        </div>
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-2">
+        <SidebarNavGroup
+          id="merchant-dashboard"
+          label="Tableau de bord"
+          containsActive={mainNav.some(n => isActive(n.href))}
+        >
+          {mainNav.map(navLink)}
+        </SidebarNavGroup>
         {verticalNavItems.length > 0 && (
-          <div>
-            <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              Module métier
-            </p>
-            <div className="space-y-0.5">{verticalNavItems.map(navLink)}</div>
-          </div>
+          <SidebarNavGroup
+            id="merchant-vertical"
+            label="Module métier"
+            containsActive={verticalNavItems.some(n => isActive(n.href))}
+          >
+            {verticalNavItems.map(navLink)}
+          </SidebarNavGroup>
         )}
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Mon établissement
-          </p>
-          <div className="space-y-0.5">{editNav.map(navLink)}</div>
-        </div>
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Croissance
-          </p>
-          <div className="space-y-0.5">{growthNav.map(navLink)}</div>
-        </div>
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Abonnement
-          </p>
-          <div className="space-y-0.5">{billingNav.map(navLink)}</div>
-        </div>
+        <SidebarNavGroup
+          id="merchant-establishment"
+          label="Mon établissement"
+          containsActive={editNav.some(n => isActive(n.href))}
+        >
+          {editNav.map(navLink)}
+        </SidebarNavGroup>
+        <SidebarNavGroup
+          id="merchant-growth"
+          label="Croissance"
+          containsActive={growthNav.some(n => isActive(n.href))}
+        >
+          {growthNav.map(navLink)}
+        </SidebarNavGroup>
+        <SidebarNavGroup
+          id="merchant-billing"
+          label="Abonnement"
+          containsActive={billingNav.some(n => isActive(n.href))}
+        >
+          {billingNav.map(navLink)}
+        </SidebarNavGroup>
         <div className="h-px bg-slate-100 mx-2" />
         <div className="space-y-0.5">
           {independentShops.length > 0 && (
@@ -413,7 +419,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       <div className="p-3 border-t border-slate-100">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
         >
           <LogOut size={17} /> Déconnexion
         </button>

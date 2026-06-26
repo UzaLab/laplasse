@@ -69,7 +69,7 @@ export default function LogisticsContractsPage() {
           </div>
           <Link
             href="/logistics/prospects"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700"
             style={{ textDecoration: 'none' }}
           >
             Trouver des prospects
@@ -134,7 +134,7 @@ export default function LogisticsContractsPage() {
                     )}
                     <Link
                       href={`/logistics/contracts/${c.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white"
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-full text-xs font-bold bg-slate-900 text-white"
                       style={{ textDecoration: 'none' }}
                     >
                       Détails <ChevronRight size={14} />

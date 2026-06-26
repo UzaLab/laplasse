@@ -18,7 +18,7 @@ export function shopApiFetch(
   return authApiFetch(withShopId(path, activeShopId), options)
 }
 
-export type ShopStatus = 'DRAFT' | 'ACTIVE' | 'SUSPENDED'
+export type ShopStatus = 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'SUSPENDED'
 
 export interface ShopSummary {
   id: string
@@ -73,6 +73,12 @@ export function getIndependentShops(shops: ShopSummary[] | undefined): ShopSumma
 }
 
 /** Retourne l'URL de gestion d'une boutique (espace marchand si liée, sinon /shop/manage). */
+/** URL publique vitrine boutique (standalone ou liée). */
+export function getShopPublicHref(shop: { slug: string } | null | undefined): string {
+  if (!shop?.slug) return '/marketplace'
+  return `/m/${shop.slug}/boutique`
+}
+
 export function getShopManageHref(shop: ShopSummary | null | undefined): string {
   return shop?.merchant_id ? '/merchant/shop' : '/shop/manage'
 }
@@ -280,4 +286,48 @@ export async function saveShopProductCategories(
     }
   }
   return { ok: true }
+}
+
+export async function uploadShopImage(
+  shopId: string,
+  file: File,
+): Promise<{ url: string } | { error: string }> {
+  const body = new FormData()
+  body.append('file', file)
+  const res = await shopApiFetch(`/shops/${shopId}/media/upload`, shopId, {
+    method: 'POST',
+    body,
+  })
+  if (!res.ok) {
+    try {
+      const data = await res.json()
+      const msg = Array.isArray(data.message) ? data.message.join(', ') : data.message
+      return { error: msg ?? 'Échec de l\'upload' }
+    } catch {
+      return { error: 'Échec de l\'upload' }
+    }
+  }
+  return res.json() as Promise<{ url: string }>
+}
+
+export interface ShopMediaPage {
+  logo?: string | null
+  cover_image?: string | null
+  gallery: Array<{ id: string; url: string; type?: string; order?: number; created_at?: string }>
+  pagination?: { page: number; limit: number; total: number; has_more: boolean }
+}
+
+export async function fetchShopMedia(
+  shopId: string,
+  page = 1,
+  limit = 24,
+): Promise<ShopMediaPage | null> {
+  const res = await shopApiFetch(`/shops/${shopId}/media?page=${page}&limit=${limit}`, shopId)
+  if (!res.ok) return null
+  return res.json() as Promise<ShopMediaPage>
+}
+
+export async function deleteShopMedia(shopId: string, mediaId: string): Promise<boolean> {
+  const res = await shopApiFetch(`/shops/${shopId}/media/${mediaId}`, shopId, { method: 'DELETE' })
+  return res.ok
 }

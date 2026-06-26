@@ -155,14 +155,14 @@ export function ProfileShell({ children }: ProfileShellProps) {
         )}
         <Link
           href="#"
-          className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-slate-500 hover:bg-slate-50 font-medium text-sm transition-colors"
+          className="flex items-center gap-3 px-4 py-2.5 rounded-full text-slate-500 hover:bg-slate-50 font-medium text-sm transition-colors"
           style={{ textDecoration: 'none' }}
         >
           <HelpCircle size={17} /> Centre d&apos;aide
         </Link>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
         >
           <LogOut size={17} /> Déconnexion
         </button>

@@ -86,7 +86,7 @@ export function MobileNav({
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
             aria-label={t('nav.closeMenu')}
           >
             <X size={22} />
@@ -120,7 +120,7 @@ export function MobileNav({
                     href={href}
                     onClick={onClose}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-semibold transition-colors',
+                      'flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-semibold transition-colors',
                       active
                         ? 'bg-slate-900 text-white'
                         : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900',
@@ -148,7 +148,7 @@ export function MobileNav({
                     href="/profile"
                     onClick={onClose}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium transition-colors',
+                      'flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium transition-colors',
                       pathname === '/profile' || pathname.startsWith('/profile/')
                         ? 'bg-slate-100 text-slate-900'
                         : 'text-slate-700 hover:bg-slate-50',
@@ -163,7 +163,7 @@ export function MobileNav({
                     href="/favoris"
                     onClick={onClose}
                     className={cn(
-                      'flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium transition-colors',
+                      'flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium transition-colors',
                       pathname === '/favoris'
                         ? 'bg-slate-100 text-slate-900'
                         : 'text-slate-700 hover:bg-slate-50',
@@ -178,7 +178,7 @@ export function MobileNav({
                     <Link
                       href="/merchant/dashboard"
                       onClick={onClose}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
                       <LayoutDashboard size={18} /> {t('nav.dashboard')}
@@ -190,7 +190,7 @@ export function MobileNav({
                     <Link
                       href="/courier/dashboard"
                       onClick={onClose}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
                       <LayoutDashboard size={18} /> Espace livreur
@@ -202,7 +202,7 @@ export function MobileNav({
                     <Link
                       href="/admin"
                       onClick={onClose}
-                      className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
                       <LayoutDashboard size={18} /> {t('nav.admin')}
@@ -237,7 +237,7 @@ export function MobileNav({
             <Link
               href="/login"
               onClick={onClose}
-              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+              className="flex items-center justify-center gap-2 w-full py-3.5 rounded-full text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               <User size={16} /> {t('nav.login')}

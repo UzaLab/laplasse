@@ -85,7 +85,7 @@ function InlineEdit({
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') setEditing(false) }}
-        className="px-2 py-1 border border-violet-300 rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-violet-200"
+        className="px-2 py-1 border border-violet-300 rounded-full text-sm font-bold outline-none focus:ring-2 focus:ring-violet-200"
       />
       <button type="button" disabled={saving} onClick={save} className="p-1 rounded text-emerald-600 hover:bg-emerald-50">
         {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -163,27 +163,27 @@ function MerchantCategoriesTab() {
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Nom (ex. Restaurant, Beauté…)"
-              className="sm:col-span-2 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              className="sm:col-span-2 px-3 py-2 border border-slate-200 rounded-full text-sm bg-white"
             />
             <input
               value={form.icon}
               onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
               placeholder="🍽️"
-              className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              className="px-3 py-2 border border-slate-200 rounded-full text-sm bg-white"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <select
               value={form.parent_id}
               onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))}
-              className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white"
+              className="px-3 py-2 border border-slate-200 rounded-full text-sm bg-white"
             >
               <option value="">— Catégorie racine —</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <div className="flex gap-2">
               <button type="submit" disabled={creating}
-                className="flex-1 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                className="flex-1 py-2 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-1.5">
                 {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Créer
               </button>
               <button type="button" onClick={() => setShowForm(false)}
@@ -352,7 +352,7 @@ function SpotlightTab() {
             <input
               type="number" min={1} max={24} value={limitDraft}
               onChange={e => setLimitDraft(Number(e.target.value))}
-              className="w-20 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold text-center"
+              className="w-20 px-3 py-2 border border-slate-200 rounded-full text-sm font-bold text-center"
             />
             <button
               type="button" disabled={savingLimit} onClick={() => void saveLimit()}
@@ -407,7 +407,7 @@ function SpotlightTab() {
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
             placeholder="Rechercher par nom ou slug…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm"
           />
         </div>
         {searching ? (
@@ -415,7 +415,7 @@ function SpotlightTab() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {searchResults.map(shop => (
-              <div key={shop.id} className="flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-2xl p-3">
+              <div key={shop.id} className="flex items-center justify-between gap-3 bg-white border border-slate-100 rounded-full p-3">
                 <div className="min-w-0">
                   <p className="font-bold text-slate-900 text-sm truncate">{shop.name}</p>
                   <p className="text-xs text-slate-400">

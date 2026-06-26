@@ -16,7 +16,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
-import { getHighestPlan, PLAN_LIMITS } from '@/lib/planLimits'
+import { getEffectivePlanLimits } from '@/lib/planLimits'
 import { notify } from '@/lib/notify'
 import {
   ADS_CONTEXT_DESCRIPTIONS,
@@ -125,7 +125,6 @@ function filterCampaignsForContext(
 export function MerchantAdsPanel({ context: contextOverride }: MerchantAdsPanelProps) {
   const pathname = usePathname()
   const { activeMerchantId, activeShopId, user } = useAuthStore()
-  const plan = getHighestPlan(user?.merchants ?? [])
 
   const context = useMemo(
     () => contextOverride ?? resolveAdsContext(pathname, user?.shops, activeMerchantId),
@@ -192,10 +191,10 @@ export function MerchantAdsPanel({ context: contextOverride }: MerchantAdsPanelP
 
   const canAds = useMemo(() => {
     if (context === 'standalone_shop') {
-      return scopedShops.some(s => s.eligible)
+      return scopedShops.some(s => s.eligible) || getEffectivePlanLimits().adsSelfService
     }
-    return PLAN_LIMITS[plan]?.adsSelfService ?? false
-  }, [context, scopedShops, plan])
+    return getEffectivePlanLimits().adsSelfService
+  }, [context, scopedShops])
 
   const suggestions = useMemo(() => {
     const raw = eligibility?.suggestions ?? []
@@ -389,13 +388,9 @@ export function MerchantAdsPanel({ context: contextOverride }: MerchantAdsPanelP
   if (!canAds) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-sm text-amber-900">
-        <p className="font-bold mb-1">
-          {context === 'standalone_shop' ? 'Boutique non éligible' : 'Plan Growth requis'}
-        </p>
+        <p className="font-bold mb-1">Boutique non éligible</p>
         <p className="text-amber-800">
-          {context === 'standalone_shop'
-            ? 'Activez votre boutique et ajoutez au moins un produit en stock pour lancer une campagne.'
-            : 'Passez au plan Growth ou Scale pour lancer des campagnes publicitaires self-service.'}
+          Activez votre boutique et ajoutez au moins un produit en stock pour lancer une campagne.
         </p>
       </div>
     )

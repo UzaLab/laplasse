@@ -63,7 +63,7 @@ export function ProductSearchResultCard({ product }: { product: ProductSearchHit
           </span>
           <Link
             href={href}
-            className="shrink-0 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-brand-500 transition-colors"
+            className="shrink-0 px-3 py-2 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-brand-500 transition-colors"
             style={{ textDecoration: 'none' }}
           >
             Voir

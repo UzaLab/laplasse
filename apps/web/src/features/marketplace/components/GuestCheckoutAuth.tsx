@@ -98,7 +98,7 @@ export function GuestCheckoutAuth({ onAuthenticated, compact = false }: GuestChe
             value={phone}
             onChange={e => setPhone(e.target.value)}
             placeholder="+225 07 XX XX XX XX"
-            className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-brand-400"
+            className="flex-1 bg-white border border-slate-200 rounded-full px-4 py-3 text-sm font-medium outline-none focus:border-brand-400"
           />
           <button
             type="button"
@@ -118,7 +118,7 @@ export function GuestCheckoutAuth({ onAuthenticated, compact = false }: GuestChe
             value={code}
             onChange={e => setCode(e.target.value)}
             placeholder="Code à 6 chiffres"
-            className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-brand-400"
+            className="flex-1 bg-white border border-slate-200 rounded-full px-4 py-3 text-sm font-medium outline-none focus:border-brand-400"
           />
           <button
             type="button"

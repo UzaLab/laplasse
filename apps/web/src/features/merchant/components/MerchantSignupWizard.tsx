@@ -17,7 +17,7 @@ import {
 import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
 import { getCategoryIcon } from '@/lib/icons'
-import { getHighestPlan, ORG_TYPE_LABELS, type OrganizationType } from '@/lib/planLimits'
+import { getEffectivePlanLimits, ORG_TYPE_LABELS, type OrganizationType } from '@/lib/planLimits'
 import {
   getCountryCode,
   getCountryLabel,
@@ -57,8 +57,7 @@ export function MerchantSignupWizard() {
   const phonePlaceholder = getPhonePlaceholder(countryCode)
 
   const existingMerchants = user?.merchants ?? []
-  const highestPlan = getHighestPlan(existingMerchants)
-  const canUseOrganization = ['GROWTH', 'PREMIUM'].includes(highestPlan)
+  const canUseOrganization = getEffectivePlanLimits().orgAllowed
   const showStructureStep = existingMerchants.length > 0 && canUseOrganization
 
   const [step, setStep] = useState(showStructureStep ? 0 : 1)
@@ -259,7 +258,7 @@ export function MerchantSignupWizard() {
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900 mb-1">Type de structure</h2>
                 <p className="text-slate-500 text-sm">
-                  Votre plan {highestPlan} permet de gérer plusieurs établissements. Comment souhaitez-vous organiser ce nouveau site ?
+                  Vous pouvez gérer plusieurs établissements. Comment souhaitez-vous organiser ce nouveau site ?
                 </p>
               </div>
 
@@ -326,7 +325,7 @@ export function MerchantSignupWizard() {
                       value={orgName}
                       onChange={e => setOrgName(e.target.value)}
                       placeholder="Ex : Groupe Foody, Salon Beauty Group…"
-                      className="w-full border-2 border-slate-200 focus:border-brand-400 rounded-2xl px-4 py-3 outline-none text-sm"
+                      className="w-full border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-3 outline-none text-sm"
                     />
                   </div>
                   <div>
@@ -375,7 +374,7 @@ export function MerchantSignupWizard() {
                   value={form.business_name}
                   onChange={e => set('business_name', e.target.value)}
                   placeholder="Ex : Villa Maasai, Noom Rooftop…"
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -545,7 +544,7 @@ export function MerchantSignupWizard() {
                     value={form.district}
                     onChange={e => set('district', e.target.value)}
                     placeholder="Quartier ou commune"
-                    className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                    className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
                   />
                 )}
               </div>
@@ -559,7 +558,7 @@ export function MerchantSignupWizard() {
                   value={form.address}
                   onChange={e => set('address', e.target.value)}
                   placeholder="Rue, immeuble, repère…"
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -603,7 +602,7 @@ export function MerchantSignupWizard() {
                   value={form.phone}
                   onChange={e => set('phone', e.target.value)}
                   placeholder={phonePlaceholder}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -616,11 +615,11 @@ export function MerchantSignupWizard() {
                   value={form.whatsapp}
                   onChange={e => set('whatsapp', e.target.value)}
                   placeholder={phonePlaceholder}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-2">
+              <div className="bg-slate-50 border border-slate-100 rounded-full p-5 space-y-2">
                 <h4 className="text-sm font-bold text-slate-700 mb-3">Récapitulatif</h4>
                 {showStructureStep && (
                   <div className="flex justify-between text-sm gap-4">
@@ -655,13 +654,13 @@ export function MerchantSignupWizard() {
               </div>
 
               {error && (
-                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-2xl">
+                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-full">
                   {error}
                 </div>
               )}
 
               {!isAuthenticated && (
-                <div className="px-4 py-3 bg-brand-50 border border-brand-200 text-brand-800 text-sm font-medium rounded-2xl">
+                <div className="px-4 py-3 bg-brand-50 border border-brand-200 text-brand-800 text-sm font-medium rounded-full">
                   Vous devez être connecté.{' '}
                   <Link href="/login?redirect=/merchant/signup" className="font-bold underline">
                     Se connecter
@@ -681,7 +680,7 @@ export function MerchantSignupWizard() {
                   type="button"
                   disabled={loading || !form.phone.trim()}
                   onClick={handleSubmit}
-                  className="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-2xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-60"
+                  className="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 rounded-full transition-colors flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 disabled:opacity-60"
                 >
                   {loading ? (
                     <>

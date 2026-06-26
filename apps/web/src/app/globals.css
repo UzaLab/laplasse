@@ -35,6 +35,100 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ─── Boutons — forme pill harmonisée ─────────────────────────────────────────── */
+
+@layer base {
+  button:not(.btn-shape-keep):not([data-btn-shape="keep"]),
+  input[type="submit"]:not(.btn-shape-keep),
+  input[type="button"]:not(.btn-shape-keep),
+  input[type="reset"]:not(.btn-shape-keep),
+  [role="button"]:not(.btn-shape-keep):not([data-btn-shape="keep"]) {
+    border-radius: 9999px;
+  }
+}
+
+@layer components {
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-dark,
+  .btn-accent,
+  .btn-admin,
+  .btn-ghost,
+  .btn-danger,
+  .btn-success,
+  .btn-icon {
+    @apply inline-flex items-center justify-center font-bold transition-colors rounded-full;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 focus-visible:ring-offset-2;
+    @apply disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply bg-brand-600 text-white hover:bg-brand-700 border border-transparent shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 hover:border-slate-300;
+  }
+
+  .btn-dark {
+    @apply bg-slate-900 text-white hover:bg-slate-800 border border-transparent;
+  }
+
+  .btn-accent {
+    @apply bg-orange-600 text-white hover:bg-orange-700 border border-transparent;
+  }
+
+  .btn-admin {
+    @apply bg-violet-600 text-white hover:bg-violet-700 border border-transparent;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-slate-600 border border-transparent hover:bg-slate-100;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 border border-transparent;
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 border border-transparent;
+  }
+
+  .btn-icon {
+    @apply h-9 w-9 p-0 shrink-0;
+  }
+
+  .btn-sm {
+    @apply h-9 px-3.5 text-sm;
+  }
+
+  .btn-md {
+    @apply h-10 px-4 text-sm;
+  }
+
+  .btn-lg {
+    @apply h-11 px-5 text-sm;
+  }
+
+  /* Liens stylés comme boutons */
+  a.btn,
+  a[data-btn="true"],
+  .btn-link {
+    @apply rounded-full;
+    text-decoration: none;
+  }
+}
+
+/* Priorité sur les utilitaires Tailwind rounded-* restants sur les boutons natifs */
+button:not(.btn-shape-keep):not([data-btn-shape="keep"]),
+input[type="submit"]:not(.btn-shape-keep),
+input[type="button"]:not(.btn-shape-keep),
+input[type="reset"]:not(.btn-shape-keep),
+[role="button"]:not(.btn-shape-keep):not([data-btn-shape="keep"]) {
+  border-radius: 9999px !important;
+}
+
 /* ─── Utilitaires globaux ────────────────────────────────────────────────────── */
 
 .glass-panel {

@@ -146,7 +146,7 @@ function AdminOrdersContent() {
             value={q}
             onChange={e => handleQ(e.target.value)}
             placeholder="Rechercher ID, client, boutique, marchand…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
           />
         </div>
       </div>

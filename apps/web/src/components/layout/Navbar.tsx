@@ -196,7 +196,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="hidden md:flex items-center gap-2 text-sm font-bold bg-slate-900 text-white px-5 py-2.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+              className="hidden md:flex items-center gap-2 text-sm font-bold bg-slate-900 text-white px-5 py-2.5 rounded-full hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
               style={{ textDecoration: 'none' }}
             >
               <User size={16} />

@@ -190,7 +190,7 @@ function CustomerDrawer({
       <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h2 className="font-extrabold text-slate-900">Fiche contact</h2>
-          <button type="button" onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500">
+          <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 text-slate-500">
             <X size={18} />
           </button>
         </div>
@@ -423,7 +423,7 @@ export function MerchantCrmPanel({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Nom, email, téléphone…"
-                className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
+                className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
               />
             </div>
 
@@ -449,7 +449,7 @@ export function MerchantCrmPanel({
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Nom, email, téléphone…"
-                  className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
+                  className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
                 />
               </div>
             </div>

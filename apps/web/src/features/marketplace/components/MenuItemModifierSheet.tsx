@@ -88,7 +88,7 @@ export function MenuItemModifierSheet({ item, open, onClose, onConfirm, submitti
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100 text-slate-500"
+            className="p-2 rounded-full hover:bg-slate-100 text-slate-500"
             aria-label="Fermer"
           >
             <X size={18} />

@@ -3,14 +3,12 @@ import { cn } from '@/lib/utils'
 interface AdminPageContainerProps {
   children: React.ReactNode
   className?: string
-  /** Pages très larges (geo) — max-w-6xl */
-  wide?: boolean
 }
 
-/** Largeur standard alignée sur les pages admin delivery / merchants. */
-export function AdminPageContainer({ children, className, wide }: AdminPageContainerProps) {
+/** Largeur pleine — alignée sur /shop/manage et les shells marchands. */
+export function AdminPageContainer({ children, className }: AdminPageContainerProps) {
   return (
-    <div className={cn('w-full mx-auto space-y-6', wide ? 'max-w-6xl' : 'max-w-5xl', className)}>
+    <div className={cn('w-full space-y-6', className)}>
       {children}
     </div>
   )

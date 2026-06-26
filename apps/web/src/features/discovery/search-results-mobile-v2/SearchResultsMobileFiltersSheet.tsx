@@ -39,7 +39,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        'shrink-0 px-3 py-1.5 rounded-xl text-sm font-bold transition-colors border',
+        'shrink-0 px-3 py-1.5 rounded-full text-sm font-bold transition-colors border',
         active
           ? 'bg-slate-900 text-white border-slate-900'
           : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300',
@@ -175,7 +175,7 @@ export function SearchResultsMobileFiltersSheet({
             <button
               type="button"
               onClick={clearAll}
-              className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+              className="flex-1 py-3 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Tout effacer
             </button>
@@ -183,7 +183,7 @@ export function SearchResultsMobileFiltersSheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
+            className="flex-1 py-3 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-brand-500 transition-colors"
           >
             Appliquer
           </button>

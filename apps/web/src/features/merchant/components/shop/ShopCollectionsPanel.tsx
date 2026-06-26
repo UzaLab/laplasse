@@ -151,10 +151,10 @@ function CollectionProductsPanel({
                         <img
                           src={product.image_url}
                           alt=""
-                          className="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"
+                          className="w-10 h-10 rounded-full object-cover bg-slate-100 shrink-0"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-lg bg-slate-100 shrink-0" />
+                        <div className="w-10 h-10 rounded-full bg-slate-100 shrink-0" />
                       )}
                       <span className="text-sm font-medium text-slate-800 truncate flex-1 min-w-0">
                         {product.name}
@@ -174,7 +174,7 @@ function CollectionProductsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+            className="flex-1 py-3 rounded-full border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
           >
             Annuler
           </button>
@@ -182,7 +182,7 @@ function CollectionProductsPanel({
             type="button"
             onClick={onSave}
             disabled={saving || products.length === 0}
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3 rounded-xl text-sm hover:bg-brand-500 transition-colors disabled:opacity-60"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3 rounded-full text-sm hover:bg-brand-500 transition-colors disabled:opacity-60"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Enregistrer
@@ -333,18 +333,18 @@ export function ShopCollectionsPanel() {
           placeholder="Nom * (ex. Nouveautés)"
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2 text-sm outline-none focus:border-brand-400"
         />
         <input
           placeholder="Description (optionnel)"
           value={form.description}
           onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2 text-sm outline-none focus:border-brand-400"
         />
         <button
           type="submit"
           disabled={creating}
-          className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl text-sm hover:bg-brand-500 transition-colors disabled:opacity-60"
+          className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-full text-sm hover:bg-brand-500 transition-colors disabled:opacity-60"
         >
           {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
           Créer

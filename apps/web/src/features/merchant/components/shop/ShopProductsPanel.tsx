@@ -143,9 +143,10 @@ export function ShopProductsPanel() {
   const statusCounts = useMemo(() => ({
     all: products.length,
     ACTIVE: products.filter(p => p.status === 'ACTIVE').length,
+    PENDING_REVIEW: products.filter(p => p.status === 'PENDING_REVIEW').length,
     DRAFT: products.filter(p => p.status === 'DRAFT').length,
     OUT_OF_STOCK: products.filter(p => p.status === 'OUT_OF_STOCK').length,
-  } satisfies Record<'all' | 'ACTIVE' | 'DRAFT' | 'OUT_OF_STOCK', number>), [products])
+  } satisfies Record<'all' | 'ACTIVE' | 'PENDING_REVIEW' | 'DRAFT' | 'OUT_OF_STOCK', number>), [products])
 
   const lowStockCount = useMemo(
     () => products.filter(p => isProductLowStock(p)).length,
@@ -170,27 +171,27 @@ export function ShopProductsPanel() {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+      <div className="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-extrabold text-slate-900">Catalogue produits</h2>
           <p className="text-slate-400 text-sm mt-0.5">
             Gérez les articles visibles sur votre vitrine marketplace.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Link
-            href={routes.productsCategories}
-            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-sm"
-            style={{ textDecoration: 'none' }}
-          >
-            <Settings2 size={16} /> Gestion des catégories
-          </Link>
+        <div className="flex flex-col gap-2 w-full sm:w-auto sm:shrink-0">
           <Link
             href={routes.productsNew}
-            className="inline-flex flex-1 sm:flex-none items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl hover:bg-slate-800 transition-colors text-sm"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-3 rounded-full hover:bg-slate-800 transition-colors text-sm"
             style={{ textDecoration: 'none' }}
           >
             <Plus size={16} /> Nouveau produit
+          </Link>
+          <Link
+            href={routes.productsCategories}
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-bold px-4 py-3 rounded-full hover:bg-slate-50 transition-colors text-sm"
+            style={{ textDecoration: 'none' }}
+          >
+            <Settings2 size={16} /> Gestion des catégories
           </Link>
         </div>
       </div>
@@ -245,6 +246,7 @@ export function ShopProductsPanel() {
             >
               <option value="all">Tous les statuts ({statusCounts.all})</option>
               <option value="ACTIVE">{PRODUCT_STATUS_LABELS.ACTIVE} ({statusCounts.ACTIVE})</option>
+              <option value="PENDING_REVIEW">{PRODUCT_STATUS_LABELS.PENDING_REVIEW} ({statusCounts.PENDING_REVIEW})</option>
               <option value="DRAFT">{PRODUCT_STATUS_LABELS.DRAFT} ({statusCounts.DRAFT})</option>
               <option value="OUT_OF_STOCK">{PRODUCT_STATUS_LABELS.OUT_OF_STOCK} ({statusCounts.OUT_OF_STOCK})</option>
               {lowStockCount > 0 && (
@@ -292,7 +294,7 @@ export function ShopProductsPanel() {
           )}
           <Link
             href={routes.productsNew}
-            className="inline-flex items-center gap-2 bg-amber-500 text-white font-bold px-4 py-2 rounded-xl text-sm"
+            className="inline-flex items-center gap-2 bg-amber-500 text-white font-bold px-4 py-2 rounded-full text-sm"
             style={{ textDecoration: 'none' }}
           >
             <Plus size={16} /> Créer un produit
@@ -353,7 +355,7 @@ export function ShopProductsPanel() {
               <div className="flex gap-1.5 sm:gap-2 shrink-0">
                 <Link
                   href={routes.productsEdit(product.id)}
-                  className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                  className="p-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
                   style={{ textDecoration: 'none' }}
                   aria-label="Modifier"
                 >

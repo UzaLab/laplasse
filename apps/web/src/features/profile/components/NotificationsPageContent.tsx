@@ -366,7 +366,7 @@ export function NotificationsPageContent({
             {filter === 'all' && (
               <Link
                 href={copy.emptyCtaHref}
-                className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
+                className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors"
                 style={{ textDecoration: 'none' }}
               >
                 {audience === 'merchant' ? null : <Package size={16} />}
@@ -393,7 +393,7 @@ export function NotificationsPageContent({
                           type="button"
                           disabled={!actionable}
                           className={cn(
-                            'w-full text-left rounded-2xl border transition-all',
+                            'w-full text-left rounded-full border transition-all',
                             'flex items-start gap-4 p-4 sm:p-5 min-h-[72px]',
                             actionable && 'hover:border-slate-200 hover:shadow-sm active:bg-slate-50',
                             !actionable && 'cursor-default',

@@ -173,7 +173,7 @@ export function ShopDeliveryZonesPanel() {
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           placeholder="Nom de la zone (ex. Cocody & Plateau)"
-          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+          className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm"
         />
         <div className="grid grid-cols-3 gap-3">
           <input
@@ -183,7 +183,7 @@ export function ShopDeliveryZonesPanel() {
             value={form.fee}
             onChange={e => setForm(f => ({ ...f, fee: e.target.value }))}
             placeholder="Tarif FCFA"
-            className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+            className="border border-slate-200 rounded-full px-3 py-2.5 text-sm"
           />
           <input
             required
@@ -192,7 +192,7 @@ export function ShopDeliveryZonesPanel() {
             value={form.eta_min}
             onChange={e => setForm(f => ({ ...f, eta_min: e.target.value }))}
             placeholder="Délai min (min)"
-            className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+            className="border border-slate-200 rounded-full px-3 py-2.5 text-sm"
           />
           <input
             required
@@ -201,7 +201,7 @@ export function ShopDeliveryZonesPanel() {
             value={form.eta_max}
             onChange={e => setForm(f => ({ ...f, eta_max: e.target.value }))}
             placeholder="Délai max (min)"
-            className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
+            className="border border-slate-200 rounded-full px-3 py-2.5 text-sm"
           />
         </div>
         <div>
@@ -212,7 +212,7 @@ export function ShopDeliveryZonesPanel() {
             {DELIVERY_VEHICLE_OPTIONS.map(opt => (
               <label
                 key={opt.value}
-                className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${
+                className={`flex items-start gap-3 p-3 rounded-full border cursor-pointer ${
                   form.vehicle === opt.value
                     ? 'border-amber-400 bg-amber-50'
                     : 'border-slate-200 hover:border-slate-300'
@@ -244,7 +244,7 @@ export function ShopDeliveryZonesPanel() {
               <select
                 value={selectedCityId}
                 onChange={e => setSelectedCityId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white"
+                className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm bg-white"
               >
                 {cities.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -281,7 +281,7 @@ export function ShopDeliveryZonesPanel() {
 
         <button
           type="submit"
-          className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800"
+          className="w-full py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800"
         >
           Créer la zone
         </button>

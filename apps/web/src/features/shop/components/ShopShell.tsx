@@ -5,21 +5,23 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutGrid, Package, ShoppingBag, FolderOpen, Tag, Truck, Settings,
-  LogOut, Compass, Menu, X, UserCircle2, Store, Building2, Plus,
-  ChevronDown, ExternalLink, Lock, Megaphone, Users,
+  LogOut, Compass, Menu, X, UserCircle2, Store, Plus,
+  ChevronDown, ExternalLink, Megaphone, Users, BarChart3,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
-import { getIndependentShops } from '@/lib/shopApi'
+import { getIndependentShops, getShopPublicHref } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 import { cn } from '@/lib/utils'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { ShopMobileNav } from '@/features/shop/components/ShopMobileNav'
+import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 
 interface ShopShellProps {
   children: React.ReactNode
 }
 
-type NavItem = { href: string; label: string; icon: React.ReactNode; locked?: boolean }
+type NavItem = { href: string; label: string; icon: React.ReactNode }
 
 export function ShopShell({ children }: ShopShellProps) {
   const pathname = usePathname()
@@ -31,7 +33,6 @@ export function ShopShell({ children }: ShopShellProps) {
   const independentShops = getIndependentShops(user?.shops)
   const isMerchant = (user?.merchants?.length ?? 0) > 0
 
-  // Ensure activeShopId points to an independent shop when in this context
   useEffect(() => {
     if (!independentShops.length) return
     const currentIsIndependent = independentShops.some(s => s.id === activeShopId)
@@ -50,21 +51,14 @@ export function ShopShell({ children }: ShopShellProps) {
     .split(/[\s@]/).filter(Boolean).slice(0, 2)
     .map((s: string) => s[0]?.toUpperCase()).join('')
 
-  // Plan — independent shops are always free tier (no merchant subscription)
-  const hasPlan = false // plan-gated features require a merchant account
-
   const mainNav: NavItem[] = [
     { href: '/shop/manage', label: "Vue d'ensemble", icon: <LayoutGrid size={17} /> },
+    { href: '/shop/manage/analytics', label: 'Statistiques', icon: <BarChart3 size={17} /> },
     { href: '/shop/manage/products', label: 'Produits', icon: <Package size={17} /> },
     { href: '/shop/manage/orders', label: 'Commandes', icon: <ShoppingBag size={17} /> },
     { href: '/shop/manage/crm', label: 'Clients CRM', icon: <Users size={17} /> },
     { href: '/shop/manage/collections', label: 'Collections', icon: <FolderOpen size={17} /> },
-    {
-      href: '/shop/manage/promotions',
-      label: 'Promotions',
-      icon: <Tag size={17} />,
-      locked: !hasPlan,
-    },
+    { href: '/shop/manage/promotions', label: 'Promotions', icon: <Tag size={17} /> },
     { href: '/shop/manage/delivery-zones', label: 'Livraison', icon: <Truck size={17} /> },
     { href: '/shop/manage/visibility', label: 'Visibilité', icon: <Megaphone size={17} /> },
     { href: '/shop/manage/settings', label: 'Paramètres', icon: <Settings size={17} /> },
@@ -84,17 +78,12 @@ export function ShopShell({ children }: ShopShellProps) {
         'flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all',
         isActive(item.href)
           ? 'bg-slate-900 text-white shadow-sm'
-          : item.locked
-            ? 'text-slate-300 cursor-default pointer-events-none'
-            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
+          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
       )}
       style={{ textDecoration: 'none' }}
     >
       <span className={isActive(item.href) ? 'text-amber-400' : ''}>{item.icon}</span>
       <span className="flex-1">{item.label}</span>
-      {item.locked && (
-        <Lock size={12} className="text-slate-300 shrink-0" />
-      )}
     </Link>
   )
 
@@ -102,7 +91,6 @@ export function ShopShell({ children }: ShopShellProps) {
 
   const SidebarInner = (
     <>
-      {/* Logo */}
       <div className="h-[72px] flex items-center px-6 border-b border-slate-100 shrink-0">
         <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
           <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
@@ -125,7 +113,6 @@ export function ShopShell({ children }: ShopShellProps) {
         </button>
       </div>
 
-      {/* Shop selector */}
       <div className="mx-3 mt-4 relative">
         {independentShops.length > 1 ? (
           <div>
@@ -175,7 +162,7 @@ export function ShopShell({ children }: ShopShellProps) {
             <p className="text-sm font-extrabold text-slate-900 truncate">{activeShop?.name ?? '—'}</p>
             {activeShop?.slug && (
               <Link
-                href={`/boutique/${activeShop.slug}`}
+                href={getShopPublicHref(activeShop)}
                 target="_blank"
                 className="inline-flex items-center gap-1 text-[10px] text-brand-600 hover:text-brand-700 font-bold mt-1 transition-colors"
                 style={{ textDecoration: 'none' }}
@@ -187,33 +174,14 @@ export function ShopShell({ children }: ShopShellProps) {
         )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-4">
-        <div>
-          <p className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            Gestion boutique
-          </p>
-          <div className="space-y-0.5">{mainNav.map(navLink)}</div>
-        </div>
-
-        {/* Upgrade CTA — promotions & analytics locked without plan */}
-        {!hasPlan && (
-          <div className="mx-1 p-3 bg-amber-50 border border-amber-100 rounded-2xl">
-            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">
-              Fonctionnalités avancées
-            </p>
-            <p className="text-xs text-amber-600 mb-2">
-              Promotions & analytics disponibles en liant votre boutique à un établissement.
-            </p>
-            <Link
-              href="/merchant/signup"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-lg transition-colors"
-              style={{ textDecoration: 'none' }}
-            >
-              <Building2 size={11} /> Créer un établissement
-            </Link>
-          </div>
-        )}
+      <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-2">
+        <SidebarNavGroup
+          id="shop-manage"
+          label="Gestion boutique"
+          containsActive={mainNav.some(n => isActive(n.href))}
+        >
+          {mainNav.map(navLink)}
+        </SidebarNavGroup>
 
         <div className="h-px bg-slate-100 mx-2" />
 
@@ -247,7 +215,6 @@ export function ShopShell({ children }: ShopShellProps) {
         </div>
       </nav>
 
-      {/* Footer */}
       <div className="p-3 border-t border-slate-100 space-y-1">
         <div className="flex items-center gap-2.5 px-4 py-2">
           <div className="w-8 h-8 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs select-none shrink-0">
@@ -262,7 +229,7 @@ export function ShopShell({ children }: ShopShellProps) {
         </div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-red-500 hover:bg-red-50 font-bold text-sm transition-colors"
         >
           <LogOut size={17} /> Déconnexion
         </button>
@@ -273,7 +240,6 @@ export function ShopShell({ children }: ShopShellProps) {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
 
-      {/* Overlay mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[105] lg:hidden"
@@ -281,7 +247,6 @@ export function ShopShell({ children }: ShopShellProps) {
         />
       )}
 
-      {/* Sidebar */}
       <aside className={cn(
         'fixed lg:relative z-[110] inset-y-0 left-0 w-72 bg-white border-r border-slate-100',
         'flex flex-col h-full flex-shrink-0 transition-transform duration-300',
@@ -290,10 +255,8 @@ export function ShopShell({ children }: ShopShellProps) {
         {SidebarInner}
       </aside>
 
-      {/* Main */}
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative z-0 isolate">
 
-        {/* Topbar */}
         <header className="relative z-20 h-[72px] bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0">
           <div className="flex items-center gap-4">
             <button
@@ -316,9 +279,9 @@ export function ShopShell({ children }: ShopShellProps) {
             />
             {activeShop?.slug && (
               <Link
-                href={`/boutique/${activeShop.slug}`}
+                href={getShopPublicHref(activeShop)}
                 target="_blank"
-                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors border border-brand-200 rounded-lg px-2.5 py-1.5"
+                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors border border-brand-200 rounded-full px-2.5 py-1.5"
                 style={{ textDecoration: 'none' }}
               >
                 <ExternalLink size={12} /> Voir la boutique
@@ -330,11 +293,12 @@ export function ShopShell({ children }: ShopShellProps) {
           </div>
         </header>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
+        <div id="shop-manage-scroll" className="flex-1 overflow-y-auto p-5 lg:p-8 pb-28 lg:pb-8 w-full min-w-0">
           {children}
         </div>
       </main>
+
+      <ShopMobileNav />
     </div>
   )
 }

@@ -112,7 +112,7 @@ export function CartDrawer() {
           <button
             type="button"
             onClick={closeDrawer}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
             aria-label="Fermer le panier"
           >
             <X size={22} />

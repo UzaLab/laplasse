@@ -100,12 +100,12 @@ export function SpotCard({ merchant }: { merchant: SpotMerchantProps }) {
         <div className={`grid gap-3 ${merchant.has_reservation ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <Link
             href={`/m/${merchant.slug}`}
-            className="py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-sm text-center hover:bg-slate-50 transition-colors"
+            className="py-3 rounded-full border border-slate-200 text-slate-700 font-bold text-sm text-center hover:bg-slate-50 transition-colors"
           >
             Voir le lieu
           </Link>
           {merchant.has_reservation && (
-            <button className="py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10">
+            <button className="py-3 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10">
               Réserver
             </button>
           )}

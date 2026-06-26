@@ -453,6 +453,7 @@ export class MerchantsService {
         ...MERCHANT_PUBLIC_SELECT,
         email: true,
         owner_id: true,
+        is_active: true,
       },
     })
     if (!merchant) return null
@@ -494,26 +495,45 @@ export class MerchantsService {
     return this.getMyHours(userId, merchantId)
   }
 
-  async getMyMedia(userId: string, merchantId?: string) {
+  async getMyMedia(
+    userId: string,
+    merchantId?: string,
+    opts?: { page?: number; limit?: number },
+  ) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
 
-    const media = await this.prisma.merchantMedia.findMany({
-      where: { merchant_id: merchant.id },
-      orderBy: { order: 'asc' },
-      select: { id: true, type: true, url: true, thumbnail: true, order: true, created_at: true },
-    })
+    const page = Math.max(1, opts?.page ?? 1)
+    const limit = Math.min(48, Math.max(1, opts?.limit ?? 24))
+    const skip = (page - 1) * limit
+    const where = { merchant_id: merchant.id, type: 'IMAGE' as const }
+
+    const [media, total] = await Promise.all([
+      this.prisma.merchantMedia.findMany({
+        where,
+        orderBy: [{ order: 'asc' }, { created_at: 'desc' }],
+        skip,
+        take: limit,
+        select: { id: true, type: true, url: true, thumbnail: true, order: true, created_at: true },
+      }),
+      this.prisma.merchantMedia.count({ where }),
+    ])
 
     const limits = getPlanLimits(merchant.subscription_plan)
-    const photoCount = media.filter(m => m.type === 'IMAGE').length
 
     return {
       logo: merchant.logo,
       cover_image: merchant.cover_image,
       gallery: media,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_more: skip + media.length < total,
+      },
       limits: {
         max_photos: limits.maxPhotos,
-        current_photos: photoCount,
-        can_add: isWithinLimit(photoCount, limits.maxPhotos),
+        current_photos: total,
+        can_add: isWithinLimit(total, limits.maxPhotos),
         plan: merchant.subscription_plan,
       },
     }

@@ -108,7 +108,7 @@ export default function LogisticsQualityPage() {
                           {d.job_id && (
                             <Link
                               href={`/logistics/orders/${d.job_id}`}
-                              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+                              className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
                               style={{ textDecoration: 'none' }}
                             >
                               Voir la course
@@ -117,7 +117,7 @@ export default function LogisticsQualityPage() {
                           {d.courier_id && d.courier_id && (
                             <Link
                               href={`/logistics/fleet/${d.courier_id}`}
-                              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                              className="text-xs font-bold px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
                               style={{ textDecoration: 'none' }}
                             >
                               Fiche livreur
@@ -231,7 +231,7 @@ export default function LogisticsQualityPage() {
                       <div className="flex gap-2 shrink-0">
                         <Link
                           href={`/logistics/fleet/${c.id}`}
-                          className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          className="text-xs font-bold px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
                           style={{ textDecoration: 'none' }}
                         >
                           Détails

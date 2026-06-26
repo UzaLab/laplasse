@@ -263,7 +263,7 @@ export function ShopOrdersPanel() {
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-50">
                 <Link
                   href={routes.orderDetail(order.id)}
-                  className="text-sm font-bold px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 min-h-[44px] inline-flex items-center"
+                  className="text-sm font-bold px-4 py-2 rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 min-h-[44px] inline-flex items-center"
                   style={{ textDecoration: 'none' }}
                 >
                   Voir le détail

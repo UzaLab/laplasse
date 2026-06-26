@@ -202,7 +202,7 @@ function OfferingListRow({
         <div className="grid grid-cols-2 gap-2">
           <Link
             href={detailHref}
-            className="py-2.5 text-center border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:border-slate-300 transition-colors"
+            className="py-2.5 text-center border border-slate-200 text-slate-700 rounded-full text-sm font-bold hover:border-slate-300 transition-colors"
             style={{ textDecoration: 'none' }}
           >
             Détails
@@ -287,7 +287,7 @@ function OfferingListRow({
         <div className="flex items-center justify-end gap-2 shrink-0">
           <Link
             href={detailHref}
-            className="py-2 px-3 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:border-slate-300 transition-colors whitespace-nowrap"
+            className="py-2 px-3 border border-slate-200 text-slate-700 rounded-full text-xs font-bold hover:border-slate-300 transition-colors whitespace-nowrap"
             style={{ textDecoration: 'none' }}
           >
             Détails

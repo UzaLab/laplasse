@@ -94,7 +94,7 @@ function BoutiqueFiltersPanel({
           value={search}
           onChange={e => onSearchChange(e.target.value)}
           placeholder="Nom du produit…"
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
+          className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
         />
       </div>
 
@@ -228,7 +228,7 @@ function ContactBlock({
         href={contactHref}
         target={whatsapp ? '_blank' : undefined}
         rel={whatsapp ? 'noopener noreferrer' : undefined}
-        className="block w-full bg-white border border-brand-200 text-brand-700 py-2 rounded-xl text-sm font-bold hover:bg-brand-100 transition-colors"
+        className="block w-full bg-white border border-brand-200 text-brand-700 py-2 rounded-full text-sm font-bold hover:bg-brand-100 transition-colors"
         style={{ textDecoration: 'none' }}
       >
         Contacter le vendeur
@@ -343,8 +343,8 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
           <div className="absolute bottom-0 left-0 right-0 pb-5 md:pb-8">
             <div className={`${PAGE_CONTAINER} flex items-end justify-between gap-4 md:gap-6`}>
               <div className="flex items-end gap-4 md:gap-6 min-w-0 flex-1">
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white p-2 shadow-xl border-4 border-[#FAFAFA] shrink-0">
-                  <div className="w-full h-full rounded-xl overflow-hidden bg-slate-100">
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded-full bg-white p-2 shadow-xl border-4 border-[#FAFAFA] shrink-0">
+                  <div className="w-full h-full rounded-full overflow-hidden bg-slate-100">
                     {logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={logo} alt={merchant.business_name} className="w-full h-full object-cover" />
@@ -377,7 +377,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
               <div className="hidden md:block shrink-0 pb-4">
                 <Link
                   href={`/m/${merchant.slug}`}
-                  className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-white/20 transition-colors"
+                  className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-white/20 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <ArrowLeft size={16} /> Voir l&apos;établissement
@@ -426,7 +426,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
           </aside>
 
           <div className="flex-1 w-full min-w-0">
-            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
+            <div className="bg-white rounded-full p-4 border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4 mb-6 md:mb-8">
               <p className="hidden sm:block text-slate-500 font-medium text-sm">
                 Affichage de{' '}
                 <span className="font-bold text-slate-900">{filtered.length}</span> produit
@@ -438,7 +438,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 <select
                   value={sort}
                   onChange={e => setSort(e.target.value as SortOption)}
-                  className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 transition-colors"
+                  className="flex-1 sm:flex-none bg-slate-50 border border-slate-200 rounded-full px-3 py-2 font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 transition-colors"
                 >
                   <option value="recommended">Recommandés</option>
                   <option value="newest">Nouveautés</option>

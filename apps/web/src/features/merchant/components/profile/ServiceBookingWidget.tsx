@@ -197,7 +197,7 @@ export function ServiceBookingWidget({
           min={new Date().toISOString().slice(0, 10)}
           value={date}
           onChange={e => setDate(e.target.value)}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
         />
         {date && (
           <div>
@@ -233,20 +233,20 @@ export function ServiceBookingWidget({
           placeholder="Nom complet *"
           value={guestName}
           onChange={e => setGuestName(e.target.value)}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
         />
         <input
           placeholder="Téléphone *"
           value={guestPhone}
           onChange={e => setGuestPhone(e.target.value)}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-brand-400"
         />
         <textarea
           placeholder="Notes (optionnel)"
           rows={2}
           value={notes}
           onChange={e => setNotes(e.target.value)}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none resize-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none resize-none focus:border-brand-400"
         />
       </div>
 

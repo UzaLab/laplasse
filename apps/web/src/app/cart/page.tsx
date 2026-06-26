@@ -210,7 +210,7 @@ export default function CartPage() {
             <p className="text-sm text-slate-500 mb-6">Découvrez la marketplace LaPlasse.</p>
             <Link
               href="/marketplace"
-              className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-xl hover:bg-slate-800 transition-colors text-sm"
+              className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3 rounded-full hover:bg-slate-800 transition-colors text-sm"
               style={{ textDecoration: 'none' }}
             >
               Explorer la marketplace
@@ -360,13 +360,13 @@ export default function CartPage() {
                           value={promoCode}
                           onChange={e => setPromoCode(e.target.value.toUpperCase())}
                           placeholder="Entrez votre code"
-                          className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                          className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-full px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
                         />
                         <button
                           type="button"
                           onClick={handleApplyPromo}
                           disabled={promoLoading}
-                          className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap disabled:opacity-50"
+                          className="shrink-0 h-10 bg-slate-900 text-white px-4 rounded-full text-sm font-bold hover:bg-slate-800 transition-colors whitespace-nowrap disabled:opacity-50"
                         >
                           {promoLoading ? '…' : 'Appliquer'}
                         </button>

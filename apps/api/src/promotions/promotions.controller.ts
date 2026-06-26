@@ -29,7 +29,9 @@ export class PromotionsController {
   getMine(
     @CurrentUser('id') userId: string,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
+    if (shopId) return this.svc.getShopPromotionsForOwner(userId, shopId)
     return this.svc.getMerchantPromotionsForOwner(userId, merchantId)
   }
 
@@ -39,8 +41,9 @@ export class PromotionsController {
     @CurrentUser('id') userId: string,
     @Body() dto: CreatePromotionDto,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
-    return this.svc.create(userId, dto, merchantId)
+    return this.svc.create(userId, dto, merchantId, shopId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -50,8 +53,9 @@ export class PromotionsController {
     @Param('id') id: string,
     @Body() dto: UpdatePromotionDto,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
-    return this.svc.update(userId, id, dto, merchantId)
+    return this.svc.update(userId, id, dto, merchantId, shopId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -60,8 +64,9 @@ export class PromotionsController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
-    return this.svc.getRedemptionsForOwner(userId, id, merchantId)
+    return this.svc.getRedemptionsForOwner(userId, id, merchantId, shopId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -70,8 +75,9 @@ export class PromotionsController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
-    return this.svc.toggle(userId, id, merchantId)
+    return this.svc.toggle(userId, id, merchantId, shopId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -80,7 +86,8 @@ export class PromotionsController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Query('merchantId') merchantId?: string,
+    @Query('shopId') shopId?: string,
   ) {
-    return this.svc.delete(userId, id, merchantId)
+    return this.svc.delete(userId, id, merchantId, shopId)
   }
 }

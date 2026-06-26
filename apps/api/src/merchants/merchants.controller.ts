@@ -119,8 +119,13 @@ export class MerchantsController {
   getMyMedia(
     @CurrentUser() user: { id: string },
     @Query('merchantId') merchantId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.merchantsService.getMyMedia(user.id, merchantId)
+    return this.merchantsService.getMyMedia(user.id, merchantId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    })
   }
 
   @UseGuards(JwtAuthGuard)

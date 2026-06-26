@@ -149,7 +149,7 @@ export default function MerchantMediaPage() {
             <button
               type="button"
               onClick={fetchMedia}
-              className="mt-4 text-sm font-bold text-slate-700 border border-slate-200 px-4 py-2 rounded-xl hover:bg-white transition-colors"
+              className="mt-4 text-sm font-bold text-slate-700 border border-slate-200 px-4 py-2 rounded-full hover:bg-white transition-colors"
             >
               Réessayer
             </button>
@@ -229,7 +229,7 @@ export default function MerchantMediaPage() {
             </div>
 
             {/* Add URL */}
-            <div className="bg-white border border-slate-100 rounded-2xl p-5">
+            <div className="bg-white border border-slate-100 rounded-full p-5">
               <h3 className="font-bold text-slate-900 mb-3">Ou coller une URL</h3>
               <p className="text-xs text-slate-500 mb-4">Unsplash, Imgur, etc.</p>
               <form onSubmit={addMedia} className="flex gap-3">
@@ -238,13 +238,13 @@ export default function MerchantMediaPage() {
                   value={newUrl}
                   onChange={e => setNewUrl(e.target.value)}
                   placeholder="https://images.unsplash.com/photo-..."
-                  className="flex-1 border-2 border-slate-200 focus:border-brand-400 rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
+                  className="flex-1 border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-2.5 text-sm outline-none transition-all"
                   required
                 />
                 <button
                   type="submit"
                   disabled={adding}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shrink-0"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold rounded-full text-sm hover:bg-slate-800 transition-colors disabled:opacity-50 shrink-0"
                 >
                   {adding ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
                   Ajouter

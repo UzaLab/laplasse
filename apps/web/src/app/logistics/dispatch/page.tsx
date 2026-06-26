@@ -229,7 +229,7 @@ export default function LogisticsDispatchPage() {
               <Zap size={14} className="text-amber-500" />
               Auto-dispatch
             </label>
-            <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl shrink-0">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-full shrink-0">
               {isFetching ? (
                 <RefreshCw size={14} className="animate-spin" />
               ) : (
@@ -241,7 +241,7 @@ export default function LogisticsDispatchPage() {
         </div>
 
         {board?.offline_couriers && board.offline_couriers.length > 0 && (
-          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-sm text-red-800">
+          <div className="bg-red-50 border border-red-100 rounded-full p-4 text-sm text-red-800">
             <p className="font-bold mb-1">Livreur(s) hors ligne avec course active</p>
             <ul className="space-y-1">
               {board.offline_couriers.map(c => (
@@ -255,7 +255,7 @@ export default function LogisticsDispatchPage() {
           <select
             value={communeFilter}
             onChange={e => setCommuneFilter(e.target.value)}
-            className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white max-w-xs"
+            className="border border-slate-200 rounded-full px-4 py-2.5 text-sm bg-white max-w-xs"
           >
             <option value="">Toutes les communes</option>
             {board.commune_options.map(c => (
@@ -281,7 +281,7 @@ export default function LogisticsDispatchPage() {
             { label: 'En route', value: counts.in_route, accent: '' },
             { label: 'Flotte en ligne', value: `${onlineFleet}/${activeFleet.length}`, accent: '' },
           ].map(item => (
-            <div key={item.label} className={`bg-white rounded-2xl border border-slate-100 p-4 ${item.accent}`}>
+            <div key={item.label} className={`bg-white rounded-full border border-slate-100 p-4 ${item.accent}`}>
               <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{item.label}</p>
               <p className="text-2xl font-extrabold text-slate-900 mt-1">{item.value}</p>
             </div>

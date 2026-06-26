@@ -86,7 +86,7 @@ export function PartnerScoreCard({ partner, compact, onSelect, selecting }: Part
           type="button"
           disabled={selecting}
           onClick={onSelect}
-          className="w-full py-2.5 rounded-xl text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+          className="w-full py-2.5 rounded-full text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
         >
           {selecting ? '…' : 'Demander un contrat'}
         </button>

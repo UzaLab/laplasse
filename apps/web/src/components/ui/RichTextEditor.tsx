@@ -38,7 +38,7 @@ function ToolbarButton({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+        'w-8 h-8 rounded-full flex items-center justify-center transition-colors',
         active
           ? 'bg-slate-900 text-white'
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900',

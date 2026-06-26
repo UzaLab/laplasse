@@ -261,7 +261,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
               required
               value={form.business_name}
               onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
             />
           ))}
 
@@ -269,7 +269,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
             <select
               value={form.category_id}
               onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
             >
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -280,26 +280,26 @@ function InfoTab({ merchant, categories, onUpdated }: {
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               rows={3}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm resize-none"
             />
           ))}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Téléphone', (
               <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('WhatsApp', (
               <input value={form.whatsapp} onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Email', (
               <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Site web', (
               <input type="url" value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                placeholder="https://…" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                placeholder="https://…" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
           </div>
 
@@ -307,15 +307,15 @@ function InfoTab({ merchant, categories, onUpdated }: {
             {field('Préparation (min)', (
               <input type="number" min={0} max={120} value={form.food_prep_minutes}
                 onChange={e => setForm(f => ({ ...f, food_prep_minutes: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Trust Score', (
               <div className="flex gap-2">
                 <input type="number" min={0} max={100} value={form.trust_score}
                   onChange={e => setForm(f => ({ ...f, trust_score: Number(e.target.value) }))}
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
                 <button type="button" disabled={recalculating} onClick={recalcTrustScore}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-200 transition-colors disabled:opacity-50"
+                  className="px-3 py-2 rounded-full border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-200 transition-colors disabled:opacity-50"
                   title="Recalculer">
                   {recalculating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                 </button>
@@ -329,19 +329,19 @@ function InfoTab({ merchant, categories, onUpdated }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Ville', (
               <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Quartier / District', (
               <input value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Adresse', (
               <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
             ))}
             {field('Pays', (
               <select value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white">
                 <option value="CI">Côte d&apos;Ivoire</option>
                 <option value="SN">Sénégal</option>
                 <option value="BF">Burkina Faso</option>
@@ -356,7 +356,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
         <button
           type="submit"
           disabled={saving}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           Enregistrer les modifications
@@ -387,13 +387,13 @@ function InfoTab({ merchant, categories, onUpdated }: {
               value={ownerEmail}
               onChange={e => { setOwnerEmail(e.target.value); setFoundOwner(null) }}
               placeholder="Email du nouveau propriétaire"
-              className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
+              className="flex-1 px-3 py-2.5 border border-slate-200 rounded-full text-sm"
             />
             <button
               type="button"
               disabled={searchingOwner}
               onClick={searchOwner}
-              className="px-3 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-50"
+              className="px-3 py-2.5 rounded-full bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-50"
             >
               {searchingOwner ? <Loader2 size={14} className="animate-spin" /> : 'Chercher'}
             </button>
@@ -407,7 +407,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
                 type="button"
                 disabled={reassigning}
                 onClick={reassignOwner}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1"
               >
                 {reassigning ? <Loader2 size={12} className="animate-spin" /> : null}
                 Réattribuer
@@ -513,19 +513,19 @@ function SubscriptionTab({ merchant, onUpdated }: { merchant: MerchantDetail; on
           <div className="sm:col-span-2">
             <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">Date d&apos;expiration (laisser vide si illimité)</label>
             <input type="date" value={form.expires_at} onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
           </div>
         </div>
 
         {sub && (
-          <div className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-500">
+          <div className="bg-slate-50 rounded-full px-4 py-3 text-xs text-slate-500">
             Actif depuis le {new Date(sub.started_at).toLocaleDateString('fr-FR')}
             {sub.expires_at && ` · expire le ${new Date(sub.expires_at).toLocaleDateString('fr-FR')}`}
           </div>
         )}
 
         <button type="submit" disabled={saving}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50">
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 disabled:opacity-50">
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           Mettre à jour
         </button>
@@ -793,7 +793,7 @@ export default function AdminMerchantDetailPage() {
             <Link
               href={`/m/${merchant.slug}`}
               target="_blank"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:border-violet-200 hover:text-violet-600 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-slate-200 text-slate-600 text-xs font-bold hover:border-violet-200 hover:text-violet-600 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               <ExternalLink size={13} /> Voir la page

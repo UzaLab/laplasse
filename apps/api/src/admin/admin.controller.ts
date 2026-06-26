@@ -17,8 +17,9 @@ import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
 import { DeliveryService } from '../delivery/delivery.service'
 import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
-import { CourierStatus, DeliveryDisputeStatus, AdCampaignStatus, OrderStatus } from '../../generated/prisma/client'
+import { CourierStatus, DeliveryDisputeStatus, AdCampaignStatus, OrderStatus, ShopStatus, ProductStatus } from '../../generated/prisma/client'
 import { AdsService } from '../ads/ads.service'
+import { UpdateAdminShopActiveDto, UpdateAdminShopStatusDto } from './dto/admin-shop.dto'
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,7 +47,7 @@ export class AdminController {
 
   @Get('stats')
   async getStats() {
-    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, productReviewPending, complaintOpen, courierReviewPending, courierPendingKyc] =
+    const [merchantTotal, merchantPending, merchantVerified, users, reviewTotal, reviewPending, productReviewPending, complaintOpen, courierReviewPending, courierPendingKyc, shopsPending, productsPending] =
       await Promise.all([
         this.prisma.merchant.count(),
         this.prisma.merchant.count({ where: { verification_status: 'PENDING' } }),
@@ -58,6 +59,8 @@ export class AdminController {
         this.prisma.complaint.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
         this.prisma.courierReview.count({ where: { status: 'PENDING' } }),
         this.prisma.courierProfile.count({ where: { status: 'PENDING_REVIEW' } }),
+        this.prisma.shop.count({ where: { status: 'PENDING_REVIEW' } }),
+        this.prisma.product.count({ where: { status: 'PENDING_REVIEW' } }),
       ])
 
     return {
@@ -68,6 +71,8 @@ export class AdminController {
       courier_reviews: { pending: courierReviewPending },
       couriers: { pending_kyc: courierPendingKyc },
       complaints: { open: complaintOpen },
+      shops: { pending: shopsPending },
+      products: { pending: productsPending },
     }
   }
 
@@ -295,6 +300,320 @@ export class AdminController {
     })
     await this.audit.log({ action: 'CREATE', entityType: 'Merchant', entityId: merchant.id, payload: body })
     return merchant
+  }
+
+  // ── Boutiques marketplace ─────────────────────────────────────────────────────
+
+  @Get('shops')
+  async getShops(
+    @Query('filter') filter?: string,
+    @Query('type') type?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const take = Math.min(Number(limit ?? 20), 100)
+    const skip = (Math.max(Number(page ?? 1), 1) - 1) * take
+
+    const statusFilter =
+      filter === 'pending' ? { status: 'PENDING_REVIEW' as ShopStatus }
+        : filter === 'active' ? { status: 'ACTIVE' as ShopStatus }
+        : filter === 'draft' ? { status: 'DRAFT' as ShopStatus }
+        : filter === 'suspended' ? { status: 'SUSPENDED' as ShopStatus }
+        : filter === 'inactive' ? { is_active: false }
+        : {}
+
+    const typeFilter =
+      type === 'standalone' ? { merchant_id: null }
+        : type === 'linked' ? { merchant_id: { not: null } }
+        : {}
+
+    const searchFilter = q?.trim()
+      ? {
+          OR: [
+            { name: { contains: q.trim(), mode: 'insensitive' as const } },
+            { slug: { contains: q.trim(), mode: 'insensitive' as const } },
+            { owner: { email: { contains: q.trim(), mode: 'insensitive' as const } } },
+            { owner: { full_name: { contains: q.trim(), mode: 'insensitive' as const } } },
+            { merchant: { business_name: { contains: q.trim(), mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}
+
+    const where = { ...statusFilter, ...typeFilter, ...searchFilter }
+
+    const [shops, total] = await Promise.all([
+      this.prisma.shop.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { updated_at: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          is_active: true,
+          merchant_id: true,
+          logo: true,
+          city: true,
+          country: true,
+          created_at: true,
+          updated_at: true,
+          owner: { select: { id: true, email: true, full_name: true } },
+          merchant: { select: { id: true, business_name: true, slug: true } },
+          _count: { select: { products: true, orders: true } },
+        },
+      }),
+      this.prisma.shop.count({ where }),
+    ])
+
+    return { shops, total, page: Math.max(Number(page ?? 1), 1), limit: take }
+  }
+
+  @Get('shops/:id')
+  async getShopDetail(@Param('id') id: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo: true,
+        cover_image: true,
+        phone: true,
+        whatsapp: true,
+        email: true,
+        city: true,
+        district: true,
+        address: true,
+        country: true,
+        status: true,
+        is_active: true,
+        enabled_modules: true,
+        has_physical_location: true,
+        delivery_fulfilment_default: true,
+        created_at: true,
+        updated_at: true,
+        owner: {
+          select: { id: true, email: true, full_name: true, phone: true, created_at: true },
+        },
+        merchant: {
+          select: { id: true, business_name: true, slug: true, verification_status: true },
+        },
+        products: {
+          take: 30,
+          orderBy: { updated_at: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            price: true,
+            image_url: true,
+            stock_quantity: true,
+            updated_at: true,
+          },
+        },
+        _count: { select: { products: true, orders: true } },
+      },
+    })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+    return shop
+  }
+
+  @Patch('shops/:id/status')
+  async updateShopStatus(
+    @Param('id') id: string,
+    @Body() body: UpdateAdminShopStatusDto,
+  ) {
+    const shop = await this.prisma.shop.findUnique({ where: { id }, select: { id: true, name: true } })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+
+    const updated = await this.prisma.shop.update({
+      where: { id },
+      data: { status: body.status as ShopStatus },
+      select: { id: true, name: true, slug: true, status: true },
+    })
+
+    await this.audit.log({
+      action: 'STATUS_CHANGE',
+      entityType: 'shop',
+      entityId: id,
+      payload: { status: body.status },
+    })
+
+    return updated
+  }
+
+  @Patch('shops/:id/active')
+  async updateShopActive(
+    @Param('id') id: string,
+    @Body() body: UpdateAdminShopActiveDto,
+  ) {
+    const shop = await this.prisma.shop.findUnique({ where: { id }, select: { id: true } })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+
+    const updated = await this.prisma.shop.update({
+      where: { id },
+      data: { is_active: body.is_active },
+      select: { id: true, name: true, is_active: true, status: true },
+    })
+
+    await this.audit.log({
+      action: 'UPDATE',
+      entityType: 'shop',
+      entityId: id,
+      payload: { is_active: body.is_active },
+    })
+
+    return updated
+  }
+
+  // ── Produits marketplace ────────────────────────────────────────────────────────
+
+  @Get('products')
+  async getProducts(
+    @Query('filter') filter?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const take = Math.min(Number(limit ?? 20), 100)
+    const skip = (Math.max(Number(page ?? 1), 1) - 1) * take
+
+    const statusFilter =
+      filter === 'pending' ? { status: 'PENDING_REVIEW' as ProductStatus }
+        : filter === 'active' ? { status: 'ACTIVE' as ProductStatus }
+        : filter === 'draft' ? { status: 'DRAFT' as ProductStatus }
+        : filter === 'archived' ? { status: 'ARCHIVED' as ProductStatus }
+        : filter === 'out_of_stock' ? { status: 'OUT_OF_STOCK' as ProductStatus }
+        : {}
+
+    const searchFilter = q?.trim()
+      ? {
+          OR: [
+            { name: { contains: q.trim(), mode: 'insensitive' as const } },
+            { slug: { contains: q.trim(), mode: 'insensitive' as const } },
+            { shop: { name: { contains: q.trim(), mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}
+
+    const where = { ...statusFilter, ...searchFilter }
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { updated_at: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          price: true,
+          image_url: true,
+          stock_quantity: true,
+          created_at: true,
+          updated_at: true,
+          shop: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              status: true,
+              merchant_id: true,
+              owner: { select: { email: true, full_name: true } },
+            },
+          },
+          category: { select: { name: true } },
+        },
+      }),
+      this.prisma.product.count({ where }),
+    ])
+
+    return { products, total, page: Math.max(Number(page ?? 1), 1), limit: take }
+  }
+
+  @Get('products/:id')
+  async getProductDetail(@Param('id') id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        composition: true,
+        price: true,
+        stock_quantity: true,
+        image_url: true,
+        status: true,
+        allow_pickup: true,
+        allow_delivery: true,
+        created_at: true,
+        updated_at: true,
+        category: { select: { id: true, name: true } },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            logo: true,
+            owner: { select: { id: true, email: true, full_name: true } },
+          },
+        },
+        images: { orderBy: { sort_order: 'asc' }, select: { url: true, sort_order: true } },
+        variants: {
+          orderBy: { sort_order: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            stock_quantity: true,
+            kind: true,
+            color_hex: true,
+            image_url: true,
+          },
+        },
+      },
+    })
+    if (!product) throw new NotFoundException('Produit introuvable')
+    return product
+  }
+
+  @Patch('products/:id/status')
+  async updateProductStatus(
+    @Param('id') id: string,
+    @Body() body: { status: ProductStatus },
+  ) {
+    const allowed: ProductStatus[] = ['DRAFT', 'PENDING_REVIEW', 'ACTIVE', 'OUT_OF_STOCK', 'ARCHIVED']
+    if (!allowed.includes(body.status)) {
+      throw new BadRequestException('Statut non autorisé')
+    }
+
+    const product = await this.prisma.product.findUnique({ where: { id }, select: { id: true, name: true } })
+    if (!product) throw new NotFoundException('Produit introuvable')
+
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: { status: body.status },
+      select: { id: true, name: true, slug: true, status: true },
+    })
+
+    this.searchService.syncProduct(id).catch(() => {})
+    await this.audit.log({
+      action: 'STATUS_CHANGE',
+      entityType: 'product',
+      entityId: id,
+      payload: { status: body.status },
+    })
+
+    return updated
   }
 
   // ── Catégories établissements ─────────────────────────────────────────────────
@@ -1248,9 +1567,13 @@ export class AdminController {
       complaintsOpen,
       couriersKyc,
       disputesOpen,
+      shopsPending,
+      productsPending,
       recentMerchants,
       recentReviews,
       recentComplaints,
+      recentShops,
+      recentProducts,
     ] = await Promise.all([
       this.prisma.merchant.count({ where: { verification_status: 'PENDING' } }),
       this.prisma.review.count({ where: { status: 'PENDING' } }),
@@ -1259,6 +1582,8 @@ export class AdminController {
       this.prisma.complaint.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
       this.prisma.courierProfile.count({ where: { status: 'PENDING_REVIEW' } }),
       this.prisma.deliveryDispute.count({ where: { status: 'OPEN' } }),
+      this.prisma.shop.count({ where: { status: 'PENDING_REVIEW' } }),
+      this.prisma.product.count({ where: { status: 'PENDING_REVIEW' } }),
       this.prisma.merchant.findMany({
         where: { verification_status: 'PENDING' },
         take: 8,
@@ -1287,6 +1612,24 @@ export class AdminController {
           merchant: { select: { business_name: true, slug: true } },
         },
       }),
+      this.prisma.shop.findMany({
+        where: { status: 'PENDING_REVIEW' },
+        take: 8,
+        orderBy: { updated_at: 'desc' },
+        select: {
+          id: true, name: true, slug: true, logo: true, city: true, updated_at: true,
+          owner: { select: { email: true, full_name: true } },
+        },
+      }),
+      this.prisma.product.findMany({
+        where: { status: 'PENDING_REVIEW' },
+        take: 8,
+        orderBy: { updated_at: 'desc' },
+        select: {
+          id: true, name: true, slug: true, image_url: true, price: true, updated_at: true,
+          shop: { select: { name: true, slug: true } },
+        },
+      }),
     ])
 
     return {
@@ -1298,11 +1641,15 @@ export class AdminController {
         complaints_open: complaintsOpen,
         couriers_kyc: couriersKyc,
         disputes_open: disputesOpen,
+        shops_pending: shopsPending,
+        products_pending: productsPending,
       },
       recent: {
         merchants: recentMerchants,
         reviews: recentReviews,
         complaints: recentComplaints,
+        shops: recentShops,
+        products: recentProducts,
       },
     }
   }

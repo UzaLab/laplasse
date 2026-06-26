@@ -98,7 +98,7 @@ export default async function CategoryPage({ params }: Props) {
             <p className="text-slate-500 mb-6">Aucun établissement dans cette catégorie pour le moment.</p>
             <Link
               href="/"
-              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-colors"
+              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               Explorer d&apos;autres catégories

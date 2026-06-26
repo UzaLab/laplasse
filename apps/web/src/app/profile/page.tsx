@@ -225,14 +225,14 @@ export default function ProfilePage() {
                     <div className="flex flex-wrap gap-3">
                       <Link
                         href={`/m/${nextBooking.merchant.slug}`}
-                        className="bg-white text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-100 transition-colors"
+                        className="bg-white text-slate-900 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-100 transition-colors"
                         style={{ textDecoration: 'none' }}
                       >
                         Voir l&apos;établissement
                       </Link>
                       <Link
                         href="/profile/bookings"
-                        className="bg-white/10 text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-white/20 transition-colors"
+                        className="bg-white/10 text-white border border-white/20 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-white/20 transition-colors"
                         style={{ textDecoration: 'none' }}
                       >
                         Mes réservations
@@ -249,7 +249,7 @@ export default function ProfilePage() {
                   <p className="text-slate-400 text-sm mb-6">{BRAND_EXPLORE_EMPTY}</p>
                   <Link
                     href="/search"
-                    className="inline-block bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-400 transition-colors"
+                    className="inline-block bg-amber-500 text-slate-900 px-5 py-2.5 rounded-full text-sm font-bold hover:bg-amber-400 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     Explorer
@@ -320,7 +320,7 @@ export default function ProfilePage() {
                   <Link
                     key={r.id}
                     href={`/m/${r.merchant.slug}`}
-                    className="block bg-slate-50 border border-slate-100 p-4 rounded-2xl hover:border-amber-200 transition-colors"
+                    className="block bg-slate-50 border border-slate-100 p-4 rounded-full hover:border-amber-200 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -376,7 +376,7 @@ export default function ProfilePage() {
                   <p className="text-sm text-slate-500 mb-4">Aucun favori enregistré</p>
                   <Link
                     href="/search"
-                    className="inline-block w-full py-3 rounded-xl border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors"
+                    className="inline-block w-full py-3 rounded-full border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
                     Découvrir de nouveaux lieux
@@ -441,7 +441,7 @@ export default function ProfilePage() {
                   </div>
                   <Link
                     href="/search"
-                    className="block w-full py-3 rounded-xl border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors text-center mt-4"
+                    className="block w-full py-3 rounded-full border-2 border-slate-100 text-slate-600 font-bold text-sm hover:border-slate-200 hover:bg-slate-50 transition-colors text-center mt-4"
                     style={{ textDecoration: 'none' }}
                   >
                     Découvrir de nouveaux lieux

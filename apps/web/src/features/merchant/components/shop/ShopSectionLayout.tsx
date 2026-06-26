@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { useAuthStore } from '@/stores/authStore'
-import { getShopsForMerchant } from '@/lib/shopApi'
+import { getShopsForMerchant, getShopPublicHref } from '@/lib/shopApi'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -78,20 +78,24 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
                         'text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg',
                         activeShop.status === 'ACTIVE'
                           ? 'bg-emerald-50 text-emerald-700'
-                          : activeShop.status === 'DRAFT'
+                          : activeShop.status === 'PENDING_REVIEW'
                             ? 'bg-amber-50 text-amber-700'
-                            : 'bg-slate-100 text-slate-500',
+                          : activeShop.status === 'DRAFT'
+                            ? 'bg-slate-100 text-slate-600'
+                            : 'bg-red-50 text-red-700',
                       )}
                     >
                       {activeShop.status === 'ACTIVE'
                         ? 'Active'
+                        : activeShop.status === 'PENDING_REVIEW'
+                          ? 'En validation'
                         : activeShop.status === 'DRAFT'
                           ? 'Brouillon'
                           : 'Suspendue'}
                     </span>
-                    {activeShop.slug && (
+                    {activeShop.slug && activeShop.status === 'ACTIVE' && (
                       <Link
-                        href={`/boutique/${activeShop.slug}`}
+                        href={getShopPublicHref(activeShop)}
                         target="_blank"
                         className="inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-bold transition-colors"
                         style={{ textDecoration: 'none' }}
@@ -116,7 +120,7 @@ export function ShopSectionLayout({ children, hideTabs = false }: ShopSectionLay
                   key={href}
                   href={href}
                   className={cn(
-                    'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all shrink-0',
+                    'flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shrink-0',
                     active
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
@@ -155,7 +159,7 @@ export function ShopEmptyState({ merchantId }: { merchantId?: string | null }) {
         </p>
         <Link
           href={createHref}
-          className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3.5 rounded-2xl hover:bg-slate-800 transition-colors"
+          className="inline-flex items-center gap-2 bg-slate-900 text-white font-bold px-6 py-3.5 rounded-full hover:bg-slate-800 transition-colors"
           style={{ textDecoration: 'none' }}
         >
           Créer ma boutique

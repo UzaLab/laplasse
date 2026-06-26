@@ -88,7 +88,7 @@ export function SearchMobileRadiusControl({
 
           <span className="text-[10px] font-bold text-slate-400">{minRadiusKm} km</span>
 
-          <span className="text-xs font-bold text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-md tabular-nums">
+          <span className="text-xs font-bold text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-full tabular-nums">
             {radiusKm} km
           </span>
 

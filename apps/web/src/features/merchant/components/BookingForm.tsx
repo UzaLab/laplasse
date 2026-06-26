@@ -394,7 +394,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           value={date}
           onChange={e => setDate(e.target.value)}
           aria-label={isRoom ? 'Date d\'arrivée' : 'Date'}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
         />
 
         {isRoom && (
@@ -405,12 +405,12 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
             value={form.check_out_date}
             onChange={e => setForm(f => ({ ...f, check_out_date: e.target.value }))}
             aria-label="Date de départ"
-            className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+            className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
           />
         )}
 
         {roomStayTotal && (
-          <div className="rounded-xl bg-brand-50 border border-brand-100 px-4 py-3 text-sm">
+          <div className="rounded-full bg-brand-50 border border-brand-100 px-4 py-3 text-sm">
             <p className="font-bold text-brand-900">
               {roomStayTotal.nights} nuit{roomStayTotal.nights > 1 ? 's' : ''} ·{' '}
               {formatPrice(roomStayTotal.total)}
@@ -465,7 +465,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           placeholder="Votre nom *"
           value={form.guest_name}
           onChange={e => setForm(f => ({ ...f, guest_name: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
         />
         <input
           type="tel"
@@ -473,7 +473,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           placeholder="Téléphone *"
           value={form.guest_phone}
           onChange={e => setForm(f => ({ ...f, guest_phone: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
         />
 
         {(resolvedBookingType === 'TABLE' || isRoom) && (
@@ -485,7 +485,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
               max={20}
               value={form.party_size}
               onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
-              className="w-full border-2 border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-amber-400"
+              className="w-full border-2 border-slate-200 rounded-full pl-9 pr-4 py-2.5 text-sm outline-none focus:border-amber-400"
               placeholder="Nombre de personnes"
             />
           </div>
@@ -496,13 +496,13 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
           rows={2}
           value={form.notes}
           onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none resize-none focus:border-amber-400"
+          className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none resize-none focus:border-amber-400"
         />
 
         {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
 
         {(config?.booking_settings?.cancellation_policy || config?.booking_settings?.no_show_policy) && (
-          <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-600 space-y-2">
+          <div className="rounded-full bg-slate-50 border border-slate-100 px-4 py-3 text-xs text-slate-600 space-y-2">
             {config.booking_settings.cancellation_policy && (
               <p>
                 <span className="font-bold text-slate-700">Annulation : </span>
@@ -521,7 +521,7 @@ export function BookingForm({ merchantId, merchantName }: BookingFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2"
+          className="w-full py-3 bg-slate-900 text-white font-bold rounded-full hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : config.cta}
         </button>
