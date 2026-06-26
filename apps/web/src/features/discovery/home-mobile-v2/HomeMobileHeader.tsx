@@ -50,7 +50,7 @@ export function HomeMobileHeader({ topOffsetClass = 'top-0' }: HomeMobileHeaderP
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="text-slate-900 p-1.5 -mr-1.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all"
+            className="text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all"
             aria-label={t('nav.openMenu')}
             aria-expanded={mobileOpen}
           >

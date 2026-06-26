@@ -20,6 +20,7 @@ import {
 } from '@/lib/marketplaceApi'
 import { detectCartKind, getCartRoute, getCheckoutRoute } from '@/lib/orderFlow'
 import { buildLoginUrl } from '@/lib/authIntent'
+import { PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 
 export function CartDrawer() {
   const router = useRouter()
@@ -91,7 +92,7 @@ export function CartDrawer() {
         aria-modal="true"
         aria-label="Panier"
       >
-        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 shrink-0 safe-area-top">
+        <div className={cn('flex items-center justify-between h-20 border-b border-slate-100 shrink-0 safe-area-top', PAGE_GUTTER_X)}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
               <ShoppingBag size={20} />
@@ -119,7 +120,7 @@ export function CartDrawer() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className={cn('flex-1 overflow-y-auto py-4', PAGE_GUTTER_X)}>
           {loading && !cart ? (
             <div className="flex justify-center py-24">
               <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -238,7 +239,7 @@ export function CartDrawer() {
         </div>
 
         {hasItems && (
-          <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white safe-area-bottom">
+          <div className={cn('shrink-0 border-t border-slate-100 py-5 bg-white safe-area-bottom', PAGE_GUTTER_X)}>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-medium text-slate-500">Sous-total</span>
               <span className="text-xl font-extrabold text-slate-900">

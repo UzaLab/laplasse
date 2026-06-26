@@ -17,6 +17,7 @@ import {
   type PartnerVerification,
 } from '@/lib/logisticsLabels'
 import type { LogisticsPartnerSummary } from '@/stores/authStore'
+import { BACKOFFICE_MAIN_PAD } from '@/lib/mobilePublicChrome'
 
 interface LogisticsShellProps {
   children: React.ReactNode
@@ -99,7 +100,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
 
   const SidebarInner = (
     <>
-      <div className="backoffice-topbar flex items-center px-6 border-b border-slate-100 shrink-0">
+      <div className="backoffice-topbar flex items-center backoffice-gutter-x border-b border-slate-100 shrink-0">
         <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
           <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
             <span className="text-indigo-400 font-black text-sm">LP</span>
@@ -205,7 +206,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
       </aside>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-5 lg:px-8 shrink-0 z-10">
+        <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between backoffice-gutter-x shrink-0 z-10">
           <div className="flex items-center gap-4">
             <button
               className="lg:hidden text-slate-500 hover:text-slate-900 transition-colors"
@@ -242,7 +243,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-5 lg:p-8 pb-24 lg:pb-8 w-full min-w-0">
+        <div className={`flex-1 overflow-y-auto w-full min-w-0 ${BACKOFFICE_MAIN_PAD}`}>
           {children}
         </div>
       </main>

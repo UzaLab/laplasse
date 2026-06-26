@@ -14,6 +14,7 @@ import { CountrySwitcher } from './CountrySwitcher'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { GLOBAL_NAV_ITEMS } from './navConfig'
 import { useT } from '@/providers/LocaleProvider'
+import { PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 
 export function Navbar() {
   const t = useT()
@@ -61,7 +62,7 @@ export function Navbar() {
         scrolled && 'shadow-sm',
       )}
     >
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <div className={cn('max-w-7xl mx-auto h-20 flex items-center justify-between', PAGE_GUTTER_X)}>
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
@@ -207,7 +208,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="md:hidden text-slate-900 p-1 -mr-1"
+            className="md:hidden text-slate-900 p-1"
             aria-label={t('nav.openMenu')}
             aria-expanded={mobileOpen}
           >

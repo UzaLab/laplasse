@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -57,6 +57,38 @@ function FitMapView({
   return null
 }
 
+/** Leaflet initialise parfois à 0×0 dans un conteneur fixed — resync taille + tuiles. */
+function MapResizeSync({ hostRef }: { hostRef: RefObject<HTMLDivElement | null> }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const sync = () => {
+      map.invalidateSize({ animate: false })
+    }
+
+    sync()
+    const timers = [0, 100, 350, 800].map(ms => window.setTimeout(sync, ms))
+
+    window.addEventListener('resize', sync)
+    window.addEventListener('orientationchange', sync)
+
+    const host = hostRef.current
+    const observer = host && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => sync())
+      : null
+    if (host && observer) observer.observe(host)
+
+    return () => {
+      timers.forEach(window.clearTimeout)
+      window.removeEventListener('resize', sync)
+      window.removeEventListener('orientationchange', sync)
+      observer?.disconnect()
+    }
+  }, [map, hostRef])
+
+  return null
+}
+
 function createPinIcon(active: boolean) {
   const size = active ? 48 : 40
   const { 500: brand500, slate200, white } = brandColors
@@ -109,6 +141,14 @@ export function SearchMobileMap({
   userLocation,
   radiusKm = 2,
 }: SearchMobileMapProps) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
   const mappable = useMemo(
     () =>
       merchants.filter(
@@ -129,60 +169,66 @@ export function SearchMobileMap({
   const mapCenter = userLocation ?? center
 
   return (
-    <div className="laplasse-leaflet-map absolute inset-0 z-0 bg-slate-100">
-      <MapContainer
-        center={[mapCenter.lat, mapCenter.lng]}
-        zoom={13}
-        className="h-full w-full"
-        zoomControl={false}
-        attributionControl={false}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <FitMapView
-          center={center}
-          points={points}
-          userLocation={userLocation}
-          radiusKm={radiusKm}
-        />
+    <div ref={hostRef} className="search-mobile-map-host" aria-hidden={!mounted}>
+      {mounted && (
+        <MapContainer
+          center={[mapCenter.lat, mapCenter.lng]}
+          zoom={13}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={false}
+          attributionControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapResizeSync hostRef={hostRef} />
+          <FitMapView
+            center={center}
+            points={points}
+            userLocation={userLocation}
+            radiusKm={radiusKm}
+          />
 
-        {userLocation && (
-          <>
-            <Circle
-              center={[userLocation.lat, userLocation.lng]}
-              radius={radiusKm * 1000}
-              pathOptions={{
-                color: brandColors[500],
-                fillColor: brandColors[400],
-                fillOpacity: 0.1,
-                weight: 2,
-              }}
-            />
-            <Marker
-              position={[userLocation.lat, userLocation.lng]}
-              icon={userLocationIcon}
-              zIndexOffset={2000}
-            />
-          </>
-        )}
+          {userLocation && (
+            <>
+              <Circle
+                center={[userLocation.lat, userLocation.lng]}
+                radius={radiusKm * 1000}
+                pathOptions={{
+                  color: brandColors[500],
+                  fillColor: brandColors[400],
+                  fillOpacity: 0.1,
+                  weight: 2,
+                }}
+              />
+              <Marker
+                position={[userLocation.lat, userLocation.lng]}
+                icon={userLocationIcon}
+                zIndexOffset={2000}
+              />
+            </>
+          )}
 
-        {mappable.map(merchant => {
-          const lat = merchant.location!.latitude!
-          const lng = merchant.location!.longitude!
-          const active = merchant.id === selectedId
+          {mappable.map(merchant => {
+            const lat = merchant.location!.latitude!
+            const lng = merchant.location!.longitude!
+            const active = merchant.id === selectedId
 
-          return (
-            <Marker
-              key={merchant.id}
-              position={[lat, lng]}
-              icon={createPinIcon(active)}
-              eventHandlers={{
-                click: () => onSelect(merchant.id),
-              }}
-              zIndexOffset={active ? 1000 : 0}
-            />
-          )
-        })}
-      </MapContainer>
+            return (
+              <Marker
+                key={merchant.id}
+                position={[lat, lng]}
+                icon={createPinIcon(active)}
+                eventHandlers={{
+                  click: () => onSelect(merchant.id),
+                }}
+                zIndexOffset={active ? 1000 : 0}
+              />
+            )
+          })}
+        </MapContainer>
+      )}
     </div>
   )
 }

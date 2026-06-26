@@ -117,3 +117,21 @@ export const MOBILE_COMPACT_HEADER_PAD_LOOSE = 'pt-[calc(4.5rem+env(safe-area-in
 
 /** Espace réservé sous le contenu quand la barre basse est visible (mobile). */
 export const MOBILE_BOTTOM_NAV_PAD = 'pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-0'
+
+/** Gouttière horizontale pages publiques (navbar + contenu). */
+export const PAGE_GUTTER_X = 'page-gutter-x'
+
+/** Défilement horizontal pleine largeur à l'intérieur d'un conteneur goutté. */
+export const PAGE_GUTTER_BLEED_X = 'page-gutter-bleed-x'
+
+/** Padding droit aligné sur la gouttière page. */
+export const PAGE_GUTTER_R = 'page-gutter-r'
+
+/** Gouttière horizontale back-offices (topbar + contenu scrollable). */
+export const BACKOFFICE_GUTTER_X = 'backoffice-gutter-x'
+
+/** Padding zone principale back-office mobile / desktop. */
+export const BACKOFFICE_MAIN_PAD = 'pt-5 backoffice-gutter-x pb-24 lg:pt-8 lg:pb-8'
+
+/** Variante shop (nav basse plus haute). */
+export const BACKOFFICE_MAIN_PAD_SHOP = 'pt-5 backoffice-gutter-x pb-28 lg:pt-8 lg:pb-8'

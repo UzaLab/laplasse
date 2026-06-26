@@ -1,5 +1,5 @@
-/** Gutter horizontal mobile — aligné sur PAGE_CONTAINER (px-6). */
-export const HOME_MOBILE_GUTTER = 'px-6'
+/** Gutter horizontal mobile — aligné sur PAGE_CONTAINER / navbar. */
+export const HOME_MOBILE_GUTTER = 'page-gutter-x'
 
-/** Padding piste carrousel (titres + première carte alignés). */
-export const HOME_MOBILE_TRACK = 'pl-6 pr-6 scroll-pl-6'
+/** Padding piste carrousel (titres + première carte alignés sur la gouttière page). */
+export const HOME_MOBILE_TRACK = 'page-gutter-x scroll-pl-[calc(1.5rem+env(safe-area-inset-left,0px))]'

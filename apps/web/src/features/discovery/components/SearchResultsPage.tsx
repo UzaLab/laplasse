@@ -24,7 +24,7 @@ import { useGeoCommunesForDefaultCity } from '@/features/discovery/hooks/useGeoC
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { getDefaultCity, getCountryCode } from '@/lib/country'
 import { allCityLabel, popularInCityLabel } from '@/lib/brandCopy'
-import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
+import { NAVBAR_TOP_PAD, PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 import { cn } from '@/lib/utils'
 
 type ResultTab = 'all' | 'merchants' | 'products'
@@ -159,7 +159,7 @@ export function SearchResultsPage() {
       <Navbar />
 
       <div className={cn('sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100', NAVBAR_TOP_PAD)}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 space-y-2.5">
+        <div className={cn('max-w-7xl mx-auto py-3 space-y-2.5', PAGE_GUTTER_X)}>
 
           <div className="flex items-center gap-2">
             <div className="flex-1">

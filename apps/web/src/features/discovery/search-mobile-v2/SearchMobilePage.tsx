@@ -10,6 +10,7 @@ import { CartSync } from '@/components/layout/CartSync'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { HOME_MOBILE_GUTTER, HOME_MOBILE_TRACK } from '@/features/discovery/home-mobile-v2/homeMobileLayout'
+import { PAGE_GUTTER_R } from '@/lib/mobilePublicChrome'
 import { getCategoryIcon } from '@/lib/icons'
 import { coordsFromCityName } from '@/lib/cityCoords'
 import { getCountryCode } from '@/lib/country'
@@ -24,10 +25,7 @@ import { useSearchMobileNearby } from './useSearchMobileNearby'
 
 const SearchMobileMap = dynamic(
   () => import('./SearchMobileMap').then(m => m.SearchMobileMap),
-  {
-    ssr: false,
-    loading: () => <div className="absolute inset-0 z-0 bg-slate-100 animate-pulse" />,
-  },
+  { ssr: false },
 )
 
 export interface SearchMobilePageProps {
@@ -169,7 +167,7 @@ export function SearchMobilePage({
         </div>
 
         {categories.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 pointer-events-auto -mx-6 px-6">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 pointer-events-auto page-gutter-bleed-x">
             <button
               type="button"
               onClick={() => setSelectedCategory('')}
@@ -210,7 +208,7 @@ export function SearchMobilePage({
       </div>
 
       <div className="absolute bottom-16 inset-x-0 z-40 pointer-events-none flex flex-col">
-        <div className="flex justify-end pointer-events-auto pb-2 pr-6">
+        <div className={cn('flex justify-end pointer-events-auto pb-2', PAGE_GUTTER_R)}>
           <SearchMobileRadiusControl
             radiusKm={radiusKm}
             minRadiusKm={minRadiusKm}

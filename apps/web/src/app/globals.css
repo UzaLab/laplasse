@@ -33,6 +33,9 @@ html {
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left: env(safe-area-inset-left, 0px);
   --safe-area-right: env(safe-area-inset-right, 0px);
+  /* Gouttières horizontales — navbar, headers et contenu alignés en PWA iOS */
+  --page-gutter-x: 1.5rem;
+  --backoffice-gutter-x: 1.25rem;
 }
 
 body {
@@ -206,6 +209,41 @@ body {
   z-index: 3 !important;
 }
 
+/* Carte plein écran /search mobile — hors contraintes des cartes embarquées */
+.search-mobile-map-host {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  background: #e2e8f0;
+}
+
+.search-mobile-map-host .leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  font-family: inherit;
+  background: #e2e8f0;
+}
+
+.search-mobile-map-host .leaflet-pane,
+.search-mobile-map-host .leaflet-top,
+.search-mobile-map-host .leaflet-bottom,
+.search-mobile-map-host .leaflet-control-container {
+  z-index: 1;
+}
+
+.search-mobile-map-host .leaflet-marker-pane,
+.search-mobile-map-host .leaflet-shadow-pane {
+  z-index: 2;
+}
+
+.search-mobile-map-host .leaflet-popup-pane,
+.search-mobile-map-host .leaflet-tooltip-pane {
+  z-index: 3;
+}
+
 /* Zone formulaire contenant une carte — contient le stacking au contenu principal */
 .laplasse-leaflet-host {
   position: relative;
@@ -233,11 +271,40 @@ body {
   padding-right: var(--safe-area-right);
 }
 
+/* Gouttière page publique (navbar + PAGE_CONTAINER) */
+.page-gutter-x {
+  padding-left: calc(var(--page-gutter-x) + var(--safe-area-left));
+  padding-right: calc(var(--page-gutter-x) + var(--safe-area-right));
+}
+
+/** Carrousel / chips : annule la gouttière parente pour défilement bord à bord. */
+.page-gutter-bleed-x {
+  margin-left: calc(-1 * (var(--page-gutter-x) + var(--safe-area-left)));
+  margin-right: calc(-1 * (var(--page-gutter-x) + var(--safe-area-right)));
+  padding-left: calc(var(--page-gutter-x) + var(--safe-area-left));
+  padding-right: calc(var(--page-gutter-x) + var(--safe-area-right));
+}
+
+.page-gutter-r {
+  padding-right: calc(var(--page-gutter-x) + var(--safe-area-right));
+}
+
+/* Gouttière back-office (topbar + contenu scrollable) */
+.backoffice-gutter-x {
+  padding-left: calc(var(--backoffice-gutter-x) + var(--safe-area-left));
+  padding-right: calc(var(--backoffice-gutter-x) + var(--safe-area-right));
+}
+
+@media (min-width: 1024px) {
+  .backoffice-gutter-x {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
 /* En-têtes des espaces pro (profile, shop, merchant, admin…) — iOS PWA */
 .backoffice-topbar {
   min-height: 4.5rem;
   padding-top: var(--safe-area-top);
-  padding-left: var(--safe-area-left);
-  padding-right: var(--safe-area-right);
 }
 

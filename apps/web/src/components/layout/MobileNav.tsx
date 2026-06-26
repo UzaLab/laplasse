@@ -12,6 +12,7 @@ import { useT } from '@/providers/LocaleProvider'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { CountrySwitcher } from './CountrySwitcher'
 import { MOBILE_DRAWER_NAV_ITEMS } from './navConfig'
+import { PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 import {
   getIndependentShops,
   getShopManageHref,
@@ -95,7 +96,7 @@ export function MobileNav({
         aria-modal="true"
         aria-label={t('nav.openMenu')}
       >
-        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 safe-area-top">
+        <div className={cn('flex items-center justify-between h-20 border-b border-slate-100 safe-area-top', PAGE_GUTTER_X)}>
           <Link
             href="/"
             onClick={onClose}
