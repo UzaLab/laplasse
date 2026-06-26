@@ -119,7 +119,7 @@ export function HomeMobilePage({
           {merchants.length > 0 ? (
             <HomeMobileV2CarouselTrack>
               {merchants.map(merchant => (
-                <div key={merchant.id} className="shrink-0 snap-start">
+                <div key={merchant.id} className="w-[280px] shrink-0 snap-start">
                   <NearbyCard merchant={merchant} />
                 </div>
               ))}

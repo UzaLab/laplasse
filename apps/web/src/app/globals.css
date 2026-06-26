@@ -36,6 +36,7 @@ html {
   /* Gouttières horizontales — navbar, headers et contenu alignés en PWA iOS */
   --page-gutter-x: 1.5rem;
   --backoffice-gutter-x: 1.25rem;
+  --mobile-bottom-nav-height: 4rem;
 }
 
 body {
@@ -264,6 +265,29 @@ body {
 
 .safe-area-bottom {
   padding-bottom: var(--safe-area-bottom);
+}
+
+/* Barre basse publique — safe area sous la zone tactile (h-16), pas dedans */
+.mobile-bottom-nav {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+.mobile-bottom-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: var(--mobile-bottom-nav-height);
+}
+
+.mobile-bottom-nav-pad {
+  padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom) + 0.5rem);
+}
+
+/* Piste carrousel home mobile — alignée sur la gouttière page */
+.home-mobile-carousel-track {
+  padding-left: calc(var(--page-gutter-x) + var(--safe-area-left));
+  padding-right: calc(var(--page-gutter-x) + var(--safe-area-right));
+  scroll-padding-left: calc(var(--page-gutter-x) + var(--safe-area-left));
 }
 
 .safe-area-x {

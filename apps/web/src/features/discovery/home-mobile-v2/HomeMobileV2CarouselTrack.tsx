@@ -11,7 +11,7 @@ export function HomeMobileV2CarouselTrack({ children, className }: HomeMobileV2C
   return (
     <div
       className={cn(
-        'flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory scroll-smooth justify-start items-stretch',
+        'flex gap-4 overflow-x-auto no-scrollbar pb-2 snap-x snap-mandatory scroll-smooth justify-start items-start',
         HOME_MOBILE_TRACK,
         className,
       )}

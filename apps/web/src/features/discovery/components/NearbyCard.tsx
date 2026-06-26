@@ -9,7 +9,7 @@ import { MerchantCardPreview } from './MerchantCardPreview'
 
 export function NearbyCard({ merchant }: { merchant: ApiMerchant }) {
   return (
-    <article className="min-w-[280px] bg-white overflow-hidden rounded-[24px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 hover:-translate-y-1 transition-transform duration-300 group">
+    <article className="w-full min-w-[280px] bg-white overflow-hidden rounded-[24px] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 hover:-translate-y-1 transition-transform duration-300 group">
 
       <Link
         href={`/m/${merchant.slug}`}

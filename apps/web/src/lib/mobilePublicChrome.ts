@@ -116,7 +116,7 @@ export const MOBILE_COMPACT_HEADER_PAD = 'pt-[calc(4rem+env(safe-area-inset-top,
 export const MOBILE_COMPACT_HEADER_PAD_LOOSE = 'pt-[calc(4.5rem+env(safe-area-inset-top,0px))]'
 
 /** Espace réservé sous le contenu quand la barre basse est visible (mobile). */
-export const MOBILE_BOTTOM_NAV_PAD = 'pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-0'
+export const MOBILE_BOTTOM_NAV_PAD = 'mobile-bottom-nav-pad md:pb-0'
 
 /** Gouttière horizontale pages publiques (navbar + contenu). */
 export const PAGE_GUTTER_X = 'page-gutter-x'
