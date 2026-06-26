@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
+import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { api, type ApiMerchantDetail } from '@/lib/api'
@@ -52,7 +52,7 @@ import {
   variantShowsAsColorSwatch,
 } from '@/lib/variantColors'
 
-type TabId = 'description' | 'composition' | 'reviews'
+type TabId = 'description' | 'composition' | 'specifications' | 'reviews'
 
 function getProductGallery(product: MarketplaceProduct): string[] {
   const fromList = product.images?.filter(Boolean) ?? []
@@ -201,7 +201,7 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA]">
         <Navbar />
-        <main className={`${PAGE_CONTAINER} pt-28 pb-16 text-center`}>
+        <main className={cn(PAGE_CONTAINER, NAVBAR_TOP_PAD_LOOSE, 'pb-16 text-center')}>
           <p className="text-slate-500 mb-4">Produit introuvable.</p>
           <Link href={`/m/${slug}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
             Retour à la fiche
@@ -234,6 +234,10 @@ export default function ProductDetailPage() {
   const locationLabel = merchantDetail?.location
     ? [merchantDetail.location.district, merchantDetail.location.city].filter(Boolean).join(', ')
     : ''
+  const productSpecifications = (product.specifications ?? []).filter(
+    s => s.label?.trim() && s.value?.trim(),
+  )
+  const hasSpecifications = productSpecifications.length > 0
 
   const scrollToReviews = () => {
     setActiveTab('reviews')
@@ -268,7 +272,7 @@ export default function ProductDetailPage() {
       <Navbar />
 
       {/* Fil d'Ariane */}
-      <div className="pt-28 pb-4 bg-white">
+      <div className={cn(NAVBAR_TOP_PAD_LOOSE, 'pb-4 bg-white')}>
         <div className={PAGE_CONTAINER}>
           <nav className="flex items-center gap-2 text-sm font-medium text-slate-500 flex-wrap">
             <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
@@ -698,6 +702,19 @@ export default function ProductDetailPage() {
               >
                 {t('product.tabComposition')}
               </button>
+              {hasSpecifications && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('specifications')}
+                  className={`pb-3 sm:pb-4 text-sm sm:text-base whitespace-nowrap transition-colors shrink-0 ${
+                    activeTab === 'specifications'
+                      ? 'text-brand-600 border-b-2 border-brand-500 font-bold'
+                      : 'text-slate-500 hover:text-slate-800 font-medium'
+                  }`}
+                >
+                  {t('product.tabSpecifications')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setActiveTab('reviews')}
@@ -740,6 +757,17 @@ export default function ProductDetailPage() {
                   </>
                 )}
               </div>
+            )}
+
+            {activeTab === 'specifications' && hasSpecifications && (
+              <dl className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                {productSpecifications.map((spec, index) => (
+                  <div key={`${spec.label}-${index}`} className="grid grid-cols-1 sm:grid-cols-[minmax(0,40%)_1fr] gap-1 sm:gap-4 px-5 py-4">
+                    <dt className="text-sm font-bold text-slate-500">{spec.label}</dt>
+                    <dd className="text-base font-medium text-slate-900">{spec.value}</dd>
+                  </div>
+                ))}
+              </dl>
             )}
 
             {activeTab === 'reviews' && (

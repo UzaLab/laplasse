@@ -280,7 +280,7 @@ export function NotificationBell({
         <div
           ref={panelRef}
           id="notification-bell-portal"
-          className="fixed inset-x-0 top-0 flex flex-col bg-white rounded-b-3xl border border-slate-100 border-t-0 shadow-2xl max-h-[min(85vh,520px)]"
+          className="fixed inset-x-0 top-0 flex flex-col bg-white rounded-b-3xl border border-slate-100 border-t-0 shadow-2xl max-h-[min(85vh,520px)] safe-area-top"
           style={{ zIndex: PANEL_Z_CONTENT }}
           role="dialog"
           aria-label="Notifications"

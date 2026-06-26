@@ -43,6 +43,7 @@ import {
   unitTypeLabel,
 } from '@/lib/roomListingConfig'
 import { RoomBookingWidget } from '@/features/merchant/components/profile/RoomBookingWidget'
+import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Wifi,
@@ -140,7 +141,7 @@ export function RoomDetailView({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      <header className="pt-20">
+      <header className={NAVBAR_TOP_PAD}>
         <div className="relative h-[45vh] md:h-[60vh] w-full overflow-hidden">
           {heroImage ? (
             // eslint-disable-next-line @next/next/no-img-element

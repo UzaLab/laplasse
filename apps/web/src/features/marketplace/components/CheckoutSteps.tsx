@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { getCheckoutConfirmation, getCheckoutSession } from '@/lib/checkoutSession'
 import { useT } from '@/providers/LocaleProvider'
 
@@ -41,7 +42,7 @@ export function CheckoutSteps({ current }: CheckoutStepsProps) {
   }
 
   return (
-    <div className="pt-28 pb-8 bg-white border-b border-slate-100">
+    <div className={cn(NAVBAR_TOP_PAD_LOOSE, 'pb-8 bg-white border-b border-slate-100')}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-center max-w-2xl mx-auto">
           {STEPS.map((step, index) => {

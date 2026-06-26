@@ -91,7 +91,7 @@ export function CartDrawer() {
         aria-modal="true"
         aria-label="Panier"
       >
-        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 shrink-0">
+        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 shrink-0 safe-area-top">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
               <ShoppingBag size={20} />
@@ -238,7 +238,7 @@ export function CartDrawer() {
         </div>
 
         {hasItems && (
-          <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white">
+          <div className="shrink-0 border-t border-slate-100 px-6 py-5 bg-white safe-area-bottom">
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-medium text-slate-500">Sous-total</span>
               <span className="text-xl font-extrabold text-slate-900">

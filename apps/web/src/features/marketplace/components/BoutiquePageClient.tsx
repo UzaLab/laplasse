@@ -29,6 +29,7 @@ import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { useScrollFabVisibility } from '@/hooks/useScrollFabVisibility'
 import { cn } from '@/lib/utils'
+import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 import { MarketplaceFilterListSection } from '@/features/marketplace/components/MarketplaceFilterListSection'
 import { ProductCard } from './ProductCard'
 
@@ -380,7 +381,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
 
   return (
     <>
-      <header className="pt-20">
+      <header className={NAVBAR_TOP_PAD}>
         <div className="relative h-[32vh] min-h-[260px] md:h-[35vh] w-full bg-slate-900 overflow-hidden">
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element

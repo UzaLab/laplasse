@@ -57,7 +57,7 @@ export function Navbar() {
       <CartSync />
     <nav
       className={cn(
-        'fixed top-0 left-0 right-0 z-50 glass-panel border-b border-slate-200/50 transition-all duration-300',
+        'fixed top-0 left-0 right-0 z-50 glass-panel border-b border-slate-200/50 transition-all duration-300 safe-area-top',
         scrolled && 'shadow-sm',
       )}
     >

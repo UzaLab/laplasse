@@ -62,7 +62,7 @@ export function MobileProductCard({
         style={{ textDecoration: 'none', color: 'inherit' }}
       >
         <div className={cn(
-          'w-full bg-slate-50 overflow-hidden relative flex items-center justify-center',
+          'w-full bg-slate-50 overflow-hidden relative',
           isCarousel ? 'h-40' : 'aspect-square',
         )}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -70,8 +70,7 @@ export function MobileProductCard({
             src={image}
             alt={name}
             className={cn(
-              'max-w-full max-h-full object-contain transition-transform duration-500',
-              isCarousel ? 'p-3' : 'p-2.5',
+              'w-full h-full object-cover transition-transform duration-500',
               !outOfStock && 'group-hover:scale-105',
             )}
           />

@@ -12,6 +12,7 @@ import {
 } from '@/lib/brandCopy'
 import { CategoryIcon } from '@/lib/icons'
 import { CategoryMerchantsGrid } from '@/features/discovery/components/CategoryMerchantsGrid'
+import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export default async function CategoryPage({ params }: Props) {
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
 
-      <div className="pt-20 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+      <div className={`${NAVBAR_TOP_PAD} bg-gradient-to-br from-slate-900 to-slate-800 text-white`}>
         <div className="max-w-7xl mx-auto px-6 py-12">
           <Link
             href="/"

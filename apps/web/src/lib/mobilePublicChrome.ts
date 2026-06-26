@@ -103,5 +103,17 @@ export function shouldHideFooterOnMobile(pathname: string): boolean {
   return true
 }
 
+/** Espace sous la Navbar fixe (h-20 + encoche iOS PWA). */
+export const NAVBAR_TOP_PAD = 'pt-[calc(5rem+env(safe-area-inset-top,0px))]'
+
+/** Variante avec marge supplémentaire (fil d'Ariane, hero). */
+export const NAVBAR_TOP_PAD_LOOSE = 'pt-[calc(7rem+env(safe-area-inset-top,0px))]'
+
+/** Espace sous le header compact mobile (home, recherche). */
+export const MOBILE_COMPACT_HEADER_PAD = 'pt-[calc(4rem+env(safe-area-inset-top,0px))]'
+
+/** Header compact + petit espace de respiration. */
+export const MOBILE_COMPACT_HEADER_PAD_LOOSE = 'pt-[calc(4.5rem+env(safe-area-inset-top,0px))]'
+
 /** Espace réservé sous le contenu quand la barre basse est visible (mobile). */
-export const MOBILE_BOTTOM_NAV_PAD = 'pb-24 md:pb-0'
+export const MOBILE_BOTTOM_NAV_PAD = 'pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-0'

@@ -93,12 +93,18 @@ export interface ProductPromotionInfo {
   promo_price?: number | null
 }
 
+export interface ProductSpecification {
+  label: string
+  value: string
+}
+
 export interface MarketplaceProduct {
   id: string
   name: string
   slug: string
   description?: string | null
   composition?: string | null
+  specifications?: ProductSpecification[]
   price: number
   currency: string
   stock_quantity: number
@@ -397,7 +403,8 @@ export interface CreateProductInput {
   name: string
   description?: string
   composition?: string
-  price: number
+  specifications?: ProductSpecification[]
+  price?: number
   stock_quantity?: number
   image_url?: string
   images?: string[]
@@ -412,6 +419,7 @@ export interface UpdateProductInput {
   name?: string
   description?: string
   composition?: string
+  specifications?: ProductSpecification[]
   price?: number
   stock_quantity?: number
   image_url?: string

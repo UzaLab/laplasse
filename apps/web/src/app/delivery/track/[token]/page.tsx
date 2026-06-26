@@ -1,6 +1,6 @@
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
+import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { DeliveryTrackClient } from '@/features/delivery/components/DeliveryTrackClient'
 
 interface Props {
@@ -13,7 +13,7 @@ export default async function DeliveryTrackPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar />
-      <main className={`flex-1 pt-24 md:pt-28 ${MOBILE_BOTTOM_NAV_PAD}`}>
+      <main className={`flex-1 ${NAVBAR_TOP_PAD_LOOSE} ${MOBILE_BOTTOM_NAV_PAD}`}>
         <DeliveryTrackClient token={token} />
       </main>
       <AppFooter />

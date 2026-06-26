@@ -20,6 +20,7 @@ import { HomeMobileV2ProductsCarousel } from './HomeMobileV2ProductsCarousel'
 import { HomeMobileV2SectionHeader } from './HomeMobileV2SectionHeader'
 import { HomeMobileV2CarouselTrack } from './HomeMobileV2CarouselTrack'
 import Link from 'next/link'
+import { MOBILE_BOTTOM_NAV_PAD, MOBILE_COMPACT_HEADER_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 
 export interface HomeMobilePageProps {
   categories: Category[]
@@ -59,7 +60,7 @@ export function HomeMobilePage({
 
       <HomeMobileHeader />
 
-      <main className="flex-1 pb-24 overflow-y-auto no-scrollbar overflow-x-hidden pt-[calc(4rem+0.5rem)]">
+      <main className={cn('flex-1 overflow-y-auto no-scrollbar overflow-x-hidden', MOBILE_COMPACT_HEADER_PAD_LOOSE, MOBILE_BOTTOM_NAV_PAD)}>
         <section className={cn('mb-8 relative', HOME_MOBILE_GUTTER)}>
           <div className="absolute -top-6 -right-8 w-48 h-48 bg-brand-100 rounded-full blur-[60px] -z-10 opacity-60 pointer-events-none" />
 

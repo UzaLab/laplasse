@@ -24,6 +24,7 @@ import {
   serviceListingSlug,
 } from '@/lib/serviceListingConfig'
 import { ServiceBookingWidget } from '@/features/merchant/components/profile/ServiceBookingWidget'
+import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 
 interface MerchantInfo {
   business_name: string
@@ -84,7 +85,7 @@ export function ServiceDetailView({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      <header className="pt-20">
+      <header className={NAVBAR_TOP_PAD}>
         <div className="relative h-[45vh] md:h-[60vh] w-full overflow-hidden">
           {heroImage ? (
             // eslint-disable-next-line @next/next/no-img-element

@@ -8,7 +8,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Loader2, UtensilsCrossed } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
+import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
@@ -687,7 +687,7 @@ function CheckoutPageContent() {
     return (
       <div className="min-h-screen bg-[#FAFAFA]">
         <Navbar />
-        <main className={`${PAGE_CONTAINER} pt-28 pb-16 text-center`}>
+        <main className={`${PAGE_CONTAINER} ${NAVBAR_TOP_PAD_LOOSE} pb-16 text-center`}>
           <p className="text-slate-500 mb-4">Votre panier est vide.</p>
           <Link href={emptyCartHref} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
             Retour au panier

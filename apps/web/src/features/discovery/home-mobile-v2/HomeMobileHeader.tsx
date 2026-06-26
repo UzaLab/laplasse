@@ -35,7 +35,7 @@ export function HomeMobileHeader({ topOffsetClass = 'top-0' }: HomeMobileHeaderP
     <>
       <header
         className={cn(
-          'fixed inset-x-0 z-50 glass-panel border-b border-slate-200/50',
+          'fixed inset-x-0 z-50 glass-panel border-b border-slate-200/50 safe-area-top',
           topOffsetClass,
         )}
       >

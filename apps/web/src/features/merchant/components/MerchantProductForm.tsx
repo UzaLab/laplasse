@@ -8,11 +8,11 @@ import {
   Banknote,
   Check,
   Layers,
+  ListChecks,
   Loader2,
   Plus,
   Save,
   Store,
-  Tag,
   Truck,
   X,
 } from 'lucide-react'
@@ -26,6 +26,7 @@ import {
   fetchMyProducts,
   updateProduct,
   type MarketplaceProduct,
+  type ProductSpecification,
   type ProductStatus,
   type ProductVariantInput,
 } from '@/lib/marketplaceApi'
@@ -53,6 +54,7 @@ interface ProductFormState {
   name: string
   description: string
   composition: string
+  specifications: ProductSpecification[]
   price: string
   stock_quantity: string
   images: string[]
@@ -68,10 +70,11 @@ const EMPTY_FORM: ProductFormState = {
   name: '',
   description: '',
   composition: '',
+  specifications: [],
   price: '',
   stock_quantity: '0',
   images: [],
-  status: 'ACTIVE',
+  status: 'DRAFT',
   category_id: '',
   allow_pickup: true,
   allow_delivery: true,
@@ -100,6 +103,7 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
     name: product.name,
     description: product.description ?? '',
     composition: product.composition ?? '',
+    specifications: product.specifications ?? [],
     price: String(product.price),
     stock_quantity: String(product.stock_quantity),
     images,
@@ -122,6 +126,12 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
 
 function normalizeHtmlField(value: string): string | undefined {
   return hasHtmlContent(value) ? value : undefined
+}
+
+function normalizeSpecifications(specs: ProductSpecification[]): ProductSpecification[] {
+  return specs
+    .map(s => ({ label: s.label.trim(), value: s.value.trim() }))
+    .filter(s => s.label && s.value)
 }
 
 interface MerchantProductFormProps {
@@ -190,11 +200,13 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   const uploadMerchantId = user?.shops?.find(s => s.id === activeShopId)?.merchant_id ?? undefined
   const uploadShopId = uploadMerchantId ? undefined : activeShopId
 
-  const handleSave = async () => {
+  const handleSave = async (targetStatus: 'DRAFT' | 'ACTIVE') => {
     if (!form.name.trim()) {
       notify.error('Le titre du produit est requis')
       return
     }
+
+    const isDraft = targetStatus === 'DRAFT'
 
     const variants = form.useVariants
       ? form.variants
@@ -206,45 +218,50 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
           .filter(v => v.name)
       : []
 
-    if (form.useVariants) {
-      if (variants.length === 0) {
-        notify.error('Ajoutez au moins une variante')
+    if (!isDraft) {
+      if (form.useVariants) {
+        if (variants.length === 0) {
+          notify.error('Ajoutez au moins une variante')
+          return
+        }
+        if (variants.some(v => !v.price && v.price !== 0)) {
+          notify.error('Chaque variante doit avoir un prix')
+          return
+        }
+      } else if (!form.price) {
+        notify.error('Le prix régulier est requis')
         return
       }
-      if (variants.some(v => !v.price && v.price !== 0)) {
-        notify.error('Chaque variante doit avoir un prix')
+
+      if (!form.allow_pickup && !form.allow_delivery) {
+        notify.error('Activez au moins un mode de livraison')
         return
       }
-    } else if (!form.price) {
-      notify.error('Le prix régulier est requis')
-      return
-    }
 
-    if (!form.allow_pickup && !form.allow_delivery) {
-      notify.error('Activez au moins un mode de livraison')
-      return
-    }
-
-    if (categoryOptions.length > 0 && !form.category_id) {
-      notify.error('Sélectionnez une catégorie produit')
-      return
+      if (categoryOptions.length > 0 && !form.category_id) {
+        notify.error('Sélectionnez une catégorie produit')
+        return
+      }
     }
 
     setSaving(true)
+
+    const specifications = normalizeSpecifications(form.specifications)
 
     const payload = {
       name: form.name.trim(),
       description: normalizeHtmlField(form.description),
       composition: normalizeHtmlField(form.composition),
+      specifications,
       price: form.useVariants
         ? Math.min(...variants.map(v => v.price))
-        : parseInt(form.price, 10),
+        : parseInt(form.price, 10) || 0,
       stock_quantity: form.useVariants
         ? variants.reduce((sum, v) => sum + (v.stock_quantity ?? 0), 0)
         : parseInt(form.stock_quantity, 10) || 0,
       image_url: form.images[0],
       images: form.images,
-      status: form.status,
+      status: targetStatus,
       allow_pickup: form.allow_pickup,
       allow_delivery: form.allow_delivery,
       ...(form.category_id ? { category_id: form.category_id } : {}),
@@ -275,20 +292,37 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
       return
     }
 
-    notify.success(isEdit ? 'Produit mis à jour' : 'Produit créé')
+    notify.success(
+      isDraft
+        ? 'Brouillon enregistré'
+        : isEdit
+          ? 'Produit mis à jour'
+          : 'Produit publié',
+    )
     router.push(routes.products)
   }
 
-  const saveButton = (
-    <button
-      type="button"
-      onClick={handleSave}
-      disabled={saving}
-      className="bg-slate-900 text-white px-5 sm:px-6 py-2.5 rounded-full font-bold text-sm shadow-md shadow-slate-900/10 hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 w-full sm:w-auto"
-    >
-      {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-      Enregistrer
-    </button>
+  const saveButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => handleSave('DRAFT')}
+        disabled={saving}
+        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+        Brouillon
+      </button>
+      <button
+        type="button"
+        onClick={() => handleSave('ACTIVE')}
+        disabled={saving}
+        className="flex-1 sm:flex-none bg-slate-900 text-white px-4 sm:px-6 py-2.5 rounded-full font-bold text-sm shadow-md shadow-slate-900/10 hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+        {isEdit && form.status !== 'DRAFT' ? 'Enregistrer' : 'Publier le produit'}
+      </button>
+    </>
   )
 
   if (!hydrated || !isAuthenticated) return null
@@ -371,6 +405,87 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                   />
                 </div>
               </div>
+            </section>
+
+            {/* Caractéristiques */}
+            <section className={CARD_CLASS}>
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                    <ListChecks size={20} className="text-brand-500" />
+                    Caractéristiques
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Pointures, stockage, connectivité, contenance… selon votre type de produit.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setForm(f => ({
+                      ...f,
+                      specifications: [...f.specifications, { label: '', value: '' }],
+                    }))
+                  }
+                  className="inline-flex items-center gap-1.5 text-sm font-bold text-brand-600 hover:text-brand-700 px-3 py-2 rounded-xl border border-brand-200 bg-brand-50/50 shrink-0"
+                >
+                  <Plus size={16} /> Ajouter
+                </button>
+              </div>
+
+              {form.specifications.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">
+                  Aucune caractéristique. Ex. : Pointure → 42, Stockage → 256 Go, Contenance → 350 L
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {form.specifications.map((spec, index) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <input
+                        type="text"
+                        value={spec.label}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            specifications: f.specifications.map((s, i) =>
+                              i === index ? { ...s, label: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                        placeholder="Nom (ex. Pointure)"
+                        className={`${INPUT_CLASS} flex-1`}
+                      />
+                      <input
+                        type="text"
+                        value={spec.value}
+                        onChange={e =>
+                          setForm(f => ({
+                            ...f,
+                            specifications: f.specifications.map((s, i) =>
+                              i === index ? { ...s, value: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                        placeholder="Valeur (ex. 42)"
+                        className={`${INPUT_CLASS} flex-1`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm(f => ({
+                            ...f,
+                            specifications: f.specifications.filter((_, i) => i !== index),
+                          }))
+                        }
+                        className="p-3 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                        aria-label="Supprimer la caractéristique"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Médias */}
@@ -654,32 +769,6 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
 
           {/* Colonne latérale */}
           <div className="space-y-6">
-            {/* Statut */}
-            <section className={CARD_CLASS}>
-              <h2 className="text-sm font-extrabold text-slate-900 mb-4 uppercase tracking-wider">
-                Statut du produit
-              </h2>
-              <select
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value as ProductStatus }))}
-                className={`${INPUT_CLASS} font-bold appearance-none cursor-pointer`}
-              >
-                <option value="ACTIVE">Actif (visible sur la boutique)</option>
-                <option value="DRAFT">Brouillon (caché)</option>
-                <option value="OUT_OF_STOCK">Rupture de stock</option>
-              </select>
-
-              <div className="mt-4 flex items-start gap-3 p-3 bg-brand-50 rounded-xl border border-brand-100">
-                <Tag size={18} className="text-brand-600 shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">Visibilité marketplace</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Les produits actifs apparaissent sur votre boutique et le catalogue LaPlasse.
-                  </p>
-                </div>
-              </div>
-            </section>
-
             {/* Organisation (adapté app) */}
             <section className={CARD_CLASS}>
               <h2 className="text-sm font-extrabold text-slate-900 mb-4 uppercase tracking-wider">
@@ -798,7 +887,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
           >
             Annuler
           </Link>
-          <div className="flex-1 min-w-0">{saveButton}</div>
+          <div className="flex flex-1 sm:flex-none items-center gap-2 min-w-0">{saveButtons}</div>
         </div>
       </div>
     </ProductFormShell>

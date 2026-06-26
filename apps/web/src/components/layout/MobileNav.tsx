@@ -71,7 +71,7 @@ export function MobileNav({
         aria-modal="true"
         aria-label={t('nav.openMenu')}
       >
-        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100 safe-area-top">
           <Link
             href="/"
             onClick={onClose}

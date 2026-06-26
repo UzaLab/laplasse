@@ -15,6 +15,7 @@ import { HOME_MOBILE_GUTTER } from '@/features/discovery/home-mobile-v2/homeMobi
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { popularInCityLabel } from '@/lib/brandCopy'
 import { cn } from '@/lib/utils'
+import { MOBILE_BOTTOM_NAV_PAD, MOBILE_COMPACT_HEADER_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 
 import { SearchResultsMobileFiltersSheet, type SearchResultsMobileFilters } from './SearchResultsMobileFiltersSheet'
 import { SearchResultsMobileMerchantCard } from './SearchResultsMobileMerchantCard'
@@ -202,7 +203,7 @@ export function SearchResultsMobilePage({
 
       <HomeMobileHeader />
 
-      <main className={cn('flex-1 pb-24 overflow-y-auto no-scrollbar pt-[calc(4rem+0.75rem)]', HOME_MOBILE_GUTTER)}>
+      <main className={cn('flex-1 overflow-y-auto no-scrollbar', MOBILE_COMPACT_HEADER_PAD_LOOSE, MOBILE_BOTTOM_NAV_PAD, HOME_MOBILE_GUTTER)}>
         <section className="space-y-4 mb-6">
           <SearchBar
             value={query}

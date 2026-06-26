@@ -1344,6 +1344,7 @@ model Product {
   slug           String
   description    String?
   composition    String?
+  specifications Json?
   price          Int
   currency       String        @default("XOF")
   stock_quantity Int           @default(0)

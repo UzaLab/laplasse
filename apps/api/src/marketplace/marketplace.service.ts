@@ -319,6 +319,15 @@ export class MarketplaceService {
     }
   }
 
+  private normalizeSpecifications(
+    specs?: { label?: string; value?: string }[] | null,
+  ): { label: string; value: string }[] | undefined {
+    if (specs == null) return specs === null ? [] : undefined
+    return specs
+      .map(s => ({ label: s.label?.trim() ?? '', value: s.value?.trim() ?? '' }))
+      .filter(s => s.label && s.value)
+  }
+
   private async resolveProductCategoryId(input?: {
     category_id?: string
     category_slug?: string
@@ -1042,12 +1051,19 @@ export class MarketplaceService {
       : dto.stock_quantity ?? 0
     const price = hasVariants
       ? Math.min(...dto.variants!.map(v => v.price))
-      : dto.price
-    const status = dto.status === 'ACTIVE' ? 'PENDING_REVIEW' : (dto.status ?? 'DRAFT')
-    this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
+      : dto.price ?? 0
+    const requestedStatus = dto.status ?? 'DRAFT'
+    const status = requestedStatus === 'ACTIVE' ? 'PENDING_REVIEW' : requestedStatus
+    const isDraft = status === 'DRAFT'
+    if (!isDraft) {
+      this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
+    }
     const imageUrls = this.resolveImageUrls(dto)
     const categoryId = await this.resolveProductCategoryId(dto)
-    await this.assertShopProductCategory(shop.id, categoryId)
+    if (!isDraft) {
+      await this.assertShopProductCategory(shop.id, categoryId)
+    }
+    const specifications = this.normalizeSpecifications(dto.specifications)
 
     const created = await this.prisma.product.create({
       data: {
@@ -1057,6 +1073,7 @@ export class MarketplaceService {
         slug,
         description: dto.description,
         composition: dto.composition,
+        ...(specifications !== undefined ? { specifications } : {}),
         price,
         stock_quantity: stock,
         image_url: imageUrls[0] ?? null,
@@ -1141,7 +1158,10 @@ export class MarketplaceService {
 
     const allowPickup = dto.allow_pickup ?? existing.allow_pickup
     const allowDelivery = dto.allow_delivery ?? existing.allow_delivery
-    this.assertDeliveryModes(allowPickup, allowDelivery)
+    const savingAsDraft = dto.status === 'DRAFT'
+    if (!savingAsDraft) {
+      this.assertDeliveryModes(allowPickup, allowDelivery)
+    }
 
     const imageUrls = dto.images !== undefined
       ? this.resolveImageUrls({ images: dto.images })
@@ -1151,7 +1171,11 @@ export class MarketplaceService {
 
     const categoryId = await this.resolveProductCategoryId(dto)
     const finalCategoryId = categoryId !== undefined ? categoryId : existing.category_id
-    await this.assertShopProductCategory(shop.id, finalCategoryId)
+    if (!savingAsDraft) {
+      await this.assertShopProductCategory(shop.id, finalCategoryId)
+    }
+
+    const specifications = this.normalizeSpecifications(dto.specifications)
 
     await this.prisma.product.update({
       where: { id: productId },
@@ -1159,6 +1183,7 @@ export class MarketplaceService {
         name: dto.name,
         description: dto.description,
         composition: dto.composition,
+        ...(specifications !== undefined ? { specifications } : {}),
         price,
         stock_quantity: stock,
         ...(categoryId !== undefined ? { category_id: categoryId } : {}),

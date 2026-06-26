@@ -21,6 +21,18 @@ export enum ProductVariantKindDto {
   COLOR = 'COLOR',
 }
 
+export class ProductSpecificationDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  label!: string
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  value!: string
+}
+
 export class ProductVariantInputDto {
   @IsString()
   @MinLength(1)
@@ -71,9 +83,16 @@ export class CreateProductDto {
   @MaxLength(15000)
   composition?: string
 
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSpecificationDto)
+  specifications?: ProductSpecificationDto[]
+
+  @IsOptional()
   @IsInt()
   @Min(0)
-  price!: number
+  price?: number
 
   @IsOptional()
   @IsInt()
@@ -133,6 +152,12 @@ export class UpdateProductDto {
   @IsString()
   @MaxLength(15000)
   composition?: string
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSpecificationDto)
+  specifications?: ProductSpecificationDto[]
 
   @IsOptional()
   @IsInt()

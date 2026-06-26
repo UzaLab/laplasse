@@ -15,6 +15,7 @@ import { AppFooter } from '@/components/layout/AppFooter'
 import { useAuthStore } from '@/stores/authStore'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { PUBLIC_NARROW } from '@/lib/pageLayout'
+import { NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { createShop } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 import { getCountryCode } from '@/lib/country'
@@ -134,7 +135,7 @@ export default function CreateShopPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
-      <main className={`${PUBLIC_NARROW} pt-28 pb-16`}>
+      <main className={`${PUBLIC_NARROW} ${NAVBAR_TOP_PAD_LOOSE} pb-16`}>
         <Link
           href="/profile"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-8"

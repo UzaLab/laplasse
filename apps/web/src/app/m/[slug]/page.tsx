@@ -19,6 +19,7 @@ import { MerchantMobileActionBar } from '@/features/merchant/components/Merchant
 import { MerchantReviewsSection } from '@/features/discovery/components/MerchantReviewsSection'
 import { getCategoryBookingCta, isBookingCategory } from '@/lib/categoryBooking'
 import { BRAND_OG_LOCALE, merchantMetaFallback } from '@/lib/brandCopy'
+import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +116,7 @@ export default async function MerchantPage({ params }: Props) {
       <Navbar />
 
       {/* ── HERO IMMERSIF ───────────────────────────────────────────────────── */}
-      <header className="pt-20">
+      <header className={NAVBAR_TOP_PAD}>
         <div className="relative h-[42vh] md:h-[58vh] w-full overflow-hidden">
           {merchant.cover_image ? (
             // eslint-disable-next-line @next/next/no-img-element

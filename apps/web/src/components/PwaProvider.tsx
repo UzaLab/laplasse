@@ -3,12 +3,13 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
-import { isWebPushSupported, subscribeToWebPush } from '@/lib/webPush'
 import {
   activateWaitingServiceWorker,
+  isStandalonePwa,
   onServiceWorkerUpdate,
   registerServiceWorker,
 } from '@/lib/pwa'
+import { isWebPushSupported, subscribeToWebPush } from '@/lib/webPush'
 
 /** Enregistre le SW, resync push si autorisé, propose la mise à jour. */
 export function PwaProvider() {
@@ -17,6 +18,12 @@ export function PwaProvider() {
 
   useEffect(() => {
     void registerServiceWorker()
+  }, [])
+
+  useEffect(() => {
+    if (isStandalonePwa()) {
+      document.documentElement.classList.add('pwa-standalone')
+    }
   }, [])
 
   useEffect(() => {
