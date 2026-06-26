@@ -283,6 +283,36 @@ body {
   padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom) + 0.5rem);
 }
 
+/* Pied de drawer (panier, menu mobile) — safe area + marge de respiration */
+.drawer-footer-pad {
+  padding-bottom: calc(var(--safe-area-bottom) + 1.75rem);
+}
+
+.backoffice-scroll,
+.app-shell-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-shell {
+  display: flex;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell-main {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
 /* Piste carrousel home mobile — alignée sur la gouttière page */
 .home-mobile-carousel-track {
   padding-left: calc(var(--page-gutter-x) + var(--safe-area-left));

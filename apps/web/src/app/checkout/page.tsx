@@ -897,7 +897,7 @@ function CheckoutPageContent() {
                             setDeliveryDistrict(e.target.value)
                           }}
                           placeholder="ex. près du marché, face au Total…"
-                          className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                         />
                       </div>
                       <div>
@@ -910,7 +910,7 @@ function CheckoutPageContent() {
                             setDeliveryAddressDetail(e.target.value)
                           }}
                           placeholder="Immeuble, porte, repères…"
-                          className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                         />
                       </div>
 
@@ -937,7 +937,7 @@ function CheckoutPageContent() {
                                 value={newAddressLabel}
                                 onChange={e => setNewAddressLabel(e.target.value)}
                                 placeholder="Maison, Bureau…"
-                                className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                               />
                             </div>
                           )}
@@ -971,7 +971,7 @@ function CheckoutPageContent() {
                           {deliveryQuotes.map(q => (
                             <li
                               key={q.shop_id}
-                              className="flex justify-between gap-3 text-sm bg-slate-50 rounded-full px-4 py-3"
+                              className="flex justify-between gap-3 text-sm bg-slate-50 rounded-xl px-4 py-3"
                             >
                               <div>
                                 <p className="font-bold text-slate-900">{q.shop_name}</p>
@@ -1011,7 +1011,7 @@ function CheckoutPageContent() {
                           value={guestFirstName}
                           onChange={e => setGuestFirstName(e.target.value)}
                           required
-                          className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                         />
                       </div>
                       <div>
@@ -1021,7 +1021,7 @@ function CheckoutPageContent() {
                           value={guestLastName}
                           onChange={e => setGuestLastName(e.target.value)}
                           required
-                          className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                         />
                       </div>
                     </div>
@@ -1037,7 +1037,7 @@ function CheckoutPageContent() {
                     value={customerPhone}
                     onChange={e => setCustomerPhone(e.target.value)}
                     required
-                    className="w-full h-10 border border-slate-200 rounded-full px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                    className="w-full h-10 border border-slate-200 rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                     placeholder="+225…"
                   />
                 </div>
@@ -1064,7 +1064,7 @@ function CheckoutPageContent() {
                             value={accountEmail}
                             onChange={e => setAccountEmail(e.target.value)}
                             placeholder="vous@exemple.ci"
-                            className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                           />
                         </div>
                         <div>
@@ -1074,7 +1074,7 @@ function CheckoutPageContent() {
                             value={accountPassword}
                             onChange={e => setAccountPassword(e.target.value)}
                             placeholder="8 caractères minimum"
-                            className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                           />
                         </div>
                       </div>
@@ -1090,7 +1090,7 @@ function CheckoutPageContent() {
                     value={customerNote}
                     onChange={e => setCustomerNote(e.target.value)}
                     rows={2}
-                    className="w-full border border-slate-200 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/10 focus:border-brand-400"
                     placeholder="Instructions spéciales…"
                   />
                 </div>

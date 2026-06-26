@@ -187,7 +187,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <div
-      className="flex h-screen bg-slate-50 overflow-hidden"
+      className="app-shell bg-slate-50"
       style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}
     >
       {sidebarOpen && (
@@ -207,7 +207,7 @@ export function AdminShell({ children }: AdminShellProps) {
         {sidebarInner}
       </aside>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <main className="app-shell-main">
         <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between backoffice-gutter-x shrink-0 z-10">
           <div className="flex items-center gap-4">
             <button
@@ -246,7 +246,7 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         </header>
 
-        <div className={`flex-1 overflow-y-auto w-full min-w-0 ${BACKOFFICE_MAIN_PAD}`}>
+        <div className={`app-shell-scroll w-full ${BACKOFFICE_MAIN_PAD}`}>
           {children}
         </div>
       </main>

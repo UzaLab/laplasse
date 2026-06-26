@@ -28,6 +28,42 @@ export function formatModifiersLabel(modifiers: SelectedMenuModifier[]): string 
   return modifiers.map(m => m.option_name).join(', ')
 }
 
+export function parseSelectedModifiers(raw: unknown): SelectedMenuModifier[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map(entry => {
+      if (!entry || typeof entry !== 'object') return null
+      const row = entry as Record<string, unknown>
+      const optionId = String(row.option_id ?? '').trim()
+      const groupId = String(row.group_id ?? '').trim()
+      const optionName = String(row.option_name ?? '').trim()
+      const groupName = String(row.group_name ?? '').trim()
+      if (!optionId || !groupId || !optionName || !groupName) return null
+      const priceDelta = Number(row.price_delta ?? 0)
+      return {
+        group_id: groupId,
+        group_name: groupName,
+        option_id: optionId,
+        option_name: optionName,
+        price_delta: Number.isFinite(priceDelta) ? priceDelta : 0,
+      }
+    })
+    .filter((v): v is SelectedMenuModifier => v != null)
+}
+
+/** Regroupe les options menu par libellé de groupe (affichage commande). */
+export function groupModifiersByLabel(
+  modifiers: SelectedMenuModifier[],
+): Array<{ group: string; options: string[] }> {
+  const map = new Map<string, string[]>()
+  for (const m of modifiers) {
+    const list = map.get(m.group_name) ?? []
+    list.push(m.option_name)
+    map.set(m.group_name, list)
+  }
+  return Array.from(map.entries()).map(([group, options]) => ({ group, options }))
+}
+
 export function computeMenuUnitPrice(basePrice: number, modifiers: SelectedMenuModifier[]): number {
   return basePrice + modifiers.reduce((sum, m) => sum + m.price_delta, 0)
 }

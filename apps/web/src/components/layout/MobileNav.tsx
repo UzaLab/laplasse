@@ -206,7 +206,19 @@ export function MobileNav({
                       className="flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       style={{ textDecoration: 'none' }}
                     >
-                      <LayoutDashboard size={18} /> {t('nav.dashboard')}
+                      <LayoutDashboard size={18} /> Espace établissement
+                    </Link>
+                  </li>
+                )}
+                {!hasMerchant && !standaloneOnly && (
+                  <li>
+                    <Link
+                      href="/merchant/signup"
+                      onClick={onClose}
+                      className="flex items-center gap-3 px-4 py-3.5 rounded-full text-base font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <LayoutDashboard size={18} /> Ajouter un établissement
                     </Link>
                   </li>
                 )}
@@ -259,14 +271,14 @@ export function MobileNav({
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">
               {t('nav.preferences')}
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <LanguageSwitcher compact />
               <CountrySwitcher />
             </div>
           </div>
         </nav>
 
-        <div className="px-4 py-6 border-t border-slate-100 safe-area-bottom">
+        <div className="shrink-0 px-4 pt-4 border-t border-slate-100 drawer-footer-pad">
           {isAuthenticated && user ? (
             <button
               type="button"

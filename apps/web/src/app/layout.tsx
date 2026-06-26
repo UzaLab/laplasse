@@ -11,6 +11,7 @@ import { PwaInstallPrompt } from '@/components/PwaInstallPrompt'
 import { CountrySuggestionBanner } from '@/components/layout/CountrySuggestionBanner'
 import { PublicMobileBottomNav } from '@/components/layout/PublicMobileBottomNav'
 import { ScrollToTopButton } from '@/components/ui/ScrollToTopButton'
+import { BodyScrollRestore } from '@/components/layout/BodyScrollRestore'
 import './globals.css'
 import {
   BRAND_DESCRIPTION,
@@ -119,6 +120,7 @@ export default async function RootLayout({
             <LocaleProvider initialLocale={initialLocale}>
               <PwaProvider />
               <AuthBootstrap />
+              <BodyScrollRestore />
               <AppToaster />
               {children}
               <ScrollToTopButton />

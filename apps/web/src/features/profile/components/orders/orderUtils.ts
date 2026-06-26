@@ -37,7 +37,7 @@ export function formatOrderTitle(order: Order): string {
 }
 
 export function orderThumbnail(order: Order, placeholder: string): string {
-  return order.merchant?.logo ?? placeholder
+  return order.merchant?.logo ?? order.shop?.logo ?? placeholder
 }
 
 export type OrderDisplayStatus = 'active' | 'delivered' | 'cancelled' | 'other'
@@ -80,10 +80,16 @@ export const ORDER_DETAIL_STATUS_LABELS: Partial<Record<OrderStatus, string>> = 
   PENDING: 'En attente de confirmation',
   CONFIRMED: 'Commande confirmée',
   PREPARING: 'En préparation',
-  READY: 'Prête — en attente de retrait/livraison',
+  READY: 'Prête',
   OUT_FOR_DELIVERY: 'En cours de livraison',
   DELIVERED: 'Livrée au client',
   COMPLETED: 'Commande terminée',
   CANCELLED: 'Commande annulée',
   REFUNDED: 'Commande remboursée',
+}
+
+export function getReadyStatusDetailLabel(deliveryType: 'PICKUP' | 'DELIVERY'): string {
+  return deliveryType === 'DELIVERY'
+    ? 'Prête — en attente d\'expédition'
+    : 'Prête — en attente de retrait'
 }

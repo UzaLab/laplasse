@@ -239,7 +239,7 @@ export function ShopShell({ children }: ShopShellProps) {
   )
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
+    <div className="app-shell bg-slate-50" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
 
       {sidebarOpen && (
         <div
@@ -256,7 +256,7 @@ export function ShopShell({ children }: ShopShellProps) {
         {SidebarInner}
       </aside>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative z-0 isolate">
+      <main className="app-shell-main relative z-0 isolate">
 
         <header className="relative z-20 backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between backoffice-gutter-x shrink-0">
           <div className="flex items-center gap-4">
@@ -294,7 +294,7 @@ export function ShopShell({ children }: ShopShellProps) {
           </div>
         </header>
 
-        <div id={APP_SHELL_SCROLL_ID} className={`flex-1 overflow-y-auto w-full min-w-0 ${BACKOFFICE_MAIN_PAD_SHOP}`}>
+        <div id={APP_SHELL_SCROLL_ID} className={`app-shell-scroll w-full ${BACKOFFICE_MAIN_PAD_SHOP}`}>
           {children}
         </div>
       </main>

@@ -16,7 +16,7 @@ import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
-import { getShopsForMerchant, getIndependentShops, getActiveMerchantShopId } from '@/lib/shopApi'
+import { getShopsForMerchant, getIndependentShops, getActiveMerchantShopId, hasMerchantEstablishment, hasStandaloneShopOnly } from '@/lib/shopApi'
 import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
@@ -48,6 +48,14 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     ? merchants.filter(m => m.organization_id !== organization.id)
     : merchants
   const exploreLabel = exploreCityLabel(getDefaultCity(getCountryCode()))
+
+  // Accès réservé aux propriétaires d'établissement (pas boutique standalone seule)
+  useEffect(() => {
+    if (!user) return
+    if (pathname.startsWith('/merchant/signup')) return
+    if (hasMerchantEstablishment(user)) return
+    router.replace(hasStandaloneShopOnly(user) ? '/shop/manage' : '/profile')
+  }, [user, pathname, router])
 
   // Synchronise la liste d'établissements et l'organisation depuis l'API
   useEffect(() => {
@@ -430,7 +438,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   )
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
+    <div className="app-shell bg-slate-50" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
 
       {/* Overlay mobile */}
       {sidebarOpen && (
@@ -450,7 +458,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
       </aside>
 
       {/* Main — isolé pour que Leaflet ne déborde pas sur la sidebar */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0 relative z-0 isolate">
+      <main className="app-shell-main relative z-0 isolate">
 
         {/* Topbar */}
         <header className="relative z-20 backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between backoffice-gutter-x shrink-0">
@@ -490,7 +498,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
         </header>
 
         {/* Content */}
-        <div id={APP_SHELL_SCROLL_ID} className={`flex-1 overflow-y-auto w-full min-w-0 ${BACKOFFICE_MAIN_PAD}`}>
+        <div id={APP_SHELL_SCROLL_ID} className={`app-shell-scroll w-full ${BACKOFFICE_MAIN_PAD}`}>
           {children}
         </div>
       </main>

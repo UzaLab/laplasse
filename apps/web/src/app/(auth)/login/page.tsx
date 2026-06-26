@@ -16,6 +16,7 @@ import {
   getAuthIntentCopy,
   resolveAuthIntent,
 } from '@/lib/authIntent'
+import { hasMerchantEstablishment } from '@/lib/shopApi'
 
 type LoginMode = 'email' | 'otp'
 
@@ -57,11 +58,11 @@ function LoginForm() {
       router.push('/courier/dashboard')
       return
     }
-    if (user.role === 'MERCHANT') {
+    if (authIntent === 'merchant' && hasMerchantEstablishment(user)) {
       router.push('/merchant/dashboard')
       return
     }
-    router.push('/')
+    router.push('/profile')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

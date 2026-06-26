@@ -239,7 +239,7 @@ export function CartDrawer() {
         </div>
 
         {hasItems && (
-          <div className={cn('shrink-0 border-t border-slate-100 py-5 bg-white safe-area-bottom', PAGE_GUTTER_X)}>
+          <div className={cn('shrink-0 border-t border-slate-100 pt-4 bg-white drawer-footer-pad', PAGE_GUTTER_X)}>
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-medium text-slate-500">Sous-total</span>
               <span className="text-xl font-extrabold text-slate-900">
@@ -247,7 +247,7 @@ export function CartDrawer() {
               </span>
             </div>
             {!isAuthenticated && (
-              <p className="text-xs text-slate-500 mb-3 text-center">
+              <p className="text-xs text-slate-500 mb-4 text-center">
                 Commande invité —{' '}
                 <button
                   type="button"
@@ -262,14 +262,14 @@ export function CartDrawer() {
               <button
                 type="button"
                 onClick={() => goTo(cartPath)}
-                className="h-12 rounded-xl border-2 border-slate-200 text-slate-900 font-bold text-sm hover:bg-slate-50 transition-colors"
+                className="h-12 rounded-full border-2 border-slate-200 text-slate-900 font-bold text-sm hover:bg-slate-50 transition-colors"
               >
                 {cartKind === 'food' ? 'Voir la commande' : 'Voir le panier'}
               </button>
               <button
                 type="button"
                 onClick={() => goTo(checkoutPath)}
-                className="h-12 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+                className="h-12 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
               >
                 Commander
               </button>

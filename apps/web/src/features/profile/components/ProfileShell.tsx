@@ -73,10 +73,10 @@ export function ProfileShell({ children }: ProfileShellProps) {
       ? [{ href: '/logistics', label: 'Espace logistique', icon: <Building2 size={17} /> }]
       : []),
     ...(isMerchant
-      ? [{ href: '/merchant/dashboard', label: 'Dashboard marchand', icon: <Store size={17} /> }]
+      ? [{ href: '/merchant/dashboard', label: 'Espace établissement', icon: <Store size={17} /> }]
       : hasShop
         ? []
-        : [{ href: '/merchant/signup', label: 'Inscrire mon commerce', icon: <Store size={17} /> }]
+        : [{ href: '/merchant/signup', label: 'Ajouter un établissement', icon: <Store size={17} /> }]
     ),
     ...(hasShop
       ? [{ href: shopManageHref, label: 'Ma boutique', icon: <ShoppingBag size={17} /> }]
@@ -174,7 +174,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
   )
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
+    <div className="app-shell bg-slate-50" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
 
       {/* Overlay mobile */}
       {sidebarOpen && (
@@ -194,7 +194,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <main className="app-shell-main relative z-0">
 
         {/* Topbar */}
         <header className="backoffice-topbar bg-white/90 backdrop-blur-md border-b border-slate-100 flex items-center justify-between backoffice-gutter-x shrink-0 z-30 relative overflow-visible">
@@ -240,7 +240,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
         </header>
 
         {/* Scrollable content */}
-        <div className={`flex-1 overflow-y-auto w-full min-w-0 ${BACKOFFICE_MAIN_PAD}`}>
+        <div className={`app-shell-scroll w-full ${BACKOFFICE_MAIN_PAD}`}>
           {children}
         </div>
       </main>

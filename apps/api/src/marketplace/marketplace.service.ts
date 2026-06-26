@@ -45,6 +45,7 @@ import { ShopCollectionsService } from '../shop-collections/shop-collections.ser
 import { DeliveryService } from '../delivery/delivery.service'
 import { DeliveryEtaService } from '../delivery/delivery-eta.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
+import { buildOrderStatusPushMessage } from '../common/order-push-messages'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryProofService } from '../delivery/delivery-proof.service'
@@ -2719,8 +2720,13 @@ export class MarketplaceService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, user_id: userId },
       include: {
-        items: true,
-        shop: { select: { name: true, slug: true, phone: true, whatsapp: true } },
+        items: {
+          include: {
+            product: { select: { id: true, slug: true, image_url: true } },
+            menu_item: { select: { id: true, image_url: true } },
+          },
+        },
+        shop: { select: { name: true, slug: true, phone: true, whatsapp: true, logo: true } },
         merchant: { select: { business_name: true, slug: true, phone: true, whatsapp: true, logo: true } },
         payment: { select: { id: true, status: true, reference: true, paid_at: true } },
         delivery_job: {
@@ -3063,7 +3069,8 @@ export class MarketplaceService {
       where: { id: orderId, ...this.merchantOrderScope(shop) },
       include: {
         user: { select: { id: true } },
-        merchant: { select: { food_prep_minutes: true } },
+        merchant: { select: { food_prep_minutes: true, business_name: true } },
+        shop: { select: { name: true } },
       },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
@@ -3099,12 +3106,21 @@ export class MarketplaceService {
       void this.deliveryEta.refreshOrderEta(orderId).catch(() => {})
     }
 
+    const pushMessage = buildOrderStatusPushMessage(
+      dto.status,
+      order.delivery_type,
+      order.merchant?.business_name ?? order.shop?.name,
+    )
     await this.notificationQueue.enqueuePush({
       userId: order.user.id,
       type: 'order_status',
-      title: 'Mise à jour commande',
-      body: `Votre commande est maintenant : ${orderStatusLabelFr(dto.status)}.`,
-      data: { order_id: order.id, status: dto.status },
+      title: pushMessage.title,
+      body: pushMessage.body,
+      data: {
+        order_id: order.id,
+        status: dto.status,
+        delivery_type: order.delivery_type,
+      },
     })
 
     return updated

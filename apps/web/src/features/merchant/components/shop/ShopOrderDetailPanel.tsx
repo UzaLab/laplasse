@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   ArrowLeft,
-  ChevronDown,
   CreditCard,
   ExternalLink,
   Loader2,
@@ -25,8 +24,15 @@ import { OrderStatusBadge } from '@/features/profile/components/orders/OrderStat
 import {
   formatOrderRef,
   getOrderDisplayStatus,
+  getReadyStatusDetailLabel,
   ORDER_DETAIL_STATUS_LABELS,
 } from '@/features/profile/components/orders/orderUtils'
+import {
+  getMerchantPrimaryActionLabel,
+  getMerchantPrimaryNextStatus,
+  MERCHANT_DANGER_STATUSES,
+  MERCHANT_ROLLBACK,
+} from '@/lib/merchantOrderFlow'
 import {
   fetchMerchantOrder,
   formatPrice,
@@ -41,35 +47,14 @@ import { notify } from '@/lib/notify'
 
 const MERCHANT_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['PENDING', 'PREPARING', 'CANCELLED', 'REFUNDED'],
-  PREPARING: ['CONFIRMED', 'READY', 'CANCELLED', 'REFUNDED'],
-  READY: ['PREPARING', 'COMPLETED', 'OUT_FOR_DELIVERY', 'CANCELLED'],
-  OUT_FOR_DELIVERY: ['READY', 'DELIVERED', 'COMPLETED'],
-  DELIVERED: ['OUT_FOR_DELIVERY', 'COMPLETED'],
-  COMPLETED: ['READY', 'REFUNDED'],
-  CANCELLED: ['PENDING'],
+  CONFIRMED: ['PREPARING', 'CANCELLED', 'REFUNDED'],
+  PREPARING: ['READY', 'CANCELLED', 'REFUNDED'],
+  READY: ['COMPLETED', 'OUT_FOR_DELIVERY', 'CANCELLED'],
+  OUT_FOR_DELIVERY: ['DELIVERED', 'COMPLETED'],
+  DELIVERED: ['COMPLETED'],
+  COMPLETED: ['REFUNDED'],
+  CANCELLED: [],
   REFUNDED: [],
-}
-
-const ROLLBACK: Partial<Record<OrderStatus, OrderStatus>> = {
-  CONFIRMED: 'PENDING',
-  PREPARING: 'CONFIRMED',
-  READY: 'PREPARING',
-  OUT_FOR_DELIVERY: 'READY',
-  DELIVERED: 'OUT_FOR_DELIVERY',
-  COMPLETED: 'READY',
-}
-
-const FORWARD_LABELS: Partial<Record<OrderStatus, string>> = {
-  CONFIRMED: 'Confirmer',
-  PREPARING: 'En préparation',
-  READY: 'Marquer prête',
-  OUT_FOR_DELIVERY: 'Expédier (livraison)',
-  DELIVERED: 'Marquer livrée',
-  COMPLETED: 'Terminer',
-  CANCELLED: 'Annuler',
-  REFUNDED: 'Rembourser',
-  PENDING: 'Réouvrir',
 }
 
 interface ShopOrderDetailPanelProps {
@@ -82,7 +67,6 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
   const routes = getShopRoutesFromPathname(pathname)
   const { activeShopId } = useAuthStore()
   const [processing, setProcessing] = useState(false)
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus | ''>('')
 
   const { data: order, isLoading, isError, refetch } = useQuery({
     queryKey: ['merchant-order', activeShopId, orderId],
@@ -99,7 +83,12 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
     return targets
   }, [order])
 
-  const rollbackTarget = order ? ROLLBACK[order.status] : null
+  const primaryNext = order
+    ? getMerchantPrimaryNextStatus(order.status, order.delivery_type)
+    : null
+  const primaryAllowed = primaryNext && allowedTargets.includes(primaryNext)
+  const dangerActions = allowedTargets.filter(s => MERCHANT_DANGER_STATUSES.includes(s))
+  const rollbackTarget = order ? MERCHANT_ROLLBACK[order.status] : null
 
   const handleStatus = async (status: OrderStatus) => {
     if (!activeShopId) return
@@ -111,7 +100,6 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
       return
     }
     notify.success(`Statut : ${ORDER_STATUS_LABELS[status]}`)
-    setSelectedStatus('')
     void refetch()
   }
 
@@ -143,7 +131,9 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
   const dt = new Date(order.created_at)
   const displayStatus = getOrderDisplayStatus(order.status)
   const statusDetail =
-    ORDER_DETAIL_STATUS_LABELS[order.status] ?? ORDER_STATUS_LABELS[order.status]
+    order.status === 'READY'
+      ? getReadyStatusDetailLabel(order.delivery_type)
+      : ORDER_DETAIL_STATUS_LABELS[order.status] ?? ORDER_STATUS_LABELS[order.status]
   const clientName = order.user?.full_name ?? order.user?.email ?? 'Client'
   const merchantSlug = order.merchant?.slug
 
@@ -215,29 +205,28 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         )}
 
         <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
-          {allowedTargets.length > 0 && (
-            <div
-              className={`grid w-full gap-2 ${
-                allowedTargets.length === 1
-                  ? 'grid-cols-1'
-                  : allowedTargets.length === 2
-                    ? 'grid-cols-1 sm:grid-cols-2'
-                    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-              }`}
+          {primaryAllowed && primaryNext && (
+            <button
+              type="button"
+              disabled={processing}
+              onClick={() => handleStatus(primaryNext)}
+              className="w-full min-h-[48px] text-sm font-bold px-4 py-3 rounded-full bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              {allowedTargets.map(target => (
+              {getMerchantPrimaryActionLabel(order.status, order.delivery_type)}
+            </button>
+          )}
+
+          {dangerActions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {dangerActions.map(target => (
                 <button
                   key={target}
                   type="button"
                   disabled={processing}
                   onClick={() => handleStatus(target)}
-                  className={`w-full min-h-[44px] text-sm font-bold px-4 py-3 rounded-xl transition-colors disabled:opacity-50 ${
-                    target === 'CANCELLED'
-                      ? 'text-red-600 border border-red-100 bg-red-50 hover:bg-red-100'
-                      : 'text-white bg-slate-900 hover:bg-slate-800'
-                  }`}
+                  className="flex-1 min-w-[140px] min-h-[44px] text-sm font-bold px-4 py-2.5 rounded-full border border-red-100 bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
                 >
-                  {FORWARD_LABELS[target] ?? ORDER_STATUS_LABELS[target]}
+                  {target === 'CANCELLED' ? 'Annuler la commande' : 'Rembourser'}
                 </button>
               ))}
             </div>
@@ -248,45 +237,11 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
               type="button"
               disabled={processing}
               onClick={() => handleStatus(rollbackTarget)}
-              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-bold text-slate-600 border border-slate-200 px-4 py-3 rounded-xl hover:bg-slate-50 disabled:opacity-50"
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-500 px-4 py-2.5 rounded-full hover:bg-slate-50 disabled:opacity-50"
             >
               <RotateCcw size={16} className="shrink-0" />
               <span className="text-center">Revenir à « {ORDER_STATUS_LABELS[rollbackTarget]} »</span>
             </button>
-          )}
-
-          {allowedTargets.length > 1 && (
-            <div className="w-full rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Changer le statut
-              </p>
-              <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 w-full">
-                <div className="relative flex-1 min-w-0">
-                  <select
-                    value={selectedStatus}
-                    onChange={e => setSelectedStatus(e.target.value as OrderStatus | '')}
-                    className="w-full min-h-[44px] appearance-none border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-sm font-medium bg-white"
-                  >
-                    <option value="">Sélectionner…</option>
-                    {allowedTargets.map(s => (
-                      <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  disabled={!selectedStatus || processing}
-                  onClick={() => selectedStatus && handleStatus(selectedStatus)}
-                  className="w-full sm:w-auto sm:min-w-[8.5rem] shrink-0 min-h-[44px] text-sm font-bold px-5 py-2.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-40"
-                >
-                  Appliquer
-                </button>
-              </div>
-            </div>
           )}
         </div>
       </div>

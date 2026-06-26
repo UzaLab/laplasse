@@ -7,14 +7,7 @@ import type { Order, OrderStatus } from '@/lib/marketplaceApi'
 import { reorderFromOrder } from '@/lib/marketplaceApi'
 import { notify } from '@/lib/notify'
 
-const REORDERABLE: OrderStatus[] = [
-  'COMPLETED',
-  'DELIVERED',
-  'CONFIRMED',
-  'PREPARING',
-  'READY',
-  'OUT_FOR_DELIVERY',
-]
+const REORDERABLE: OrderStatus[] = ['COMPLETED']
 
 interface OrderAgainButtonProps {
   order: Order

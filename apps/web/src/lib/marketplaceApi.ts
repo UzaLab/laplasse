@@ -258,9 +258,14 @@ export interface OrderItem {
   unit_price: number
   quantity: number
   line_total: number
+  modifiers?: unknown
   product?: {
     id: string
     slug: string
+    image_url?: string | null
+  } | null
+  menu_item?: {
+    id: string
     image_url?: string | null
   } | null
 }
@@ -290,7 +295,14 @@ export interface Order {
     logo?: string | null
     phone?: string | null
     whatsapp?: string | null
-  }
+  } | null
+  shop?: {
+    name: string
+    slug: string
+    logo?: string | null
+    phone?: string | null
+    whatsapp?: string | null
+  } | null
   user?: {
     full_name: string | null
     email: string

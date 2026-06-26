@@ -25,8 +25,16 @@ import {
   formatOrderRef,
   getOrderDisplayStatus,
   ORDER_DETAIL_STATUS_LABELS,
+  getReadyStatusDetailLabel,
   resolveOrderStatus,
 } from '@/features/profile/components/orders/orderUtils'
+import { OrderItemRow } from '@/features/profile/components/orders/OrderItemRow'
+import {
+  getOrderSellerHref,
+  getOrderSellerName,
+  getOrderSellerPhone,
+  orderDisplayThumbnail,
+} from '@/features/profile/components/orders/orderSellerUtils'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import {
   fetchOrder,
@@ -114,9 +122,12 @@ export default function ProfileOrderDetailPage() {
   const effectiveStatus = resolveOrderStatus(order)
   const displayStatus = getOrderDisplayStatus(effectiveStatus)
   const statusDetail =
-    ORDER_DETAIL_STATUS_LABELS[effectiveStatus] ?? ORDER_STATUS_LABELS[effectiveStatus]
-  const merchantName = order.merchant?.business_name ?? 'Boutique'
-  const supportPhone = order.merchant?.whatsapp ?? order.merchant?.phone
+    effectiveStatus === 'READY'
+      ? getReadyStatusDetailLabel(order.delivery_type)
+      : ORDER_DETAIL_STATUS_LABELS[effectiveStatus] ?? ORDER_STATUS_LABELS[effectiveStatus]
+  const merchantName = getOrderSellerName(order)
+  const sellerHref = getOrderSellerHref(order)
+  const supportPhone = getOrderSellerPhone(order)
   const supportHref = supportPhone
     ? whatsAppSupportUrl(
         supportPhone,
@@ -168,7 +179,9 @@ export default function ProfileOrderDetailPage() {
                 Payer
               </Link>
             )}
-            {!pendingPayment && <OrderAgainButton order={order} variant="detail" />}
+            {!pendingPayment && effectiveStatus === 'COMPLETED' && (
+              <OrderAgainButton order={{ ...order, status: effectiveStatus }} variant="detail" />
+            )}
             <Link
               href={`/profile/orders/${order.id}/receipt`}
               target="_blank"
@@ -258,13 +271,13 @@ export default function ProfileOrderDetailPage() {
                     Suivre
                   </Link>
                 )}
-                {order.merchant?.slug && (
+                {sellerHref && (
                   <Link
-                    href={`/m/${order.merchant.slug}`}
+                    href={sellerHref}
                     className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-full text-xs sm:text-sm font-bold hover:bg-slate-50 transition-colors"
                     style={{ textDecoration: 'none' }}
                   >
-                    Voir la boutique
+                    {order.shop && !order.merchant ? 'Voir la boutique' : 'Voir l\'établissement'}
                   </Link>
                 )}
               </div>
@@ -274,6 +287,37 @@ export default function ProfileOrderDetailPage() {
 
         {showEta && (
           <OrderDeliveryEtaBanner orderId={order.id} enabled={showEta} />
+        )}
+
+        {(order.shop || order.merchant) && (
+          <div className="bg-white/80 backdrop-blur-xl border border-slate-100 rounded-3xl p-5 sm:p-6 shadow-sm flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={orderDisplayThumbnail(order, PLACEHOLDER_PRODUCT_IMAGE)}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">
+                {order.shop && !order.merchant ? 'Boutique' : 'Établissement'}
+              </p>
+              <p className="text-base font-extrabold text-slate-900 truncate">{merchantName}</p>
+              {order.shop && !order.merchant && order.shop.slug && (
+                <p className="text-xs text-slate-500 mt-0.5 truncate">@{order.shop.slug}</p>
+              )}
+            </div>
+            {sellerHref && (
+              <Link
+                href={sellerHref}
+                className="shrink-0 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                style={{ textDecoration: 'none' }}
+              >
+                Voir
+              </Link>
+            )}
+          </div>
         )}
 
         {(order.delivery_dispute || order.return_request) && (
@@ -340,39 +384,14 @@ export default function ProfileOrderDetailPage() {
               <ShoppingCart size={20} className="text-amber-500" />
               Articles
             </h2>
-            <div className="space-y-4">
-              {order.items.map((item, index) => (
-                <div key={item.id}>
-                  {index > 0 && <hr className="border-slate-100 mb-4" />}
-                  <div className="flex gap-4 p-3 sm:p-4 rounded-2xl hover:bg-slate-50/80 transition-colors border border-transparent hover:border-slate-100">
-                    <div className="w-20 h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={order.merchant?.logo ?? PLACEHOLDER_PRODUCT_IMAGE}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-slate-900">{item.product_name}</h3>
-                          {item.variant_name && (
-                            <p className="text-xs text-slate-400 mt-1">{item.variant_name}</p>
-                          )}
-                        </div>
-                        <p className="text-sm font-bold text-slate-900 shrink-0">
-                          {formatPrice(item.line_total)}
-                        </p>
-                      </div>
-                      <p className="text-xs text-slate-400">
-                        Qté : {item.quantity}
-                        {item.quantity > 1 && (
-                          <> ({formatPrice(item.unit_price)}/u)</>
-                        )}
-                      </p>
-                    </div>
-                  </div>
+            <div className="space-y-1 divide-y divide-slate-100">
+              {order.items.map(item => (
+                <div key={item.id} className="py-4 first:pt-0 last:pb-0">
+                  <OrderItemRow
+                    item={item}
+                    merchantSlug={order.merchant?.slug}
+                    shopSlug={order.shop?.slug}
+                  />
                 </div>
               ))}
             </div>

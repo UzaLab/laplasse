@@ -1,11 +1,18 @@
 import { Check, Circle, Truck, X } from 'lucide-react'
 import type { OrderStatus } from '@/lib/marketplaceApi'
 
-const BASE_FLOW: { status: OrderStatus; label: string }[] = [
+const BASE_FLOW_PICKUP: { status: OrderStatus; label: string }[] = [
   { status: 'PENDING', label: 'Commande reçue' },
   { status: 'CONFIRMED', label: 'Confirmée par la boutique' },
   { status: 'PREPARING', label: 'En préparation' },
-  { status: 'READY', label: 'Prête (retrait / livraison)' },
+  { status: 'READY', label: 'Prête pour retrait' },
+]
+
+const BASE_FLOW_DELIVERY: { status: OrderStatus; label: string }[] = [
+  { status: 'PENDING', label: 'Commande reçue' },
+  { status: 'CONFIRMED', label: 'Confirmée par la boutique' },
+  { status: 'PREPARING', label: 'En préparation' },
+  { status: 'READY', label: 'Prête pour expédition' },
 ]
 
 const DELIVERY_EXTRA: { status: OrderStatus; label: string }[] = [
@@ -36,9 +43,10 @@ export function OrderTimeline({ status, deliveryType = 'PICKUP' }: Props) {
   }
 
   const isDelivery = deliveryType === 'DELIVERY'
+  const baseFlow = isDelivery ? BASE_FLOW_DELIVERY : BASE_FLOW_PICKUP
   const flow = isDelivery
-    ? [...BASE_FLOW, ...DELIVERY_EXTRA, PICKUP_END]
-    : [...BASE_FLOW, PICKUP_END]
+    ? [...baseFlow, ...DELIVERY_EXTRA, PICKUP_END]
+    : [...baseFlow, PICKUP_END]
 
   const indexMap = STATUS_INDEX(flow)
   const currentIndex = indexMap[status] ?? 0
@@ -46,8 +54,8 @@ export function OrderTimeline({ status, deliveryType = 'PICKUP' }: Props) {
   return (
     <ol className="space-y-0">
       {flow.map((step, index) => {
-        const done = index < currentIndex
-        const active = index === currentIndex
+        const done = index < currentIndex || (status === 'COMPLETED' && step.status === 'COMPLETED')
+        const active = index === currentIndex && !(status === 'COMPLETED' && step.status === 'COMPLETED')
         const upcoming = index > currentIndex
         const isDeliveryStep = step.status === 'OUT_FOR_DELIVERY' || step.status === 'DELIVERED'
 
@@ -85,7 +93,7 @@ export function OrderTimeline({ status, deliveryType = 'PICKUP' }: Props) {
               <p className={`text-sm font-bold ${active ? 'text-amber-900' : 'text-slate-900'}`}>
                 {step.label}
               </p>
-              {active && (
+              {active && step.status !== 'COMPLETED' && (
                 <p className="text-xs text-amber-700 mt-0.5 font-medium">Étape en cours</p>
               )}
             </div>

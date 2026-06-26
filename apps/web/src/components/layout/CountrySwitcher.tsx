@@ -27,12 +27,12 @@ export function CountrySwitcher() {
   }
 
   return (
-    <div className="relative flex items-center gap-1.5">
+    <div className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white min-w-0 flex-1">
       <Globe size={14} className="text-slate-400 shrink-0" aria-hidden />
       <select
         value={code}
         onChange={e => handleChange(e.target.value)}
-        className="bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer pr-1"
+        className="bg-transparent text-xs font-bold text-slate-600 outline-none cursor-pointer w-full min-w-0"
         aria-label={t('geo.country')}
       >
         {SUPPORTED_COUNTRIES.map(c => (
