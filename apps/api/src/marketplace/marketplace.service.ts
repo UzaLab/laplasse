@@ -118,6 +118,86 @@ export class MarketplaceService {
     }
   }
 
+  private readonly orderItemDetailInclude = {
+    product: {
+      select: {
+        id: true,
+        slug: true,
+        image_url: true,
+        images: { select: { url: true }, orderBy: { sort_order: 'asc' as const } },
+      },
+    },
+    menu_item: { select: { id: true, image_url: true } },
+    variant: { select: { id: true, image_url: true } },
+  } as const
+
+  private resolveOrderItemImageFromRelations<
+    T extends {
+      menu_item_id?: string | null
+      variant_id?: string | null
+      variant?: { image_url: string | null } | null
+      product?: { image_url: string | null; images?: { url: string }[] } | null
+      menu_item?: { image_url: string | null } | null
+    },
+  >(item: T): string | null {
+    if (item.menu_item_id && item.menu_item?.image_url?.trim()) {
+      return item.menu_item.image_url.trim()
+    }
+    if (item.variant_id && item.variant?.image_url?.trim()) {
+      return item.variant.image_url.trim()
+    }
+    if (item.product?.image_url?.trim()) {
+      return item.product.image_url.trim()
+    }
+    const galleryUrl = item.product?.images?.[0]?.url?.trim()
+    if (galleryUrl) return galleryUrl
+    if (item.menu_item?.image_url?.trim()) {
+      return item.menu_item.image_url.trim()
+    }
+    return null
+  }
+
+  private async resolveCartLineImageUrl(
+    item: ReturnType<MarketplaceService['mapRawCartItem']>,
+  ): Promise<string | null> {
+    if (item.line_kind === 'menu') {
+      return item.menu_item?.image_url?.trim() ?? item.product.image_url?.trim() ?? null
+    }
+    if (item.variant_id) {
+      const variant = await this.prisma.productVariant.findUnique({
+        where: { id: item.variant_id },
+        select: { image_url: true },
+      })
+      if (variant?.image_url?.trim()) return variant.image_url.trim()
+    }
+    return item.product.image_url?.trim() ?? null
+  }
+
+  private mapOrderItemWithImage<
+    T extends {
+      image_url?: string | null
+      menu_item_id?: string | null
+      variant_id?: string | null
+      variant?: { image_url: string | null } | null
+      product?: ({ image_url: string | null; images?: { url: string }[] } & Record<string, unknown>) | null
+      menu_item?: { image_url: string | null } | null
+    },
+  >(item: T) {
+    const image_url =
+      item.image_url?.trim()
+      || this.resolveOrderItemImageFromRelations(item)
+    const product = item.product
+      ? (() => {
+          const { images: _images, ...rest } = item.product!
+          return {
+            ...rest,
+            image_url: rest.image_url ?? item.product!.images?.[0]?.url ?? null,
+          }
+        })()
+      : null
+    return { ...item, product, image_url }
+  }
+
   private async syncProductImages(productId: string, urls: string[]) {
     const cleaned = [...new Set(urls.map(u => u.trim()).filter(Boolean))].slice(0, 10)
     await this.prisma.$transaction([
@@ -1970,6 +2050,13 @@ export class MarketplaceService {
       (dto.applied_promotions ?? []).map(p => [p.shop_id, p]),
     )
 
+    const lineImages = new Map<string, string | null>()
+    await Promise.all(
+      cart.items.map(async item => {
+        lineImages.set(item.id, await this.resolveCartLineImageUrl(item))
+      }),
+    )
+
     const checkoutOrders = await this.prisma.$transaction(async tx => {
       const results: Array<{
         orderId: string
@@ -2067,6 +2154,7 @@ export class MarketplaceService {
                 unit_price: item.unit_price,
                 quantity: item.quantity,
                 line_total: item.line_total,
+                image_url: lineImages.get(item.id) ?? null,
               })),
             },
           },
@@ -2279,6 +2367,7 @@ export class MarketplaceService {
                 unit_price: item.unit_price,
                 quantity: item.quantity,
                 line_total: item.line_total,
+                image_url: item.menu_item?.image_url?.trim() ?? item.product.image_url?.trim() ?? null,
                 modifiers: (item.selected_modifiers ?? []) as unknown as Prisma.InputJsonValue,
               })),
             },
@@ -2721,10 +2810,7 @@ export class MarketplaceService {
       where: { id: orderId, user_id: userId },
       include: {
         items: {
-          include: {
-            product: { select: { id: true, slug: true, image_url: true } },
-            menu_item: { select: { id: true, image_url: true } },
-          },
+          include: this.orderItemDetailInclude,
         },
         shop: { select: { name: true, slug: true, phone: true, whatsapp: true, logo: true } },
         merchant: { select: { business_name: true, slug: true, phone: true, whatsapp: true, logo: true } },
@@ -2769,6 +2855,7 @@ export class MarketplaceService {
 
     return {
       ...order,
+      items: order.items.map(item => this.mapOrderItemWithImage(item)),
       delivery_job: order.delivery_job
         ? { ...order.delivery_job, delivery_code: deliveryCode }
         : null,

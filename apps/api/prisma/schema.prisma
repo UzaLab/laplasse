@@ -1583,6 +1583,7 @@ model OrderItem {
   unit_price   Int
   quantity     Int
   line_total   Int
+  image_url    String?
   modifiers    Json    @default("[]")
 
   order     Order           @relation(fields: [order_id], references: [id], onDelete: Cascade)

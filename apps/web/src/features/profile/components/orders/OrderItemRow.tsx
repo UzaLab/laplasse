@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { OrderItem } from '@/lib/marketplaceApi'
 import { formatPrice, PLACEHOLDER_PRODUCT_IMAGE } from '@/lib/marketplaceApi'
+import { publicMediaUrl } from '@/lib/mediaUrl'
 import {
   formatModifiersLabel,
   groupModifiersByLabel,
@@ -8,22 +9,24 @@ import {
 } from '@/lib/menuModifiers'
 
 export function orderItemImageUrl(item: OrderItem): string {
-  return (
-    item.product?.image_url
-    ?? item.menu_item?.image_url
-    ?? PLACEHOLDER_PRODUCT_IMAGE
-  )
+  return publicMediaUrl(item.image_url, PLACEHOLDER_PRODUCT_IMAGE)
 }
 
 export function orderItemHref(
   item: OrderItem,
   ctx: { merchantSlug?: string | null; shopSlug?: string | null },
 ): string | null {
+  const slug = ctx.merchantSlug ?? ctx.shopSlug
+  if (!slug) return null
+
+  if (item.menu_item_id) {
+    return `/m/${slug}`
+  }
+
   const productSlug = item.product?.slug
-  if (!productSlug) return null
-  if (ctx.merchantSlug) return `/m/${ctx.merchantSlug}/p/${productSlug}`
-  if (ctx.shopSlug) return `/m/${ctx.shopSlug}/p/${productSlug}`
-  return null
+  if (!productSlug || productSlug.startsWith('menu-')) return null
+
+  return `/m/${slug}/p/${productSlug}`
 }
 
 export function orderItemMetaLines(item: OrderItem): Array<{ label?: string; value: string }> {
@@ -66,12 +69,12 @@ interface OrderItemRowProps {
 export function OrderItemRow({ item, merchantSlug, shopSlug }: OrderItemRowProps) {
   const metaLines = orderItemMetaLines(item)
   const href = orderItemHref(item, { merchantSlug, shopSlug })
+  const imageSrc = orderItemImageUrl(item)
 
   const nameEl = href ? (
     <Link
       href={href}
-      className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 hover:text-amber-600 transition-colors block"
-      style={{ textDecoration: 'none' }}
+      className="text-sm font-bold text-slate-900 leading-snug line-clamp-2 hover:text-amber-600 hover:underline underline-offset-2 transition-colors block"
     >
       {item.product_name}
     </Link>
@@ -81,30 +84,26 @@ export function OrderItemRow({ item, merchantSlug, shopSlug }: OrderItemRowProps
     </h3>
   )
 
+  const thumbClass =
+    'w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100'
+
+  const thumbImage = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={imageSrc}
+      alt=""
+      className="w-full h-full object-cover"
+    />
+  )
+
   return (
     <div className="flex gap-3 sm:gap-4">
       {href ? (
-        <Link
-          href={href}
-          className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100 block"
-          style={{ textDecoration: 'none' }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={orderItemImageUrl(item)}
-            alt=""
-            className="w-full h-full object-cover"
-          />
+        <Link href={href} className={`${thumbClass} block`} style={{ textDecoration: 'none' }}>
+          {thumbImage}
         </Link>
       ) : (
-        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={orderItemImageUrl(item)}
-            alt=""
-            className="w-full h-full object-cover"
-          />
-        </div>
+        <div className={thumbClass}>{thumbImage}</div>
       )}
 
       <div className="flex-1 min-w-0 space-y-1">

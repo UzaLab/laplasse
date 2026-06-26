@@ -30,10 +30,8 @@ import {
 } from '@/features/profile/components/orders/orderUtils'
 import { OrderItemRow } from '@/features/profile/components/orders/OrderItemRow'
 import {
-  getOrderSellerHref,
   getOrderSellerName,
   getOrderSellerPhone,
-  orderDisplayThumbnail,
 } from '@/features/profile/components/orders/orderSellerUtils'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import {
@@ -48,6 +46,7 @@ import { OrderReturnRequestForm, isOrderReturnEligible } from '@/features/profil
 import { CourierReviewPrompt } from '@/features/profile/components/orders/CourierReviewPrompt'
 import { DeliveryDisputeForm, isDeliveryDisputeEligible } from '@/features/profile/components/orders/DeliveryDisputeForm'
 import { OrderDeliveryEtaBanner } from '@/features/profile/components/orders/OrderDeliveryEtaBanner'
+import { publicMediaUrl } from '@/lib/mediaUrl'
 import { getWhatsAppUrl } from '@/lib/whatsapp'
 
 function whatsAppSupportUrl(phone: string, message: string): string | undefined {
@@ -126,7 +125,6 @@ export default function ProfileOrderDetailPage() {
       ? getReadyStatusDetailLabel(order.delivery_type)
       : ORDER_DETAIL_STATUS_LABELS[effectiveStatus] ?? ORDER_STATUS_LABELS[effectiveStatus]
   const merchantName = getOrderSellerName(order)
-  const sellerHref = getOrderSellerHref(order)
   const supportPhone = getOrderSellerPhone(order)
   const supportHref = supportPhone
     ? whatsAppSupportUrl(
@@ -271,15 +269,6 @@ export default function ProfileOrderDetailPage() {
                     Suivre
                   </Link>
                 )}
-                {sellerHref && (
-                  <Link
-                    href={sellerHref}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 text-slate-700 rounded-full text-xs sm:text-sm font-bold hover:bg-slate-50 transition-colors"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    {order.shop && !order.merchant ? 'Voir la boutique' : 'Voir l\'établissement'}
-                  </Link>
-                )}
               </div>
             </div>
           </div>
@@ -294,7 +283,7 @@ export default function ProfileOrderDetailPage() {
             <div className="w-14 h-14 rounded-2xl bg-slate-100 overflow-hidden shrink-0 border border-slate-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={orderDisplayThumbnail(order, PLACEHOLDER_PRODUCT_IMAGE)}
+                src={publicMediaUrl(order.merchant?.logo ?? order.shop?.logo, PLACEHOLDER_PRODUCT_IMAGE)}
                 alt=""
                 className="w-full h-full object-cover"
               />
@@ -308,15 +297,6 @@ export default function ProfileOrderDetailPage() {
                 <p className="text-xs text-slate-500 mt-0.5 truncate">@{order.shop.slug}</p>
               )}
             </div>
-            {sellerHref && (
-              <Link
-                href={sellerHref}
-                className="shrink-0 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
-                style={{ textDecoration: 'none' }}
-              >
-                Voir
-              </Link>
-            )}
           </div>
         )}
 

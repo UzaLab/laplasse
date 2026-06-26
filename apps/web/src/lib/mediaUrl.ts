@@ -24,3 +24,13 @@ export function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!url?.trim()) return null
   return url.trim()
 }
+
+/** URL utilisable dans un `<img src>` (absolue ou préfixée). */
+export function publicMediaUrl(url: string | null | undefined, fallback: string): string {
+  const trimmed = url?.trim()
+  if (!trimmed) return fallback
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (trimmed.startsWith('/uploads/')) return `${MEDIA_BASE_URL}${trimmed}`
+  if (trimmed.startsWith('/')) return `${MEDIA_BASE_URL}${trimmed}`
+  return `${MEDIA_BASE_URL}/${trimmed.replace(/^\/+/, '')}`
+}

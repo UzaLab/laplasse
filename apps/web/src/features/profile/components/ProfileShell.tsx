@@ -8,6 +8,7 @@ import {
   LogOut, Compass, Menu, X, Bell, HelpCircle, Trophy, Gift, Calendar, ShoppingBag, ArrowRight,
 } from 'lucide-react'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { BackofficeUserMenu } from '@/components/layout/BackofficeUserMenu'
 import { useAuthStore } from '@/stores/authStore'
 import { getIndependentShops, getShopManageHref, hasMerchantEstablishment } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
@@ -30,10 +31,13 @@ export function ProfileShell({ children }: ProfileShellProps) {
     .split(/[\s@]/).filter(Boolean).slice(0, 2)
     .map((s: string) => s[0]?.toUpperCase()).join('')
 
+  if (!user) return null
+
   const roleLabel: Record<string, string> = {
     ADMIN: 'Admin', SUPER_ADMIN: 'Super Admin',
     MERCHANT: 'Marchand', USER: 'Membre',
   }
+  const roleLabelText = roleLabel[user.role] ?? 'Membre'
   const roleColor: Record<string, string> = {
     ADMIN: 'text-purple-300', SUPER_ADMIN: 'text-purple-300',
     MERCHANT: 'text-amber-400', USER: 'text-slate-400',
@@ -223,19 +227,12 @@ export function ProfileShell({ children }: ProfileShellProps) {
             </Link>
             <div className="w-px h-5 bg-slate-200 hidden sm:block" />
             <NotificationBell />
-            <div className="flex items-center gap-2.5">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-900 leading-none">
-                  {user?.full_name?.split(' ')[0] ?? 'Profil'}
-                </p>
-                <p className={`text-[10px] font-bold uppercase mt-0.5 ${roleColor[user?.role ?? 'USER'] ?? 'text-slate-400'}`}>
-                  {roleLabel[user?.role ?? 'USER'] ?? 'Membre'}
-                </p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm select-none">
-                {initials}
-              </div>
-            </div>
+            <BackofficeUserMenu
+              user={user}
+              context="profile"
+              roleLabel={roleLabelText}
+              roleColorClass={roleColor[user.role] ?? 'text-slate-400'}
+            />
           </div>
         </header>
 

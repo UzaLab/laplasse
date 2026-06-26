@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { AdminMobileNav } from '@/features/admin/components/AdminMobileNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { BackofficeUserMenu } from '@/components/layout/BackofficeUserMenu'
 import { useAuthStore } from '@/stores/authStore'
 import { adminFetch } from '@/lib/adminApi'
 import {
@@ -230,19 +231,13 @@ export function AdminShell({ children }: AdminShellProps) {
               showPushPrompt
               pushPromptDescription="Activez le push pour recevoir les alertes de modération et ops, même hors de l'admin."
             />
-            <div className="flex items-center gap-2.5">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-900 leading-none">
-                  {user.full_name?.split(' ')[0] ?? 'Admin'}
-                </p>
-                <p className="text-[10px] font-bold uppercase mt-0.5 text-violet-600">
-                  {user.role === 'SUPER_ADMIN' ? 'Super admin' : 'Admin'}
-                </p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-slate-900 text-violet-400 flex items-center justify-center font-black text-sm select-none">
-                {initials || 'AD'}
-              </div>
-            </div>
+            <BackofficeUserMenu
+              user={user}
+              context="admin"
+              roleLabel={user.role === 'SUPER_ADMIN' ? 'Super admin' : 'Admin'}
+              roleColorClass="text-violet-600"
+              avatarAccentClass="text-violet-400"
+            />
           </div>
         </header>
 

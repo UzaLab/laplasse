@@ -10,7 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { BookingsService } from '../bookings/bookings.service'
 import { ShopsService } from '../shops/shops.service'
-import { RegisterDto, LoginDto } from './dto/auth.dto'
+import { RegisterDto, LoginDto, UpdateMeDto, ChangePasswordDto } from './dto/auth.dto'
 import {
   createRefreshTokenValue,
   hashToken,
@@ -213,6 +213,69 @@ export class AuthService {
     })
     if (!user) return null
     return this.withAccessibleShops(user)
+  }
+
+  async updateMe(userId: string, dto: UpdateMeDto) {
+    const data: { full_name?: string; phone?: string } = {}
+
+    if (dto.full_name !== undefined) {
+      const full_name = dto.full_name.trim()
+      if (!full_name) throw new BadRequestException('Nom complet requis')
+      data.full_name = full_name
+    }
+
+    if (dto.phone !== undefined) {
+      const phone = dto.phone.trim()
+      if (!phone) throw new BadRequestException('Numéro de téléphone requis')
+      const phoneTaken = await this.prisma.user.findFirst({
+        where: { phone, id: { not: userId }, is_active: true },
+        select: { id: true },
+      })
+      if (phoneTaken) throw new ConflictException('Ce numéro de téléphone est déjà utilisé')
+      data.phone = phone
+    }
+
+    if (!Object.keys(data).length) {
+      throw new BadRequestException('Aucune modification fournie')
+    }
+
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data,
+        select: this.authUserSelect,
+      })
+      return this.withAccessibleShops(user)
+    } catch (err) {
+      if (this.isUniqueConstraint(err, 'phone')) {
+        throw new ConflictException('Ce numéro de téléphone est déjà utilisé')
+      }
+      throw err
+    }
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, password_hash: true },
+    })
+    if (!user) throw new UnauthorizedException('Utilisateur introuvable')
+
+    if (user.password_hash) {
+      if (!dto.current_password?.trim()) {
+        throw new BadRequestException('Mot de passe actuel requis')
+      }
+      const valid = await compare(dto.current_password, user.password_hash)
+      if (!valid) throw new UnauthorizedException('Mot de passe actuel incorrect')
+    }
+
+    const password_hash = await hash(dto.new_password, 12)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password_hash },
+    })
+
+    return { success: true, message: 'Mot de passe mis à jour' }
   }
 
   async sendPhoneOtp(phone: string) {

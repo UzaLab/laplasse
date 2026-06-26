@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -14,7 +15,15 @@ import type { Request, Response } from 'express'
 import { Throttle } from '@nestjs/throttler'
 import { ConfigService } from '@nestjs/config'
 import { AuthService } from './auth.service'
-import { RegisterDto, LoginDto, RefreshTokenDto, SendOtpDto, VerifyOtpDto } from './dto/auth.dto'
+import {
+  RegisterDto,
+  LoginDto,
+  RefreshTokenDto,
+  SendOtpDto,
+  VerifyOtpDto,
+  UpdateMeDto,
+  ChangePasswordDto,
+} from './dto/auth.dto'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
 import { CurrentUser } from './decorators/current-user.decorator'
@@ -126,6 +135,19 @@ export class AuthController {
   @Get('me')
   getMe(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateMe(@CurrentUser() user: { id: string }, @Body() dto: UpdateMeDto) {
+    return this.authService.updateMe(user.id, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/password')
+  @HttpCode(HttpStatus.OK)
+  changePassword(@CurrentUser() user: { id: string }, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, dto)
   }
 
   @UseGuards(JwtAuthGuard)

@@ -15,6 +15,7 @@ import { exploreCityLabel } from '@/lib/brandCopy'
 import { cn } from '@/lib/utils'
 import { APP_SHELL_SCROLL_ID } from '@/lib/appShellScroll'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { BackofficeUserMenu } from '@/components/layout/BackofficeUserMenu'
 import { ShopMobileNav } from '@/features/shop/components/ShopMobileNav'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { BACKOFFICE_MAIN_PAD_SHOP } from '@/lib/mobilePublicChrome'
@@ -288,9 +289,14 @@ export function ShopShell({ children }: ShopShellProps) {
                 <ExternalLink size={12} /> Voir la boutique
               </Link>
             )}
-            <div className="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm select-none">
-              {initials}
-            </div>
+            {user && (
+              <BackofficeUserMenu
+                user={user}
+                context="shop"
+                roleLabel="Vendeur"
+                roleColorClass="text-amber-500"
+              />
+            )}
           </div>
         </header>
 

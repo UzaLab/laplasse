@@ -12,6 +12,7 @@ import {
 import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
+import { BackofficeUserMenu } from '@/components/layout/BackofficeUserMenu'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
@@ -481,19 +482,14 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
               refetchIntervalMs={20_000}
               showPushPrompt
             />
-            <div className="flex items-center gap-2.5">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-900 leading-none">
-                  {user?.full_name?.split(' ')[0] ?? 'Marchand'}
-                </p>
-                <p className="text-[10px] font-bold uppercase mt-0.5 text-amber-500">
-                  Marchand
-                </p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-slate-900 text-amber-400 flex items-center justify-center font-black text-sm select-none">
-                {initials}
-              </div>
-            </div>
+            {user && (
+              <BackofficeUserMenu
+                user={user}
+                context="merchant"
+                roleLabel="Marchand"
+                roleColorClass="text-amber-500"
+              />
+            )}
           </div>
         </header>
 

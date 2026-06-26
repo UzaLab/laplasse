@@ -259,9 +259,14 @@ export interface OrderItem {
   quantity: number
   line_total: number
   modifiers?: unknown
+  image_url?: string | null
   product?: {
     id: string
     slug: string
+    image_url?: string | null
+  } | null
+  variant?: {
+    id: string
     image_url?: string | null
   } | null
   menu_item?: {
