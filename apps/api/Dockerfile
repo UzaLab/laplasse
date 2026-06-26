@@ -24,7 +24,9 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 WORKDIR /app/apps/api
 RUN pnpm exec prisma generate
-RUN pnpm exec tsc -p tsconfig.build.json
+# Deux passes tsc séparées : évite OOM sur VPS 2 Go (heap ~768 Mo par process)
+RUN pnpm exec tsc -p tsconfig.build.app.json
+RUN NODE_OPTIONS="--max-old-space-size=512" pnpm exec tsc -p tsconfig.build.prisma.json
 
 # ── Deps production (image finale légère) ──────────────────────────────────────
 FROM base AS prod-deps
