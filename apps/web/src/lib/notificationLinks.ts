@@ -9,6 +9,10 @@ export interface NotificationLinkData {
   contract_id?: string
   courier_id?: string
   logistics_partner_id?: string
+  product_id?: string
+  review_id?: string
+  complaint_id?: string
+  dispute_id?: string
 }
 
 /** Cible de navigation pour une notification (panneau cloche, page liste, clic push). */
@@ -62,6 +66,21 @@ export function resolveNotificationHref(data?: NotificationLinkData | null, type
   }
 
   if (data?.order_id) return `/profile/orders/${data.order_id}`
+
+  if (notifType === 'admin_merchant_pending') {
+    return data?.merchant_id ? `/admin/merchants/${data.merchant_id}` : '/admin/merchants?filter=pending'
+  }
+  if (notifType === 'admin_shop_pending') {
+    return data?.shop_id ? `/admin/shops/${data.shop_id}` : '/admin/shops'
+  }
+  if (notifType === 'admin_product_pending') {
+    return data?.product_id ? `/admin/products/${data.product_id}` : '/admin/products'
+  }
+  if (notifType === 'admin_review_pending') return '/admin/reviews'
+  if (notifType === 'admin_product_review_pending') return '/admin/product-reviews'
+  if (notifType === 'admin_complaint_open') return '/admin/complaints'
+  if (notifType === 'admin_courier_kyc') return '/admin/delivery/couriers'
+  if (notifType === 'admin_delivery_dispute') return '/admin/delivery/disputes'
 
   return null
 }

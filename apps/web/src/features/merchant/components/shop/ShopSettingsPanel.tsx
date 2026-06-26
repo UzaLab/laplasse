@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Building2, Image as ImageIcon, Link2, Loader2, MapPin, Save, UploadCloud } from 'lucide-react'
+import { Building2, ExternalLink, Image as ImageIcon, Link2, Loader2, MapPin, Save, UploadCloud } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/stores/authStore'
@@ -86,6 +86,7 @@ export function ShopSettingsPanel() {
     cover_image: '',
   })
   const [baseline, setBaseline] = useState('')
+  const [publicSlug, setPublicSlug] = useState('')
 
   const isDirty = useMemo(
     () => baseline !== '' && serializeSettingsForm(form) !== baseline,
@@ -143,6 +144,7 @@ export function ShopSettingsPanel() {
       }
       setForm(next)
       setBaseline(serializeSettingsForm(next))
+      setPublicSlug(shop.slug ?? '')
     }
     setLoading(false)
   }, [activeShopId])
@@ -151,6 +153,10 @@ export function ShopSettingsPanel() {
     if (!activeShopId) return
     void load()
   }, [load, activeShopId])
+
+  useEffect(() => {
+    if (activeShop?.slug) setPublicSlug(activeShop.slug)
+  }, [activeShop?.slug])
 
   useEffect(() => {
     if (form.city_id || !cities.length || !activeShopId) return
@@ -232,6 +238,7 @@ export function ShopSettingsPanel() {
           : s,
       ),
     })
+    setPublicSlug(shop.slug)
     const saved: SettingsForm = {
       ...form,
       name: shop.name,
@@ -261,10 +268,22 @@ export function ShopSettingsPanel() {
         <p className="text-slate-400 text-sm mt-0.5">
           Identité visuelle, coordonnées et statut de publication.
         </p>
+        {publicSlug && (
+          <Link
+            href={getShopPublicHref({ slug: publicSlug })}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-brand-600 hover:text-brand-700 transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            Voir la vitrine
+            <ExternalLink size={14} />
+            <span className="text-slate-400 font-semibold">/m/{publicSlug}/boutique</span>
+          </Link>
+        )}
       </div>
 
       {/* Visuel */}
-      <div className="bg-white border border-slate-100 rounded-[28px] p-6 space-y-6">
+      <div className="bg-white border border-slate-100 rounded-xl p-6 space-y-6">
         <p className="text-sm font-extrabold text-slate-900">Identité visuelle</p>
 
         <div>
@@ -306,7 +325,7 @@ export function ShopSettingsPanel() {
         <div>
           <label className={LABEL}>Image de couverture</label>
           <div className="space-y-3">
-            <div className="w-full aspect-[2.4/1] max-h-40 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+            <div className="w-full aspect-[2.4/1] max-h-40 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
               {form.cover_image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={form.cover_image} alt="" className="w-full h-full object-cover" />
@@ -341,7 +360,7 @@ export function ShopSettingsPanel() {
       </div>
 
       {/* Infos générales */}
-      <div className="bg-white border border-slate-100 rounded-[28px] p-6 space-y-4">
+      <div className="bg-white border border-slate-100 rounded-xl p-6 space-y-4">
         <p className="text-sm font-extrabold text-slate-900">Informations générales</p>
         <div>
           <label className={LABEL}>Nom de la boutique *</label>
@@ -377,7 +396,7 @@ export function ShopSettingsPanel() {
       </div>
 
       {/* Contact & localisation */}
-      <div className="bg-white border border-slate-100 rounded-[28px] p-6 space-y-4 laplasse-leaflet-host">
+      <div className="bg-white border border-slate-100 rounded-xl p-6 space-y-4 laplasse-leaflet-host">
         <div>
           <p className="text-sm font-extrabold text-slate-900">Contact & localisation</p>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -461,7 +480,7 @@ export function ShopSettingsPanel() {
           />
         </div>
 
-        <label className="flex items-start gap-3 p-4 rounded-full border border-slate-200 bg-slate-50 cursor-pointer">
+        <label className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
           <input
             type="checkbox"
             checked={form.has_physical_location}
@@ -511,7 +530,7 @@ export function ShopSettingsPanel() {
 
     {/* Lier à un établissement — uniquement pour les boutiques indépendantes */}
     {isIndependentShop && (
-      <div className="bg-amber-50 border border-amber-100 rounded-[28px] p-6 space-y-4">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 space-y-4">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
             <Link2 size={16} className="text-amber-600" />

@@ -13,6 +13,7 @@ import { parseCoord } from '../geo/geo-coords.util'
 import { DeliveryVehicle, Role } from '../../generated/prisma/client'
 import { DeliveryOfferService } from '../delivery/delivery-offer.service'
 import { DeliveryEtaService } from '../delivery/delivery-eta.service'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 import { haversineDistanceKm } from '../delivery/delivery-geo.util'
 
 const COURIER_PROFILE_SELECT = {
@@ -41,6 +42,7 @@ export class CouriersService {
     private readonly prisma: PrismaService,
     private readonly offerService: DeliveryOfferService,
     private readonly etaService: DeliveryEtaService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async getMyProfile(userId: string) {
@@ -120,6 +122,11 @@ export class CouriersService {
     })
 
     const updatedRole = user.role === Role.USER ? Role.COURIER : user.role
+
+    void this.adminNotifications.courierKycPending(
+      profile.id,
+      user.full_name?.trim() || user.phone || 'Nouveau livreur',
+    )
 
     return {
       profile,

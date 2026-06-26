@@ -60,7 +60,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-14 h-14 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="w-14 h-14 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0 overflow-hidden">
                 {activeShop?.logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={activeShop.logo} alt="" className="w-full h-full object-cover" />
@@ -108,7 +108,7 @@ export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
         {!hideTabs && activeShop && (
           <nav
             ref={tabsNavRef}
-            className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-2xl scroll-smooth"
+            className="flex gap-1 overflow-x-auto no-scrollbar mb-8 p-1 bg-slate-100/80 rounded-xl scroll-smooth"
           >
             {TABS.map(tab => {
               const { href, label, icon: Icon } = tab

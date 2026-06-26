@@ -131,7 +131,7 @@ export function ShopAnalyticsPanel() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-100 rounded-[28px] p-6">
+        <div className="bg-white border border-slate-100 rounded-xl p-6">
           <h3 className="font-extrabold text-slate-900 mb-1">Revenus</h3>
           <p className="text-xs text-slate-400 mb-4">Évolution sur {days} jours</p>
           {chartData.some(d => d.count > 0) ? (
@@ -141,7 +141,7 @@ export function ShopAnalyticsPanel() {
           )}
         </div>
 
-        <div className="bg-white border border-slate-100 rounded-[28px] p-6">
+        <div className="bg-white border border-slate-100 rounded-xl p-6">
           <h3 className="font-extrabold text-slate-900 mb-1">Commandes par statut</h3>
           <p className="text-xs text-slate-400 mb-4">{summary.orders_total} commandes au total</p>
           {data.orders_by_status.length ? (
@@ -161,7 +161,7 @@ export function ShopAnalyticsPanel() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
+      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h3 className="font-extrabold text-slate-900">Top produits</h3>
           <p className="text-xs text-slate-400 mt-0.5">Par chiffre d&apos;affaires généré</p>

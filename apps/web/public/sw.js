@@ -98,6 +98,20 @@ function resolveNotificationTarget(data) {
     return data.merchant_id ? '/merchant/bookings' : '/profile/bookings'
   }
   if (data.order_id) return `/profile/orders/${data.order_id}`
+  if (type === 'admin_merchant_pending') {
+    return data.merchant_id ? `/admin/merchants/${data.merchant_id}` : '/admin/merchants?filter=pending'
+  }
+  if (type === 'admin_shop_pending') {
+    return data.shop_id ? `/admin/shops/${data.shop_id}` : '/admin/shops'
+  }
+  if (type === 'admin_product_pending') {
+    return data.product_id ? `/admin/products/${data.product_id}` : '/admin/products'
+  }
+  if (type === 'admin_review_pending') return '/admin/reviews'
+  if (type === 'admin_product_review_pending') return '/admin/product-reviews'
+  if (type === 'admin_complaint_open') return '/admin/complaints'
+  if (type === 'admin_courier_kyc') return '/admin/delivery/couriers'
+  if (type === 'admin_delivery_dispute') return '/admin/delivery/disputes'
   return '/profile/notifications'
 }
 

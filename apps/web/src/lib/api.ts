@@ -1,5 +1,6 @@
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
 import { countryRequestHeaders, getDefaultCity } from '@/lib/country'
+import type { ApiPublicShop } from './boutiquePublic'
 
 function getApiUrl(): string {
   // SSR dans Docker : URL interne Coolify (évite le loopback Traefik/SSL)
@@ -225,6 +226,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ event_type }),
       }),
+  },
+
+  shops: {
+    bySlug: (slug: string) => apiFetch<ApiPublicShop>(`/shops/${slug}`),
   },
 
   search: (params: {

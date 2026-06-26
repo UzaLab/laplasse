@@ -70,7 +70,7 @@ function CollectionProductsPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="collection-products-title"
-        className="relative bg-white w-full sm:max-w-lg max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] sm:rounded-[28px] shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative bg-white w-full sm:max-w-lg max-h-[min(88vh,640px)] flex flex-col rounded-t-[28px] sm:rounded-xl shadow-2xl border border-slate-100 overflow-hidden"
       >
         <div className="shrink-0 px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
           <div className="min-w-0">

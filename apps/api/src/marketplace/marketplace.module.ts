@@ -18,9 +18,10 @@ import { CouriersModule } from '../couriers/couriers.module'
 import { ProductDiscoveryService } from './product-discovery.service'
 import { AuthModule } from '../auth/auth.module'
 import { AdsModule } from '../ads/ads.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule, LoyaltyModule, CouriersModule, AuthModule, AdsModule],
+  imports: [QueueModule, ShopsModule, DeliveryZonesModule, PromotionsModule, SearchModule, AddressesModule, ShopCollectionsModule, ShopMenuModule, ProductReviewsModule, DeliveryModule, LoyaltyModule, CouriersModule, AuthModule, AdsModule, NotificationsModule],
   controllers: [MarketplaceController],
   providers: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],
   exports: [MarketplaceService, ProductCategoriesService, ProductDiscoveryService],

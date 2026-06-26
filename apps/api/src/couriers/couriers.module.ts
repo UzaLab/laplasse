@@ -7,9 +7,10 @@ import { CourierReviewsService } from './courier-reviews.service'
 import { DeliveryModule } from '../delivery/delivery.module'
 import { AuditModule } from '../audit/audit.module'
 import { StorageModule } from '../storage/storage.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [DeliveryModule, AuditModule, StorageModule],
+  imports: [DeliveryModule, AuditModule, StorageModule, NotificationsModule],
   controllers: [CouriersController],
   providers: [CouriersService, CourierJobsService, CourierWalletService, CourierReviewsService],
   exports: [CouriersService, CourierJobsService, CourierWalletService, CourierReviewsService],

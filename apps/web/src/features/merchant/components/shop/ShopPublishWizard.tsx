@@ -151,7 +151,7 @@ export function ShopPublishWizard() {
 
   if (loading) {
     return (
-      <div className="bg-white border border-slate-100 rounded-[28px] p-8 flex justify-center">
+      <div className="bg-white border border-slate-100 rounded-xl p-8 flex justify-center">
         <Loader2 size={22} className="animate-spin text-slate-300" />
       </div>
     )
@@ -161,7 +161,7 @@ export function ShopPublishWizard() {
 
   if (isPendingReview && !isActive) {
     return (
-      <div className="bg-amber-50 border border-amber-100 rounded-[28px] p-6 sm:p-8">
+      <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 sm:p-8">
         <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">
           Validation en cours
         </p>
@@ -177,7 +177,7 @@ export function ShopPublishWizard() {
 
   if (allDone) {
     return (
-      <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-[28px] p-6 sm:p-8">
+      <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-xl p-6 sm:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
@@ -214,7 +214,7 @@ export function ShopPublishWizard() {
   }
 
   return (
-    <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
+    <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
       <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-brand-50/80 to-amber-50/50">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shrink-0">

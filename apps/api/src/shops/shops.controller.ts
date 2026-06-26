@@ -253,7 +253,7 @@ export class ShopsController {
   @Public()
   @Get(':slug')
   getPublic(@Param('slug') slug: string) {
-    return this.svc.getBySlug(slug)
+    return this.svc.getByMerchantSlug(slug)
   }
 
   @UseGuards(JwtAuthGuard)

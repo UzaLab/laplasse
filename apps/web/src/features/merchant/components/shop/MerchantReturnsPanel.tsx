@@ -149,7 +149,7 @@ export function MerchantReturnsPanel() {
       </MerchantListToolbar>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-3xl border border-slate-100">
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-100">
           <PackageX size={36} className="text-slate-200 mx-auto mb-3" />
           <p className="font-bold text-slate-600">Aucune demande de retour</p>
           <p className="text-sm text-slate-400 mt-1">

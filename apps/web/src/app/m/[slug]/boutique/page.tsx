@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { api } from '@/lib/api'
 import { BoutiquePageClient } from '@/features/marketplace/components/BoutiquePageClient'
+import { resolveBoutiqueDisplay } from '@/lib/boutiquePublic'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -10,22 +10,16 @@ interface Props {
 
 export default async function MerchantBoutiquePage({ params }: Props) {
   const { slug } = await params
+  const boutique = await resolveBoutiqueDisplay(slug)
 
-  let merchant
-  try {
-    merchant = await api.merchants.bySlug(slug).catch(() => null)
-  } catch {
-    merchant = null
-  }
-
-  if (!merchant) {
+  if (!boutique) {
     notFound()
   }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <Navbar />
-      <BoutiquePageClient merchant={merchant} />
+      <BoutiquePageClient merchant={boutique} />
       <AppFooter />
     </div>
   )

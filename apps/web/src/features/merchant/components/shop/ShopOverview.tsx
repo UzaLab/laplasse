@@ -112,7 +112,7 @@ export function ShopOverview() {
         </div>
       )}
 
-      <div className="bg-white border border-slate-100 rounded-[28px] overflow-hidden">
+      <div className="bg-white border border-slate-100 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="font-extrabold text-slate-900">Gérer ma boutique</h2>
           <p className="text-xs text-slate-400 mt-0.5">Accès rapide aux fonctionnalités</p>

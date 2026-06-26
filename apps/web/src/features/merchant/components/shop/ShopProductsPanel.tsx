@@ -275,7 +275,7 @@ export function ShopProductsPanel() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100">
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-100">
           <Package size={32} className="text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-600">Aucun produit</p>
           <p className="text-sm text-slate-400 mt-1 mb-4">

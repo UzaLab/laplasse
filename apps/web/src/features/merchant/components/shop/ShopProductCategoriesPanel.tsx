@@ -154,7 +154,7 @@ export function ShopProductCategoriesPanel() {
         </p>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 space-y-4">
+      <div className="bg-white border border-slate-100 rounded-xl p-6 space-y-4">
         {loadError && (
           <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />

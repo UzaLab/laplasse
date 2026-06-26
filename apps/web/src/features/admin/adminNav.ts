@@ -106,6 +106,7 @@ export const ADMIN_MOBILE_NAV = [
 ] as const
 
 export function getAdminPageTitle(pathname: string): string {
+  if (pathname.startsWith('/admin/notifications')) return 'Notifications'
   for (const group of ADMIN_NAV_GROUPS) {
     for (const item of group.items) {
       const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)

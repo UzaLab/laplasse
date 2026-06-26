@@ -223,7 +223,12 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <NotificationBell viewAllHref="/profile/notifications" refetchIntervalMs={30_000} />
+            <NotificationBell
+              viewAllHref="/admin/notifications"
+              refetchIntervalMs={30_000}
+              showPushPrompt
+              pushPromptDescription="Activez le push pour recevoir les alertes de modération et ops, même hors de l'admin."
+            />
             <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-slate-900 leading-none">

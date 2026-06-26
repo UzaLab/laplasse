@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { FraudService } from '../fraud/fraud.service'
 import { CreateReviewDto } from './dto/create-review.dto'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 @Injectable()
 export class ReviewsService {
@@ -10,6 +11,7 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly loyalty: LoyaltyService,
     private readonly fraud: FraudService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async create(dto: CreateReviewDto, userId: string) {
@@ -48,6 +50,8 @@ export class ReviewsService {
 
     // Gain de points loyalty pour l'auteur de l'avis
     this.loyalty.earnPoints(userId, 'review', { merchant_id: dto.merchant_id }).catch(() => {})
+
+    void this.adminNotifications.reviewPending(review.id, merchant.business_name)
 
     return review
   }

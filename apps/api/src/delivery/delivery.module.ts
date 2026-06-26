@@ -8,9 +8,10 @@ import { DeliveryEtaService } from './delivery-eta.service'
 import { DeliveryFeeSplitService } from './delivery-fee-split.service'
 import { QueueModule } from '../queue/queue.module'
 import { LogisticsModule } from '../logistics/logistics.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [QueueModule, forwardRef(() => LogisticsModule)],
+  imports: [QueueModule, forwardRef(() => LogisticsModule), NotificationsModule],
   controllers: [DeliveryController],
   providers: [
     DeliveryService,

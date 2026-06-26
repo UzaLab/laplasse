@@ -230,7 +230,7 @@ function PromoCodeUsageModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40" onClick={onClose}>
       <div
-        className="bg-white rounded-[28px] w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-xl"
+        className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
@@ -661,7 +661,7 @@ export function ShopPromotionsPanel() {
           <button
             type="button"
             onClick={() => openForm('code')}
-            className="text-left bg-white border-2 border-slate-100 hover:border-violet-300 rounded-[28px] p-6 transition-all group"
+            className="text-left bg-white border-2 border-slate-100 hover:border-violet-300 rounded-xl p-6 transition-all group"
           >
             <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <Ticket size={24} />
@@ -674,7 +674,7 @@ export function ShopPromotionsPanel() {
           <button
             type="button"
             onClick={() => openForm('showcase')}
-            className="text-left bg-white border-2 border-slate-100 hover:border-amber-300 rounded-[28px] p-6 transition-all group"
+            className="text-left bg-white border-2 border-slate-100 hover:border-amber-300 rounded-xl p-6 transition-all group"
           >
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
               <Sparkles size={24} />
@@ -688,7 +688,7 @@ export function ShopPromotionsPanel() {
       )}
 
       {formMode && (
-        <form onSubmit={savePromo} className="bg-white rounded-[28px] border border-slate-100 p-6 mb-8 space-y-5 shadow-sm">
+        <form onSubmit={savePromo} className="bg-white rounded-xl border border-slate-100 p-6 mb-8 space-y-5 shadow-sm">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${
@@ -902,7 +902,7 @@ export function ShopPromotionsPanel() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : promos.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100">
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-100">
           <Tag size={32} className="text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-600">Aucune promotion</p>
           <p className="text-sm text-slate-400 mt-1">Choisissez un parcours ci-dessus pour commencer.</p>

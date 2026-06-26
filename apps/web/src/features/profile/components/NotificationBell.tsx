@@ -41,6 +41,8 @@ interface NotificationBellProps {
   refetchIntervalMs?: number
   /** Proposer l'activation push dans le panneau */
   showPushPrompt?: boolean
+  /** Texte d'aide pour l'activation push (panneau cloche) */
+  pushPromptDescription?: string
 }
 
 const PANEL_WIDTH = 360
@@ -63,6 +65,7 @@ export function NotificationBell({
   viewAllHref = '/profile/notifications',
   refetchIntervalMs = 60_000,
   showPushPrompt = false,
+  pushPromptDescription,
 }: NotificationBellProps = {}) {
   const router = useRouter()
   const { ready: authReady } = useAuthReady()
@@ -248,7 +251,7 @@ export function NotificationBell({
       {pushSupported && !pushGranted && (
         <div className="px-4 py-3 border-t border-slate-50 bg-slate-50/80 shrink-0">
           <p className="text-[11px] text-slate-500 mb-2 leading-snug">
-            Activez le push pour être alerté des courses urgentes et litiges, même hors de l&apos;app.
+            {pushPromptDescription ?? 'Activez le push pour être alerté des courses urgentes et litiges, même hors de l\'app.'}
           </p>
           <WebPushToggle compact />
         </div>

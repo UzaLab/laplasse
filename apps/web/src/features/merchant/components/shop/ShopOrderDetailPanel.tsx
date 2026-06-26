@@ -158,7 +158,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         Retour aux commandes
       </button>
 
-      <div className="relative overflow-hidden bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <div className="relative overflow-hidden bg-white border border-slate-100 rounded-xl p-6 sm:p-8 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900 mb-1">
@@ -195,7 +195,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         />
       )}
 
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+      <div className="bg-white border border-slate-100 rounded-xl p-6 sm:p-8 shadow-sm">
         <h2 className="text-lg font-extrabold text-slate-900 mb-6">Suivi & gestion</h2>
         <OrderTimeline status={order.status} deliveryType={order.delivery_type} />
 
@@ -292,7 +292,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="md:col-span-2 bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div className="md:col-span-2 bg-white border border-slate-100 rounded-xl p-6 sm:p-8 shadow-sm">
           <h2 className="text-lg font-extrabold text-slate-900 mb-6 flex items-center gap-2">
             <ShoppingCart size={20} className="text-amber-500" />
             Articles ({order.items.length})
@@ -347,7 +347,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
         </div>
 
         <div className="space-y-5">
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
               <User size={16} className="text-amber-500" />
               Client
@@ -359,7 +359,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
             </p>
           </div>
 
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Truck size={16} className="text-amber-500" />
               Livraison
@@ -407,7 +407,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
             )}
           </div>
 
-          <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+          <div className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
               <CreditCard size={16} className="text-amber-500" />
               Paiement

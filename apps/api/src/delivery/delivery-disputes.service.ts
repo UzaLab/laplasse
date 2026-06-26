@@ -7,12 +7,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { DeliveryDisputeStatus } from '../../generated/prisma/client'
 import { NotificationQueueService } from '../queue/notification-queue.service'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 @Injectable()
 export class DeliveryDisputesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationQueue: NotificationQueueService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   async createForOrder(
@@ -85,6 +87,13 @@ export class DeliveryDisputesService {
         ),
       )
     }
+
+    void this.adminNotifications.deliveryDispute(
+      dispute.id,
+      orderId,
+      order.shop?.name ?? 'Commerce',
+      reason,
+    )
 
     return dispute
   }

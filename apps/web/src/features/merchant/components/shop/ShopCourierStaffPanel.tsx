@@ -75,7 +75,7 @@ export function ShopCourierStaffPanel() {
         </p>
       </div>
 
-      <form onSubmit={handleLink} className="bg-white border border-slate-100 rounded-3xl p-6 space-y-3">
+      <form onSubmit={handleLink} className="bg-white border border-slate-100 rounded-xl p-6 space-y-3">
         <h3 className="font-bold text-slate-900 flex items-center gap-2">
           <UserPlus size={18} /> Ajouter un livreur
         </h3>

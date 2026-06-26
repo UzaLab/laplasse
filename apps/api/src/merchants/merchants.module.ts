@@ -5,9 +5,10 @@ import { StorageModule } from '../storage/storage.module'
 import { ShopMenuModule } from '../shop-menu/shop-menu.module'
 import { AdsModule } from '../ads/ads.module'
 import { CrmModule } from '../crm/crm.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [StorageModule, ShopMenuModule, AdsModule, CrmModule],
+  imports: [StorageModule, ShopMenuModule, AdsModule, CrmModule, NotificationsModule],
   controllers: [MerchantsController],
   providers: [MerchantsService],
   exports: [MerchantsService],

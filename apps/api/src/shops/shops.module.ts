@@ -6,9 +6,10 @@ import { ShopCourierStaffService } from './shop-courier-staff.service'
 import { LogisticsModule } from '../logistics/logistics.module'
 import { CrmModule } from '../crm/crm.module'
 import { StorageModule } from '../storage/storage.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 
 @Module({
-  imports: [DeliveryZonesModule, LogisticsModule, CrmModule, StorageModule],
+  imports: [DeliveryZonesModule, LogisticsModule, CrmModule, StorageModule, NotificationsModule],
   controllers: [ShopsController],
   providers: [ShopsService, ShopCourierStaffService],
   exports: [ShopsService, ShopCourierStaffService],

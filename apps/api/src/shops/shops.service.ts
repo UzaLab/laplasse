@@ -11,6 +11,7 @@ import { CreateShopDto, LinkShopMerchantDto, UpdateShopDto } from './dto/shops.d
 import { SHOP_MINI_SELECT, shopAccessibleWhere } from './shop-access.util'
 import { CrmService } from '../crm/crm.service'
 import { StorageService } from '../storage/storage.service'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -58,6 +59,7 @@ export class ShopsService {
     private readonly prisma: PrismaService,
     private readonly crm: CrmService,
     private readonly storage: StorageService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   private async assertShopLimit(userId: string) {
@@ -271,6 +273,11 @@ export class ShopsService {
         delivery_fulfilment_default: dto.delivery_fulfilment_default,
       },
       select: SHOP_PUBLIC_SELECT,
+    }).then(updated => {
+      if (updated.status === 'PENDING_REVIEW' && shop.status !== 'PENDING_REVIEW') {
+        void this.adminNotifications.shopPendingReview(updated.id, updated.name)
+      }
+      return updated
     })
   }
 

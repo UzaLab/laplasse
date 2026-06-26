@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { fetchNotifications, type NotificationItem } from '@/lib/notificationsApi'
 import { notificationIsActionable, resolveNotificationHref } from '@/lib/notificationLinks'
 
-export type NotificationsAudience = 'client' | 'merchant' | 'logistics'
+export type NotificationsAudience = 'client' | 'merchant' | 'logistics' | 'admin'
 
 const AUDIENCE_COPY: Record<NotificationsAudience, {
   subtitle: string
@@ -49,6 +49,14 @@ const AUDIENCE_COPY: Record<NotificationsAudience, {
     emptyCtaHref: '/logistics/dispatch',
     emptyCtaLabel: 'Ouvrir le dispatch',
   },
+  admin: {
+    subtitle: 'Modération, validations KYC, signalements et litiges — alertes ops en temps réel.',
+    pushDescription: 'Soyez alerté instantanément des nouvelles demandes de validation, signalements et litiges, même hors de l\'admin.',
+    emptyAll: 'Les alertes de modération et ops apparaîtront ici.',
+    emptyUnread: 'Aucune alerte en attente. Les prochaines validations s\'afficheront ici.',
+    emptyCtaHref: '/admin/moderation',
+    emptyCtaLabel: 'Ouvrir la modération',
+  },
 }
 
 type FilterTab = 'all' | 'unread'
@@ -79,6 +87,14 @@ const TYPE_ACCENT: Record<string, { bg: string; ring: string; icon: string }> = 
   order_status: { bg: 'bg-blue-50', ring: 'ring-blue-200/80', icon: 'text-blue-600' },
   order_return: { bg: 'bg-orange-50', ring: 'ring-orange-200/80', icon: 'text-orange-600' },
   delivery_status: { bg: 'bg-indigo-50', ring: 'ring-indigo-200/80', icon: 'text-indigo-600' },
+  admin_merchant_pending: { bg: 'bg-violet-50', ring: 'ring-violet-200/80', icon: 'text-violet-600' },
+  admin_shop_pending: { bg: 'bg-teal-50', ring: 'ring-teal-200/80', icon: 'text-teal-600' },
+  admin_product_pending: { bg: 'bg-cyan-50', ring: 'ring-cyan-200/80', icon: 'text-cyan-600' },
+  admin_review_pending: { bg: 'bg-blue-50', ring: 'ring-blue-200/80', icon: 'text-blue-600' },
+  admin_product_review_pending: { bg: 'bg-sky-50', ring: 'ring-sky-200/80', icon: 'text-sky-600' },
+  admin_complaint_open: { bg: 'bg-red-50', ring: 'ring-red-200/80', icon: 'text-red-500' },
+  admin_courier_kyc: { bg: 'bg-emerald-50', ring: 'ring-emerald-200/80', icon: 'text-emerald-600' },
+  admin_delivery_dispute: { bg: 'bg-orange-50', ring: 'ring-orange-200/80', icon: 'text-orange-600' },
   subscription_upgraded: { bg: 'bg-violet-50', ring: 'ring-violet-200/80', icon: 'text-violet-600' },
   welcome: { bg: 'bg-brand-50', ring: 'ring-brand-200/80', icon: 'text-brand-600' },
   default: { bg: 'bg-slate-100', ring: 'ring-slate-200/80', icon: 'text-slate-600' },

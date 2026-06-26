@@ -118,7 +118,7 @@ export function ShopShell({ children }: ShopShellProps) {
           <div>
             <button
               onClick={() => setShopSwitcherOpen(v => !v)}
-              className="w-full flex items-center gap-2 px-3 py-3 bg-brand-50 border border-brand-100 rounded-2xl hover:border-brand-300 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-3 bg-brand-50 border border-brand-100 rounded-xl hover:border-brand-300 transition-colors"
             >
               <ShoppingBag size={14} className="text-brand-500 shrink-0" />
               <div className="flex-1 min-w-0 text-left">
@@ -128,7 +128,7 @@ export function ShopShell({ children }: ShopShellProps) {
               <ChevronDown size={14} className={cn('text-brand-500 shrink-0 transition-transform', shopSwitcherOpen ? 'rotate-180' : '')} />
             </button>
             {shopSwitcherOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-lg z-50 overflow-hidden">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
                 {independentShops.map(shop => (
                   <button
                     key={shop.id}
@@ -157,7 +157,7 @@ export function ShopShell({ children }: ShopShellProps) {
             )}
           </div>
         ) : (
-          <div className="px-3 py-3 bg-brand-50 border border-brand-100 rounded-2xl">
+          <div className="px-3 py-3 bg-brand-50 border border-brand-100 rounded-xl">
             <p className="text-[10px] text-brand-600 font-bold uppercase tracking-wider mb-0.5">Boutique</p>
             <p className="text-sm font-extrabold text-slate-900 truncate">{activeShop?.name ?? '—'}</p>
             {activeShop?.slug && (

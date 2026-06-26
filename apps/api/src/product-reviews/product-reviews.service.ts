@@ -6,10 +6,14 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateProductReviewDto } from './dto/product-review.dto'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 @Injectable()
 export class ProductReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminNotifications: AdminNotificationsService,
+  ) {}
 
   async listByProductSlug(slug: string, shopSlug?: string) {
     const product = await this.resolveProduct(slug, shopSlug)
@@ -68,7 +72,7 @@ export class ProductReviewsService {
       throw new BadRequestException('Vous avez déjà noté ce produit')
     }
 
-    return this.prisma.productReview.create({
+    const review = await this.prisma.productReview.create({
       data: {
         product_id: product.id,
         user_id: userId,
@@ -81,6 +85,10 @@ export class ProductReviewsService {
         user: { select: { full_name: true, avatar: true } },
       },
     })
+
+    void this.adminNotifications.productReviewPending(review.id, product.name)
+
+    return review
   }
 
   private async resolveProduct(slug: string, shopSlug?: string) {

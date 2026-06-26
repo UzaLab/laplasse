@@ -15,6 +15,7 @@ import { attachCardPreviewsToMerchants } from '../marketplace/vertical-preview'
 import { uniqueMerchantSlug } from '../common/slug.util'
 import { AdsService } from '../ads/ads.service'
 import { CrmService } from '../crm/crm.service'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 const DEFAULT_CITY_BY_COUNTRY: Record<string, string> = {
   CI: 'Abidjan',
@@ -100,6 +101,7 @@ export class MerchantsService {
     private readonly storage: StorageService,
     private readonly ads: AdsService,
     private readonly crm: CrmService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   // ── Helper : résoudre l'établissement actif d'un utilisateur ────────────────
@@ -442,6 +444,8 @@ export class MerchantsService {
       where: { id: userId },
       data: { role: 'MERCHANT' },
     })
+
+    void this.adminNotifications.merchantPendingReview(merchant.id, merchant.business_name)
 
     return merchant
   }

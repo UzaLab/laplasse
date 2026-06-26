@@ -184,7 +184,7 @@ export function ShopOrdersPanel() {
           <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : orders.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100">
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-100">
           <ShoppingBag size={32} className="text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-600">Aucune commande</p>
           <p className="text-sm text-slate-400 mt-1">
@@ -192,7 +192,7 @@ export function ShopOrdersPanel() {
           </p>
         </div>
       ) : filteredOrders.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-[28px] border border-slate-100 px-6">
+        <div className="text-center py-16 bg-white rounded-xl border border-slate-100 px-6">
           <ShoppingBag size={32} className="text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-600">Aucun résultat</p>
           <p className="text-sm text-slate-400 mt-1">
@@ -211,7 +211,7 @@ export function ShopOrdersPanel() {
       ) : (
         <div className="space-y-4">
           {filteredOrders.map(order => (
-            <div key={order.id} className="bg-white border border-slate-100 rounded-[28px] p-5">
+            <div key={order.id} className="bg-white border border-slate-100 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
                 <div className="flex-1 min-w-0">
                   <Link

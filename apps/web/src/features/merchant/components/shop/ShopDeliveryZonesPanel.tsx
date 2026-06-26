@@ -164,7 +164,7 @@ export function ShopDeliveryZonesPanel() {
         </p>
       </div>
 
-      <form onSubmit={create} className="bg-white border border-slate-100 rounded-3xl p-6 space-y-4">
+      <form onSubmit={create} className="bg-white border border-slate-100 rounded-xl p-6 space-y-4">
         <h3 className="font-bold text-slate-900 flex items-center gap-2">
           <Plus size={18} /> Nouvelle zone
         </h3>

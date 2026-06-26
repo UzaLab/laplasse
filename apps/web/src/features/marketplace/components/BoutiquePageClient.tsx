@@ -31,6 +31,8 @@ export interface BoutiqueDisplay {
   phone?: string | null
   whatsapp?: string | null
   location?: { city?: string; district?: string | null } | null
+  /** Slug établissement marchand lié (masque le lien « Voir l'établissement » si absent). */
+  establishment_slug?: string | null
 }
 
 type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc'
@@ -318,7 +320,13 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
     ? `https://wa.me/${merchant.whatsapp.replace(/\D/g, '')}`
     : merchant.phone
       ? `tel:${merchant.phone}`
-      : `/m/${merchant.slug}`
+      : merchant.establishment_slug
+        ? `/m/${merchant.establishment_slug}`
+        : '#'
+
+  const establishmentHref = merchant.establishment_slug
+    ? `/m/${merchant.establishment_slug}`
+    : null
 
   const locationLabel = formatLocation(merchant)
   const cover = merchant.cover_image
@@ -374,30 +382,34 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                 </div>
               </div>
 
+              {establishmentHref && (
               <div className="hidden md:block shrink-0 pb-4">
                 <Link
-                  href={`/m/${merchant.slug}`}
+                  href={establishmentHref}
                   className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-white/20 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
                   <ArrowLeft size={16} /> Voir l&apos;établissement
                 </Link>
               </div>
+              )}
             </div>
           </div>
         </div>
       </header>
 
       <main className={`${PAGE_CONTAINER} pt-6 md:pt-10 pb-28 lg:pb-16`}>
+        {establishmentHref && (
         <div className="md:hidden mb-5">
           <Link
-            href={`/m/${merchant.slug}`}
+            href={establishmentHref}
             className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
             style={{ textDecoration: 'none' }}
           >
             <ArrowLeft size={16} /> Voir l&apos;établissement
           </Link>
         </div>
+        )}
 
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-28">

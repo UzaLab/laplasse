@@ -9,6 +9,7 @@ import { NotificationQueueService } from '../queue/notification-queue.service'
 import {
   merchantOrderNotificationData,
 } from '../notifications/notification-links'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 import { getPlanLimits, isWithinLimit } from '../common/plan-limits'
 import {
   DeliveryType,
@@ -74,6 +75,7 @@ export class MarketplaceService {
     private readonly deliveryDisputes: DeliveryDisputesService,
     private readonly authService: AuthService,
     private readonly ads: AdsService,
+    private readonly adminNotifications: AdminNotificationsService,
   ) {}
 
   private shopPublicSelect = {
@@ -989,6 +991,9 @@ export class MarketplaceService {
       },
     })
     void this.searchService.syncProduct(created.id)
+    if (created.status === 'PENDING_REVIEW') {
+      void this.adminNotifications.productPendingReview(created.id, created.name)
+    }
     return this.attachProductImages(created)
   }
 
@@ -1078,6 +1083,9 @@ export class MarketplaceService {
       },
     })
     void this.searchService.syncProduct(productId)
+    if (withImages.status === 'PENDING_REVIEW' && existing.status !== 'PENDING_REVIEW') {
+      void this.adminNotifications.productPendingReview(withImages.id, withImages.name)
+    }
     return this.attachProductImages(withImages)
   }
 

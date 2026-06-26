@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AdminNotificationsService } from '../notifications/admin-notifications.service'
 
 @Injectable()
 export class ComplaintsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminNotifications: AdminNotificationsService,
+  ) {}
 
   async create(
     data: { merchant_id: string; reason: string; description?: string },
@@ -24,6 +28,13 @@ export class ComplaintsService {
         id: true, reason: true, status: true, created_at: true,
         merchant: { select: { business_name: true, slug: true } },
       },
+    }).then(complaint => {
+      void this.adminNotifications.complaintOpen(
+        complaint.id,
+        complaint.merchant.business_name,
+        complaint.reason,
+      )
+      return complaint
     })
   }
 
