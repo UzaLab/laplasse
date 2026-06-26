@@ -178,7 +178,7 @@ export function ShopProductsPanel() {
             Gérez les articles visibles sur votre vitrine marketplace.
           </p>
         </div>
-        <div className="flex flex-col gap-2 w-full sm:w-auto sm:shrink-0">
+        <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-center sm:justify-end sm:shrink-0">
           <Link
             href={routes.productsNew}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 bg-slate-900 text-white font-bold px-4 py-3 rounded-full hover:bg-slate-800 transition-colors text-sm"

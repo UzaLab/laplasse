@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/providers/LocaleProvider'
 import { ProductPromoPrice } from '@/features/marketplace/components/ProductPromoPrice'
 import { computePromoPriceForAmount, getPromoBadgeLabel } from '@/lib/productPromoUtils'
+import { isProductBestSeller, isProductNew } from '@/lib/productBadges'
 
 type TabId = 'description' | 'composition' | 'reviews'
 
@@ -241,6 +242,11 @@ export default function ProductDetailPage() {
   const plainDescription = product.description ? stripHtml(product.description) : ''
   const shortDescription = plainDescription.slice(0, SHORT_DESC_LIMIT)
   const hasMoreDescription = plainDescription.length > SHORT_DESC_LIMIT
+  const isNewProduct = isProductNew(product.created_at)
+  const isBestSellerProduct = isProductBestSeller(product)
+  const colorVariantsOnly =
+    variants.length > 0
+    && variants.every(v => v.kind === 'COLOR' && Boolean(v.color_hex))
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -281,24 +287,28 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* Galerie */}
             <div className="lg:col-span-7">
-              <div className="aspect-[4/3] w-full bg-slate-50 rounded-[32px] overflow-hidden relative border border-slate-100 group">
+              <div className="aspect-[4/3] w-full bg-slate-50 rounded-2xl overflow-hidden relative border border-slate-100 group p-4 sm:p-6">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={image}
                   alt={product.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-full object-contain"
                 />
                 {!outOfStock && (
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
                     {product.promotion ? (
-                      <span className="bg-rose-500 text-white px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
+                      <span className="bg-rose-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
                         {getPromoBadgeLabel(product.promotion)}
                       </span>
-                    ) : (
-                      <span className="bg-white/90 backdrop-blur-sm text-brand-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+                    ) : isNewProduct ? (
+                      <span className="bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm">
+                        Nouveau
+                      </span>
+                    ) : isBestSellerProduct ? (
+                      <span className="bg-white/90 backdrop-blur-sm text-brand-600 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
                         <Sparkles size={12} /> Best-Seller
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 )}
                 {product.id && (
@@ -318,14 +328,14 @@ export default function ProductDetailPage() {
                       key={`${thumb}-${i}`}
                       type="button"
                       onClick={() => setSelectedImage(thumb)}
-                      className={`aspect-square rounded-2xl overflow-hidden relative transition-colors ${
+                      className={`aspect-square rounded-xl overflow-hidden relative transition-colors ${
                         selectedImage === thumb
                           ? 'border-2 border-slate-900 ring-2 ring-slate-200'
                           : 'border border-slate-200 hover:border-brand-300 opacity-80 hover:opacity-100'
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={thumb} className="w-full h-full object-cover" alt="" />
+                      <img src={thumb} className="w-full h-full object-contain bg-slate-50 p-1" alt="" />
                     </button>
                   ))}
                 </div>
@@ -459,9 +469,46 @@ export default function ProductDetailPage() {
                       <label className="block text-sm font-bold text-slate-900 mb-3 uppercase tracking-wider">
                         {t('product.variant')}
                       </label>
-                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                      <div className={cn(
+                        'gap-2',
+                        colorVariantsOnly ? 'flex flex-wrap' : 'grid grid-cols-2 sm:flex sm:flex-wrap',
+                      )}>
                         {variants.map(variant => {
                           const variantOut = variant.stock_quantity <= 0
+                          const selected = selectedVariantId === variant.id
+                          const variantPromoPrice = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
+                            ? computePromoPriceForAmount(variant.price, product.promotion)
+                            : null
+
+                          if (colorVariantsOnly) {
+                            return (
+                              <button
+                                key={variant.id}
+                                type="button"
+                                disabled={variantOut}
+                                title={variant.name}
+                                aria-label={variant.name}
+                                onClick={() => {
+                                  setSelectedVariantId(variant.id)
+                                  setQuantity(1)
+                                }}
+                                className={cn(
+                                  'w-11 h-11 rounded-xl border-2 transition-all shrink-0 p-1',
+                                  selected
+                                    ? 'border-slate-900 ring-2 ring-slate-200'
+                                    : variantOut
+                                      ? 'border-slate-100 opacity-40 cursor-not-allowed'
+                                      : 'border-slate-200 hover:border-brand-300',
+                                )}
+                              >
+                                <span
+                                  className="block w-full h-full rounded-md border border-black/10"
+                                  style={{ backgroundColor: variant.color_hex ?? '#e2e8f0' }}
+                                />
+                              </button>
+                            )
+                          }
+
                           return (
                             <button
                               key={variant.id}
@@ -472,7 +519,7 @@ export default function ProductDetailPage() {
                                 setQuantity(1)
                               }}
                               className={`min-h-[48px] px-3 py-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all text-left sm:text-center ${
-                                selectedVariantId === variant.id
+                                selected
                                   ? 'bg-slate-900 text-white border-slate-900'
                                   : variantOut
                                     ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
@@ -482,7 +529,7 @@ export default function ProductDetailPage() {
                               <span className="flex items-center justify-center gap-2">
                                 {variant.kind === 'COLOR' && variant.color_hex && (
                                   <span
-                                    className="w-4 h-4 rounded-full border border-white/30 shrink-0"
+                                    className="w-4 h-4 rounded-md border border-slate-200 shrink-0"
                                     style={{ backgroundColor: variant.color_hex }}
                                   />
                                 )}
@@ -497,23 +544,17 @@ export default function ProductDetailPage() {
                                 <span>{variant.name}</span>
                               </span>
                               <span className="block text-[10px] font-medium opacity-80 mt-0.5">
-                                {(() => {
-                                  const vp = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
-                                    ? computePromoPriceForAmount(variant.price, product.promotion)
-                                    : null
-                                  if (vp) {
-                                    return (
-                                      <>
-                                        {formatPrice(vp.promoPrice, product.currency)}
-                                        {' '}
-                                        <span className="line-through opacity-70">
-                                          {formatPrice(variant.price, product.currency)}
-                                        </span>
-                                      </>
-                                    )
-                                  }
-                                  return formatPrice(variant.price, product.currency)
-                                })()}
+                                {variantPromoPrice ? (
+                                  <>
+                                    {formatPrice(variantPromoPrice.promoPrice, product.currency)}
+                                    {' '}
+                                    <span className="line-through opacity-70">
+                                      {formatPrice(variant.price, product.currency)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  formatPrice(variant.price, product.currency)
+                                )}
                               </span>
                             </button>
                           )

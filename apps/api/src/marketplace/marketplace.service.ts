@@ -697,6 +697,71 @@ export class MarketplaceService {
     )
   }
 
+  private async getShopProductSalesCounts(shopId: string): Promise<Map<string, number>> {
+    const items = await this.prisma.orderItem.findMany({
+      where: {
+        product_id: { not: null },
+        order: {
+          shop_id: shopId,
+          status: { in: ['COMPLETED', 'DELIVERED'] },
+        },
+      },
+      select: { product_id: true, quantity: true },
+    })
+
+    const map = new Map<string, number>()
+    for (const item of items) {
+      if (!item.product_id) continue
+      map.set(item.product_id, (map.get(item.product_id) ?? 0) + item.quantity)
+    }
+    return map
+  }
+
+  private pickBestSellerProductIds(salesMap: Map<string, number>, limit = 3): Set<string> {
+    return new Set(
+      [...salesMap.entries()]
+        .filter(([, qty]) => qty > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([id]) => id),
+    )
+  }
+
+  private async attachProductCatalogMeta<
+    T extends { id: string; created_at?: Date | string | null },
+  >(products: T[], shopId: string) {
+    if (!products.length) return []
+
+    const salesMap = await this.getShopProductSalesCounts(shopId)
+    const bestSellerIds = this.pickBestSellerProductIds(salesMap)
+
+    return products.map(product => {
+      const createdAt =
+        product.created_at instanceof Date
+          ? product.created_at.toISOString()
+          : product.created_at ?? null
+      const salesCount = salesMap.get(product.id) ?? 0
+
+      return {
+        ...product,
+        created_at: createdAt,
+        sales_count: salesCount,
+        is_best_seller: bestSellerIds.has(product.id),
+      }
+    })
+  }
+
+  private readonly publicVariantSelect = {
+    id: true,
+    name: true,
+    kind: true,
+    color_hex: true,
+    image_url: true,
+    price: true,
+    stock_quantity: true,
+    sku: true,
+  } as const
+
   // ─── Products (public) ───────────────────────────────────────────────────────
 
   async listPublicProducts(
@@ -734,7 +799,10 @@ export class MarketplaceService {
         )
       }
 
-      return this.enrichShopCatalogProducts(products, shop)
+      return this.attachProductCatalogMeta(
+        await this.enrichShopCatalogProducts(products, shop),
+        shop.id,
+      )
     }
 
     if (query?.q?.trim()) {
@@ -779,18 +847,22 @@ export class MarketplaceService {
         stock_quantity: true,
         image_url: true,
         status: true,
+        created_at: true,
         category_id: true,
         category: { select: { id: true, name: true, slug: true } },
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
-          select: { id: true, name: true, price: true, stock_quantity: true },
+          select: this.publicVariantSelect,
         },
       },
     })
     const filtered = products.filter(
       p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0),
     )
-    return this.enrichShopCatalogProducts(filtered, shop)
+    return this.attachProductCatalogMeta(
+      await this.enrichShopCatalogProducts(filtered, shop),
+      shop.id,
+    )
   }
 
   private async fetchPublicProductsByIds(
@@ -815,11 +887,12 @@ export class MarketplaceService {
         stock_quantity: true,
         image_url: true,
         status: true,
+        created_at: true,
         category_id: true,
         category: { select: { id: true, name: true, slug: true } },
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
-          select: { id: true, name: true, price: true, stock_quantity: true },
+          select: this.publicVariantSelect,
         },
       },
     })
@@ -828,7 +901,10 @@ export class MarketplaceService {
       .filter(p => p.stock_quantity > 0 || p.variants.some(v => v.stock_quantity > 0))
       .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
     if (options?.enrich === false) return filtered
-    return this.enrichShopCatalogProducts(filtered, shop)
+    return this.attachProductCatalogMeta(
+      await this.enrichShopCatalogProducts(filtered, shop),
+      shop.id,
+    )
   }
 
   async listPublicShopProductCategories(shopSlug: string) {
@@ -869,7 +945,7 @@ export class MarketplaceService {
       include: {
         variants: {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
-          select: { id: true, name: true, price: true, stock_quantity: true, sku: true },
+          select: this.publicVariantSelect,
         },
         ...this.productImagesInclude,
       },
@@ -897,7 +973,8 @@ export class MarketplaceService {
           },
     })
     const [enriched] = await this.enrichShopCatalogProducts([attached], shop)
-    return enriched ?? attached
+    const [withMeta] = await this.attachProductCatalogMeta([enriched ?? attached], shop.id)
+    return withMeta
   }
 
   // ─── Products (boutique) ─────────────────────────────────────────────────────

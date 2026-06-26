@@ -14,6 +14,8 @@ export interface MobileProductCardProps {
   priceLabel: string
   originalPriceLabel?: string
   promoBadge?: string | null
+  newBadge?: string | null
+  bestSellerBadge?: string | null
   merchantName?: string
   showMerchantName?: boolean
   variant?: 'compact' | 'carousel'
@@ -32,6 +34,8 @@ export function MobileProductCard({
   priceLabel,
   originalPriceLabel,
   promoBadge,
+  newBadge,
+  bestSellerBadge,
   merchantName,
   showMerchantName = false,
   variant = 'compact',
@@ -75,6 +79,16 @@ export function MobileProductCard({
           {promoBadge && !outOfStock && (
             <span className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
               {promoBadge}
+            </span>
+          )}
+          {newBadge && !outOfStock && !promoBadge && (
+            <span className="absolute top-2 left-2 bg-sky-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+              {newBadge}
+            </span>
+          )}
+          {bestSellerBadge && !outOfStock && !promoBadge && !newBadge && (
+            <span className="absolute top-2 left-2 bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
+              {bestSellerBadge}
             </span>
           )}
         </div>

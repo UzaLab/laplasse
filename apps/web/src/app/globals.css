@@ -35,17 +35,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ─── Boutons — forme pill harmonisée ─────────────────────────────────────────── */
-
-@layer base {
-  button:not(.btn-shape-keep):not([data-btn-shape="keep"]),
-  input[type="submit"]:not(.btn-shape-keep),
-  input[type="button"]:not(.btn-shape-keep),
-  input[type="reset"]:not(.btn-shape-keep),
-  [role="button"]:not(.btn-shape-keep):not([data-btn-shape="keep"]) {
-    border-radius: 9999px;
-  }
-}
+/* ─── Boutons — forme pill via classes utilitaires (.btn, a[data-btn="true"]) ── */
+/* Les <button> natifs conservent leur border-radius Tailwind (rounded-xl, etc.). */
 
 @layer components {
   .btn,
@@ -118,15 +109,6 @@ body {
     @apply rounded-full;
     text-decoration: none;
   }
-}
-
-/* Priorité sur les utilitaires Tailwind rounded-* restants sur les boutons natifs */
-button:not(.btn-shape-keep):not([data-btn-shape="keep"]),
-input[type="submit"]:not(.btn-shape-keep),
-input[type="button"]:not(.btn-shape-keep),
-input[type="reset"]:not(.btn-shape-keep),
-[role="button"]:not(.btn-shape-keep):not([data-btn-shape="keep"]) {
-  border-radius: 9999px !important;
 }
 
 /* ─── Utilitaires globaux ────────────────────────────────────────────────────── */

@@ -13,6 +13,7 @@ import { ProductFavoriteButton } from './ProductFavoriteButton'
 import { MobileProductCard } from './MobileProductCard'
 import { ProductPromoPrice } from './ProductPromoPrice'
 import { getPromoBadgeLabel, getProductDisplayPrices } from '@/lib/productPromoUtils'
+import { isProductBestSeller, isProductNew } from '@/lib/productBadges'
 
 type ProductCardProduct = FeaturedProduct | MarketplaceProduct
 
@@ -58,6 +59,15 @@ export function ProductCard({
     'stock_quantity' in product && product.stock_quantity !== undefined && product.stock_quantity <= 0
   const promoBadge = product.promotion ? getPromoBadgeLabel(product.promotion) : null
   const priceInfo = getProductDisplayPrices(product)
+  const createdAt = 'created_at' in product ? product.created_at : undefined
+  const isNew = isProductNew(createdAt)
+  const isBestSeller =
+    showBestSeller
+    || isProductBestSeller(
+      'is_best_seller' in product
+        ? { is_best_seller: product.is_best_seller, sales_count: product.sales_count }
+        : {},
+    )
 
   const mobileCard = (
     <MobileProductCard
@@ -71,6 +81,8 @@ export function ProductCard({
           : undefined
       }
       promoBadge={promoBadge}
+      newBadge={isNew && !promoBadge ? 'Nouveau' : null}
+      bestSellerBadge={isBestSeller && !promoBadge && !isNew ? 'Best-seller' : null}
       merchantName={name}
       showMerchantName={variant === 'default' && !compact}
       variant="compact"
@@ -108,7 +120,12 @@ export function ProductCard({
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                {showBestSeller && !outOfStock && !promoBadge && (
+                {isNew && !outOfStock && !promoBadge && (
+                  <div className="absolute top-2 left-2 bg-sky-500 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                    Nouveau
+                  </div>
+                )}
+                {isBestSeller && !outOfStock && !promoBadge && !isNew && (
                   <div className="absolute top-2 left-2 bg-brand-500 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                     Best-seller
                   </div>
@@ -248,8 +265,13 @@ export function ProductCard({
                 Rupture
               </div>
             )}
-            {showBestSeller && !outOfStock && !promoBadge && (
-              <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-brand-600 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+            {isNew && !outOfStock && !promoBadge && (
+              <div className="absolute top-3 left-3 bg-sky-500 text-white px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                Nouveau
+              </div>
+            )}
+            {isBestSeller && !outOfStock && !promoBadge && !isNew && (
+              <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-brand-600 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
                 <Sparkles size={10} /> Best-Seller
               </div>
             )}
@@ -258,8 +280,8 @@ export function ProductCard({
                 {promoBadge}
               </div>
             )}
-            {isSponsored && !showBestSeller && !promoBadge && !outOfStock && (
-              <div className="absolute top-3 left-3 bg-amber-400 text-white px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
+            {isSponsored && !isBestSeller && !isNew && !promoBadge && !outOfStock && (
+              <div className="absolute top-3 left-3 bg-amber-400 text-white px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1">
                 <Sparkles size={10} /> Sponsorisé
               </div>
             )}

@@ -507,7 +507,6 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                     merchantSlug={merchant.slug}
                     merchantName={merchant.business_name}
                     variant="boutique"
-                    showBestSeller={index === 0 && sort === 'recommended'}
                     showAddButton
                     onAdd={() => handleAddToCart(product)}
                     adding={addingId === product.id}

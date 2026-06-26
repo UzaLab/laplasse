@@ -77,7 +77,8 @@ Utiliser la couleur du **domaine**, pas du brand public :
 
 Tous les boutons de l’application sont **entièrement arrondis** (`border-radius: 9999px` / `rounded-full`).
 
-- Appliqué globalement dans `globals.css` sur `button`, `[role="button"]`, `input[type=submit|button|reset]`.
+- Appliqué via classes `.btn` / `.btn-*`, liens `a[data-btn="true"]`, ou `rounded-full` explicite sur les CTA.
+- Les `<button>` UI (vignettes, variantes, onglets) gardent leur `rounded-xl` / `rounded-lg` Tailwind.
 - Les liens stylés bouton doivent inclure `rounded-full` ou la classe `.btn`.
 - **Exception** : ajouter `btn-shape-keep` ou `data-btn-shape="keep"` pour conserver une forme custom (rare).
 

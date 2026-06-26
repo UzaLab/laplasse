@@ -120,6 +120,9 @@ export interface MarketplaceProduct {
     slug: string
     category?: { slug: string; name: string }
   }
+  created_at?: string | null
+  sales_count?: number
+  is_best_seller?: boolean
 }
 
 export interface FeaturedProduct {
