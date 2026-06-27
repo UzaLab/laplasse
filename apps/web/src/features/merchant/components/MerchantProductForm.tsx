@@ -1,12 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   ArrowLeft,
   Banknote,
   Check,
+  ChevronDown,
+  ChevronUp,
   Layers,
   ListChecks,
   Loader2,
@@ -14,6 +16,7 @@ import {
   Save,
   Store,
   Truck,
+  Wand2,
   X,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
@@ -23,12 +26,18 @@ import { RichTextEditor } from '@/components/ui/RichTextEditor'
 import { hasHtmlContent } from '@/lib/htmlUtils'
 import {
   createProduct,
+  fetchCategoryAttributes,
   fetchMyProducts,
   updateProduct,
+  type CategoryAttributePublic,
   type MarketplaceProduct,
+  type ProductCondition,
+  type ProductOrigin,
   type ProductSpecification,
   type ProductStatus,
   type ProductVariantInput,
+  PRODUCT_CONDITION_LABELS,
+  PRODUCT_ORIGIN_LABELS,
 } from '@/lib/marketplaceApi'
 import { fetchShopProductCategories, getShopRoutesFromPathname, type ShopProductCategoryOption } from '@/lib/shopApi'
 import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
@@ -42,6 +51,7 @@ const EMPTY_VARIANT: ProductVariantInput & { kind: 'TEXT' | 'COLOR' } = {
   kind: 'TEXT',
 }
 const MAX_PRODUCT_IMAGES = 10
+const MAX_VARIANTS = 100
 
 const INPUT_CLASS =
   'w-full bg-slate-50 border border-slate-200 text-slate-900 rounded-xl px-4 py-3 font-medium outline-none focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all'
@@ -52,9 +62,19 @@ const CARD_CLASS = 'bg-white rounded-3xl p-6 border border-slate-200 shadow-sm'
 
 interface ProductFormState {
   name: string
+  sku: string
+  short_description: string
   description: string
   composition: string
+  condition: ProductCondition | ''
+  origin: ProductOrigin | ''
+  tags: string
+  weight_grams: string
+  dimensions: string
+  preparation_delay_days: string
+  is_made_to_order: boolean
   specifications: ProductSpecification[]
+  attribute_values: Record<string, string>
   price: string
   stock_quantity: string
   images: string[]
@@ -68,9 +88,19 @@ interface ProductFormState {
 
 const EMPTY_FORM: ProductFormState = {
   name: '',
+  sku: '',
+  short_description: '',
   description: '',
   composition: '',
+  condition: '',
+  origin: '',
+  tags: '',
+  weight_grams: '',
+  dimensions: '',
+  preparation_delay_days: '',
+  is_made_to_order: false,
   specifications: [],
+  attribute_values: {},
   price: '',
   stock_quantity: '0',
   images: [],
@@ -99,11 +129,25 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
     : product.image_url
       ? [product.image_url]
       : []
+  const attrValues: Record<string, string> = {}
+  for (const av of product.attribute_values ?? []) {
+    attrValues[av.attribute_id] = av.value
+  }
   return {
     name: product.name,
+    sku: product.sku ?? '',
+    short_description: product.short_description ?? '',
     description: product.description ?? '',
     composition: product.composition ?? '',
+    condition: (product.condition ?? '') as ProductCondition | '',
+    origin: (product.origin ?? '') as ProductOrigin | '',
+    tags: (product.tags ?? []).join(', '),
+    weight_grams: product.weight_grams != null ? String(product.weight_grams) : '',
+    dimensions: product.dimensions ?? '',
+    preparation_delay_days: product.preparation_delay_days != null ? String(product.preparation_delay_days) : '',
+    is_made_to_order: product.is_made_to_order ?? false,
     specifications: product.specifications ?? [],
+    attribute_values: attrValues,
     price: String(product.price),
     stock_quantity: String(product.stock_quantity),
     images,
@@ -126,6 +170,184 @@ function productToForm(product: MarketplaceProduct): ProductFormState {
 
 function normalizeHtmlField(value: string): string | undefined {
   return hasHtmlContent(value) ? value : undefined
+}
+
+/** Génère toutes les combinaisons de N axes */
+function cartesianProduct(axes: string[][]): string[][] {
+  return axes.reduce<string[][]>(
+    (acc, axis) => acc.flatMap(combo => axis.map(val => [...combo, val])),
+    [[]],
+  )
+}
+
+interface AxisDef {
+  name: string
+  values: string
+}
+
+function VariantAxisAssistant({
+  currentCount,
+  maxVariants,
+  basePrice,
+  onGenerate,
+}: {
+  currentCount: number
+  maxVariants: number
+  basePrice: number
+  onGenerate: (variants: ProductVariantInput[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [axes, setAxes] = useState<AxisDef[]>([
+    { name: 'Taille', values: '' },
+  ])
+  const [preview, setPreview] = useState<string[]>([])
+
+  const updatePreview = (defs: AxisDef[]) => {
+    const filled = defs.filter(a => a.name.trim() && a.values.trim())
+    if (!filled.length) { setPreview([]); return }
+    const axisValues = filled.map(a => a.values.split(',').map(v => v.trim()).filter(Boolean))
+    const combos = cartesianProduct(axisValues)
+    setPreview(combos.map(combo =>
+      combo.map((v, i) => `${filled[i]!.name} : ${v}`).join(' — ')
+    ))
+  }
+
+  const handleAxisChange = (index: number, field: keyof AxisDef, value: string) => {
+    const next = axes.map((a, i) => i === index ? { ...a, [field]: value } : a)
+    setAxes(next)
+    updatePreview(next)
+  }
+
+  const addAxis = () => {
+    if (axes.length >= 3) return
+    const next = [...axes, { name: '', values: '' }]
+    setAxes(next)
+    updatePreview(next)
+  }
+
+  const removeAxis = (index: number) => {
+    const next = axes.filter((_, i) => i !== index)
+    setAxes(next)
+    updatePreview(next)
+  }
+
+  const handleGenerate = () => {
+    const filled = axes.filter(a => a.name.trim() && a.values.trim())
+    if (!filled.length) return
+    const axisValues = filled.map(a => a.values.split(',').map(v => v.trim()).filter(Boolean))
+    const combos = cartesianProduct(axisValues)
+    const toAdd = combos.slice(0, maxVariants - currentCount)
+    const variants: ProductVariantInput[] = toAdd.map(combo => ({
+      name: combo.map((v, i) => `${filled[i]!.name} ${v}`).join(' / '),
+      price: basePrice,
+      stock_quantity: 0,
+      kind: 'TEXT' as const,
+    }))
+    onGenerate(variants)
+    setOpen(false)
+    setAxes([{ name: 'Taille', values: '' }])
+    setPreview([])
+  }
+
+  return (
+    <div className="mb-4 border border-dashed border-brand-200 rounded-2xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-brand-600 hover:bg-brand-50/50 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Wand2 size={16} />
+          Assistant génération de combinaisons
+        </span>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-4 bg-brand-50/30">
+          <p className="text-xs text-slate-500 pt-1">
+            Définissez jusqu&apos;à 3 axes (ex. Taille, Couleur, Volume). Les combinaisons seront ajoutées en variantes texte.
+          </p>
+          <div className="space-y-3">
+            {axes.map((axis, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <div className="flex-1 grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={axis.name}
+                    onChange={e => handleAxisChange(i, 'name', e.target.value)}
+                    placeholder={i === 0 ? 'Ex: Taille' : i === 1 ? 'Ex: Couleur' : 'Ex: Volume'}
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  />
+                  <input
+                    type="text"
+                    value={axis.values}
+                    onChange={e => handleAxisChange(i, 'values', e.target.value)}
+                    placeholder="S, M, L, XL (séparés par virgules)"
+                    className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+                {axes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAxis(i)}
+                    className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors mt-0.5"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {axes.length < 3 && (
+            <button
+              type="button"
+              onClick={addAxis}
+              className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+            >
+              <Plus size={12} /> Ajouter un axe
+            </button>
+          )}
+
+          {preview.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-3">
+              <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                Aperçu — {preview.length} combinaison{preview.length > 1 ? 's' : ''}
+                {preview.length > maxVariants - currentCount && (
+                  <span className="ml-1 text-orange-500">
+                    (max {maxVariants - currentCount} ajoutables)
+                  </span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                {preview.slice(0, 30).map((p, i) => (
+                  <span key={i} className="text-xs bg-slate-100 text-slate-700 rounded-full px-2.5 py-1 font-medium">
+                    {p}
+                  </span>
+                ))}
+                {preview.length > 30 && (
+                  <span className="text-xs text-slate-400 font-medium px-2 py-1">
+                    +{preview.length - 30} autres…
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={preview.length === 0 || currentCount >= maxVariants}
+            onClick={handleGenerate}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500 text-white text-sm font-bold hover:bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Wand2 size={15} />
+            Générer {Math.min(preview.length, maxVariants - currentCount)} variante{Math.min(preview.length, maxVariants - currentCount) > 1 ? 's' : ''}
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function normalizeSpecifications(specs: ProductSpecification[]): ProductSpecification[] {
@@ -165,6 +387,7 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   const [initialHadVariants, setInitialHadVariants] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; label: string }[]>([])
+  const [categoryAttributes, setCategoryAttributes] = useState<CategoryAttributePublic[]>([])
 
   const categorySelectOptions = useMemo(
     () => categoryOptions.map(opt => ({ value: opt.id, label: opt.label })),
@@ -177,6 +400,15 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
       setCategoryOptions(flattenShopCategories(categories))
     })
   }, [activeShopId])
+
+  // Load category-specific attributes when category changes
+  useEffect(() => {
+    if (!form.category_id) {
+      setCategoryAttributes([])
+      return
+    }
+    void fetchCategoryAttributes(form.category_id).then(attrs => setCategoryAttributes(attrs))
+  }, [form.category_id])
 
   const loadProduct = useCallback(async () => {
     if (!productId || !activeShopId) return
@@ -248,11 +480,27 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
 
     const specifications = normalizeSpecifications(form.specifications)
 
+    const tagList = form.tags.split(',').map(t => t.trim()).filter(Boolean)
+
+    const attributeValuesList = Object.entries(form.attribute_values)
+      .filter(([, v]) => v.trim() !== '')
+      .map(([attribute_id, value]) => ({ attribute_id, value: value.trim() }))
+
     const payload = {
       name: form.name.trim(),
+      sku: form.sku.trim() || undefined,
+      short_description: form.short_description.trim() || undefined,
       description: normalizeHtmlField(form.description),
       composition: normalizeHtmlField(form.composition),
+      condition: (form.condition || undefined) as ProductCondition | undefined,
+      origin: (form.origin || undefined) as ProductOrigin | undefined,
+      tags: tagList.length ? tagList : undefined,
+      weight_grams: form.weight_grams ? parseInt(form.weight_grams, 10) : undefined,
+      dimensions: form.dimensions.trim() || undefined,
+      preparation_delay_days: form.preparation_delay_days ? parseInt(form.preparation_delay_days, 10) : undefined,
+      is_made_to_order: form.is_made_to_order || undefined,
       specifications,
+      attribute_values: attributeValuesList.length ? attributeValuesList : undefined,
       price: form.useVariants
         ? Math.min(...variants.map(v => v.price))
         : parseInt(form.price, 10) || 0,
@@ -292,12 +540,15 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
       return
     }
 
+    const isPublishAction = targetStatus === 'ACTIVE'
     notify.success(
       isDraft
         ? 'Brouillon enregistré'
-        : isEdit
-          ? 'Produit mis à jour'
-          : 'Produit publié',
+        : isPublishAction && !isEdit
+          ? 'Produit soumis — en attente de validation'
+          : isPublishAction && isEdit && form.status === 'DRAFT'
+            ? 'Produit soumis — en attente de validation'
+            : 'Produit mis à jour',
     )
     router.push(routes.products)
   }
@@ -379,9 +630,22 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                     type="text"
                     value={form.name}
                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Ex : Robe Wax Élégance"
+                    placeholder="Ex : Robe Wax Élégance (min. 5 caractères)"
                     className={INPUT_CLASS}
                   />
+                  <p className="text-xs text-slate-400 mt-1">Entre 5 et 100 caractères.</p>
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>Accroche courte</label>
+                  <input
+                    type="text"
+                    value={form.short_description}
+                    onChange={e => setForm(f => ({ ...f, short_description: e.target.value }))}
+                    placeholder="Une phrase percutante visible sur la fiche produit…"
+                    maxLength={300}
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">{form.short_description.length}/300 car. — résumé affiché en haut de la fiche produit.</p>
                 </div>
                 <div>
                   <label className={LABEL_CLASS}>Description détaillée</label>
@@ -503,6 +767,180 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                 showUrlInput={false}
               />
             </section>
+
+            {/* Détails & logistique */}
+            <section className={CARD_CLASS}>
+              <h2 className="text-lg font-extrabold text-slate-900 mb-6">Détails &amp; logistique</h2>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={LABEL_CLASS}>État du produit</label>
+                    <select
+                      value={form.condition}
+                      onChange={e => setForm(f => ({ ...f, condition: e.target.value as ProductCondition | '' }))}
+                      className={INPUT_CLASS}
+                    >
+                      <option value="">Non spécifié</option>
+                      {(Object.keys(PRODUCT_CONDITION_LABELS) as ProductCondition[]).map(k => (
+                        <option key={k} value={k}>{PRODUCT_CONDITION_LABELS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>Origine</label>
+                    <select
+                      value={form.origin}
+                      onChange={e => setForm(f => ({ ...f, origin: e.target.value as ProductOrigin | '' }))}
+                      className={INPUT_CLASS}
+                    >
+                      <option value="">Non spécifiée</option>
+                      {(Object.keys(PRODUCT_ORIGIN_LABELS) as ProductOrigin[]).map(k => (
+                        <option key={k} value={k}>{PRODUCT_ORIGIN_LABELS[k]}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className={LABEL_CLASS}>Mots-clés / tags</label>
+                  <input
+                    type="text"
+                    value={form.tags}
+                    onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                    placeholder="Ex : wax, femme, robe, été — séparés par des virgules"
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Séparés par des virgules. Améliorent la recherche.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={LABEL_CLASS}>Poids (g)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.weight_grams}
+                      onChange={e => setForm(f => ({ ...f, weight_grams: e.target.value }))}
+                      placeholder="Ex : 500"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>Dimensions (L×l×H)</label>
+                    <input
+                      type="text"
+                      value={form.dimensions}
+                      onChange={e => setForm(f => ({ ...f, dimensions: e.target.value }))}
+                      placeholder="Ex : 30×20×10 cm"
+                      maxLength={50}
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                  <div>
+                    <label className={LABEL_CLASS}>Délai de préparation (j)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.preparation_delay_days}
+                      onChange={e => setForm(f => ({ ...f, preparation_delay_days: e.target.value }))}
+                      placeholder="Ex : 2"
+                      className={INPUT_CLASS}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Jours ouvrés avant expédition.</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="inline-flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.is_made_to_order}
+                      onChange={e => setForm(f => ({ ...f, is_made_to_order: e.target.checked }))}
+                      className="rounded border-slate-300 text-brand-500 focus:ring-brand-500/20"
+                    />
+                    <span className="text-sm font-bold text-slate-700">Produit fabriqué sur commande</span>
+                  </label>
+                  <p className="text-xs text-slate-400 mt-1 ml-6">
+                    Indique à l&apos;acheteur que le produit est créé après commande — pas de stock immédiat.
+                  </p>
+                </div>
+                {/* SKU produit */}
+                <div>
+                  <label className={LABEL_CLASS}>Référence interne (SKU)</label>
+                  <input
+                    type="text"
+                    value={form.sku}
+                    onChange={e => setForm(f => ({ ...f, sku: e.target.value }))}
+                    placeholder="Ex : REF-ROBE-WAX-001"
+                    maxLength={60}
+                    className={INPUT_CLASS}
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Optionnel — référence interne pour votre gestion de stock.</p>
+                </div>
+              </div>
+            </section>
+
+            {/* Attributs dynamiques par catégorie */}
+            {categoryAttributes.length > 0 && (
+              <section className={CARD_CLASS}>
+                <h2 className="text-lg font-extrabold text-slate-900 mb-1">Attributs de la catégorie</h2>
+                <p className="text-sm text-slate-500 mb-5">
+                  Ces champs sont spécifiques à la catégorie sélectionnée et améliorent la visibilité du produit.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {categoryAttributes.map(attr => (
+                    <div key={attr.id}>
+                      <label className={LABEL_CLASS}>
+                        {attr.label}
+                        {attr.unit ? <span className="ml-1 normal-case font-normal text-slate-400">({attr.unit})</span> : null}
+                        {attr.is_required && <span className="ml-1 text-red-500">*</span>}
+                      </label>
+                      {attr.attribute_type === 'ENUM' ? (
+                        <select
+                          value={form.attribute_values[attr.id] ?? ''}
+                          onChange={e => setForm(f => ({
+                            ...f,
+                            attribute_values: { ...f.attribute_values, [attr.id]: e.target.value },
+                          }))}
+                          className={INPUT_CLASS}
+                        >
+                          <option value="">Non spécifié</option>
+                          {attr.enum_options.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : attr.attribute_type === 'BOOLEAN' ? (
+                        <label className="inline-flex items-center gap-3 cursor-pointer mt-1">
+                          <input
+                            type="checkbox"
+                            checked={form.attribute_values[attr.id] === 'true'}
+                            onChange={e => setForm(f => ({
+                              ...f,
+                              attribute_values: { ...f.attribute_values, [attr.id]: e.target.checked ? 'true' : 'false' },
+                            }))}
+                            className="rounded border-slate-300 text-brand-500"
+                          />
+                          <span className="text-sm text-slate-700">{attr.label}</span>
+                        </label>
+                      ) : (
+                        <input
+                          type={attr.attribute_type === 'NUMBER' ? 'number' : 'text'}
+                          value={form.attribute_values[attr.id] ?? ''}
+                          onChange={e => setForm(f => ({
+                            ...f,
+                            attribute_values: { ...f.attribute_values, [attr.id]: e.target.value },
+                          }))}
+                          placeholder={attr.placeholder ?? undefined}
+                          className={INPUT_CLASS}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* Legal notice for category */}
+                {categoryOptions.find(o => o.id === form.category_id) && (() => {
+                  const catAttr = categoryAttributes[0]
+                  return null // legal_notice shown via category details
+                })()}
+              </section>
+            )}
 
             {/* Tarification & inventaire */}
             <section className={CARD_CLASS}>
@@ -736,31 +1174,45 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
                       )}
                     </div>
                   ))}
-                  <div className="flex flex-wrap gap-2">
+                  <VariantAxisAssistant
+                    currentCount={form.variants.length}
+                    maxVariants={MAX_VARIANTS}
+                    basePrice={parseInt(form.price, 10) || 0}
+                    onGenerate={generated =>
+                      setForm(f => ({
+                        ...f,
+                        variants: [...f.variants, ...generated],
+                      }))
+                    }
+                  />
+                  <div className="flex flex-wrap gap-2 items-center">
                     <button
                       type="button"
+                      disabled={form.variants.length >= MAX_VARIANTS}
                       onClick={() =>
                         setForm(f => ({
                           ...f,
                           variants: [...f.variants, { ...EMPTY_VARIANT, kind: 'TEXT' }],
                         }))
                       }
-                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-700 px-3 py-2 rounded-xl border border-brand-200 bg-brand-50/50"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-700 px-3 py-2 rounded-xl border border-brand-200 bg-brand-50/50 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Plus size={16} /> Variante texte
                     </button>
                     <button
                       type="button"
+                      disabled={form.variants.length >= MAX_VARIANTS}
                       onClick={() =>
                         setForm(f => ({
                           ...f,
                           variants: [...f.variants, { ...EMPTY_VARIANT, kind: 'COLOR', color_hex: '#000000' }],
                         }))
                       }
-                      className="inline-flex items-center gap-2 text-sm font-bold text-violet-600 hover:text-violet-700 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50/50"
+                      className="inline-flex items-center gap-2 text-sm font-bold text-violet-600 hover:text-violet-700 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50/50 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Plus size={16} /> Variante couleur
                     </button>
+                    <span className="text-xs text-slate-400">{form.variants.length}/{MAX_VARIANTS} variantes</span>
                   </div>
                 </div>
               )}

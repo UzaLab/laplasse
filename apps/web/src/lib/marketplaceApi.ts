@@ -84,6 +84,7 @@ export interface ProductVariant {
   price: number
   stock_quantity: number
   sku?: string | null
+  is_disabled?: boolean
 }
 
 export interface ProductPromotionInfo {
@@ -101,13 +102,64 @@ export interface ProductSpecification {
   value: string
 }
 
+export interface CategoryAttributePublic {
+  id: string
+  label: string
+  key: string
+  attribute_type: 'TEXT' | 'NUMBER' | 'ENUM' | 'BOOLEAN'
+  is_required: boolean
+  sort_order: number
+  enum_options: string[]
+  unit: string | null
+  placeholder: string | null
+}
+
+export interface ProductAttributeValue {
+  attribute_id: string
+  value: string
+  attribute?: {
+    id: string
+    label: string
+    key: string
+    attribute_type: string
+    unit: string | null
+  }
+}
+
+export type ProductCondition = 'NEW' | 'USED_GOOD' | 'USED_FAIR' | 'REFURBISHED'
+export type ProductOrigin = 'LOCAL_CI' | 'IMPORTED' | 'HANDMADE'
+
+export const PRODUCT_CONDITION_LABELS: Record<ProductCondition, string> = {
+  NEW: 'Neuf',
+  USED_GOOD: 'Occasion — bon état',
+  USED_FAIR: 'Occasion — acceptable',
+  REFURBISHED: 'Reconditionné',
+}
+
+export const PRODUCT_ORIGIN_LABELS: Record<ProductOrigin, string> = {
+  LOCAL_CI: "Fabriqué en Côte d'Ivoire",
+  IMPORTED: 'Importé',
+  HANDMADE: 'Fait main / artisanat',
+}
+
 export interface MarketplaceProduct {
   id: string
   name: string
   slug: string
+  sku?: string | null
+  short_description?: string | null
   description?: string | null
   composition?: string | null
   specifications?: ProductSpecification[]
+  condition?: ProductCondition | null
+  origin?: ProductOrigin | null
+  tags?: string[]
+  weight_grams?: number | null
+  dimensions?: string | null
+  preparation_delay_days?: number | null
+  is_made_to_order?: boolean
+  seo_title?: string | null
+  seo_description?: string | null
   price: number
   currency: string
   stock_quantity: number
@@ -119,7 +171,8 @@ export interface MarketplaceProduct {
   has_variants?: boolean
   variants?: ProductVariant[]
   category_id?: string | null
-  category?: { id: string; name: string; slug: string; parent_id?: string | null } | null
+  category?: { id: string; name: string; slug: string; parent_id?: string | null; legal_notice?: string | null } | null
+  attribute_values?: ProductAttributeValue[]
   original_price?: number
   promo_price?: number | null
   promotion?: ProductPromotionInfo | null
@@ -132,6 +185,15 @@ export interface MarketplaceProduct {
   created_at?: string | null
   sales_count?: number
   is_best_seller?: boolean
+}
+
+export async function fetchCategoryAttributes(categoryId: string): Promise<CategoryAttributePublic[]> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL ?? ''}/marketplace/product-categories/${categoryId}/attributes`,
+    { next: { revalidate: 3600 } },
+  )
+  if (!res.ok) return []
+  return res.json() as Promise<CategoryAttributePublic[]>
 }
 
 export interface FeaturedProduct {
@@ -613,6 +675,19 @@ export function fetchMerchantProducts(
   return publicFetch<MarketplaceProduct[]>(
     `/shops/${shopSlug}/products${query ? `?${query}` : ''}`,
   )
+}
+
+export interface ShopTrustScore {
+  score: number | null
+  total_orders: number
+  fulfilled_orders: number
+  cancelled_orders: number
+  label: string
+  badge: 'trusted' | 'good' | 'new' | null
+}
+
+export function fetchShopTrustScore(shopSlug: string): Promise<ShopTrustScore | null> {
+  return publicFetch<ShopTrustScore>(`/shops/${shopSlug}/trust`)
 }
 
 export interface ShopCollectionPublic {

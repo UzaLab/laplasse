@@ -268,7 +268,7 @@ export class MarketplaceService {
       slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
       OR: [
         { variants: { none: {} }, stock_quantity: { gt: 0 } },
-        { variants: { some: { stock_quantity: { gt: 0 } } } },
+        { variants: { some: { stock_quantity: { gt: 0 }, is_disabled: false } } },
       ],
       shop: { is_active: true, status: 'ACTIVE' },
       ...extra,
@@ -287,7 +287,7 @@ export class MarketplaceService {
       category: { select: { id: true, name: true, slug: true } },
       shop: { select: { name: true, slug: true, logo: true, merchant_id: true } },
       variants: {
-        where: { stock_quantity: { gt: 0 } },
+        where: { stock_quantity: { gt: 0 }, is_disabled: false },
         orderBy: { created_at: 'asc' as const },
         select: { id: true, stock_quantity: true },
       },
@@ -399,6 +399,81 @@ export class MarketplaceService {
     if (!pickup && !delivery) {
       throw new BadRequestException('Activez au moins un mode de livraison (retrait ou livraison)')
     }
+  }
+
+  private assertPublishRequirements(opts: {
+    name: string
+    price: number
+    imageUrls: string[]
+    hasVariants: boolean
+    variants?: { price: number }[] | null
+    description?: string | null
+    short_description?: string | null
+  }) {
+    if (opts.name.trim().length < 5) {
+      throw new BadRequestException('Le nom du produit doit contenir au moins 5 caractères')
+    }
+    // Anti-spam : pas de numéro de téléphone dans le nom
+    if (/\b(?:0[1-9]|[1-9]\d)\s*\d{2}\s*\d{2}\s*\d{2}\s*\d{2}\b/.test(opts.name)) {
+      throw new BadRequestException('Le nom du produit ne doit pas contenir de numéro de téléphone')
+    }
+    const effectivePrice = opts.hasVariants && opts.variants?.length
+      ? Math.min(...opts.variants.map(v => v.price))
+      : opts.price
+    if (effectivePrice <= 0) {
+      throw new BadRequestException('Le prix doit être supérieur à 0 pour publier un produit')
+    }
+    if (effectivePrice < 100) {
+      throw new BadRequestException('Le prix minimum de publication est 100 XOF')
+    }
+    if (opts.imageUrls.length === 0) {
+      throw new BadRequestException('Au moins une image est requise pour publier un produit')
+    }
+    // Sanitize HTML descriptions — rejeter les balises interdites
+    const forbiddenTagPattern = /<\s*(script|iframe|object|embed|form|input|button|a\s|link\s)[^>]*>/i
+    for (const field of [opts.description, opts.short_description]) {
+      if (field && forbiddenTagPattern.test(field)) {
+        throw new BadRequestException('La description contient des balises HTML non autorisées')
+      }
+    }
+  }
+
+  /**
+   * Sanitize les champs HTML pour supprimer les éléments dangereux
+   * tout en conservant la mise en forme basique (p, ul, li, strong, em).
+   */
+  private sanitizeHtml(html?: string | null): string | undefined {
+    if (!html) return html === null ? undefined : undefined
+    return html
+      .replace(/<\s*(script|iframe|object|embed|form|input|button)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<\s*\/?(script|iframe|object|embed|form|input|button)[^>]*>/gi, '')
+      .replace(/<\s*a\s[^>]*href\s*=\s*["'](?!https?:\/\/laplasse)[^"']*["'][^>]*>/gi, '<span>')
+      .replace(/<\s*\/a\s*>/gi, '</span>')
+      .trim() || undefined
+  }
+
+  private async syncAttributeValues(
+    productId: string,
+    values: { attribute_id: string; value: string }[],
+  ) {
+    if (!values.length) {
+      await this.prisma.productAttributeValue.deleteMany({ where: { product_id: productId } })
+      return
+    }
+    await this.prisma.$transaction(
+      values.map(v =>
+        this.prisma.productAttributeValue.upsert({
+          where: { product_id_attribute_id: { product_id: productId, attribute_id: v.attribute_id } },
+          update: { value: v.value.trim() },
+          create: { product_id: productId, attribute_id: v.attribute_id, value: v.value.trim() },
+        }),
+      ),
+    )
+    // Remove values not in the new list
+    const incoming = values.map(v => v.attribute_id)
+    await this.prisma.productAttributeValue.deleteMany({
+      where: { product_id: productId, attribute_id: { notIn: incoming } },
+    })
   }
 
   private normalizeSpecifications(
@@ -924,6 +999,7 @@ export class MarketplaceService {
     price: true,
     stock_quantity: true,
     sku: true,
+    is_disabled: true,
   } as const
 
   // ─── Products (public) ───────────────────────────────────────────────────────
@@ -1132,10 +1208,28 @@ export class MarketplaceService {
           orderBy: [{ sort_order: 'asc' }, { created_at: 'asc' }],
           select: this.publicVariantSelect,
         },
+        category: { select: { id: true, name: true, slug: true, legal_notice: true } },
+        attribute_values: {
+          include: {
+            attribute: {
+              select: { id: true, label: true, key: true, attribute_type: true, unit: true },
+            },
+          },
+        },
         ...this.productImagesInclude,
       },
     })
-    if (!product) throw new NotFoundException('Produit introuvable')
+    if (!product) {
+      // Vérifier si le produit existe mais est archivé — pour rediriger le frontend
+      const archived = await this.prisma.product.findFirst({
+        where: { shop_id: shop.id, slug: productSlug, status: 'ARCHIVED' },
+        select: { id: true },
+      })
+      if (archived) {
+        throw new NotFoundException('ARCHIVED')
+      }
+      throw new NotFoundException('Produit introuvable')
+    }
     const attached = this.attachProductImages({
       ...product,
       has_variants: product.variants.length > 0,
@@ -1201,6 +1295,9 @@ export class MarketplaceService {
     }
 
     const hasVariants = (dto.variants?.length ?? 0) > 0
+    if (hasVariants && dto.variants!.length > 100) {
+      throw new BadRequestException('Un produit ne peut pas avoir plus de 100 variantes')
+    }
     const stock = hasVariants
       ? dto.variants!.reduce((sum, v) => sum + (v.stock_quantity ?? 0), 0)
       : dto.stock_quantity ?? 0
@@ -1214,6 +1311,12 @@ export class MarketplaceService {
       this.assertDeliveryModes(dto.allow_pickup, dto.allow_delivery)
     }
     const imageUrls = this.resolveImageUrls(dto)
+    if (!isDraft) {
+      this.assertPublishRequirements({
+        name: dto.name, price, imageUrls, hasVariants, variants: dto.variants,
+        description: dto.description, short_description: dto.short_description,
+      })
+    }
     const categoryId = await this.resolveProductCategoryId(dto)
     if (!isDraft) {
       await this.assertShopProductCategory(shop.id, categoryId)
@@ -1226,8 +1329,19 @@ export class MarketplaceService {
         category_id: categoryId ?? undefined,
         name: dto.name,
         slug,
-        description: dto.description,
-        composition: dto.composition,
+        sku: dto.sku ?? null,
+        short_description: dto.short_description,
+        description: this.sanitizeHtml(dto.description),
+        composition: this.sanitizeHtml(dto.composition),
+        seo_title: dto.seo_title ?? null,
+        seo_description: dto.seo_description ?? null,
+        condition: dto.condition as any,
+        origin: dto.origin as any,
+        tags: dto.tags ?? [],
+        weight_grams: dto.weight_grams,
+        dimensions: dto.dimensions,
+        preparation_delay_days: dto.preparation_delay_days,
+        is_made_to_order: dto.is_made_to_order ?? false,
         ...(specifications !== undefined ? { specifications } : {}),
         price,
         stock_quantity: stock,
@@ -1250,6 +1364,7 @@ export class MarketplaceService {
                 price: v.price,
                 stock_quantity: v.stock_quantity ?? 0,
                 sku: v.sku,
+                is_disabled: v.is_disabled ?? false,
                 sort_order: index,
               })),
             }
@@ -1260,6 +1375,10 @@ export class MarketplaceService {
         ...this.productImagesInclude,
       },
     })
+    // Persist attribute_values (CategoryAttribute dynamic fields)
+    if (dto.attribute_values?.length) {
+      await this.syncAttributeValues(created.id, dto.attribute_values)
+    }
     void this.searchService.syncProduct(created.id)
     if (created.status === 'PENDING_REVIEW') {
       void this.adminNotifications.productPendingReview(created.id, created.name)
@@ -1281,10 +1400,25 @@ export class MarketplaceService {
       status = 'PENDING_REVIEW'
     }
 
+    // Re-modération si changement critique sur un produit ACTIVE
+    const isCurrentlyActive = existing.status === 'ACTIVE'
+    if (isCurrentlyActive && !status) {
+      const nameChanged = dto.name !== undefined && dto.name.trim() !== existing.name
+      const categoryChanged = dto.category_id !== undefined && dto.category_id !== existing.category_id
+      const categorySlugChanged = dto.category_slug !== undefined // résolution async vérifiée plus loin
+      const imagesChanged = dto.images !== undefined || dto.image_url !== undefined
+      if (nameChanged || categoryChanged || categorySlugChanged || imagesChanged) {
+        status = 'PENDING_REVIEW'
+      }
+    }
+
     let stock = dto.stock_quantity
     let price = dto.price
 
     if (dto.variants) {
+      if (dto.variants.length > 100) {
+        throw new BadRequestException('Un produit ne peut pas avoir plus de 100 variantes')
+      }
       await this.prisma.productVariant.deleteMany({ where: { product_id: productId } })
       if (dto.variants.length > 0) {
         await this.prisma.productVariant.createMany({
@@ -1297,6 +1431,7 @@ export class MarketplaceService {
             price: v.price,
             stock_quantity: v.stock_quantity ?? 0,
             sku: v.sku,
+            is_disabled: v.is_disabled ?? false,
             sort_order: index,
           })),
         })
@@ -1324,6 +1459,20 @@ export class MarketplaceService {
         ? this.resolveImageUrls({ image_url: dto.image_url })
         : undefined
 
+    if (!savingAsDraft && status === 'PENDING_REVIEW') {
+      const effectiveImageUrls = imageUrls ?? (existing.image_url ? [existing.image_url] : [])
+      const hasVariants = (dto.variants?.length ?? 0) > 0 || (existing.variants?.length ?? 0) > 0
+      this.assertPublishRequirements({
+        name: dto.name ?? existing.name,
+        price: price ?? existing.price,
+        imageUrls: effectiveImageUrls,
+        hasVariants,
+        variants: dto.variants,
+        description: dto.description,
+        short_description: dto.short_description,
+      })
+    }
+
     const categoryId = await this.resolveProductCategoryId(dto)
     const finalCategoryId = categoryId !== undefined ? categoryId : existing.category_id
     if (!savingAsDraft) {
@@ -1336,8 +1485,19 @@ export class MarketplaceService {
       where: { id: productId },
       data: {
         name: dto.name,
-        description: dto.description,
-        composition: dto.composition,
+        ...(dto.sku !== undefined ? { sku: dto.sku || null } : {}),
+        short_description: dto.short_description,
+        description: dto.description !== undefined ? this.sanitizeHtml(dto.description) : undefined,
+        composition: dto.composition !== undefined ? this.sanitizeHtml(dto.composition) : undefined,
+        ...(dto.seo_title !== undefined ? { seo_title: dto.seo_title || null } : {}),
+        ...(dto.seo_description !== undefined ? { seo_description: dto.seo_description || null } : {}),
+        ...(dto.condition !== undefined ? { condition: dto.condition as any } : {}),
+        ...(dto.origin !== undefined ? { origin: dto.origin as any } : {}),
+        ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
+        ...(dto.weight_grams !== undefined ? { weight_grams: dto.weight_grams } : {}),
+        ...(dto.dimensions !== undefined ? { dimensions: dto.dimensions } : {}),
+        ...(dto.preparation_delay_days !== undefined ? { preparation_delay_days: dto.preparation_delay_days } : {}),
+        ...(dto.is_made_to_order !== undefined ? { is_made_to_order: dto.is_made_to_order } : {}),
         ...(specifications !== undefined ? { specifications } : {}),
         price,
         stock_quantity: stock,
@@ -1353,6 +1513,10 @@ export class MarketplaceService {
       await this.syncProductImages(productId, imageUrls)
     }
 
+    if (dto.attribute_values !== undefined) {
+      await this.syncAttributeValues(productId, dto.attribute_values)
+    }
+
     const withImages = await this.prisma.product.findUniqueOrThrow({
       where: { id: productId },
       include: {
@@ -1365,6 +1529,52 @@ export class MarketplaceService {
       void this.adminNotifications.productPendingReview(withImages.id, withImages.name)
     }
     return this.attachProductImages(withImages)
+  }
+
+  async getShopTrustScore(shopSlug: string): Promise<{
+    score: number | null
+    total_orders: number
+    fulfilled_orders: number
+    cancelled_orders: number
+    label: string
+    badge: 'trusted' | 'good' | 'new' | null
+  }> {
+    const shop = await this.resolveShopBySlug(shopSlug)
+    const since = new Date()
+    since.setDate(since.getDate() - 90)
+
+    const [fulfilled, cancelled, total] = await Promise.all([
+      this.prisma.order.count({
+        where: {
+          shop_id: shop.id,
+          status: { in: ['DELIVERED', 'COMPLETED'] },
+          created_at: { gte: since },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          shop_id: shop.id,
+          status: 'CANCELLED',
+          created_at: { gte: since },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          shop_id: shop.id,
+          status: { in: ['DELIVERED', 'COMPLETED', 'CANCELLED'] },
+          created_at: { gte: since },
+        },
+      }),
+    ])
+
+    if (total < 3) {
+      return { score: null, total_orders: total, fulfilled_orders: fulfilled, cancelled_orders: cancelled, label: 'Nouveau vendeur', badge: 'new' }
+    }
+
+    const score = Math.round((fulfilled / total) * 100)
+    const badge: 'trusted' | 'good' | 'new' = score >= 92 ? 'trusted' : score >= 75 ? 'good' : 'new'
+    const label = badge === 'trusted' ? 'Vendeur de confiance' : badge === 'good' ? 'Vendeur fiable' : 'En cours d\'évaluation'
+    return { score, total_orders: total, fulfilled_orders: fulfilled, cancelled_orders: cancelled, label, badge }
   }
 
   async deleteProduct(userId: string, productId: string, shopId?: string) {
@@ -3465,6 +3675,8 @@ export class MarketplaceService {
     merchant?: string
     shop?: string
     category?: string
+    condition?: string
+    origin?: string
     sort?: string
     maxPrice?: number
     country?: string
@@ -3534,9 +3746,20 @@ export class MarketplaceService {
       }
     }
 
+    const VALID_CONDITIONS = ['NEW', 'USED_GOOD', 'USED_FAIR', 'REFURBISHED']
+    const VALID_ORIGINS = ['LOCAL_CI', 'IMPORTED', 'HANDMADE']
+    const conditionFilter = query?.condition && VALID_CONDITIONS.includes(query.condition.toUpperCase())
+      ? query.condition.toUpperCase()
+      : undefined
+    const originFilter = query?.origin && VALID_ORIGINS.includes(query.origin.toUpperCase())
+      ? query.origin.toUpperCase()
+      : undefined
+
     const catalogSelect = this.marketplaceCatalogSelect()
     const where = this.marketplaceCartProductWhere({
       ...(categoryId ? { category_id: categoryId } : {}),
+      ...(conditionFilter ? { condition: conditionFilter as any } : {}),
+      ...(originFilter ? { origin: originFilter as any } : {}),
       ...(query?.maxPrice != null && query.maxPrice > 0
         ? { price: { lte: query.maxPrice } }
         : {}),

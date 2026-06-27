@@ -372,7 +372,18 @@ export function ShopProductsPanel() {
                   >
                     {product.name}
                   </Link>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500">
+                  <span className={cn(
+                    'text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg',
+                    product.status === 'ACTIVE'
+                      ? 'bg-green-50 text-green-700 border border-green-100'
+                      : product.status === 'PENDING_REVIEW'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : product.status === 'OUT_OF_STOCK'
+                          ? 'bg-orange-50 text-orange-700 border border-orange-100'
+                          : product.status === 'ARCHIVED'
+                            ? 'bg-red-50 text-red-600 border border-red-100'
+                            : 'bg-slate-100 text-slate-500',
+                  )}>
                     {PRODUCT_STATUS_LABELS[product.status]}
                   </span>
                   {product.category ? (

@@ -8,7 +8,20 @@ export interface ProductCategoryNode {
   slug: string
   icon: string | null
   sort_order: number
+  legal_notice?: string | null
   children: ProductCategoryNode[]
+}
+
+export interface CategoryAttributePublic {
+  id: string
+  label: string
+  key: string
+  attribute_type: string
+  is_required: boolean
+  sort_order: number
+  enum_options: string[]
+  unit: string | null
+  placeholder: string | null
 }
 
 @Injectable()
@@ -33,9 +46,68 @@ export class ProductCategoriesService {
         icon: true,
         parent_id: true,
         sort_order: true,
+        legal_notice: true,
       },
     })
     return this.buildTree(rows)
+  }
+
+  async getCategoryAttributes(categoryId: string): Promise<CategoryAttributePublic[]> {
+    const attrs = await this.prisma.categoryAttribute.findMany({
+      where: { category_id: categoryId },
+      orderBy: [{ sort_order: 'asc' }, { label: 'asc' }],
+      select: {
+        id: true,
+        label: true,
+        key: true,
+        attribute_type: true,
+        is_required: true,
+        sort_order: true,
+        enum_options: true,
+        unit: true,
+        placeholder: true,
+      },
+    })
+    return attrs.map(a => ({ ...a, attribute_type: a.attribute_type as string }))
+  }
+
+  async getCategoryWithAncestorAttributes(categoryId: string): Promise<CategoryAttributePublic[]> {
+    const category = await this.prisma.productCategory.findUnique({
+      where: { id: categoryId },
+      select: { id: true, parent_id: true },
+    })
+    if (!category) return []
+
+    const ids: string[] = [categoryId]
+    if (category.parent_id) ids.push(category.parent_id)
+
+    const attrs = await this.prisma.categoryAttribute.findMany({
+      where: { category_id: { in: ids } },
+      orderBy: [{ sort_order: 'asc' }],
+      select: {
+        id: true,
+        label: true,
+        key: true,
+        attribute_type: true,
+        is_required: true,
+        sort_order: true,
+        enum_options: true,
+        unit: true,
+        placeholder: true,
+        category_id: true,
+      },
+    })
+
+    // Category-specific attrs first, then parent attrs, no duplicates on key
+    const seen = new Set<string>()
+    const result: CategoryAttributePublic[] = []
+    for (const a of attrs.sort((a, b) => (a.category_id === categoryId ? -1 : 1) - (b.category_id === categoryId ? -1 : 1))) {
+      if (!seen.has(a.key)) {
+        seen.add(a.key)
+        result.push({ ...a, attribute_type: a.attribute_type as string })
+      }
+    }
+    return result
   }
 
   async listAdmin() {
@@ -176,6 +248,7 @@ export class ProductCategoriesService {
       icon: string | null
       parent_id: string | null
       sort_order: number
+      legal_notice?: string | null
     }[],
   ): ProductCategoryNode[] {
     const byParent = new Map<string | null, typeof rows>()
@@ -192,6 +265,7 @@ export class ProductCategoriesService {
         slug: row.slug,
         icon: row.icon,
         sort_order: row.sort_order,
+        legal_notice: row.legal_notice,
         children: visit(row.id),
       }))
 

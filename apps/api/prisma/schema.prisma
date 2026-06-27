@@ -463,15 +463,16 @@ model ProductFavorite {
 }
 
 model ProductCategory {
-  id         String   @id @default(cuid())
-  name       String
-  slug       String   @unique
-  icon       String?
-  parent_id  String?
-  sort_order Int      @default(0)
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  icon         String?
+  parent_id    String?
+  sort_order   Int      @default(0)
+  is_active    Boolean  @default(true)
+  legal_notice String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   parent    ProductCategory?         @relation("ProductCategoryTree", fields: [parent_id], references: [id], onDelete: SetNull)
   children  ProductCategory[]        @relation("ProductCategoryTree")
@@ -480,9 +481,49 @@ model ProductCategory {
   shops     ShopProductCategory[]
   promotions Promotion[]
   promotion_links PromotionCategory[]
+  attributes CategoryAttribute[]
 
   @@index([parent_id, sort_order])
   @@index([is_active])
+}
+
+enum CategoryAttributeType {
+  TEXT
+  NUMBER
+  ENUM
+  BOOLEAN
+}
+
+model CategoryAttribute {
+  id             String                @id @default(cuid())
+  category_id    String
+  label          String
+  key            String
+  attribute_type CategoryAttributeType @default(TEXT)
+  is_required    Boolean               @default(false)
+  sort_order     Int                   @default(0)
+  enum_options   String[]
+  unit           String?
+  placeholder    String?
+
+  category ProductCategory         @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  values   ProductAttributeValue[]
+
+  @@unique([category_id, key])
+  @@index([category_id, sort_order])
+}
+
+model ProductAttributeValue {
+  id           String @id @default(cuid())
+  product_id   String
+  attribute_id String
+  value        String
+
+  product   Product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  attribute CategoryAttribute @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, attribute_id])
+  @@index([product_id])
 }
 
 model ProductCategoryCountry {
@@ -1362,25 +1403,50 @@ model PlatformDeliveryRate {
   @@index([commune_id, is_active])
 }
 
+enum ProductCondition {
+  NEW
+  USED_GOOD
+  USED_FAIR
+  REFURBISHED
+}
+
+enum ProductOrigin {
+  LOCAL_CI
+  IMPORTED
+  HANDMADE
+}
+
 model Product {
-  id             String        @id @default(cuid())
-  shop_id        String
-  category_id    String?
-  name           String
-  slug           String
-  description    String?
-  composition    String?
-  specifications Json?
-  price          Int
-  currency       String        @default("XOF")
-  stock_quantity Int           @default(0)
-  image_url      String?
-  allow_pickup   Boolean       @default(true)
-  allow_delivery Boolean       @default(true)
-  status         ProductStatus @default(DRAFT)
-  sort_order     Int           @default(0)
-  created_at     DateTime      @default(now())
-  updated_at     DateTime      @updatedAt
+  id                    String            @id @default(cuid())
+  shop_id               String
+  category_id           String?
+  name                  String
+  slug                  String
+  short_description     String?
+  description           String?
+  composition           String?
+  specifications        Json?
+  condition             ProductCondition?
+  origin                ProductOrigin?
+  tags                  String[]
+  weight_grams          Int?
+  dimensions            String?
+  preparation_delay_days Int?
+  is_made_to_order      Boolean           @default(false)
+  price                 Int
+  currency              String            @default("XOF")
+  stock_quantity        Int               @default(0)
+  image_url             String?
+  allow_pickup          Boolean           @default(true)
+  allow_delivery        Boolean           @default(true)
+  status                ProductStatus     @default(DRAFT)
+  sort_order            Int               @default(0)
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+
+  sku                   String?
+  seo_title             String?
+  seo_description       String?
 
   shop        Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   category    ProductCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
@@ -1394,10 +1460,12 @@ model Product {
   views       ProductView[]
   ad_campaigns AdCampaign[]
   promotions   PromotionProduct[]
+  attribute_values ProductAttributeValue[]
 
   @@unique([shop_id, slug])
   @@index([shop_id, status])
   @@index([category_id])
+  @@index([condition])
 }
 
 model PromotionCategory {
@@ -1442,6 +1510,7 @@ model ProductImage {
   id         String   @id @default(cuid())
   product_id String
   url        String
+  alt_text   String?
   sort_order Int      @default(0)
   created_at DateTime @default(now())
 
@@ -1466,6 +1535,7 @@ model ProductVariant {
   stock_quantity Int                @default(0)
   sku            String?
   sort_order     Int                @default(0)
+  is_disabled    Boolean            @default(false)
   created_at     DateTime           @default(now())
   updated_at     DateTime           @updatedAt
 

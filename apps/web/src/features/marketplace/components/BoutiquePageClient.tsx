@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
+  BadgeCheck,
   Headphones,
   Loader2,
   MapPin,
   RotateCcw,
+  Shield,
   SlidersHorizontal,
   Store,
   X,
@@ -16,9 +18,11 @@ import {
   fetchMerchantProducts,
   fetchShopProductCategories,
   fetchShopCollections,
+  fetchShopTrustScore,
   type MarketplaceProduct,
   type ProductCategoryOption,
   type ShopCollectionPublic,
+  type ShopTrustScore,
 } from '@/lib/marketplaceApi'
 import {
   buildProductCategoryTree,
@@ -271,12 +275,27 @@ function ContactBlock({
   )
 }
 
+function TrustBadge({ trust }: { trust: ShopTrustScore }) {
+  if (trust.badge === 'new' || trust.badge === null) return null
+  const trusted = trust.badge === 'trusted'
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+      trusted ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+    }`}>
+      {trusted ? <BadgeCheck size={13} /> : <Shield size={13} />}
+      {trust.label}
+      {trust.score != null && <span className="opacity-70">({trust.score}%)</span>}
+    </div>
+  )
+}
+
 export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
   const { addToCart } = useMarketplaceAddToCart()
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ProductCategoryOption[]>([])
   const [collections, setCollections] = useState<ShopCollectionPublic[]>([])
   const [catalogProducts, setCatalogProducts] = useState<MarketplaceProduct[]>([])
+  const [trustScore, setTrustScore] = useState<ShopTrustScore | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -301,6 +320,9 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
     })
     void fetchMerchantProducts(merchant.slug).then(data => {
       if (data) setCatalogProducts(data)
+    })
+    void fetchShopTrustScore(merchant.slug).then(data => {
+      if (data) setTrustScore(data)
     })
   }, [merchant.slug])
 
@@ -425,6 +447,11 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
                       <MapPin size={16} className="text-brand-500 shrink-0" />
                       <span className="truncate">{locationLabel}</span>
                     </p>
+                  )}
+                  {trustScore && trustScore.badge !== 'new' && trustScore.badge !== null && (
+                    <div className="mt-2">
+                      <TrustBadge trust={trustScore} />
+                    </div>
                   )}
                 </div>
               </div>

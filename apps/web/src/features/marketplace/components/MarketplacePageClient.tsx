@@ -23,6 +23,10 @@ import {
   type MarketplaceCatalogProduct,
   type MarketplaceSpotlightShop,
   type ProductCategoryNode,
+  PRODUCT_CONDITION_LABELS,
+  PRODUCT_ORIGIN_LABELS,
+  type ProductCondition,
+  type ProductOrigin,
 } from '@/lib/marketplaceApi'
 import { getCountryCode } from '@/lib/country'
 import {
@@ -71,6 +75,60 @@ const SORT_OPTIONS: { value: SortOption; labelKey: string }[] = [
   { value: 'price_desc', labelKey: 'marketplace.sortPriceDesc' },
 ]
 
+function FilterRadioGroup<T extends string>({
+  title,
+  options,
+  selected,
+  onSelect,
+  allLabel = 'Tous',
+}: {
+  title: string
+  options: { value: T; label: string }[]
+  selected: T | ''
+  onSelect: (v: T | '') => void
+  allLabel?: string
+}) {
+  return (
+    <div className="mb-8">
+      <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">{title}</h4>
+      <div className="space-y-1">
+        <label className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-lg hover:bg-white">
+          <button
+            type="button"
+            onClick={() => onSelect('')}
+            className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+              !selected ? 'border-brand-500 bg-brand-500' : 'border-slate-200 group-hover:border-brand-400'
+            }`}
+          />
+          <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">{allLabel}</span>
+        </label>
+        {options.map(opt => (
+          <label key={opt.value} className="flex items-center gap-3 cursor-pointer group px-1 py-1 rounded-lg hover:bg-white">
+            <button
+              type="button"
+              onClick={() => onSelect(opt.value)}
+              className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors ${
+                selected === opt.value ? 'border-brand-500 bg-brand-500' : 'border-slate-200 group-hover:border-brand-400'
+              }`}
+            />
+            <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">{opt.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const CONDITION_OPTIONS = (Object.keys(PRODUCT_CONDITION_LABELS) as ProductCondition[]).map(k => ({
+  value: k,
+  label: PRODUCT_CONDITION_LABELS[k],
+}))
+
+const ORIGIN_OPTIONS = (Object.keys(PRODUCT_ORIGIN_LABELS) as ProductOrigin[]).map(k => ({
+  value: k,
+  label: PRODUCT_ORIGIN_LABELS[k],
+}))
+
 function MarketplaceFiltersPanel({
   search,
   onSearchChange,
@@ -81,6 +139,10 @@ function MarketplaceFiltersPanel({
   categories,
   selectedCategory,
   onCategoryChange,
+  selectedCondition,
+  onConditionChange,
+  selectedOrigin,
+  onOriginChange,
   merchants,
   selectedMerchants,
   onToggleMerchant,
@@ -98,6 +160,10 @@ function MarketplaceFiltersPanel({
   categories: ProductCategoryNode[]
   selectedCategory: string
   onCategoryChange: (slug: string) => void
+  selectedCondition: ProductCondition | ''
+  onConditionChange: (v: ProductCondition | '') => void
+  selectedOrigin: ProductOrigin | ''
+  onOriginChange: (v: ProductOrigin | '') => void
   merchants: MarketplaceBoutique[]
   selectedMerchants: Set<string>
   onToggleMerchant: (slug: string) => void
@@ -259,6 +325,26 @@ function MarketplaceFiltersPanel({
 
       <div className="h-px w-full bg-slate-100 mb-8" />
 
+      <FilterRadioGroup
+        title="État du produit"
+        options={CONDITION_OPTIONS}
+        selected={selectedCondition}
+        onSelect={v => onConditionChange(v as ProductCondition | '')}
+        allLabel="Tous les états"
+      />
+
+      <div className="h-px w-full bg-slate-100 mb-8" />
+
+      <FilterRadioGroup
+        title="Origine"
+        options={ORIGIN_OPTIONS}
+        selected={selectedOrigin}
+        onSelect={v => onOriginChange(v as ProductOrigin | '')}
+        allLabel="Toutes origines"
+      />
+
+      <div className="h-px w-full bg-slate-100 mb-8" />
+
       <div>
         <h4 className="font-bold text-slate-900 text-sm mb-4 uppercase tracking-wider">
           {t('marketplace.maxPrice')}
@@ -302,6 +388,8 @@ export function MarketplacePageClient() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [categories, setCategories] = useState<ProductCategoryNode[]>([])
   const [selectedMerchants, setSelectedMerchants] = useState<Set<string>>(new Set())
+  const [selectedCondition, setSelectedCondition] = useState<ProductCondition | ''>('')
+  const [selectedOrigin, setSelectedOrigin] = useState<ProductOrigin | ''>('')
   const [priceFilter, setPriceFilter] = useState(100_000)
   const [addingId, setAddingId] = useState<string | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -330,6 +418,8 @@ export function MarketplacePageClient() {
     if (sort === 'price_asc') qs.set('sort', 'price_asc')
     else if (sort === 'price_desc') qs.set('sort', 'price_desc')
     if (selectedCategory) qs.set('category', selectedCategory)
+    if (selectedCondition) qs.set('condition', selectedCondition)
+    if (selectedOrigin) qs.set('origin', selectedOrigin)
     if (debouncedSearch) qs.set('q', debouncedSearch)
     if (selectedMerchants.size === 1) {
       qs.set('merchant', [...selectedMerchants][0]!)
@@ -379,7 +469,7 @@ export function MarketplacePageClient() {
 
     setLoading(false)
     setLoadingMore(false)
-  }, [sort, selectedCategory, debouncedSearch, selectedMerchants])
+  }, [sort, selectedCategory, selectedCondition, selectedOrigin, debouncedSearch, selectedMerchants])
 
   useEffect(() => {
     void fetchPublicJson<ProductCategoryNode[]>(
@@ -419,17 +509,21 @@ export function MarketplacePageClient() {
     if (search.trim()) count += 1
     if (selectedMerchants.size > 0) count += 1
     if (selectedCategory) count += 1
+    if (selectedCondition) count += 1
+    if (selectedOrigin) count += 1
     if (priceFilter < priceCeiling) count += 1
     return count
-  }, [search, selectedMerchants, selectedCategory, priceFilter, priceCeiling])
+  }, [search, selectedMerchants, selectedCategory, selectedCondition, selectedOrigin, priceFilter, priceCeiling])
 
   const mobileModalFilterCount = useMemo(() => {
     let count = 0
     if (selectedMerchants.size > 0) count += 1
+    if (selectedCondition) count += 1
+    if (selectedOrigin) count += 1
     if (priceFilter < priceCeiling) count += 1
     if (sort !== 'newest') count += 1
     return count
-  }, [selectedMerchants, priceFilter, priceCeiling, sort])
+  }, [selectedMerchants, selectedCondition, selectedOrigin, priceFilter, priceCeiling, sort])
 
   const toggleMerchant = (slug: string) => {
     setSelectedMerchants(prev => {
@@ -443,6 +537,8 @@ export function MarketplacePageClient() {
   const clearFilters = () => {
     setSearch('')
     setSelectedCategory('')
+    setSelectedCondition('')
+    setSelectedOrigin('')
     setSelectedMerchants(new Set())
     setPriceFilter(priceCeiling)
     setSort('newest')
@@ -543,6 +639,10 @@ export function MarketplacePageClient() {
                 categories={categories}
                 selectedCategory={selectedCategory}
                 onCategoryChange={setSelectedCategory}
+                selectedCondition={selectedCondition}
+                onConditionChange={setSelectedCondition}
+                selectedOrigin={selectedOrigin}
+                onOriginChange={setSelectedOrigin}
                 merchants={merchants}
                 selectedMerchants={selectedMerchants}
                 onToggleMerchant={toggleMerchant}
@@ -735,6 +835,10 @@ export function MarketplacePageClient() {
                 categories={categories}
                 selectedCategory={selectedCategory}
                 onCategoryChange={setSelectedCategory}
+                selectedCondition={selectedCondition}
+                onConditionChange={setSelectedCondition}
+                selectedOrigin={selectedOrigin}
+                onOriginChange={setSelectedOrigin}
                 merchants={merchants}
                 selectedMerchants={selectedMerchants}
                 onToggleMerchant={toggleMerchant}

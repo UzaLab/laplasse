@@ -88,6 +88,7 @@ export default function ProductDetailPage() {
   const [merchantDetail, setMerchantDetail] = useState<ApiMerchantDetail | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
+  const [isArchivedProduct, setIsArchivedProduct] = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [adding, setAdding] = useState(false)
@@ -107,7 +108,17 @@ export default function ProductDetailPage() {
     setLoading(true)
 
     Promise.all([
-      fetchProductDetail(slug, productSlug),
+      fetchProductDetail(slug, productSlug).catch(async (err) => {
+        // Detect archived product to redirect to shop
+        if (err?.message === 'ARCHIVED' || (typeof err === 'object' && err?.status === 404)) {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/shops/${slug}/products/${productSlug}`).catch(() => null)
+          if (res?.status === 404) {
+            const json = await res.json().catch(() => null)
+            if (json?.message === 'ARCHIVED') setIsArchivedProduct(true)
+          }
+        }
+        return null
+      }),
       api.merchants.bySlug(slug).catch(() => null),
       fetchMerchantProducts(slug).catch(() => [] as MarketplaceProduct[]),
       fetchPublicJson<{ average_rating: number | null; reviews: unknown[] }>(
@@ -202,9 +213,16 @@ export default function ProductDetailPage() {
       <div className="min-h-screen bg-[#FAFAFA]">
         <Navbar />
         <main className={cn(PAGE_CONTAINER, NAVBAR_TOP_PAD_LOOSE, 'pb-16 text-center')}>
-          <p className="text-slate-500 mb-4">Produit introuvable.</p>
-          <Link href={`/m/${slug}`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
-            Retour à la fiche
+          {isArchivedProduct ? (
+            <>
+              <p className="text-slate-700 font-semibold mb-2">Ce produit n&apos;est plus disponible.</p>
+              <p className="text-slate-500 text-sm mb-6">Il a été retiré de la vente par le vendeur.</p>
+            </>
+          ) : (
+            <p className="text-slate-500 mb-4">Produit introuvable.</p>
+          )}
+          <Link href={`/m/${slug}/boutique`} className="text-brand-600 font-bold" style={{ textDecoration: 'none' }}>
+            Voir les autres produits de cette boutique →
           </Link>
         </main>
         <AppFooter />
@@ -249,10 +267,12 @@ export default function ProductDetailPage() {
     document.getElementById('product-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const SHORT_DESC_LIMIT = 90
+  const SHORT_DESC_LIMIT = 150
   const plainDescription = product.description ? stripHtml(product.description) : ''
-  const shortDescription = plainDescription.slice(0, SHORT_DESC_LIMIT)
-  const hasMoreDescription = plainDescription.length > SHORT_DESC_LIMIT
+  const shortDescription = product.short_description?.trim()
+    || plainDescription.slice(0, SHORT_DESC_LIMIT)
+  const hasMoreDescription = !product.short_description && plainDescription.length > SHORT_DESC_LIMIT
+  const isLowStock = !outOfStock && displayStock > 0 && displayStock <= 10
   const isNewProduct = isProductNew(product.created_at)
   const isBestSellerProduct = isProductBestSeller(product)
   const colorSwatchVariants = allVariantsAreColorSwatches(variants)
@@ -384,6 +404,9 @@ export default function ProductDetailPage() {
                 </Link>
               )}
 
+              <p className="text-xs text-slate-400 font-mono mb-1 uppercase tracking-wider">
+                Réf. LP-{product.id.slice(0, 8).toUpperCase()}
+              </p>
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
                 {product.name}
               </h1>
@@ -406,6 +429,16 @@ export default function ProductDetailPage() {
                   <span className="text-sm font-bold flex items-center gap-1 text-red-500">
                     <CheckCircle2 size={16} />
                     {t('product.outOfStock')}
+                  </span>
+                )}
+                {isLowStock && (
+                  <span className="text-sm font-bold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-100">
+                    Plus que {displayStock} en stock !
+                  </span>
+                )}
+                {product.is_made_to_order && (
+                  <span className="text-sm font-bold text-violet-700 bg-violet-50 px-2.5 py-0.5 rounded-full border border-violet-100">
+                    Fabriqué sur commande
                   </span>
                 )}
               </div>
@@ -457,9 +490,9 @@ export default function ProductDetailPage() {
                 </p>
               </div>
 
-              {hasHtmlContent(product.description) && (
+              {(shortDescription || hasHtmlContent(product.description)) && (
                 <div className="mb-8">
-                  <p className="text-slate-600 leading-relaxed text-sm line-clamp-2">
+                  <p className="text-slate-600 leading-relaxed text-sm">
                     {shortDescription}
                     {hasMoreDescription ? '…' : ''}
                   </p>
@@ -493,7 +526,7 @@ export default function ProductDetailPage() {
                         colorSwatchVariants ? 'flex flex-wrap items-center' : 'grid grid-cols-2 sm:flex sm:flex-wrap',
                       )}>
                         {variants.map(variant => {
-                          const variantOut = variant.stock_quantity <= 0
+                          const variantOut = variant.stock_quantity <= 0 || variant.is_disabled
                           const selected = selectedVariantId === variant.id
                           const variantPromoPrice = product.promotion && product.promotion.type !== 'FREE_DELIVERY'
                             ? computePromoPriceForAmount(variant.price, product.promotion)
@@ -737,24 +770,85 @@ export default function ProductDetailPage() {
             )}
 
             {activeTab === 'composition' && (
-              <div className="text-slate-600 leading-relaxed text-lg">
+              <div className="text-slate-600 leading-relaxed text-lg space-y-6">
+                {(product.condition || product.origin || product.preparation_delay_days || product.weight_grams || product.dimensions) && (
+                  <dl className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white overflow-hidden mb-4">
+                    {product.condition && (
+                      <div className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">État</dt>
+                        <dd className="text-base font-medium text-slate-900">
+                          {product.condition === 'NEW' ? 'Neuf'
+                            : product.condition === 'USED_GOOD' ? 'Occasion — bon état'
+                            : product.condition === 'USED_FAIR' ? 'Occasion — acceptable'
+                            : 'Reconditionné'}
+                        </dd>
+                      </div>
+                    )}
+                    {product.origin && (
+                      <div className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">Origine</dt>
+                        <dd className="text-base font-medium text-slate-900">
+                          {product.origin === 'LOCAL_CI' ? "Fabriqué en Côte d'Ivoire"
+                            : product.origin === 'IMPORTED' ? 'Importé'
+                            : 'Fait main / artisanat'}
+                        </dd>
+                      </div>
+                    )}
+                    {product.weight_grams && (
+                      <div className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">Poids</dt>
+                        <dd className="text-base font-medium text-slate-900">{product.weight_grams} g</dd>
+                      </div>
+                    )}
+                    {product.dimensions && (
+                      <div className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">Dimensions</dt>
+                        <dd className="text-base font-medium text-slate-900">{product.dimensions}</dd>
+                      </div>
+                    )}
+                    {product.preparation_delay_days != null && (
+                      <div className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">Délai de préparation</dt>
+                        <dd className="text-base font-medium text-slate-900">{product.preparation_delay_days} jour{product.preparation_delay_days > 1 ? 's' : ''} ouvré{product.preparation_delay_days > 1 ? 's' : ''}</dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+                {/* Dynamic category attributes */}
+                {(product.attribute_values?.length ?? 0) > 0 && (
+                  <dl className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                    {product.attribute_values!.map(av => (
+                      <div key={av.attribute_id} className="grid grid-cols-[minmax(0,40%)_1fr] gap-4 px-5 py-4">
+                        <dt className="text-sm font-bold text-slate-500">{av.attribute?.label ?? av.attribute_id}</dt>
+                        <dd className="text-base font-medium text-slate-900">
+                          {av.value === 'true' ? 'Oui' : av.value === 'false' ? 'Non'
+                            : av.attribute?.unit ? `${av.value} ${av.attribute.unit}` : av.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
                 {hasHtmlContent(product.composition) ? (
                   <ProductHtmlContent html={product.composition} />
                 ) : (
                   <>
-                    <p className="mb-6">
+                    <p>
                       Produit proposé par{' '}
                       <Link href={`/m/${slug}`} className="font-bold text-brand-600" style={{ textDecoration: 'none' }}>
                         {merchant?.business_name}
                       </Link>
                       {categorySlug && <> — catégorie {categoryName}.</>}
                     </p>
-                    {hasHtmlContent(product.description) ? (
-                      <ProductHtmlContent html={product.description} />
-                    ) : (
+                    {!product.condition && !product.origin && (product.attribute_values?.length ?? 0) === 0 && (
                       <p className="text-slate-500">Aucune information de composition renseignée.</p>
                     )}
                   </>
+                )}
+                {/* Legal notice from category */}
+                {product.category?.legal_notice && (
+                  <div className="mt-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 leading-relaxed">
+                    {product.category.legal_notice}
+                  </div>
                 )}
               </div>
             )}

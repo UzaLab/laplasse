@@ -33,6 +33,15 @@ export class ProductSpecificationDto {
   value!: string
 }
 
+export class ProductAttributeValueDto {
+  @IsString()
+  attribute_id!: string
+
+  @IsString()
+  @MaxLength(500)
+  value!: string
+}
+
 export class ProductVariantInputDto {
   @IsString()
   @MinLength(1)
@@ -65,13 +74,41 @@ export class ProductVariantInputDto {
   @IsString()
   @MaxLength(60)
   sku?: string
+
+  @IsOptional()
+  @IsBoolean()
+  is_disabled?: boolean
+}
+
+export const PRODUCT_CONDITIONS = ['NEW', 'USED_GOOD', 'USED_FAIR', 'REFURBISHED'] as const
+export type ProductCondition = (typeof PRODUCT_CONDITIONS)[number]
+
+export const PRODUCT_CONDITION_LABELS: Record<ProductCondition, string> = {
+  NEW: 'Neuf',
+  USED_GOOD: 'Occasion — bon état',
+  USED_FAIR: 'Occasion — acceptable',
+  REFURBISHED: 'Reconditionné',
+}
+
+export const PRODUCT_ORIGIN_OPTIONS = ['LOCAL_CI', 'IMPORTED', 'HANDMADE'] as const
+export type ProductOrigin = (typeof PRODUCT_ORIGIN_OPTIONS)[number]
+
+export const PRODUCT_ORIGIN_LABELS: Record<ProductOrigin, string> = {
+  LOCAL_CI: 'Fabriqué en Côte d\'Ivoire',
+  IMPORTED: 'Importé',
+  HANDMADE: 'Fait main / artisanat',
 }
 
 export class CreateProductDto {
   @IsString()
-  @MinLength(2)
-  @MaxLength(120)
+  @MinLength(5)
+  @MaxLength(100)
   name!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  short_description?: string
 
   @IsOptional()
   @IsString()
@@ -84,10 +121,64 @@ export class CreateProductDto {
   composition?: string
 
   @IsOptional()
+  @IsIn([...PRODUCT_CONDITIONS])
+  condition?: ProductCondition
+
+  @IsOptional()
+  @IsIn([...PRODUCT_ORIGIN_OPTIONS])
+  origin?: ProductOrigin
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  tags?: string[]
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  weight_grams?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  dimensions?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  preparation_delay_days?: number
+
+  @IsOptional()
+  @IsBoolean()
+  is_made_to_order?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  sku?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(70)
+  seo_title?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  seo_description?: string
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProductSpecificationDto)
   specifications?: ProductSpecificationDto[]
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductAttributeValueDto)
+  attribute_values?: ProductAttributeValueDto[]
 
   @IsOptional()
   @IsInt()
@@ -139,9 +230,14 @@ export class CreateProductDto {
 export class UpdateProductDto {
   @IsOptional()
   @IsString()
-  @MinLength(2)
-  @MaxLength(120)
+  @MinLength(5)
+  @MaxLength(100)
   name?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  short_description?: string
 
   @IsOptional()
   @IsString()
@@ -154,10 +250,64 @@ export class UpdateProductDto {
   composition?: string
 
   @IsOptional()
+  @IsIn([...PRODUCT_CONDITIONS])
+  condition?: ProductCondition
+
+  @IsOptional()
+  @IsIn([...PRODUCT_ORIGIN_OPTIONS])
+  origin?: ProductOrigin
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  tags?: string[]
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  weight_grams?: number
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  dimensions?: string
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  preparation_delay_days?: number
+
+  @IsOptional()
+  @IsBoolean()
+  is_made_to_order?: boolean
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  sku?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(70)
+  seo_title?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  seo_description?: string
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProductSpecificationDto)
   specifications?: ProductSpecificationDto[]
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductAttributeValueDto)
+  attribute_values?: ProductAttributeValueDto[]
 
   @IsOptional()
   @IsInt()

@@ -71,6 +71,12 @@ export class MarketplaceController {
   }
 
   @Public()
+  @Get('marketplace/product-categories/:id/attributes')
+  getCategoryAttributes(@Param('id') id: string) {
+    return this.productCategories.getCategoryWithAncestorAttributes(id)
+  }
+
+  @Public()
   @Get('marketplace/featured')
   getFeatured() {
     return this.svc.getFeaturedProducts()
@@ -171,6 +177,8 @@ export class MarketplaceController {
     @Query('q') q?: string,
     @Query('merchant') merchant?: string,
     @Query('category') category?: string,
+    @Query('condition') condition?: string,
+    @Query('origin') origin?: string,
     @Query('sort') sort?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('country') country?: string,
@@ -188,6 +196,8 @@ export class MarketplaceController {
       q,
       merchant,
       category,
+      condition,
+      origin,
       sort,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
       country: country ?? req.countryCode ?? DEFAULT_COUNTRY,
@@ -245,6 +255,12 @@ export class MarketplaceController {
   @Get('shops/:slug/product-categories')
   listPublicShopCategories(@Param('slug') slug: string) {
     return this.svc.listPublicShopProductCategories(slug)
+  }
+
+  @Public()
+  @Get('shops/:slug/trust')
+  getShopTrust(@Param('slug') slug: string) {
+    return this.svc.getShopTrustScore(slug)
   }
 
   @Public()

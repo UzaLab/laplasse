@@ -388,6 +388,10 @@ async function main() {
   const pcStats = await seedProductCategories(prisma)
   console.log(`✅ Catégories produit marketplace (${pcStats.total} entrées)`)
 
+  const { seedCategoryAttributes } = await import('./seed-category-attributes')
+  const caStats = await seedCategoryAttributes(prisma)
+  console.log(`✅ Attributs catégorie marketplace (${caStats.total} entrées)`)
+
   // ─── MARKETPLACE PRODUCTS (boutiques) ────────────────────────────────────────
 
   const boutiqueProducts: Array<{ merchantSlug: string; products: Array<{ name: string; slug: string; price: number; stock: number; image: string; desc: string }> }> = [
