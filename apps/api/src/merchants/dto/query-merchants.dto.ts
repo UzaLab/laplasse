@@ -18,6 +18,11 @@ export class QueryMerchantsDto {
   @IsString()
   category?: string
 
+  /** Filtre vertical food : restaurants, fast-food, cafés, bars-lounges */
+  @IsOptional()
+  @IsIn(['food'])
+  vertical?: 'food'
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

@@ -159,11 +159,48 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
             delivery_city_id: true,
             delivery_commune_id: true,
             shop: { select: { name: true, city: true, country: true } },
+            merchant: { select: { business_name: true } },
           },
         },
         offer_rejections: { select: { courier_profile_id: true } },
       },
     })
+  }
+
+  /**
+   * Scoring pour platform riders — formule DN-7.3 étendue avec distance GPS.
+   * score = distScore*0.5 + loadScore*0.3 + ratingScore*0.15 + completedScore*0.05
+   * Plus haut = meilleur candidat.
+   */
+  private scorePlatformCourier(
+    pickup: { lat: number | null; lng: number | null },
+    courier: {
+      current_latitude: number | null
+      current_longitude: number | null
+      _count: { jobs: number }
+      rating_avg: number
+      completed_jobs: number
+    },
+  ): number {
+    let distScore = 0.5 // par défaut si pas de GPS
+    if (
+      pickup.lat != null && pickup.lng != null
+      && courier.current_latitude != null && courier.current_longitude != null
+    ) {
+      const R = 6371
+      const dLat = ((courier.current_latitude - pickup.lat) * Math.PI) / 180
+      const dLng = ((courier.current_longitude - pickup.lng) * Math.PI) / 180
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((pickup.lat * Math.PI) / 180) * Math.cos((courier.current_latitude * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2
+      const distKm = Math.max(0.1, R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+      distScore = 1 / distKm
+    }
+    const loadScore = 1 - Math.min(courier._count.jobs / 4, 1)
+    const ratingScore = courier.rating_avg / 5
+    const completedScore = Math.min(courier.completed_jobs / 50, 1)
+    return distScore * 0.5 + loadScore * 0.3 + ratingScore * 0.15 + completedScore * 0.05
   }
 
   private async offerToNextCourier(
@@ -203,12 +240,12 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    // Tri par score composite — distance GPS pickup, charge, note, expérience
+    const pickup = { lat: job.pickup_latitude, lng: job.pickup_longitude }
     zoneMatched.sort((a, b) => {
-      const loadA = a._count.jobs
-      const loadB = b._count.jobs
-      if (loadA !== loadB) return loadA - loadB
-      if (b.rating_avg !== a.rating_avg) return b.rating_avg - a.rating_avg
-      return b.completed_jobs - a.completed_jobs
+      const scoreA = this.scorePlatformCourier(pickup, { ...a, _count: a._count })
+      const scoreB = this.scorePlatformCourier(pickup, { ...b, _count: b._count })
+      return scoreB - scoreA
     })
 
     const candidate = zoneMatched[0] ?? null
@@ -220,7 +257,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
 
     const now = new Date()
     const expires = new Date(now.getTime() + DELIVERY_OFFER_TIMEOUT_SEC * 1000)
-    const shopName = job.order.shop?.name ?? 'Commerce'
+    const shopName = job.order.merchant?.business_name ?? job.order.shop?.name ?? 'Commerce'
 
     await this.prisma.deliveryJob.update({
       where: { id: job.id },
@@ -284,7 +321,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
 
     const now = new Date()
     const expires = new Date(now.getTime() + DELIVERY_OFFER_TIMEOUT_SEC * 1000)
-    const shopName = job.order.shop?.name ?? 'Commerce'
+    const shopName = job.order.merchant?.business_name ?? job.order.shop?.name ?? 'Commerce'
 
     await this.prisma.deliveryJob.update({
       where: { id: job.id },

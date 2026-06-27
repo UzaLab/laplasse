@@ -303,7 +303,12 @@ export interface Cart {
   currency: string
   kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   estimated_prep_minutes?: number | null
-  merchant: { id: string; business_name: string; slug: string } | null
+  merchant: {
+    id: string
+    business_name: string
+    slug: string
+    food_min_order_amount?: number | null
+  } | null
   merchants: CartMerchantGroup[]
   merchant_count: number
   item_count: number

@@ -57,6 +57,13 @@ const MERCHANT_PUBLIC_SELECT = {
   verification_status: true,
   trust_score: true,
   is_sponsored: true,
+  food_prep_minutes: true,
+  food_min_order_amount: true,
+  food_is_paused: true,
+  food_pause_until: true,
+  avg_rating: true,
+  food_accepts_cash: true,
+  food_cash_max_amount: true,
   subscription_plan: true,
   delivery_fulfilment_default: true,
   created_at: true,
@@ -146,9 +153,15 @@ export class MerchantsService {
         district: query.district,
         country,
       }),
-      ...(query.category && {
-        category: { slug: query.category },
-      }),
+      ...(query.vertical === 'food'
+        ? {
+            category: query.category
+              ? { slug: query.category }
+              : { slug: { in: ['restaurants', 'fast-food', 'cafes', 'bars-lounges'] } },
+          }
+        : query.category
+          ? { category: { slug: query.category } }
+          : {}),
     }
 
     const categoryBoostIds = query.category
@@ -182,7 +195,9 @@ export class MerchantsService {
     })
 
     return {
-      data: await attachCardPreviewsToMerchants(this.prisma, formatted),
+      data: await this.attachPromoFlags(
+        await attachCardPreviewsToMerchants(this.prisma, formatted),
+      ),
       meta: {
         total,
         limit: query.limit ?? 20,
@@ -241,7 +256,7 @@ export class MerchantsService {
       merchants = [...merchants, ...fallback]
     }
 
-    return attachCardPreviewsToMerchants(
+    const previewed = await attachCardPreviewsToMerchants(
       this.prisma,
       merchants.map(m => {
         const formatted = this.formatMerchant(m)
@@ -251,6 +266,7 @@ export class MerchantsService {
         return formatted
       }),
     )
+    return this.attachPromoFlags(previewed)
   }
 
   async findNearby(city?: string, district?: string, lat?: number, lng?: number, radiusKm = 2, limit = 6, country = 'CI') {
@@ -866,6 +882,26 @@ export class MerchantsService {
     return updated
   }
 
+  async updateMyTags(userId: string, tags: string[], merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    const normalized = [...new Set(tags.map(t => t.trim().toLowerCase()).filter(Boolean))]
+
+    await this.prisma.$transaction(async tx => {
+      await tx.merchantTag.deleteMany({ where: { merchant_id: merchant.id } })
+      for (const name of normalized) {
+        const tag = await tx.tag.upsert({
+          where: { name },
+          create: { name },
+          update: {},
+        })
+        await tx.merchantTag.create({
+          data: { merchant_id: merchant.id, tag_id: tag.id },
+        })
+      }
+    })
+    return { tags: normalized }
+  }
+
   // ── Similar merchants ─────────────────────────────────────────────────────────
 
   async findSimilar(slug: string, limit = 4) {
@@ -1017,6 +1053,37 @@ export class MerchantsService {
       throw new BadRequestException('Un seul horaire par jour est autorisé')
     }
     return this.dedupeBusinessHours(hours)
+  }
+
+  // ── Helpers promos & ratings ────────────────────────────────────────────────
+
+  private async attachPromoFlags<T extends { id: string }>(
+    merchants: T[],
+  ): Promise<(T & { has_active_promo: boolean })[]> {
+    if (merchants.length === 0) return merchants.map(m => ({ ...m, has_active_promo: false }))
+    const now = new Date()
+    const promoRows = await this.prisma.promotion.findMany({
+      where: {
+        merchant_id: { in: merchants.map(m => m.id) },
+        is_active: true,
+        starts_at: { lte: now },
+        ends_at: { gte: now },
+      },
+      select: { merchant_id: true },
+    })
+    const promoIds = new Set(promoRows.map(p => p.merchant_id).filter(Boolean) as string[])
+    return merchants.map(m => ({ ...m, has_active_promo: promoIds.has(m.id) }))
+  }
+
+  async refreshMerchantAvgRating(merchantId: string): Promise<void> {
+    const agg = await this.prisma.review.aggregate({
+      where: { merchant_id: merchantId, status: 'APPROVED' },
+      _avg: { rating: true },
+    })
+    await this.prisma.merchant.update({
+      where: { id: merchantId },
+      data: { avg_rating: agg._avg.rating != null ? Math.round(agg._avg.rating * 10) / 10 : null },
+    })
   }
 
   private formatMerchant<T extends Record<string, unknown>>(m: T): T & {

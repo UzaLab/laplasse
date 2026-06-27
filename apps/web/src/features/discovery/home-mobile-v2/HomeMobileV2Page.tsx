@@ -21,6 +21,7 @@ import { HomeMobileV2SectionHeader } from './HomeMobileV2SectionHeader'
 import { HomeMobileV2CarouselTrack } from './HomeMobileV2CarouselTrack'
 import Link from 'next/link'
 import { MOBILE_BOTTOM_NAV_PAD, MOBILE_COMPACT_HEADER_PAD_LOOSE } from '@/lib/mobilePublicChrome'
+import { isFoodCategorySlug } from '@/lib/foodHub'
 
 export interface HomeMobilePageProps {
   categories: Category[]
@@ -89,7 +90,11 @@ export function HomeMobilePage({
                 return (
                   <Link
                     key={cat.id}
-                    href={`/categories/${cat.slug}`}
+                    href={
+                      isFoodCategorySlug(cat.slug)
+                        ? `/restauration?cat=${cat.slug}`
+                        : `/categories/${cat.slug}`
+                    }
                     className="flex flex-col items-center min-w-[80px] gap-2 group shrink-0 snap-start"
                     style={{ textDecoration: 'none' }}
                   >

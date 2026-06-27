@@ -1,13 +1,28 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { SearchService } from '../search/search.service'
 import {
   CreateMenuItemDto,
   CreateMenuSectionDto,
   MenuModifierGroupDto,
+  UpdateMenuAvailabilityDto,
   UpdateMenuItemDto,
   UpdateMenuSectionDto,
   UpdateMenuSettingsDto,
 } from './dto/shop-menu.dto'
+
+/** Statut disponibilité food calculé depuis les champs DB. */
+export type FoodAvailabilityStatus = 'open' | 'paused' | 'closed'
+
+export function computeFoodStatus(
+  is_paused: boolean,
+  pause_until: Date | null,
+  now = new Date(),
+): FoodAvailabilityStatus {
+  if (!is_paused) return 'open'
+  if (pause_until == null) return 'closed'
+  return now < pause_until ? 'paused' : 'open'
+}
 
 type ModifierGroupWithOptions = {
   id: string
@@ -26,7 +41,10 @@ type ModifierGroupWithOptions = {
 
 @Injectable()
 export class ShopMenuService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly searchService: SearchService,
+  ) {}
 
   private modifierInclude = {
     modifier_groups: {
@@ -42,6 +60,9 @@ export class ShopMenuService {
   private async resolveMyMerchant(ownerId: string, merchantId?: string) {
     const merchant = await this.prisma.merchant.findFirst({
       where: merchantId ? { id: merchantId, owner_id: ownerId } : { owner_id: ownerId },
+      include: {
+        tags: { include: { tag: { select: { name: true } } } },
+      },
     })
     if (!merchant) throw new NotFoundException('Établissement introuvable')
     return merchant
@@ -74,6 +95,9 @@ export class ShopMenuService {
     image_url: string | null
     is_available: boolean
     prep_minutes: number | null
+    allergens?: string[]
+    item_tags?: string[]
+    contains_alcohol?: boolean
     sort_order: number
     modifier_groups?: ModifierGroupWithOptions[]
   }) {
@@ -87,6 +111,9 @@ export class ShopMenuService {
       image_url: row.image_url,
       is_available: row.is_available,
       prep_minutes: row.prep_minutes,
+      allergens: row.allergens ?? [],
+      item_tags: row.item_tags ?? [],
+      contains_alcohol: row.contains_alcohol ?? false,
       sort_order: row.sort_order,
       modifier_groups: this.formatModifierGroups(row.modifier_groups ?? []),
     }
@@ -160,6 +187,11 @@ export class ShopMenuService {
         business_name: true,
         slug: true,
         food_prep_minutes: true,
+        food_min_order_amount: true,
+        food_is_paused: true,
+        food_pause_until: true,
+        food_accepts_cash: true,
+        food_cash_max_amount: true,
       },
     })
     if (!merchant) throw new NotFoundException('Établissement introuvable')
@@ -182,6 +214,11 @@ export class ShopMenuService {
         name: merchant.business_name,
         slug: merchant.slug,
         food_prep_minutes: merchant.food_prep_minutes,
+        food_min_order_amount: merchant.food_min_order_amount,
+        food_accepts_cash: merchant.food_accepts_cash,
+        food_cash_max_amount: merchant.food_cash_max_amount ?? null,
+        food_status: computeFoodStatus(merchant.food_is_paused, merchant.food_pause_until ?? null),
+        food_pause_until: merchant.food_pause_until ?? null,
       },
       sections: sections.map(s => ({
         id: s.id,
@@ -215,8 +252,13 @@ export class ShopMenuService {
         include: this.modifierInclude,
       }),
     ])
+    const cuisine_tags = merchant.tags.map(t => t.tag.name)
     return {
       food_prep_minutes: merchant.food_prep_minutes,
+      food_min_order_amount: merchant.food_min_order_amount,
+      food_status: computeFoodStatus(merchant.food_is_paused, merchant.food_pause_until ?? null),
+      food_pause_until: merchant.food_pause_until ?? null,
+      cuisine_tags,
       sections,
       items: items.map(i => this.formatItem(i)),
     }
@@ -224,15 +266,75 @@ export class ShopMenuService {
 
   async updateSettings(userId: string, dto: UpdateMenuSettingsDto, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    if (dto.food_prep_minutes === undefined) {
-      return { food_prep_minutes: merchant.food_prep_minutes }
+    const data: {
+      food_prep_minutes?: number
+      food_min_order_amount?: number | null
+      food_accepts_cash?: boolean
+      food_cash_max_amount?: number | null
+    } = {}
+    if (dto.food_prep_minutes !== undefined) {
+      data.food_prep_minutes = dto.food_prep_minutes
+    }
+    if (dto.food_min_order_amount !== undefined) {
+      data.food_min_order_amount =
+        dto.food_min_order_amount == null || dto.food_min_order_amount <= 0
+          ? null
+          : dto.food_min_order_amount
+    }
+    if (dto.food_accepts_cash !== undefined) {
+      data.food_accepts_cash = dto.food_accepts_cash
+    }
+    if (dto.food_cash_max_amount !== undefined) {
+      data.food_cash_max_amount =
+        dto.food_cash_max_amount == null || dto.food_cash_max_amount <= 0
+          ? null
+          : dto.food_cash_max_amount
+    }
+    if (Object.keys(data).length === 0) {
+      return {
+        food_prep_minutes: merchant.food_prep_minutes,
+        food_min_order_amount: merchant.food_min_order_amount,
+        food_accepts_cash: merchant.food_accepts_cash,
+        food_cash_max_amount: merchant.food_cash_max_amount,
+      }
     }
     const updated = await this.prisma.merchant.update({
       where: { id: merchant.id },
-      data: { food_prep_minutes: dto.food_prep_minutes },
-      select: { food_prep_minutes: true },
+      data,
+      select: {
+        food_prep_minutes: true,
+        food_min_order_amount: true,
+        food_accepts_cash: true,
+        food_cash_max_amount: true,
+      },
     })
     return updated
+  }
+
+  async updateAvailability(userId: string, dto: UpdateMenuAvailabilityDto, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    let food_is_paused = false
+    let food_pause_until: Date | null = null
+
+    if (dto.mode === 'paused') {
+      if (!dto.duration_minutes) {
+        throw new BadRequestException('duration_minutes requis pour le mode pause')
+      }
+      food_is_paused = true
+      food_pause_until = new Date(Date.now() + dto.duration_minutes * 60_000)
+    } else if (dto.mode === 'closed') {
+      food_is_paused = true
+      food_pause_until = null
+    }
+
+    await this.prisma.merchant.update({
+      where: { id: merchant.id },
+      data: { food_is_paused, food_pause_until },
+    })
+
+    const now = new Date()
+    const status = computeFoodStatus(food_is_paused, food_pause_until, now)
+    return { status, food_is_paused, food_pause_until }
   }
 
   async createSection(userId: string, dto: CreateMenuSectionDto, merchantId?: string) {
@@ -299,6 +401,9 @@ export class ShopMenuService {
         image_url: dto.image_url?.trim() || null,
         sort_order: dto.sort_order ?? 0,
         prep_minutes: dto.prep_minutes ?? null,
+        allergens: dto.allergens ?? [],
+        item_tags: dto.item_tags ?? [],
+        contains_alcohol: dto.contains_alcohol ?? false,
       },
     })
     await this.replaceModifierGroups(row.id, dto.modifier_groups)
@@ -306,6 +411,7 @@ export class ShopMenuService {
       where: { id: row.id },
       include: this.modifierInclude,
     })
+    void this.searchService.syncMenuItem(row.id)
     return this.formatItem(full)
   }
 
@@ -337,6 +443,9 @@ export class ShopMenuService {
         ...(dto.is_available !== undefined ? { is_available: dto.is_available } : {}),
         ...(dto.sort_order !== undefined ? { sort_order: dto.sort_order } : {}),
         ...(dto.prep_minutes !== undefined ? { prep_minutes: dto.prep_minutes } : {}),
+        ...(dto.allergens !== undefined ? { allergens: dto.allergens } : {}),
+        ...(dto.item_tags !== undefined ? { item_tags: dto.item_tags } : {}),
+        ...(dto.contains_alcohol !== undefined ? { contains_alcohol: dto.contains_alcohol } : {}),
       },
     })
     await this.replaceModifierGroups(itemId, dto.modifier_groups)
@@ -344,6 +453,7 @@ export class ShopMenuService {
       where: { id: itemId },
       include: this.modifierInclude,
     })
+    void this.searchService.syncMenuItem(itemId)
     return this.formatItem(full)
   }
 
@@ -354,6 +464,7 @@ export class ShopMenuService {
     })
     if (!existing) throw new NotFoundException('Plat introuvable')
     await this.prisma.menuItem.delete({ where: { id: itemId } })
+    void this.searchService.removeMenuItem(itemId)
     return { success: true }
   }
 }

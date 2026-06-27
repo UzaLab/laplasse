@@ -89,13 +89,22 @@ export default function CourierMissionsPage() {
     },
     onSuccess: (job) => {
       if (job?.status === 'DELIVERED') {
-        notify.success('Livraison terminée')
+        notify.success('Livraison terminée ✓')
         queryClient.invalidateQueries({ queryKey: ['courier-wallet'] })
-        setTab('history')
+        // Invalider d'abord, puis switcher le tab pour que history soit enabled
+        invalidate()
+        setTimeout(() => setTab('history'), 50)
       } else {
         notify.success('Statut mis à jour')
+        invalidate()
       }
-      invalidate()
+    },
+    onError: (e: Error) => {
+      // Les erreurs OTP sont gérées inline dans CourierJobCard
+      // On affiche aussi l'erreur globale pour les erreurs non-OTP
+      if (!e.message.includes('Code de livraison')) {
+        setActionError(e.message)
+      }
     },
   })
 

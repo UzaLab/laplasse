@@ -114,6 +114,10 @@ export interface ApiMerchant {
   website: string | null
   verification_status: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED'
   trust_score: number
+  food_prep_minutes?: number
+  food_min_order_amount?: number | null
+  food_is_paused?: boolean
+  food_pause_until?: string | null
   is_sponsored: boolean
   category: { id: string; name: string; slug: string; icon: string | null }
   location: ApiMerchantLocation | null
@@ -121,6 +125,10 @@ export interface ApiMerchant {
   tags: string[]
   review_count: number
   favorites_count: number
+  avg_rating?: number | null
+  has_active_promo?: boolean
+  food_accepts_cash?: boolean
+  food_cash_max_amount?: number | null
   has_marketplace?: boolean
   featured_product?: ApiShopFeaturedProduct
   featured_vertical?: ApiVerticalFeaturedItem

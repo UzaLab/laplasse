@@ -27,6 +27,7 @@ import { FraudModule } from './fraud/fraud.module'
 import { StaffModule } from './staff/staff.module'
 import { AdsModule } from './ads/ads.module'
 import { MarketplaceModule } from './marketplace/marketplace.module'
+import { FoodModule } from './food/food.module'
 import { ShopsModule } from './shops/shops.module'
 import { GeoModule } from './geo/geo.module'
 import { CountryModule } from './common/country/country.module'
@@ -66,6 +67,7 @@ import { LogisticsModule } from './logistics/logistics.module'
     StaffModule,
     AdsModule,
     MarketplaceModule,
+    FoodModule,
     ShopsModule,
     GeoModule,
     CountryModule,

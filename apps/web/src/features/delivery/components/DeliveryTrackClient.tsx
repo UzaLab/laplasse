@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Clock,
@@ -83,6 +83,44 @@ export function DeliveryTrackClient({ token }: Props) {
   })
 
   const isTerminal = data ? ['DELIVERED', 'CANCELLED', 'FAILED'].includes(data.status) : false
+
+  // OSRM route polyline — fetched when courier + dropoff coords are available
+  const [routePolyline, setRoutePolyline] = useState<[number, number][] | undefined>()
+  const routeKey = useRef('')
+
+  useEffect(() => {
+    if (
+      isTerminal
+      || !data?.courier_latitude
+      || !data?.courier_longitude
+      || !data?.dropoff_latitude
+      || !data?.dropoff_longitude
+    ) {
+      setRoutePolyline(undefined)
+      return
+    }
+    const key = `${data.courier_latitude.toFixed(4)},${data.courier_longitude.toFixed(4)};${data.dropoff_latitude.toFixed(4)},${data.dropoff_longitude.toFixed(4)}`
+    // Only fetch when courier position changes meaningfully (>~44m, 4 decimal places)
+    if (key === routeKey.current) return
+    routeKey.current = key
+
+    const url =
+      `https://router.project-osrm.org/route/v1/driving/` +
+      `${data.courier_longitude},${data.courier_latitude};` +
+      `${data.dropoff_longitude},${data.dropoff_latitude}` +
+      `?overview=full&geometries=geojson`
+
+    fetch(url, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok ? r.json() : null)
+      .then((json: { routes?: Array<{ geometry: { coordinates: [number, number][] } }> } | null) => {
+        const coords = json?.routes?.[0]?.geometry?.coordinates
+        if (coords && coords.length > 1) {
+          // OSRM returns [lng, lat] — Leaflet wants [lat, lng]
+          setRoutePolyline(coords.map(([lng, lat]) => [lat, lng]))
+        }
+      })
+      .catch(() => {/* OSRM unavailable — map shows pins only */})
+  }, [data?.courier_latitude, data?.courier_longitude, data?.dropoff_latitude, data?.dropoff_longitude, isTerminal])
 
   const mapZones = useMemo(() => {
     if (!data) return []
@@ -264,6 +302,7 @@ export function DeliveryTrackClient({ token }: Props) {
             {showMap ? (
               <CourierOsmMap
                 zones={mapZones}
+                routePolyline={routePolyline}
                 className="flex-1 min-h-[280px] lg:min-h-[420px] w-full rounded-none border-0"
               />
             ) : (

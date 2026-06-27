@@ -740,15 +740,19 @@ export class AdminController {
   }
 
   @Patch('reviews/:id')
-  moderateReview(
+  async moderateReview(
     @Param('id') id: string,
     @Body() body: { status: 'APPROVED' | 'REJECTED' },
   ) {
-    return this.prisma.review.update({
+    const updated = await this.prisma.review.update({
       where: { id },
       data: { status: body.status },
-      select: { id: true, status: true },
+      select: { id: true, status: true, merchant_id: true },
     })
+    if (updated.merchant_id) {
+      this.merchantsService.refreshMerchantAvgRating(updated.merchant_id).catch(() => {})
+    }
+    return { id: updated.id, status: updated.status }
   }
 
   @Patch('reviews/:id/moderate')
@@ -757,7 +761,11 @@ export class AdminController {
     @Body() body: { action: 'approve' | 'reject' | 'delete' },
   ) {
     if (body.action === 'delete') {
+      const deleted = await this.prisma.review.findUnique({ where: { id }, select: { merchant_id: true } })
       await this.prisma.review.delete({ where: { id } })
+      if (deleted?.merchant_id) {
+        this.merchantsService.refreshMerchantAvgRating(deleted.merchant_id).catch(() => {})
+      }
       return { deleted: true }
     }
     const updated = await this.prisma.review.update({
@@ -766,11 +774,15 @@ export class AdminController {
       select: {
         id: true, status: true,
         user_id: true,
+        merchant_id: true,
         merchant: { select: { business_name: true } },
       },
     })
     if (body.action === 'approve') {
       this.notifications.sendReviewApproved(updated.user_id, updated.merchant.business_name).catch(() => {})
+    }
+    if (updated.merchant_id) {
+      this.merchantsService.refreshMerchantAvgRating(updated.merchant_id).catch(() => {})
     }
     return { id: updated.id, status: updated.status }
   }
@@ -930,7 +942,8 @@ export class AdminController {
   async syncSearch() {
     await this.searchService.syncAllMerchants()
     await this.searchService.syncAllProducts()
-    return { ok: true, message: 'Meilisearch re-indexé (établissements + produits)' }
+    await this.searchService.syncAllMenuItems()
+    return { ok: true, message: 'Meilisearch re-indexé (établissements + produits + menus)' }
   }
 
   @Post('seed-marketplace')

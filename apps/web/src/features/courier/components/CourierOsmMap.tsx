@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, Fragment } from 'react'
-import { MapContainer, TileLayer, Circle, Marker, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Circle, Marker, Tooltip, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -27,6 +27,8 @@ interface CourierOsmMapProps {
   radiusMeters?: number
   /** Multi-sélection : un pin + cercle par zone */
   zones?: MapZonePoint[]
+  /** Tracé de route OSRM — tableau de [lat, lng] */
+  routePolyline?: [number, number][]
   className?: string
 }
 
@@ -75,6 +77,7 @@ export function CourierOsmMap({
   lng,
   radiusMeters = 4500,
   zones,
+  routePolyline,
   className,
 }: CourierOsmMapProps) {
   const points: MapZonePoint[] = useMemo(() => {
@@ -119,6 +122,18 @@ export function CourierOsmMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitMapToZones zones={points} />
+        {/* Tracé OSRM du trajet livreur → client */}
+        {routePolyline && routePolyline.length > 1 && (
+          <Polyline
+            positions={routePolyline}
+            pathOptions={{
+              color: '#059669',
+              weight: 5,
+              opacity: 0.8,
+              dashArray: undefined,
+            }}
+          />
+        )}
         {points.map((zone, i) => {
           const r = zone.radiusMeters ?? DEFAULT_COMMUNE_RADIUS
           return (

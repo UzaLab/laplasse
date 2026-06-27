@@ -19,9 +19,21 @@ export interface DeliveryQuoteRequest {
   subtotals?: Record<string, number>
   /** Parcours restaurant : tarif par défaut si aucune zone configurée */
   order_flow?: 'food' | 'marketplace'
+  /** Pays ISO-2 pour adapter les frais de livraison par défaut */
+  country?: string
 }
 
+/** Frais de livraison food par défaut selon le pays (XOF) */
+const FOOD_FALLBACK_FEE_BY_COUNTRY: Record<string, number> = {
+  CI: 1500,
+  BF: 1000,
+  SN: 2000,
+}
 const FOOD_FALLBACK_FEE = 1500
+
+function foodFallbackFee(country?: string | null): number {
+  return FOOD_FALLBACK_FEE_BY_COUNTRY[country?.toUpperCase() ?? 'CI'] ?? FOOD_FALLBACK_FEE
+}
 
 export interface DeliveryQuoteItem {
   shop_id: string
@@ -238,17 +250,18 @@ export class DeliveryZonesService {
 
       if (!zone) {
         if (input.order_flow === 'food' || shop.enabled_modules.includes('food')) {
+          const fallback = foodFallbackFee(input.country ?? null)
           quotes.push({
             shop_id: shopId,
             shop_name: shop.name,
             available: true,
-            fee: 1500,
+            fee: fallback,
             zone_name: 'Livraison restaurant',
             eta_min_minutes: 30,
             eta_max_minutes: 45,
             vehicle: 'MOTO',
           })
-          total_delivery_fee += 1500
+          total_delivery_fee += fallback
           continue
         }
         quotes.push({
@@ -401,9 +414,10 @@ export class DeliveryZonesService {
         continue
       }
 
-      // Fallback 1500 FCFA
-      quotes.push({ shop_id: linkedShop?.id ?? merchantId, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee: FOOD_FALLBACK_FEE, zone_name: 'Livraison restaurant', eta_min_minutes: 30, eta_max_minutes: 45, vehicle: 'MOTO' })
-      total_delivery_fee += FOOD_FALLBACK_FEE
+      // Fallback pays-aware
+      const fallbackFee = foodFallbackFee(input.country ?? null)
+      quotes.push({ shop_id: linkedShop?.id ?? merchantId, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee: fallbackFee, zone_name: 'Livraison restaurant', eta_min_minutes: 30, eta_max_minutes: 45, vehicle: 'MOTO' })
+      total_delivery_fee += fallbackFee
     }
 
     return { quotes, total_delivery_fee }

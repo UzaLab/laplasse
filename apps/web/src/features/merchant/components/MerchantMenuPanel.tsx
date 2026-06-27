@@ -33,6 +33,16 @@ import {
 } from '@/features/merchant/components/menu/MenuItemDrawer'
 import { modifierGroupsToPayload, type MenuModifierGroup, type ModifierGroupDraft } from '@/lib/menuModifiers'
 
+const CUISINE_TAGS = [
+  'Ivoirienne', 'Sénégalaise', 'Malienne', 'Burkinabè', 'Togolaise', 'Béninoise',
+  'Camerounaise', 'Congolaise', 'Ghanéenne',
+  'Braise & Grillades', 'Maquis populaire', 'Plats du jour',
+  'Libanaise', 'Chinoise / Asiatique', 'Française / Européenne',
+  'Fast-food', 'Pizzas', 'Burgers', 'Sandwichs',
+  'Jus naturels', 'Café & Boissons', 'Pâtisserie & Desserts', 'Glaces',
+  'Végétarien', 'Halal',
+]
+
 interface MenuSection {
   id: string
   name: string
@@ -50,6 +60,9 @@ interface MenuItem {
   image_url: string | null
   is_available: boolean
   prep_minutes: number | null
+  allergens?: string[]
+  item_tags?: string[]
+  contains_alcohol?: boolean
   sort_order: number
   modifier_groups: MenuModifierGroup[]
 }
@@ -115,7 +128,14 @@ export function MerchantMenuPanel() {
   const [sectionEditName, setSectionEditName] = useState('')
 
   const [foodPrepMinutes, setFoodPrepMinutes] = useState('25')
-  const [savingPrep, setSavingPrep] = useState(false)
+  const [foodMinOrderAmount, setFoodMinOrderAmount] = useState('')
+  const [foodAcceptsCash, setFoodAcceptsCash] = useState(false)
+  const [foodCashMaxAmount, setFoodCashMaxAmount] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [foodStatus, setFoodStatus] = useState<'open' | 'paused' | 'closed'>('open')
+  const [foodPauseUntil, setFoodPauseUntil] = useState<string | null>(null)
+  const [savingAvailability, setSavingAvailability] = useState(false)
+  const [cuisineTags, setCuisineTags] = useState<string[]>([])
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMode, setDrawerMode] = useState<'create' | 'edit'>('create')
@@ -132,6 +152,20 @@ export function MerchantMenuPanel() {
       setSections(data.sections ?? [])
       setItems(data.items ?? [])
       setFoodPrepMinutes(String(data.food_prep_minutes ?? 25))
+      setFoodMinOrderAmount(
+        data.food_min_order_amount != null && data.food_min_order_amount > 0
+          ? String(data.food_min_order_amount)
+          : '',
+      )
+      setFoodAcceptsCash(data.food_accepts_cash ?? false)
+      setFoodCashMaxAmount(
+        data.food_cash_max_amount != null && data.food_cash_max_amount > 0
+          ? String(data.food_cash_max_amount)
+          : '',
+      )
+      setFoodStatus(data.food_status ?? 'open')
+      setFoodPauseUntil(data.food_pause_until ?? null)
+      setCuisineTags(data.cuisine_tags ?? [])
     }
     setLoading(false)
   }, [activeMerchantId])
@@ -202,6 +236,9 @@ export function MerchantMenuPanel() {
       description: item.description ?? '',
       image_url: item.image_url ?? '',
       prep_minutes: item.prep_minutes != null ? String(item.prep_minutes) : '',
+      allergens: item.allergens ?? [],
+      item_tags: item.item_tags ?? [],
+      contains_alcohol: item.contains_alcohol ?? false,
     })
     setDrawerModifiers(item.modifier_groups ?? [])
     setDrawerOpen(true)
@@ -331,6 +368,9 @@ export function MerchantMenuPanel() {
           description: form.description.trim() || undefined,
           image_url: form.image_url.trim() || undefined,
           prep_minutes: form.prep_minutes.trim() ? Number(form.prep_minutes) : undefined,
+          allergens: form.allergens,
+          item_tags: form.item_tags,
+          contains_alcohol: form.contains_alcohol,
         }),
       })
       setSavingId(null)
@@ -349,13 +389,16 @@ export function MerchantMenuPanel() {
     const res = await merchantApiFetch(`/merchant-menu/items/${editingItemId}`, activeMerchantId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+        body: JSON.stringify({
         name: form.name.trim(),
         price: Number(form.price),
         section_id: form.section_id || null,
         description: form.description.trim() || undefined,
         image_url: form.image_url.trim() || null,
         prep_minutes: form.prep_minutes.trim() ? Number(form.prep_minutes) : null,
+        allergens: form.allergens,
+        item_tags: form.item_tags,
+        contains_alcohol: form.contains_alcohol,
         modifier_groups: modifierGroupsToPayload(modifiers),
       }),
     })
@@ -392,21 +435,82 @@ export function MerchantMenuPanel() {
     } else notify.error(await parseApiError(res))
   }
 
-  const saveFoodPrepMinutes = async () => {
+  const updateAvailability = async (mode: 'open' | 'paused' | 'closed', duration_minutes?: number) => {
+    setSavingAvailability(true)
+    const res = await merchantApiFetch('/merchant-menu/availability', activeMerchantId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, ...(duration_minutes ? { duration_minutes } : {}) }),
+    })
+    setSavingAvailability(false)
+    if (!res.ok) {
+      notify.error(await parseApiError(res))
+      return
+    }
+    const data = await res.json() as { status: 'open' | 'paused' | 'closed'; food_pause_until: string | null }
+    setFoodStatus(data.status)
+    setFoodPauseUntil(data.food_pause_until)
+    notify.success(
+      mode === 'open' ? 'Restaurant rouvert' :
+      mode === 'closed' ? 'Restaurant fermé temporairement' :
+      `Restaurant en pause ${duration_minutes} min`
+    )
+  }
+
+  const saveCuisineTags = async () => {
+    const res = await merchantApiFetch('/merchants/me/tags', activeMerchantId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tags: cuisineTags }),
+    })
+    if (!res.ok) throw new Error(await parseApiError(res))
+  }
+
+  const toggleCuisineTag = (tag: string) => {
+    setCuisineTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
+    )
+  }
+
+  const saveAllSettings = async () => {
     const minutes = Number(foodPrepMinutes)
     if (!Number.isFinite(minutes) || minutes < 5) {
       notify.error('Délai invalide (minimum 5 min)')
       return
     }
-    setSavingPrep(true)
-    const res = await merchantApiFetch('/merchant-menu/settings', activeMerchantId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ food_prep_minutes: minutes }),
-    })
-    setSavingPrep(false)
-    if (!res.ok) notify.error(await parseApiError(res))
-    else notify.success('Paramètres enregistrés')
+    const minRaw = foodMinOrderAmount.trim()
+    const minOrder = minRaw === '' ? null : Number(minRaw)
+    if (minRaw !== '' && (!Number.isFinite(minOrder) || minOrder! < 0)) {
+      notify.error('Commande minimum invalide')
+      return
+    }
+    const cashMaxRaw = foodCashMaxAmount.trim()
+    const cashMax = cashMaxRaw === '' ? null : Number(cashMaxRaw)
+    if (cashMaxRaw !== '' && (!Number.isFinite(cashMax) || cashMax! < 0)) {
+      notify.error('Plafond cash invalide')
+      return
+    }
+
+    setSavingSettings(true)
+    try {
+      const settingsRes = await merchantApiFetch('/merchant-menu/settings', activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          food_prep_minutes: minutes,
+          food_min_order_amount: minOrder,
+          food_accepts_cash: foodAcceptsCash,
+          food_cash_max_amount: cashMax,
+        }),
+      })
+      if (!settingsRes.ok) throw new Error(await parseApiError(settingsRes))
+      await saveCuisineTags()
+      notify.success('Paramètres enregistrés')
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Enregistrement impossible')
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   const toggleSectionCollapsed = (key: string) => {
@@ -459,6 +563,29 @@ export function MerchantMenuPanel() {
               <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
                 <Clock size={11} /> {item.prep_minutes} min
               </p>
+            )}
+            {(item.allergens?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {item.allergens!.map(a => (
+                  <span key={a} className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-100">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            )}
+            {((item.item_tags?.length ?? 0) > 0 || item.contains_alcohol) && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {item.item_tags?.map(t => (
+                  <span key={t} className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    {t}
+                  </span>
+                ))}
+                {item.contains_alcohol && (
+                  <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-100">
+                    🍷 alcool
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -708,9 +835,11 @@ export function MerchantMenuPanel() {
               <button
                 type="button"
                 onClick={() => openCreateDrawer(section.id)}
-                className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2.5 rounded-full bg-orange-600 text-white text-sm font-bold hover:bg-orange-700"
+                title="Ajouter un plat"
+                aria-label="Ajouter un plat"
+                className="w-10 h-10 shrink-0 rounded-xl border border-orange-200 bg-orange-50 flex items-center justify-center text-orange-600 hover:bg-orange-100"
               >
-                <Plus size={16} /> Ajouter
+                <Plus size={16} />
               </button>
               <button
                 type="button"
@@ -910,13 +1039,18 @@ export function MerchantMenuPanel() {
               Voir en ligne <ExternalLink size={14} />
             </Link>
           )}
-          <button
-            type="button"
-            onClick={() => openCreateDrawer(sectionFilter !== 'all' && sectionFilter !== 'none' ? sectionFilter : undefined)}
-            className="inline-flex items-center justify-center gap-2 min-h-[48px] px-4 py-2.5 bg-orange-600 text-white rounded-full text-sm font-bold hover:bg-orange-700 w-full sm:w-auto shadow-sm"
-          >
-            <Plus size={18} /> Ajouter
-          </button>
+          {pageTab === 'menu' && (
+            <button
+              type="button"
+              onClick={() => openCreateDrawer(sectionFilter !== 'all' && sectionFilter !== 'none' ? sectionFilter : undefined)}
+              title="Ajouter un plat"
+              aria-label="Ajouter un plat"
+              className="inline-flex items-center justify-center gap-2 w-10 h-10 sm:w-auto sm:min-h-[48px] sm:px-4 sm:py-2.5 bg-orange-600 text-white rounded-xl sm:rounded-full text-sm font-bold hover:bg-orange-700 shrink-0 sm:shadow-sm"
+            >
+              <Plus size={18} />
+              <span className="hidden sm:inline">Ajouter</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -949,29 +1083,174 @@ export function MerchantMenuPanel() {
       </div>
 
       {pageTab === 'settings' ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 max-w-lg">
-          <h2 className="text-lg font-extrabold text-slate-900 mb-1">Délai de préparation</h2>
-          <p className="text-sm text-slate-500 mb-4">
-            Délai par défaut affiché aux clients pour les plats sans temps de préparation spécifique.
-          </p>
-          <label className="block">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Minutes</span>
-            <input
-              type="number"
-              min={5}
-              value={foodPrepMinutes}
-              onChange={e => setFoodPrepMinutes(e.target.value)}
-              className={`mt-1.5 ${INPUT}`}
-            />
-          </label>
-          <button
-            type="button"
-            disabled={savingPrep}
-            onClick={() => void saveFoodPrepMinutes()}
-            className="mt-4 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60"
-          >
-            {savingPrep ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 lg:p-8 space-y-8">
+
+            {/* ── Disponibilité ─────────────────────────────────────── */}
+            <section>
+              <h2 className="text-lg font-extrabold text-slate-900 mb-1">Disponibilité</h2>
+              <p className="text-sm text-slate-500 mb-4">
+                Statut actuel :&nbsp;
+                <span className={`font-bold ${foodStatus === 'open' ? 'text-emerald-600' : foodStatus === 'paused' ? 'text-amber-600' : 'text-red-600'}`}>
+                  {foodStatus === 'open' ? 'Ouvert' : foodStatus === 'paused' ? `En pause${foodPauseUntil ? ` jusqu'à ${new Date(foodPauseUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}` : 'Fermé temporairement'}
+                </span>
+              </p>
+              {foodStatus !== 'open' ? (
+                <button
+                  type="button"
+                  disabled={savingAvailability}
+                  onClick={() => void updateAvailability('open')}
+                  className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold disabled:opacity-60 hover:bg-emerald-700"
+                >
+                  {savingAvailability ? '…' : 'Rouvrir maintenant'}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mettre en pause</p>
+                  <div className="flex flex-wrap gap-2">
+                    {([15, 30, 45, 60] as const).map(min => (
+                      <button
+                        key={min}
+                        type="button"
+                        disabled={savingAvailability}
+                        onClick={() => void updateAvailability('paused', min)}
+                        className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-sm font-bold hover:bg-amber-100 disabled:opacity-60"
+                      >
+                        {min} min
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={savingAvailability}
+                    onClick={() => void updateAvailability('closed')}
+                    className="px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm font-bold hover:bg-red-100 disabled:opacity-60"
+                  >
+                    Fermer jusqu&apos;à réouverture manuelle
+                  </button>
+                </div>
+              )}
+            </section>
+
+            <div className="border-t border-slate-100" />
+
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
+              <section>
+                <h2 className="text-lg font-extrabold text-slate-900 mb-1">Délai de préparation</h2>
+                <p className="text-sm text-slate-500 mb-4">
+                  Délai par défaut affiché aux clients pour les plats sans temps de préparation spécifique.
+                </p>
+                <label className="block max-w-xs">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Minutes</span>
+                  <input
+                    type="number"
+                    min={5}
+                    value={foodPrepMinutes}
+                    onChange={e => setFoodPrepMinutes(e.target.value)}
+                    className={`mt-1.5 ${INPUT}`}
+                  />
+                </label>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-extrabold text-slate-900 mb-1">Commande minimum</h2>
+                <p className="text-sm text-slate-500 mb-4">
+                  Montant minimum du panier (hors frais de livraison). Laissez vide pour aucun minimum.
+                </p>
+                <label className="block max-w-xs">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Montant (FCFA)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    placeholder="Ex. 5000"
+                    value={foodMinOrderAmount}
+                    onChange={e => setFoodMinOrderAmount(e.target.value)}
+                    className={`mt-1.5 ${INPUT}`}
+                  />
+                </label>
+              </section>
+
+              <section className="lg:col-span-2">
+                <h2 className="text-lg font-extrabold text-slate-900 mb-1">Cash à la livraison</h2>
+                <p className="text-sm text-slate-500 mb-4">
+                  Autoriser les clients à payer en espèces à la réception de la commande.
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer mb-4">
+                  <div
+                    role="switch"
+                    aria-checked={foodAcceptsCash}
+                    tabIndex={0}
+                    onClick={() => setFoodAcceptsCash(v => !v)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setFoodAcceptsCash(v => !v) }}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${foodAcceptsCash ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${foodAcceptsCash ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {foodAcceptsCash ? 'Cash accepté' : 'Cash désactivé'}
+                  </span>
+                </label>
+                {foodAcceptsCash && (
+                  <label className="block max-w-xs">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Plafond cash (FCFA — vide = illimité)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={500}
+                      placeholder="Ex. 50000"
+                      value={foodCashMaxAmount}
+                      onChange={e => setFoodCashMaxAmount(e.target.value)}
+                      className={`mt-1.5 ${INPUT}`}
+                    />
+                  </label>
+                )}
+              </section>
+            </div>
+
+            <div className="border-t border-slate-100" />
+
+            {/* ── Cuisines proposées ─────────────────────────────── */}
+            <section>
+              <h2 className="text-lg font-extrabold text-slate-900 mb-1">Cuisines proposées</h2>
+              <p className="text-sm text-slate-500 mb-4">
+                Tags visibles par les clients dans la recherche et les filtres. Sélectionnez jusqu&apos;à 5.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {CUISINE_TAGS.map(tag => {
+                  const selected = cuisineTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleCuisineTag(tag)}
+                      disabled={!selected && cuisineTags.length >= 5}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                        selected
+                          ? 'bg-orange-500 text-white border-orange-500'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-orange-300 disabled:opacity-40'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              disabled={savingSettings}
+              onClick={() => void saveAllSettings()}
+              className="min-w-[220px] px-8 py-3 bg-slate-900 text-white rounded-full text-sm font-bold disabled:opacity-60 hover:bg-slate-800 shadow-sm"
+            >
+              {savingSettings ? 'Enregistrement…' : 'Enregistrer les paramètres'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid lg:grid-cols-[240px_1fr] gap-6">

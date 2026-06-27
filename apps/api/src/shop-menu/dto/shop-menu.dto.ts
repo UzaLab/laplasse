@@ -1,10 +1,12 @@
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator'
 import { Type } from 'class-transformer'
@@ -117,6 +119,20 @@ export class CreateMenuItemDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
+  allergens?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  item_tags?: string[]
+
+  @IsOptional()
+  @IsBoolean()
+  contains_alcohol?: boolean
+
+  @IsOptional()
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MenuModifierGroupDto)
   modifier_groups?: MenuModifierGroupDto[]
@@ -160,9 +176,35 @@ export class UpdateMenuItemDto {
 
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
+  allergens?: string[]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  item_tags?: string[]
+
+  @IsOptional()
+  @IsBoolean()
+  contains_alcohol?: boolean
+
+  @IsOptional()
+  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MenuModifierGroupDto)
   modifier_groups?: MenuModifierGroupDto[]
+}
+
+/** Disponibilité restaurant : open, paused (avec durée), closed (sans limite). */
+export class UpdateMenuAvailabilityDto {
+  @IsIn(['open', 'paused', 'closed'])
+  mode: 'open' | 'paused' | 'closed'
+
+  /** Durée de pause en minutes (requis si mode=paused). Valeurs valides : 15, 30, 45, 60. */
+  @IsOptional()
+  @IsInt()
+  @IsIn([15, 30, 45, 60])
+  duration_minutes?: number
 }
 
 export class UpdateMenuSettingsDto {
@@ -170,4 +212,23 @@ export class UpdateMenuSettingsDto {
   @IsInt()
   @Min(5)
   food_prep_minutes?: number
+
+  /** Montant minimum panier (XOF). 0 ou null = pas de minimum. */
+  @IsOptional()
+  @ValidateIf(o => o.food_min_order_amount != null)
+  @IsInt()
+  @Min(0)
+  food_min_order_amount?: number | null
+
+  /** Paiement cash à la livraison activé pour ce restaurant. */
+  @IsOptional()
+  @IsBoolean()
+  food_accepts_cash?: boolean
+
+  /** Montant max autorisé pour le cash à la livraison (XOF). null = pas de plafond. */
+  @IsOptional()
+  @ValidateIf(o => o.food_cash_max_amount != null)
+  @IsInt()
+  @Min(0)
+  food_cash_max_amount?: number | null
 }

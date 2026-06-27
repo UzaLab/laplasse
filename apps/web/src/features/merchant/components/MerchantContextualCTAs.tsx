@@ -35,12 +35,13 @@ export function MerchantContextualCTAs({
   const secondaryBtn = `${primaryClass} bg-white text-slate-900 border border-slate-200 hover:border-brand-300 hover:bg-brand-50`
 
   if (vertical === 'food') {
+    const menuHref = tabHref(merchantSlug, 'menu')
     return (
       <div className="flex flex-col gap-3 mb-5">
-        <Link href={tabHref(merchantSlug, 'menu')} className={primaryBtn} style={{ textDecoration: 'none' }}>
+        <Link href={menuHref} className={primaryBtn} style={{ textDecoration: 'none' }}>
           <UtensilsCrossed size={18} /> Voir le menu
         </Link>
-        <Link href={tabHref(merchantSlug, 'menu')} className={secondaryBtn} style={{ textDecoration: 'none' }}>
+        <Link href={menuHref} className={secondaryBtn} style={{ textDecoration: 'none' }}>
           <ShoppingBag size={18} /> Commander
         </Link>
         {bookingEnabled && (

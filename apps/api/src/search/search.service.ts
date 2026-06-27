@@ -42,6 +42,8 @@ export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name)
   private readonly INDEX_NAME = 'merchants'
   private readonly PRODUCTS_INDEX = 'products'
+  private readonly MENUS_INDEX = 'menu_items'
+  private readonly FOOD_CATEGORY_SLUGS = ['restaurants', 'fast-food', 'cafes', 'bars-lounges'] as const
   private meiliHost: string
   private meiliKey: string
 
@@ -57,8 +59,10 @@ export class SearchService implements OnModuleInit {
   async onModuleInit() {
     await this.ensureIndex()
     await this.ensureProductsIndex()
+    await this.ensureMenusIndex()
     await this.syncAllMerchants()
     await this.syncAllProducts()
+    await this.syncAllMenuItems()
   }
 
   // ─── Meilisearch REST helpers ──────────────────────────────────────────────
@@ -1050,5 +1054,272 @@ export class SearchService implements OnModuleInit {
       },
       _formatted: h['_formatted'] as Record<string, string> | undefined,
     }
+  }
+
+  // ─── Menu items index (vertical food) ─────────────────────────────────────
+
+  private async ensureMenusIndex() {
+    try {
+      await this.meiliRequest('PATCH', `/indexes/${this.MENUS_INDEX}/settings`, {
+        searchableAttributes: [
+          'name', 'description', 'merchant_name', 'section_name',
+        ],
+        filterableAttributes: [
+          'merchant_slug', 'category_slug', 'country', 'is_available',
+        ],
+        sortableAttributes: ['price', 'name'],
+        rankingRules: [
+          'words', 'typo', 'proximity', 'attribute', 'sort', 'exactness',
+        ],
+      })
+      this.logger.log(`Meilisearch index "${this.MENUS_INDEX}" configured`)
+    } catch (error) {
+      this.logger.warn(`Meilisearch menus index not available: ${(error as Error).message}`)
+    }
+  }
+
+  private menuSyncInclude = {
+    section: { select: { name: true } },
+    merchant: {
+      select: {
+        id: true,
+        business_name: true,
+        slug: true,
+        is_active: true,
+        food_prep_minutes: true,
+        category: { select: { slug: true } },
+        location: { select: { country: true } },
+      },
+    },
+  } as const
+
+  private buildMenuDocument(item: {
+    id: string
+    name: string
+    description: string | null
+    price: number
+    currency: string
+    image_url: string | null
+    prep_minutes: number | null
+    is_available: boolean
+    section: { name: string } | null
+    merchant: {
+      business_name: string
+      slug: string
+      is_active: boolean
+      food_prep_minutes: number
+      category: { slug: string }
+      location: { country: string } | null
+    }
+  }): MeiliDocument | null {
+    if (!this.FOOD_CATEGORY_SLUGS.includes(item.merchant.category.slug as typeof this.FOOD_CATEGORY_SLUGS[number])) {
+      return null
+    }
+    return {
+      id: item.id,
+      name: item.name,
+      description: item.description ?? '',
+      price: item.price,
+      currency: item.currency,
+      image_url: item.image_url ?? null,
+      prep_minutes: item.prep_minutes ?? item.merchant.food_prep_minutes ?? 25,
+      merchant_name: item.merchant.business_name,
+      merchant_slug: item.merchant.slug,
+      section_name: item.section?.name ?? null,
+      category_slug: item.merchant.category.slug,
+      country: item.merchant.location?.country ?? 'CI',
+      is_available: item.is_available && item.merchant.is_active,
+    }
+  }
+
+  async syncAllMenuItems() {
+    try {
+      const items = await this.prisma.menuItem.findMany({
+        where: {
+          merchant: {
+            is_active: true,
+            category: { slug: { in: [...this.FOOD_CATEGORY_SLUGS] } },
+          },
+        },
+        include: this.menuSyncInclude,
+      })
+
+      const documents = items
+        .map(i => this.buildMenuDocument(i))
+        .filter((d): d is MeiliDocument => d != null)
+
+      if (documents.length === 0) return
+
+      await this.meiliRequest(
+        'POST',
+        `/indexes/${this.MENUS_INDEX}/documents?primaryKey=id`,
+        documents,
+      )
+      this.logger.log(`Synced ${documents.length} menu items to Meilisearch`)
+    } catch (error) {
+      this.logger.warn(`Meilisearch menus sync skipped: ${(error as Error).message}`)
+    }
+  }
+
+  async syncMenuItem(menuItemId: string) {
+    try {
+      const item = await this.prisma.menuItem.findUnique({
+        where: { id: menuItemId },
+        include: this.menuSyncInclude,
+      })
+      if (!item) return
+
+      const doc = this.buildMenuDocument(item)
+      if (!doc || !item.is_available || !item.merchant.is_active) {
+        await this.removeMenuItem(menuItemId)
+        return
+      }
+
+      await this.meiliRequest(
+        'POST',
+        `/indexes/${this.MENUS_INDEX}/documents?primaryKey=id`,
+        [doc],
+      )
+    } catch (error) {
+      this.logger.warn(`Meilisearch menu sync ${menuItemId}: ${(error as Error).message}`)
+    }
+  }
+
+  async removeMenuItem(menuItemId: string) {
+    try {
+      await this.meiliRequest(
+        'DELETE',
+        `/indexes/${this.MENUS_INDEX}/documents/${menuItemId}`,
+      )
+    } catch (error) {
+      this.logger.warn(`Meilisearch menu remove ${menuItemId}: ${(error as Error).message}`)
+    }
+  }
+
+  async autocompleteMenus(q: string, limit = 8, country?: string) {
+    if (!q || q.length < 2) return []
+
+    try {
+      const filterParts = ['is_available = true']
+      if (country) filterParts.push(`country = "${country.toUpperCase()}"`)
+
+      const result = await this.meiliRequest('POST', `/indexes/${this.MENUS_INDEX}/search`, {
+        q,
+        limit,
+        filter: filterParts.join(' AND '),
+        attributesToRetrieve: [
+          'id', 'name', 'merchant_name', 'merchant_slug', 'section_name',
+          'price', 'currency', 'prep_minutes', 'image_url',
+        ],
+        attributesToHighlight: ['name', 'description'],
+        highlightPreTag: '<mark>',
+        highlightPostTag: '</mark>',
+        showRankingScore: false,
+      }) as { hits: MeiliDocument[] }
+
+      return result.hits.map(h => ({
+        id: h['id'] as string,
+        name: h['name'] as string,
+        price: h['price'] as number,
+        currency: (h['currency'] as string) ?? 'XOF',
+        prep_minutes: (h['prep_minutes'] as number | null) ?? null,
+        image_url: (h['image_url'] as string | null) ?? null,
+        section_name: (h['section_name'] as string | null) ?? null,
+        merchant: {
+          business_name: h['merchant_name'] as string,
+          slug: h['merchant_slug'] as string,
+        },
+        _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['name'],
+      }))
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
+      return this.autocompleteMenusFallback(q, limit, country)
+    }
+  }
+
+  async searchMenus(q: string, limit = 20, country?: string) {
+    if (!q?.trim()) {
+      return { data: [], meta: { total: 0, query: '', limit, processing_time_ms: 0 } }
+    }
+
+    try {
+      const filterParts = ['is_available = true']
+      if (country) filterParts.push(`country = "${country.toUpperCase()}"`)
+
+      const result = await this.meiliRequest('POST', `/indexes/${this.MENUS_INDEX}/search`, {
+        q: q.trim(),
+        limit,
+        filter: filterParts.join(' AND '),
+        attributesToRetrieve: [
+          'id', 'name', 'description', 'merchant_name', 'merchant_slug',
+          'section_name', 'price', 'currency', 'prep_minutes', 'image_url',
+        ],
+      }) as { hits: MeiliDocument[]; estimatedTotalHits: number; processingTimeMs: number }
+
+      return {
+        data: result.hits.map(h => ({
+          id: h['id'] as string,
+          name: h['name'] as string,
+          description: (h['description'] as string) || null,
+          price: h['price'] as number,
+          currency: (h['currency'] as string) ?? 'XOF',
+          prep_minutes: (h['prep_minutes'] as number | null) ?? null,
+          image_url: (h['image_url'] as string | null) ?? null,
+          section_name: (h['section_name'] as string | null) ?? null,
+          merchant: {
+            business_name: h['merchant_name'] as string,
+            slug: h['merchant_slug'] as string,
+          },
+        })),
+        meta: {
+          total: result.estimatedTotalHits ?? result.hits.length,
+          query: q.trim(),
+          limit,
+          processing_time_ms: result.processingTimeMs ?? 0,
+        },
+      }
+    } catch (error) {
+      if (this.isMeiliRequired()) this.failMeiliRequired(error)
+      const fallback = await this.autocompleteMenusFallback(q, limit, country)
+      return {
+        data: fallback,
+        meta: { total: fallback.length, query: q.trim(), limit, processing_time_ms: 0 },
+      }
+    }
+  }
+
+  private async autocompleteMenusFallback(q: string, limit: number, country?: string) {
+    const items = await this.prisma.menuItem.findMany({
+      where: {
+        is_available: true,
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } },
+        ],
+        merchant: {
+          is_active: true,
+          category: { slug: { in: [...this.FOOD_CATEGORY_SLUGS] } },
+          ...(country && { location: { country: country.toUpperCase() } }),
+        },
+      },
+      include: this.menuSyncInclude,
+      orderBy: { name: 'asc' },
+      take: limit,
+    })
+
+    return items.map(i => ({
+      id: i.id,
+      name: i.name,
+      price: i.price,
+      currency: i.currency,
+      prep_minutes: i.prep_minutes ?? i.merchant.food_prep_minutes ?? null,
+      image_url: i.image_url ?? null,
+      section_name: i.section?.name ?? null,
+      merchant: {
+        business_name: i.merchant.business_name,
+        slug: i.merchant.slug,
+      },
+      _highlight: null,
+    }))
   }
 }

@@ -10,6 +10,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { MerchantsService } from './merchants.service'
 import { QueryMerchantsDto } from './dto/query-merchants.dto'
 import { ShopMenuService } from '../shop-menu/shop-menu.service'
+import { ComposedMenuService } from '../shop-menu/composed-menu.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { CreateDeliveryZoneDto } from '../delivery-zones/dto/create-delivery-zone.dto'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
@@ -20,6 +21,7 @@ export class MerchantsController {
     private readonly merchantsService: MerchantsService,
     private readonly shopMenu: ShopMenuService,
     private readonly deliveryZones: DeliveryZonesService,
+    private readonly composedMenuSvc: ComposedMenuService,
   ) {}
 
   @Public()
@@ -96,6 +98,16 @@ export class MerchantsController {
     @Query('merchantId') merchantId?: string,
   ) {
     return this.merchantsService.updateMine(body, user.id, merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/tags')
+  updateMyTags(
+    @Body() body: { tags: string[] },
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.updateMyTags(user.id, body.tags ?? [], merchantId)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -317,8 +329,10 @@ export class MerchantsController {
 
   @Public()
   @Get(':slug/menu')
-  menu(@Param('slug') slug: string) {
-    return this.shopMenu.listPublicByMerchantSlug(slug)
+  async menu(@Param('slug') slug: string) {
+    const menuData = await this.shopMenu.listPublicByMerchantSlug(slug)
+    const composedMenus = await this.composedMenuSvc.listPublic(menuData.merchant.id)
+    return { ...menuData, composed_menus: composedMenus }
   }
 
   @Public()

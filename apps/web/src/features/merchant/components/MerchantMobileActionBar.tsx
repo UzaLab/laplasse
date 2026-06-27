@@ -80,7 +80,7 @@ function buildActions(
     const actions: ActionBtn[] = [{
       label: 'Commander',
       icon: <ShoppingBag size={20} />,
-      href: tabHref(merchantSlug, 'menu'),
+      href: `/restauration/${merchantSlug}`,
       variant: 'primary',
       iconOnly: true,
     }]

@@ -19,6 +19,9 @@ export type MenuItemFormState = {
   description: string
   image_url: string
   prep_minutes: string
+  allergens: string[]
+  item_tags: string[]
+  contains_alcohol: boolean
 }
 
 export const EMPTY_MENU_ITEM_FORM: MenuItemFormState = {
@@ -28,7 +31,26 @@ export const EMPTY_MENU_ITEM_FORM: MenuItemFormState = {
   description: '',
   image_url: '',
   prep_minutes: '',
+  allergens: [],
+  item_tags: [],
+  contains_alcohol: false,
 }
+
+const ALLERGEN_LIST = [
+  'Gluten', 'Crustacés', 'Œufs', 'Poisson', 'Arachides', 'Soja',
+  'Lait', 'Fruits à coque', 'Céleri', 'Moutarde', 'Graines de sésame',
+  'Anhydride sulfureux / Sulfites', 'Lupin', 'Mollusques',
+]
+
+const ITEM_TAG_LIST = [
+  { value: 'halal', label: '🥩 Halal' },
+  { value: 'vegetarien', label: '🥦 Végétarien' },
+  { value: 'vegan', label: '🌱 Vegan' },
+  { value: 'epice', label: '🌶️ Épicé' },
+  { value: 'sans_gluten', label: '🌾 Sans gluten' },
+  { value: 'populaire', label: '⭐ Populaire' },
+  { value: 'recommande', label: '👍 Recommandé' },
+]
 
 const INPUT =
   'w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-500/10'
@@ -77,7 +99,7 @@ export function MenuItemDrawer({
   const title = mode === 'create' ? 'Nouveau plat' : 'Modifier le plat'
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex flex-col sm:flex-row sm:justify-end">
+    <div className="fixed inset-0 z-[300] flex flex-col sm:flex-row sm:justify-end pt-6 sm:pt-0">
       <div
         role="presentation"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
@@ -87,9 +109,9 @@ export function MenuItemDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="menu-item-drawer-title"
-        className="relative ml-auto flex flex-col w-full sm:max-w-lg h-[100dvh] sm:h-full bg-white shadow-2xl min-h-0"
+        className="relative ml-auto flex flex-col w-full sm:max-w-lg h-[calc(100dvh-1.5rem)] sm:h-full rounded-t-2xl sm:rounded-none bg-white shadow-2xl min-h-0 overflow-hidden"
       >
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 sm:py-4 border-b border-slate-100 shrink-0 safe-area-top">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-5 pb-3 sm:py-4 border-b border-slate-100 shrink-0 safe-area-top">
           <div className="min-w-0">
             <p id="menu-item-drawer-title" className="text-lg font-extrabold text-slate-900 truncate">{title}</p>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -184,6 +206,78 @@ export function MenuItemDrawer({
               className={INPUT}
               placeholder="Laisser vide = délai du restaurant"
             />
+          </label>
+
+          <div>
+            <span className={LABEL}>Allergènes</span>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {ALLERGEN_LIST.map(a => {
+                const selected = form.allergens.includes(a)
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      allergens: selected ? f.allergens.filter(x => x !== a) : [...f.allergens, a],
+                    }))}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                      selected
+                        ? 'bg-orange-100 text-orange-800 border-orange-300'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-orange-200'
+                    }`}
+                  >
+                    {a}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div>
+            <span className={LABEL}>Tags diététiques</span>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              {ITEM_TAG_LIST.map(({ value, label }) => {
+                const selected = form.item_tags.includes(value)
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setForm(f => ({
+                      ...f,
+                      item_tags: selected ? f.item_tags.filter(x => x !== value) : [...f.item_tags, value],
+                    }))}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                      selected
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              "Halal" uniquement si certification ou déclaration sur l'honneur.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={form.contains_alcohol}
+                onChange={e => setForm(f => ({ ...f, contains_alcohol: e.target.checked }))}
+              />
+              <div className="w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-red-500 transition-colors" />
+              <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+            </div>
+            <div>
+              <span className="text-sm font-bold text-slate-700">Contient de l'alcool</span>
+              <p className="text-[11px] text-slate-400">Mention obligatoire si le plat contient de l'alcool (§13.4).</p>
+            </div>
           </label>
 
           {mode === 'edit' && (

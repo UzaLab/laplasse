@@ -59,11 +59,17 @@ function isStaticOrAuthPage(pathname: string): boolean {
   )
 }
 
+/** Fiche restaurant hub — menu + panier contextuel en bas. */
+function isRestaurationDetailPage(pathname: string): boolean {
+  return /^\/restauration\/[^/]+$/.test(pathname)
+}
+
 const PUBLIC_APP_PREFIXES = [
   '/',
   '/marketplace',
   '/search',
   '/categories/',
+  '/restauration',
   '/boutique/',
   '/m/',
   '/cart',
@@ -98,6 +104,7 @@ export function shouldHideFooterOnMobile(pathname: string): boolean {
   if (isStaticOrAuthPage(pathname)) return false
   if (isFocusedCheckoutFlow(pathname)) return true
   if (isMerchantProfilePage(pathname) || isMerchantBookingDetailPage(pathname)) return true
+  if (isRestaurationDetailPage(pathname)) return true
   if (isPublicAppPage(pathname)) return true
   // 404 et autres URLs publiques inconnues
   return true

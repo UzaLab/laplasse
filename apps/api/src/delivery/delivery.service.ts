@@ -684,15 +684,22 @@ export class DeliveryService {
       await this.assignCourierProfile(job.id, dto.courier_profile_id)
       await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
     } else if (mode === 'PLATFORM_RIDER' || mode === 'LOGISTICS_PARTNER') {
+      let courierAssigned = false
       if (mode === 'LOGISTICS_PARTNER') {
-        const autoAssigned = await this.logisticsPartners.autoDispatchJobIfEnabled(job.id).catch(() => false)
-        if (!autoAssigned) {
+        courierAssigned = await this.logisticsPartners.autoDispatchJobIfEnabled(job.id).catch(() => false)
+        if (!courierAssigned) {
           await this.offerService.startOffering(job.id)
         }
       } else {
         await this.offerService.startOffering(job.id)
       }
-      await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
+      // Notifier le client : "livreur assigné" seulement si auto-dispatch a trouvé quelqu'un,
+      // sinon un message neutre indiquant que la recherche est en cours
+      if (courierAssigned) {
+        await this.notifyDeliveryUpdate(order.user_id, orderId, 'ASSIGNED', 'OUT_FOR_DELIVERY')
+      } else {
+        await this.notifyDeliveryUpdate(order.user_id, orderId, 'PENDING', 'OUT_FOR_DELIVERY')
+      }
       if (mode === 'LOGISTICS_PARTNER' && partnerId) {
         await this.notifyLogisticsPartnerStaff(
           partnerId,

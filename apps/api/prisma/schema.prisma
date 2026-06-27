@@ -178,6 +178,12 @@ model Merchant {
   is_active           Boolean            @default(true)
   is_sponsored        Boolean            @default(false)
   food_prep_minutes           Int                    @default(25)
+  food_min_order_amount       Int?
+  food_is_paused              Boolean                @default(false)
+  food_pause_until            DateTime?
+  avg_rating                  Float?
+  food_accepts_cash           Boolean                @default(false)
+  food_cash_max_amount        Int?
   delivery_fulfilment_default DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
@@ -207,6 +213,7 @@ model Merchant {
   orders           Order[]
   menu_sections    MenuSection[]
   menu_items       MenuItem[]
+  composed_menus   ComposedMenu[]
   staff_couriers   CourierProfile[]
 
   @@index([slug])
@@ -835,7 +842,10 @@ model MenuItem {
   image_url    String?
   is_available Boolean  @default(true)
   prep_minutes Int?
-  sort_order   Int      @default(0)
+  allergens        String[]
+  item_tags        String[]
+  contains_alcohol Boolean  @default(false)
+  sort_order       Int      @default(0)
   created_at   DateTime @default(now())
 
   merchant        Merchant            @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
@@ -848,6 +858,40 @@ model MenuItem {
   @@index([merchant_id, sort_order])
   @@index([shop_id, sort_order])
   @@index([section_id])
+}
+
+// Formule / menu composé (ex: Entrée + Plat + Dessert à prix réduit)
+model ComposedMenu {
+  id          String   @id @default(cuid())
+  merchant_id String
+  name        String
+  description String?
+  price       Int
+  currency    String   @default("XOF")
+  image_url   String?
+  is_available Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  merchant Merchant          @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  items    ComposedMenuSlot[]
+
+  @@index([merchant_id, sort_order])
+}
+
+// Un "slot" dans une formule : ex. "Choix du plat" avec 1 à N items possibles
+model ComposedMenuSlot {
+  id               String   @id @default(cuid())
+  composed_menu_id String
+  label            String
+  sort_order       Int      @default(0)
+  required         Boolean  @default(true)
+  item_choices     String[] // IDs de MenuItem parmi lesquels choisir
+
+  composed_menu ComposedMenu @relation(fields: [composed_menu_id], references: [id], onDelete: Cascade)
+
+  @@index([composed_menu_id])
 }
 
 model MenuModifierGroup {

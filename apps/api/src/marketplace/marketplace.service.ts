@@ -38,6 +38,7 @@ import {
   type MenuModifierGroupRow,
 } from '../common/menu-modifiers'
 import { ShopsService } from '../shops/shops.service'
+import { computeFoodStatus } from '../shop-menu/shop-menu.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import type { DeliveryQuoteItem } from '../delivery-zones/delivery-zones.service'
 import { PromotionsService } from '../promotions/promotions.service'
@@ -539,6 +540,7 @@ export class MarketplaceService {
           slug: string
           logo?: string | null
           food_prep_minutes?: number
+          food_min_order_amount?: number | null
         }
       } | null
       product?: {
@@ -610,6 +612,7 @@ export class MarketplaceService {
             slug: m.merchant.slug,
             logo: m.merchant.logo ?? null,
             food_prep_minutes: m.merchant.food_prep_minutes ?? 25,
+            food_min_order_amount: m.merchant.food_min_order_amount ?? null,
           },
         },
       }
@@ -701,6 +704,8 @@ export class MarketplaceService {
           quantity: i.quantity,
         }))
       const merchantPrepDefault = items.find(i => i.line_kind === 'menu')?.product.merchant.food_prep_minutes ?? 25
+      const foodMinOrder =
+        items.find(i => i.line_kind === 'menu')?.product.merchant.food_min_order_amount ?? null
       const estimated_prep_minutes = prepSource.length
         ? estimateFoodPrepMinutes(merchantPrepDefault, prepSource)
         : null
@@ -725,6 +730,7 @@ export class MarketplaceService {
               slug: single.slug,
               subtotal: single.subtotal,
               item_count: single.item_count,
+              food_min_order_amount: foodMinOrder,
             }
           : null,
         item_count: items.reduce((n, i) => n + i.quantity, 0),
@@ -1611,6 +1617,7 @@ export class MarketplaceService {
             logo: true,
             is_active: true,
             food_prep_minutes: true,
+            food_min_order_amount: true,
           },
         },
       },
@@ -1894,7 +1901,7 @@ export class MarketplaceService {
     const menuItem = await this.prisma.menuItem.findFirst({
       where: { id: menuItemId, is_available: true },
       include: {
-        merchant: { select: { id: true, is_active: true } },
+        merchant: { select: { id: true, is_active: true, food_is_paused: true, food_pause_until: true, business_name: true } },
         modifier_groups: {
           orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
           include: {
@@ -1909,6 +1916,20 @@ export class MarketplaceService {
     if (!menuItem) throw new NotFoundException('Plat introuvable ou indisponible')
     if (!menuItem.merchant.is_active) {
       throw new BadRequestException('Ce restaurant n\'accepte pas de commandes pour le moment')
+    }
+    const foodStatus = computeFoodStatus(
+      menuItem.merchant.food_is_paused,
+      menuItem.merchant.food_pause_until ?? null,
+    )
+    if (foodStatus === 'closed') {
+      throw new BadRequestException(`${menuItem.merchant.business_name} est temporairement fermé et n'accepte plus de commandes`)
+    }
+    if (foodStatus === 'paused') {
+      const until = menuItem.merchant.food_pause_until
+      const eta = until
+        ? until.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        : ''
+      throw new BadRequestException(`${menuItem.merchant.business_name} est en pause jusqu'à ${eta}. Réessayez dans quelques minutes.`)
     }
 
     const groups: MenuModifierGroupRow[] = menuItem.modifier_groups.map(group => ({
@@ -2579,8 +2600,41 @@ export class MarketplaceService {
     const merchantIds = Array.from(groups.keys())
     const merchantHourRows = await this.prisma.merchant.findMany({
       where: { id: { in: merchantIds } },
-      select: { id: true, business_name: true, hours: true, delivery_fulfilment_default: true },
+      select: {
+        id: true,
+        business_name: true,
+        hours: true,
+        delivery_fulfilment_default: true,
+        food_min_order_amount: true,
+        food_is_paused: true,
+        food_pause_until: true,
+      },
     })
+
+    // ── Vérification disponibilité (pause / fermeture manuelle) ──────────────
+    for (const m of merchantHourRows) {
+      const status = computeFoodStatus(m.food_is_paused, m.food_pause_until ?? null)
+      if (status === 'closed') {
+        throw new BadRequestException(`${m.business_name} est temporairement fermé et n'accepte plus de commandes`)
+      }
+      if (status === 'paused') {
+        const eta = m.food_pause_until
+          ? m.food_pause_until.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          : ''
+        throw new BadRequestException(`${m.business_name} est en pause jusqu'à ${eta}. Réessayez dans quelques minutes.`)
+      }
+    }
+
+    for (const m of merchantHourRows) {
+      const minOrder = m.food_min_order_amount
+      const sub = subtotals[m.id] ?? 0
+      if (minOrder != null && minOrder > 0 && sub < minOrder) {
+        const remaining = minOrder - sub
+        throw new BadRequestException(
+          `Commande minimum ${minOrder.toLocaleString('fr-FR')} FCFA pour ${m.business_name}. Encore ${remaining.toLocaleString('fr-FR')} FCFA d'articles.`,
+        )
+      }
+    }
 
     for (const m of merchantHourRows) {
       if (!this.isMerchantOpenAt(m.hours, checkAt)) {

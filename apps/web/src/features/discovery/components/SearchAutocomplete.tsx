@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { Search, BadgeCheck, Loader2, TrendingUp, Store, ShoppingBag } from 'lucide-react'
+import { Search, BadgeCheck, Loader2, TrendingUp, Store, ShoppingBag, UtensilsCrossed, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
 import { countryRequestHeaders } from '@/lib/country'
 import { formatPrice } from '@/lib/marketplaceApi'
+import { restaurationMenuItemHref } from '@/lib/restaurationLinks'
+import { MenuSearchItemThumb } from '@/features/food-hub/components/MenuSearchItemThumb'
 import { cn } from '@/lib/utils'
 
 interface MerchantSuggestion {
@@ -31,6 +33,18 @@ interface ProductSuggestion {
   _highlight: string | null
 }
 
+interface MenuSuggestion {
+  id: string
+  name: string
+  price: number
+  currency: string
+  prep_minutes: number | null
+  image_url: string | null
+  section_name: string | null
+  merchant: { business_name: string; slug: string }
+  _highlight: string | null
+}
+
 interface TrendingItem {
   query: string
   count: number
@@ -44,6 +58,8 @@ interface Props {
   size?: 'sm' | 'md' | 'lg'
   /** Recherche produits marketplace uniquement (Meilisearch index products). */
   productsOnly?: boolean
+  /** Recherche plats menu restauration uniquement (Meilisearch index menu_items). */
+  menusOnly?: boolean
   /** Mode contrôlé — ex. page marketplace. */
   value?: string
   onValueChange?: (v: string) => void
@@ -79,6 +95,7 @@ export function SearchAutocomplete({
   onSearch,
   size = 'md',
   productsOnly = false,
+  menusOnly = false,
   value: controlledValue,
   onValueChange,
   className,
@@ -93,6 +110,7 @@ export function SearchAutocomplete({
   const [open, setOpen] = useState(false)
   const [merchants, setMerchants] = useState<MerchantSuggestion[]>([])
   const [products, setProducts] = useState<ProductSuggestion[]>([])
+  const [menus, setMenus] = useState<MenuSuggestion[]>([])
   const [trending, setTrending] = useState<TrendingItem[]>([])
   const [loading, setLoading] = useState(false)
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 })
@@ -105,19 +123,38 @@ export function SearchAutocomplete({
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
-    if (productsOnly) return
+    if (productsOnly || menusOnly) return
     fetchSearchJson<TrendingItem[]>('/search/trending?limit=6')
       .then(data => setTrending(Array.isArray(data) ? data : []))
       .catch(() => {})
-  }, [productsOnly])
+  }, [productsOnly, menusOnly])
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
       setMerchants([])
       setProducts([])
+      setMenus([])
       return
     }
     setLoading(true)
+    if (menusOnly) {
+      fetchSearchJson<MenuSuggestion[]>(
+        `/search/autocomplete/menus?q=${encodeURIComponent(debouncedQuery)}&limit=8`,
+      )
+        .then(data => {
+          setMerchants([])
+          setProducts([])
+          setMenus(Array.isArray(data) ? data : [])
+          setLoading(false)
+        })
+        .catch(() => {
+          setMerchants([])
+          setProducts([])
+          setMenus([])
+          setLoading(false)
+        })
+      return
+    }
     if (productsOnly) {
       fetchSearchJson<ProductSuggestion[]>(
         `/search/autocomplete/products?q=${encodeURIComponent(debouncedQuery)}&limit=8`,
@@ -125,11 +162,13 @@ export function SearchAutocomplete({
         .then(data => {
           setMerchants([])
           setProducts(Array.isArray(data) ? data : [])
+          setMenus([])
           setLoading(false)
         })
         .catch(() => {
           setMerchants([])
           setProducts([])
+          setMenus([])
           setLoading(false)
         })
       return
@@ -140,14 +179,16 @@ export function SearchAutocomplete({
       .then(data => {
         setMerchants(Array.isArray(data.merchants) ? data.merchants : [])
         setProducts(Array.isArray(data.products) ? data.products : [])
+        setMenus([])
         setLoading(false)
       })
       .catch(() => {
         setMerchants([])
         setProducts([])
+        setMenus([])
         setLoading(false)
       })
-  }, [debouncedQuery, productsOnly])
+  }, [debouncedQuery, productsOnly, menusOnly])
 
   const updatePanelPos = useCallback(() => {
     const el = containerRef.current
@@ -193,11 +234,12 @@ export function SearchAutocomplete({
       return
     }
     if (navigateTo === 'search' || !onSearch) {
-      router.push(`/search?q=${encodeURIComponent(q)}`)
+      const base = menusOnly ? '/restauration' : '/search'
+      router.push(`${base}?q=${encodeURIComponent(q)}`)
     } else {
       onSearch(q)
     }
-  }, [navigateTo, onSearch, router])
+  }, [navigateTo, onSearch, router, menusOnly])
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
@@ -211,10 +253,10 @@ export function SearchAutocomplete({
     goToSearch(q)
   }
 
-  const hasSuggestions = merchants.length > 0 || products.length > 0
+  const hasSuggestions = merchants.length > 0 || products.length > 0 || menus.length > 0
   const showDropdown = open && (
     hasSuggestions
-    || (!productsOnly && !query.trim() && trending.length > 0)
+    || (!productsOnly && !menusOnly && !query.trim() && trending.length > 0)
     || loading
   )
 
@@ -231,7 +273,7 @@ export function SearchAutocomplete({
         style={{ top: panelPos.top, left: panelPos.left, width: panelPos.width }}
         role="listbox"
       >
-        {!productsOnly && !query.trim() && trending.length > 0 && (
+        {!productsOnly && !menusOnly && !query.trim() && trending.length > 0 && (
           <div>
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <TrendingUp size={10} /> Tendances
@@ -253,7 +295,7 @@ export function SearchAutocomplete({
           </div>
         )}
 
-        {merchants.length > 0 && !productsOnly && (
+        {merchants.length > 0 && !productsOnly && !menusOnly && (
           <div className={products.length > 0 ? 'border-b border-slate-100' : ''}>
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <Store size={10} /> Établissements
@@ -289,7 +331,47 @@ export function SearchAutocomplete({
           </div>
         )}
 
-        {products.length > 0 && (
+        {menus.length > 0 && (
+          <div>
+            <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <UtensilsCrossed size={10} /> Plats & menus
+            </p>
+            <ul className="py-1">
+              {menus.map(m => (
+                <li key={m.id}>
+                  <Link
+                    href={restaurationMenuItemHref(m.merchant.slug, m.id)}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <MenuSearchItemThumb imageUrl={m.image_url} alt={m.name} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="text-sm font-bold text-slate-900 truncate [&_mark]:bg-amber-100 [&_mark]:text-amber-700 [&_mark]:rounded"
+                        dangerouslySetInnerHTML={{ __html: m._highlight ?? m.name }}
+                      />
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        {m.merchant.business_name}
+                        {m.section_name ? ` · ${m.section_name}` : ''}
+                        {m.prep_minutes != null && (
+                          <span className="inline-flex items-center gap-0.5 ml-1">
+                            · <Clock size={10} className="inline" /> {m.prep_minutes} min
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-amber-700 shrink-0">
+                      {formatPrice(m.price, m.currency)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {products.length > 0 && !menusOnly && (
           <div>
             <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
               <ShoppingBag size={10} /> Produits
@@ -337,7 +419,7 @@ export function SearchAutocomplete({
                 <Search size={14} className="text-amber-400" />
               </div>
               <span className="text-sm font-bold text-slate-900">
-                {productsOnly && navigateTo === 'current'
+                {(productsOnly || menusOnly) && navigateTo === 'current'
                   ? `Rechercher « ${query} »`
                   : `Voir tous les résultats pour « ${query} »`}
               </span>
@@ -377,7 +459,7 @@ export function SearchAutocomplete({
           {query && (
             <button
               type="button"
-              onClick={() => { setQuery(''); setMerchants([]); setProducts([]); inputRef.current?.focus() }}
+              onClick={() => { setQuery(''); setMerchants([]); setProducts([]); setMenus([]); inputRef.current?.focus() }}
               className="text-slate-300 hover:text-slate-500 text-lg leading-none transition-colors shrink-0"
               aria-label="Effacer"
             >

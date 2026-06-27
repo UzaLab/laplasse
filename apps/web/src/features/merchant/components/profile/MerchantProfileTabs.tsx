@@ -9,7 +9,12 @@ import {
   isValidProfileTab,
   type ProfileTabId,
 } from '@/lib/merchantProfileTabs'
+import { MerchantFoodMenuTab } from './MerchantFoodMenuTab'
 import { FoodMenuOrderPanel } from './FoodMenuOrderPanel'
+import {
+  RESTAURATION_DESKTOP_ONLY_CLASS,
+  RESTAURATION_MOBILE_ONLY_CLASS,
+} from '@/lib/restaurationViewport'
 import { MerchantHotelTab } from './MerchantHotelTab'
 import { MerchantOfferingsTab } from './MerchantOfferingsTab'
 import { MerchantInfoTab } from './MerchantInfoTab'
@@ -100,10 +105,17 @@ export function MerchantProfileTabs({ merchant }: Props) {
 
       <div role="tabpanel">
         {activeTab === 'menu' && (
-          <FoodMenuOrderPanel
-            merchantSlug={merchant.slug}
-            merchantName={merchant.business_name}
-          />
+          <>
+            <div className={RESTAURATION_MOBILE_ONLY_CLASS}>
+              <MerchantFoodMenuTab merchant={merchant} />
+            </div>
+            <div className={RESTAURATION_DESKTOP_ONLY_CLASS}>
+              <FoodMenuOrderPanel
+                merchantSlug={merchant.slug}
+                merchantName={merchant.business_name}
+              />
+            </div>
+          </>
         )}
         {activeTab === 'chambres' && (
           <MerchantHotelTab

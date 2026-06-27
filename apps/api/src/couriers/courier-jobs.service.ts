@@ -29,7 +29,10 @@ const JOB_INCLUDE = {
       delivery_city_id: true,
       delivery_commune_id: true,
       customer_phone: true,
+      customer_note: true,
+      order_source: true,
       created_at: true,
+      user: { select: { full_name: true } },
       shop: {
         select: {
           id: true,
@@ -39,6 +42,13 @@ const JOB_INCLUDE = {
           district: true,
           city: true,
           country: true,
+        },
+      },
+      merchant: {
+        select: {
+          id: true,
+          business_name: true,
+          location: { select: { address: true, district: true, city: true } },
         },
       },
       _count: { select: { items: true } },
@@ -254,8 +264,9 @@ export class CourierJobsService {
     }
 
     await this.offerService.clearOfferOnAccept(jobId)
-    const updated = await this.delivery.assignCourierProfile(jobId, profile.id)
-    void this.etaService.refreshOrderEta(updated.order.id).catch(() => {})
+    const assigned = await this.delivery.assignCourierProfile(jobId, profile.id)
+    void this.etaService.refreshOrderEta(assigned.order.id).catch(() => {})
+    const updated = await this.prisma.deliveryJob.findUniqueOrThrow({ where: { id: jobId }, include: JOB_INCLUDE })
     return this.serializeJob(updated, profile.id)
   }
 
@@ -287,15 +298,16 @@ export class CourierJobsService {
       await this.proof.verifyAndConfirm(jobId, proofOtp)
     }
 
-    const updated = await this.delivery.updateJobStatusForProfile(jobId, profile.id, status)
+    const statusResult = await this.delivery.updateJobStatusForProfile(jobId, profile.id, status)
 
     if (status === 'DELIVERED') {
       await this.wallet.creditForDeliveredJob(jobId, profile.id)
-      await this.feeSplit.persistForJob(jobId).catch(() => {})
+      // NB: feeSplit is already persisted inside updateJobStatusForProfile on DELIVERED — no duplicate call here
     } else {
-      void this.etaService.refreshOrderEta(updated.order.id).catch(() => {})
+      void this.etaService.refreshOrderEta(statusResult.order.id).catch(() => {})
     }
 
+    const updated = await this.prisma.deliveryJob.findUniqueOrThrow({ where: { id: jobId }, include: JOB_INCLUDE })
     return this.serializeJob(updated, profile.id)
   }
 
@@ -368,7 +380,10 @@ export class CourierJobsService {
         delivery_address: string | null
         delivery_district: string | null
         customer_phone: string | null
+        customer_note: string | null
+        order_source: string
         created_at: Date
+        user: { full_name: string | null } | null
         shop: {
           id: string
           name: string
@@ -377,6 +392,11 @@ export class CourierJobsService {
           district: string | null
           city: string | null
           country: string
+        } | null
+        merchant: {
+          id: string
+          business_name: string
+          location: { address: string | null; district: string | null; city: string | null } | null
         } | null
         _count: { items: number }
       }
@@ -391,6 +411,21 @@ export class CourierJobsService {
     const secondsLeft = offerActive && job.offer_expires_at
       ? Math.max(0, Math.ceil((job.offer_expires_at.getTime() - Date.now()) / 1000))
       : null
+
+    // For food orders (order_source = FOOD), merchant replaces shop
+    const isFood = job.order.order_source === 'FOOD'
+    const shopName = isFood
+      ? (job.order.merchant?.business_name ?? 'Restaurant')
+      : (job.order.shop?.name ?? 'Commerce')
+    const shopAddress = isFood
+      ? [
+          job.order.merchant?.location?.address,
+          job.order.merchant?.location?.district,
+          job.order.merchant?.location?.city,
+        ].filter(Boolean).join(', ') || null
+      : job.order.shop
+        ? [job.order.shop.address, job.order.shop.district, job.order.shop.city].filter(Boolean).join(', ')
+        : null
 
     return {
       id: job.id,
@@ -415,11 +450,11 @@ export class CourierJobsService {
         delivery_address: job.order.delivery_address,
         delivery_district: job.order.delivery_district,
         customer_phone: job.order.customer_phone,
+        customer_name: job.order.user?.full_name ?? null,
+        customer_note: job.order.customer_note ?? null,
         item_count: job.order._count.items,
-        shop_name: job.order.shop?.name ?? 'Commerce',
-        shop_address: job.order.shop
-          ? [job.order.shop.address, job.order.shop.district, job.order.shop.city].filter(Boolean).join(', ')
-          : null,
+        shop_name: shopName,
+        shop_address: shopAddress,
         created_at: job.order.created_at,
       },
     }

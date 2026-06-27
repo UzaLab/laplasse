@@ -30,6 +30,7 @@ import {
   type Cart,
 } from '@/lib/marketplaceApi'
 import { clearCartPromos } from '@/lib/cartPromo'
+import { foodMinOrderMessage } from '@/lib/foodHub'
 import { useCartStore } from '@/stores/cartStore'
 import { notify } from '@/lib/notify'
 
@@ -72,6 +73,9 @@ export default function FoodOrderCartPage() {
   }, [cart])
 
   const merchantName = cart?.merchant?.business_name ?? 'Restaurant'
+  const minOrderAmount = cart?.merchant?.food_min_order_amount ?? null
+  const minOrderMessage = foodMinOrderMessage(minOrderAmount, cart?.subtotal ?? 0)
+  const canProceed = (cart?.items?.length ?? 0) > 0 && !minOrderMessage
 
   const updateQty = async (itemId: string, quantity: number) => {
     setUpdatingId(itemId)
@@ -226,16 +230,22 @@ export default function FoodOrderCartPage() {
                     Étape suivante
                   </span>
                 </div>
-                <div className="flex justify-between items-end mb-6 pt-4 border-t border-slate-100">
+                <div className="flex justify-between items-end mb-4 pt-4 border-t border-slate-100">
                   <span className="font-bold text-slate-900">Total estimé</span>
                   <span className="text-2xl font-extrabold text-orange-600">
                     {formatPrice(cart?.subtotal ?? 0)}
                   </span>
                 </div>
+                {minOrderMessage && (
+                  <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
+                    {minOrderMessage}
+                  </p>
+                )}
                 <button
                   type="button"
+                  disabled={!canProceed}
                   onClick={() => router.push(getCheckoutRoute('food'))}
-                  className="w-full h-14 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all flex items-center justify-center gap-2"
+                  className="w-full h-14 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Choisir livraison ou retrait
                   <ArrowRight size={20} />

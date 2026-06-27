@@ -82,6 +82,34 @@ export class SearchController {
     )
   }
 
+  @Get('autocomplete/menus')
+  autocompleteMenus(
+    @Req() req: RequestWithCountry,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+  ) {
+    return this.searchService.autocompleteMenus(
+      q ?? '',
+      limit ? Number(limit) : 8,
+      country ?? req.countryCode ?? DEFAULT_COUNTRY,
+    )
+  }
+
+  @Get('menus')
+  searchMenus(
+    @Req() req: RequestWithCountry,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('country') country?: string,
+  ) {
+    return this.searchService.searchMenus(
+      q ?? '',
+      limit ? Number(limit) : 20,
+      country ?? req.countryCode ?? DEFAULT_COUNTRY,
+    )
+  }
+
   @Get('trending')
   async trending(@Query('limit') limit?: string) {
     return this.searchService.trendingSearches(limit ? Number(limit) : 8)

@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import {
-  ArrowRight, Camera, Clock, Loader2, MapPin, Package, Phone, Store, X,
+  ArrowRight, Camera, Clock, Loader2, MapPin, MessageSquare, Package, Phone, Store, User, X,
 } from 'lucide-react'
 import type { CourierJobRow, DeliveryJobStatus } from '@/lib/courierJobsApi'
 import {
@@ -144,12 +143,27 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
             </p>
           </div>
         </div>
-        {job.order.customer_phone && (
+        {/* Client info — nom + téléphone */}
+        {(job.order.customer_name || job.order.customer_phone) && (
           <div className="flex gap-2">
-            <Phone size={15} className="text-slate-400 shrink-0 mt-0.5" />
-            <a href={`tel:${job.order.customer_phone}`} className="text-emerald-700 font-semibold">
-              {job.order.customer_phone}
-            </a>
+            <User size={15} className="text-slate-400 shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5">
+              {job.order.customer_name && (
+                <span className="text-slate-700 font-semibold">{job.order.customer_name}</span>
+              )}
+              {job.order.customer_phone && (
+                <a href={`tel:${job.order.customer_phone}`} className="text-emerald-700 font-semibold inline-flex items-center gap-1">
+                  <Phone size={13} />
+                  {job.order.customer_phone}
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+        {job.order.customer_note && (
+          <div className="flex gap-2">
+            <MessageSquare size={15} className="text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-slate-600 italic text-xs">{job.order.customer_note}</p>
           </div>
         )}
       </div>
@@ -259,16 +273,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
         </div>
       )}
 
-      {mode === 'active' && (
-        <Link
-          href={`/delivery/track/${job.tracking_token}`}
-          className="block text-center text-xs font-bold text-slate-500 hover:text-slate-800"
-          style={{ textDecoration: 'none' }}
-          target="_blank"
-        >
-          Voir le suivi client →
-        </Link>
-      )}
+      {/* Le lien de suivi client n'est pas exposé au livreur */}
     </article>
   )
 }

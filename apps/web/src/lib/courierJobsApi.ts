@@ -32,6 +32,8 @@ export interface CourierJobRow {
     delivery_address: string | null
     delivery_district: string | null
     customer_phone: string | null
+    customer_name: string | null
+    customer_note: string | null
     item_count: number
     shop_name: string
     shop_address: string | null
