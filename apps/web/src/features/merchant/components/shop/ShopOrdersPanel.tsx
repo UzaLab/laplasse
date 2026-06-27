@@ -17,7 +17,12 @@ import {
   updateOrderStatus,
   type Order,
   type OrderStatus,
+  type MerchantOrderScope,
 } from '@/lib/marketplaceApi'
+import {
+  buildMerchantOrderScope,
+  type MerchantOrderRoutes,
+} from '@/lib/merchantOrderScope'
 import { getShopRoutesFromPathname } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 
@@ -69,10 +74,26 @@ function orderSearchFields(order: Order) {
   ]
 }
 
-export function ShopOrdersPanel() {
+interface ShopOrdersPanelProps {
+  scope?: MerchantOrderScope
+  routes?: MerchantOrderRoutes
+  heading?: string
+  subheading?: string
+}
+
+export function ShopOrdersPanel({
+  scope: scopeProp,
+  routes: routesProp,
+  heading = 'Commandes',
+  subheading = 'Suivez et mettez à jour les commandes.',
+}: ShopOrdersPanelProps = {}) {
   const pathname = usePathname()
-  const routes = getShopRoutesFromPathname(pathname)
-  const { activeShopId } = useAuthStore()
+  const routes = routesProp ?? getShopRoutesFromPathname(pathname)
+  const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const scope = useMemo(
+    () => scopeProp ?? buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
+    [scopeProp, activeMerchantId, user?.shops, activeShopId],
+  )
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
@@ -82,12 +103,12 @@ export function ShopOrdersPanel() {
   const debouncedSearch = useDebounce(searchQuery, 250)
 
   const load = useCallback(async () => {
-    if (!activeShopId) return
+    if (!scope.shopId && !scope.merchantId) return
     setLoading(true)
-    const list = await fetchMerchantOrders(activeShopId)
+    const list = await fetchMerchantOrders(scope)
     setOrders(list)
     setLoading(false)
-  }, [activeShopId])
+  }, [scope])
 
   useEffect(() => { load() }, [load])
 
@@ -121,14 +142,14 @@ export function ShopOrdersPanel() {
 
   const handleStatus = async (orderId: string, status: OrderStatus) => {
     setProcessingId(orderId)
-    await updateOrderStatus(orderId, status, activeShopId)
+    await updateOrderStatus(orderId, status, scope)
     await load()
     setProcessingId(null)
   }
 
   const handleExport = async () => {
     setExporting(true)
-    const result = await downloadMerchantOrdersCsv(activeShopId, 90)
+    const result = await downloadMerchantOrdersCsv(scope, 90)
     setExporting(false)
     if (result.ok) {
       notify.success('Export CSV téléchargé')
@@ -141,15 +162,13 @@ export function ShopOrdersPanel() {
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-900">Commandes</h2>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Suivez et mettez à jour les commandes de votre boutique.
-          </p>
+          <h2 className="text-lg font-extrabold text-slate-900">{heading}</h2>
+          <p className="text-slate-400 text-sm mt-0.5">{subheading}</p>
         </div>
         <button
           type="button"
           onClick={() => void handleExport()}
-          disabled={exporting || !activeShopId}
+          disabled={exporting || (!scope.shopId && !scope.merchantId)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:border-slate-300 disabled:opacity-60"
         >
           {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}

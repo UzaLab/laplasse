@@ -2,12 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Loader2 } from 'lucide-react'
-import { fetchMerchantOrderEta, fetchOrderEta, type OrderEtaSnapshot } from '@/lib/marketplaceApi'
+import { fetchMerchantOrderEta, fetchOrderEta, type OrderEtaSnapshot, type MerchantOrderScope } from '@/lib/marketplaceApi'
 
 interface OrderDeliveryEtaBannerProps {
   orderId: string
   enabled: boolean
   variant?: 'client' | 'merchant'
+  scope?: MerchantOrderScope
+  /** @deprecated use scope */
   shopId?: string | null
   showPrepOnly?: boolean
 }
@@ -16,16 +18,19 @@ export function OrderDeliveryEtaBanner({
   orderId,
   enabled,
   variant = 'client',
+  scope,
   shopId,
   showPrepOnly = false,
 }: OrderDeliveryEtaBannerProps) {
+  const merchantScope: MerchantOrderScope | undefined = scope ?? (shopId ? { shopId, merchantId: null } : undefined)
+
   const { data: eta, isLoading } = useQuery({
-    queryKey: ['order-eta', variant, orderId, shopId],
+    queryKey: ['order-eta', variant, orderId, merchantScope?.shopId, merchantScope?.merchantId],
     queryFn: () =>
-      variant === 'merchant'
-        ? fetchMerchantOrderEta(orderId, shopId)
+      variant === 'merchant' && merchantScope
+        ? fetchMerchantOrderEta(orderId, merchantScope)
         : fetchOrderEta(orderId),
-    enabled,
+    enabled: enabled && (variant === 'client' || !!merchantScope),
     refetchInterval: 8_000,
   })
 

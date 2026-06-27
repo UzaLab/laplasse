@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { LogisticsPartnersService } from './logistics-partners.service'
 import { LogisticsPartnerOpsService } from './logistics-partner-ops.service'
+import { DeliveryZonesService, type CreateDeliveryZoneDto } from '../delivery-zones/delivery-zones.service'
 import {
   LinkPartnerCourierDto,
   RegisterLogisticsPartnerDto,
@@ -35,6 +36,7 @@ export class LogisticsController {
   constructor(
     private readonly partners: LogisticsPartnersService,
     private readonly ops: LogisticsPartnerOpsService,
+    private readonly deliveryZones: DeliveryZonesService,
   ) {}
 
   @Post('register')
@@ -267,5 +269,25 @@ export class LogisticsController {
     @Param('shopId') shopId: string,
   ) {
     return this.partners.proposePartnership(userId, shopId)
+  }
+
+  // ── Zones de livraison du prestataire logistique ────────────────────────────
+
+  @Get('me/delivery-zones')
+  async listMyDeliveryZones(@CurrentUser('id') userId: string) {
+    const partner = await this.partners.resolveMyPartner(userId)
+    return this.deliveryZones.listForLogisticsPartner(partner.id)
+  }
+
+  @Post('me/delivery-zones')
+  async createMyDeliveryZone(@CurrentUser('id') userId: string, @Body() dto: CreateDeliveryZoneDto) {
+    const partner = await this.partners.resolveMyPartner(userId)
+    return this.deliveryZones.createForLogisticsPartner(partner.id, dto)
+  }
+
+  @Delete('me/delivery-zones/:zoneId')
+  async deleteMyDeliveryZone(@CurrentUser('id') userId: string, @Param('zoneId') zoneId: string) {
+    const partner = await this.partners.resolveMyPartner(userId)
+    return this.deliveryZones.deleteZoneForPartner(partner.id, zoneId)
   }
 }

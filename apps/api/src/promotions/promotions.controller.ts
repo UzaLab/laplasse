@@ -1,12 +1,29 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards,
 } from '@nestjs/common'
+import { IsNumber, IsString, MaxLength, Min, MinLength } from 'class-validator'
+import { Type } from 'class-transformer'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { PromotionsService } from './promotions.service'
 import { CreatePromotionDto } from './dto/create-promotion.dto'
 import { UpdatePromotionDto } from './dto/update-promotion.dto'
+
+class ValidateFoodPromoDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(40)
+  code!: string
+
+  @IsString()
+  merchant_id!: string
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  subtotal!: number
+}
 
 @Controller('promotions')
 export class PromotionsController {
@@ -16,6 +33,21 @@ export class PromotionsController {
   @Get('active')
   getPublicActive() {
     return this.svc.getPublicActivePromotions()
+  }
+
+  /** Valide un code promo food (restaurant) sans déclencher le checkout. */
+  @Public()
+  @Post('validate-food')
+  async validateFood(
+    @Body() dto: ValidateFoodPromoDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.svc.validateForMerchant({
+      code: dto.code,
+      merchantId: dto.merchant_id,
+      subtotal: dto.subtotal,
+      userId,
+    })
   }
 
   @Public()

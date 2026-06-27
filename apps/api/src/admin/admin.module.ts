@@ -12,9 +12,10 @@ import { AuditModule } from '../audit/audit.module'
 import { DeliveryModule } from '../delivery/delivery.module'
 import { LogisticsModule } from '../logistics/logistics.module'
 import { AdsModule } from '../ads/ads.module'
+import { DeliveryZonesModule } from '../delivery-zones/delivery-zones.module'
 
 @Module({
-  imports: [ComplaintsModule, SearchModule, MerchantsModule, NotificationsModule, MarketplaceModule, GeoModule, CouriersModule, AuditModule, DeliveryModule, LogisticsModule, AdsModule],
+  imports: [ComplaintsModule, SearchModule, MerchantsModule, NotificationsModule, MarketplaceModule, GeoModule, CouriersModule, AuditModule, DeliveryModule, LogisticsModule, AdsModule, DeliveryZonesModule],
   controllers: [AdminController],
   providers: [AdminSeedService],
 })

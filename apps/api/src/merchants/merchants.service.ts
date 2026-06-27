@@ -58,6 +58,7 @@ const MERCHANT_PUBLIC_SELECT = {
   trust_score: true,
   is_sponsored: true,
   subscription_plan: true,
+  delivery_fulfilment_default: true,
   created_at: true,
   category: {
     select: { id: true, name: true, slug: true, icon: true },
@@ -112,6 +113,26 @@ export class MerchantsService {
     const m = await this.prisma.merchant.findFirst({ where })
     if (!m) throw new NotFoundException('Merchant not found')
     return m
+  }
+
+  async resolveMyShop(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    const shop = await this.prisma.shop.findUnique({ where: { merchant_id: merchant.id } })
+    if (!shop) throw new NotFoundException('Aucune boutique liée à cet établissement')
+    return shop
+  }
+
+  async updateDeliverySettings(
+    userId: string,
+    dto: { delivery_fulfilment_default: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER' },
+    merchantId?: string,
+  ) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    return this.prisma.merchant.update({
+      where: { id: merchant.id },
+      data: { delivery_fulfilment_default: dto.delivery_fulfilment_default },
+      select: { id: true, delivery_fulfilment_default: true },
+    })
   }
 
   // ── Liste publique ──────────────────────────────────────────────────────────

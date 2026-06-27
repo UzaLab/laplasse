@@ -7,7 +7,7 @@ import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
   Crown, Menu, X, LogOut, Compass, ExternalLink, Users, UserCircle2,
   ChevronDown, Plus, Building2, Network, Calendar, Megaphone,
-  ShoppingBag, UtensilsCrossed, BedDouble, Sparkles, Dumbbell, Stethoscope,
+  ShoppingBag, UtensilsCrossed, BedDouble, Sparkles, Dumbbell, Stethoscope, Truck,
 } from 'lucide-react'
 import { getMerchantPlan, getPlanLimitsForMerchant } from '@/lib/planLimits'
 import { MerchantMobileNav } from '@/components/layout/MerchantMobileNav'
@@ -18,7 +18,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { authApiFetch } from '@/lib/authFetch'
 import { getShopsForMerchant, getIndependentShops, getActiveMerchantShopId, hasMerchantEstablishment, hasStandaloneShopOnly } from '@/lib/shopApi'
-import { getVerticalNavItems, type VerticalNavIcon } from '@/lib/merchantVertical'
+import { getVerticalNavItems, FOOD_CATEGORY_SLUGS, type VerticalNavIcon } from '@/lib/merchantVertical'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
 import { APP_SHELL_SCROLL_ID } from '@/lib/appShellScroll'
@@ -153,11 +153,19 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     }
   }
 
+  const isFood = categorySlug ? FOOD_CATEGORY_SLUGS.has(categorySlug) : false
+
   const mainNav: NavItem[] = [
     { href: '/merchant/dashboard', label: "Vue d'ensemble", icon: <LayoutDashboard size={17} /> },
     { href: '/merchant/analytics', label: 'Statistiques', icon: <TrendingUp size={17} /> },
     { href: '/merchant/crm', label: 'Clients CRM', icon: <Users size={17} /> },
     { href: '/merchant/bookings', label: 'Réservations', icon: <Calendar size={17} /> },
+    ...(isFood
+      ? [
+          { href: '/merchant/orders', label: 'Commandes', icon: <UtensilsCrossed size={17} /> },
+          { href: '/merchant/delivery-zones', label: 'Livraison', icon: <Truck size={17} /> },
+        ]
+      : []),
     ...(hasLinkedShop
       ? [{ href: '/merchant/shop', label: 'Boutique', icon: <ShoppingBag size={17} /> }]
       : []),

@@ -606,6 +606,74 @@ export class PromotionsService {
     }
   }
 
+  /** Valide un code promo pour une commande food (pas de shop_id requis). */
+  async validateForMerchant(input: {
+    code: string
+    merchantId: string
+    subtotal: number
+    userId?: string
+  }) {
+    const code = input.code.trim().toUpperCase()
+    if (!code) {
+      return { valid: false as const, message: 'Code promo requis' }
+    }
+
+    const now = new Date()
+    const promo = await this.prisma.promotion.findFirst({
+      where: {
+        merchant_id: input.merchantId,
+        shop_id: null,
+        code,
+        is_active: true,
+        starts_at: { lte: now },
+        ends_at: { gte: now },
+      },
+      include: {
+        products: { select: { product_id: true } },
+        categories: { select: { category_id: true } },
+      },
+    })
+
+    if (!promo) {
+      return { valid: false as const, message: 'Code promo invalide ou expiré' }
+    }
+
+    if (promo.max_uses != null && promo.uses_count >= promo.max_uses) {
+      return { valid: false as const, message: 'Ce code promo a atteint sa limite d\'utilisation' }
+    }
+
+    if (input.userId && promo.max_uses_per_user != null) {
+      const userUses = await this.prisma.promotionRedemption.count({
+        where: { promotion_id: promo.id, user_id: input.userId },
+      })
+      if (userUses >= promo.max_uses_per_user) {
+        return {
+          valid: false as const,
+          message: 'Vous avez déjà utilisé ce code le nombre maximum de fois autorisé',
+        }
+      }
+    }
+
+    if (promo.min_order_amount != null && input.subtotal < promo.min_order_amount) {
+      return {
+        valid: false as const,
+        message: `Commande minimum ${promo.min_order_amount.toLocaleString('fr-FR')} FCFA requise`,
+      }
+    }
+
+    const { discount, free_delivery } = this.computeDiscount(promo, input.subtotal)
+
+    return {
+      valid: true as const,
+      promotion: promo,
+      discount,
+      free_delivery,
+      message: free_delivery
+        ? 'Livraison offerte appliquée'
+        : `Remise de ${discount.toLocaleString('fr-FR')} FCFA`,
+    }
+  }
+
   async update(ownerId: string, promotionId: string, dto: UpdatePromotionDto, merchantId?: string, shopId?: string) {
     const promo = await this.assertOwner(ownerId, promotionId, merchantId, shopId)
 

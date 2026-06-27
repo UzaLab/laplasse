@@ -356,6 +356,17 @@ export class CheckoutDto {
   @ValidateNested({ each: true })
   @Type(() => ShopCheckoutDeliveryDto)
   shop_deliveries?: ShopCheckoutDeliveryDto[]
+
+  /** Code promo pour les commandes food (restaurant) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  food_promo_code?: string
+
+  /** Pré-commande : heure souhaitée ISO8601 (J+1 max). Exemples : "2026-06-27T12:30:00" */
+  @IsOptional()
+  @IsString()
+  preorder_for?: string
 }
 
 export class GuestCartItemDto {

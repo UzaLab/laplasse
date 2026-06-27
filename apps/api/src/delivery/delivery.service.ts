@@ -51,6 +51,7 @@ export class DeliveryService {
         merchant: {
           select: {
             business_name: true,
+            delivery_fulfilment_default: true,
             location: { select: { address: true, district: true, city: true, latitude: true, longitude: true } },
           },
         },
@@ -63,6 +64,7 @@ export class DeliveryService {
 
     const fulfilmentMode = order.delivery_fulfilment_mode
       ?? order.shop?.delivery_fulfilment_default
+      ?? order.merchant?.delivery_fulfilment_default
       ?? 'PLATFORM_RIDER'
 
     const existing = await this.prisma.deliveryJob.findUnique({ where: { order_id: orderId } })
@@ -590,23 +592,36 @@ export class DeliveryService {
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { shop: { select: { id: true, name: true, delivery_fulfilment_default: true } } },
+      include: {
+        shop: { select: { id: true, name: true, delivery_fulfilment_default: true } },
+        merchant: { select: { id: true, business_name: true, delivery_fulfilment_default: true } },
+      },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
     if (order.delivery_type !== 'DELIVERY') {
       throw new BadRequestException('Commande non livrable')
     }
 
+    let contractShopId = order.shop_id
+    if (!contractShopId && order.merchant_id) {
+      const linkedShop = await this.prisma.shop.findFirst({
+        where: { merchant_id: order.merchant_id },
+        select: { id: true, name: true, delivery_fulfilment_default: true },
+      })
+      contractShopId = linkedShop?.id ?? null
+    }
+
     const mode = dto.fulfilment_mode
       ?? order.delivery_fulfilment_mode
       ?? order.shop?.delivery_fulfilment_default
+      ?? order.merchant?.delivery_fulfilment_default
       ?? 'PLATFORM_RIDER'
 
     let partnerId = dto.logistics_partner_id ?? order.logistics_partner_id ?? null
     if (mode === 'LOGISTICS_PARTNER') {
-      if (!partnerId && order.shop_id) {
+      if (!partnerId && contractShopId) {
         const contract = await this.prisma.deliveryPartnerContract.findFirst({
-          where: { shop_id: order.shop_id, status: 'ACTIVE' },
+          where: { shop_id: contractShopId, status: 'ACTIVE' },
           orderBy: { signed_at: 'desc' },
         })
         partnerId = contract?.logistics_partner_id ?? null
@@ -616,7 +631,7 @@ export class DeliveryService {
       }
       const active = await this.prisma.deliveryPartnerContract.findFirst({
         where: {
-          shop_id: order.shop_id ?? undefined,
+          shop_id: contractShopId ?? undefined,
           logistics_partner_id: partnerId,
           status: 'ACTIVE',
         },
@@ -624,16 +639,20 @@ export class DeliveryService {
       if (!active) throw new BadRequestException('Contrat partenaire non actif pour cette boutique')
     }
 
-    if (mode === 'MERCHANT_OWN' && dto.courier_profile_id && order.shop_id) {
+    if (mode === 'MERCHANT_OWN' && dto.courier_profile_id) {
       const staff = await this.prisma.courierProfile.findFirst({
         where: {
           id: dto.courier_profile_id,
-          shop_id: order.shop_id,
           kind: 'MERCHANT_STAFF',
           status: 'ACTIVE',
+          OR: [
+            ...(order.shop_id ? [{ shop_id: order.shop_id }] : []),
+            ...(order.merchant_id ? [{ merchant_id: order.merchant_id }] : []),
+            ...(contractShopId ? [{ shop_id: contractShopId }] : []),
+          ],
         },
       })
-      if (!staff) throw new BadRequestException('Livreur interne invalide pour cette boutique')
+      if (!staff) throw new BadRequestException('Livreur interne invalide pour cet établissement')
     }
 
     await this.prisma.order.update({
@@ -678,7 +697,7 @@ export class DeliveryService {
         await this.notifyLogisticsPartnerStaff(
           partnerId,
           job.id,
-          order.shop?.name ?? 'Commerce',
+          order.shop?.name ?? order.merchant?.business_name ?? 'Commerce',
         )
       }
     } else {

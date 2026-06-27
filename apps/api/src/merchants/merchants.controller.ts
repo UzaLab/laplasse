@@ -10,6 +10,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { MerchantsService } from './merchants.service'
 import { QueryMerchantsDto } from './dto/query-merchants.dto'
 import { ShopMenuService } from '../shop-menu/shop-menu.service'
+import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
+import { CreateDeliveryZoneDto } from '../delivery-zones/dto/create-delivery-zone.dto'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 
 @Controller('merchants')
@@ -17,6 +19,7 @@ export class MerchantsController {
   constructor(
     private readonly merchantsService: MerchantsService,
     private readonly shopMenu: ShopMenuService,
+    private readonly deliveryZones: DeliveryZonesService,
   ) {}
 
   @Public()
@@ -264,6 +267,50 @@ export class MerchantsController {
     @CurrentUser() user: { id: string },
   ) {
     return this.merchantsService.registerMerchant(body, user.id)
+  }
+
+  // ── Livraison : zones & réglages fleet (restaurants) ────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/delivery-zones')
+  async getMyDeliveryZones(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return this.deliveryZones.listForShop(shop.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/delivery-zones')
+  async createMyDeliveryZone(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateDeliveryZoneDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return this.deliveryZones.createForShop(shop.id, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/delivery-zones/:zoneId')
+  async deleteMyDeliveryZone(
+    @CurrentUser() user: { id: string },
+    @Param('zoneId') zoneId: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return this.deliveryZones.deleteZone(shop.id, zoneId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/delivery-settings')
+  async updateMyDeliverySettings(
+    @CurrentUser() user: { id: string },
+    @Body() dto: { delivery_fulfilment_default: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER' },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.merchantsService.updateDeliverySettings(user.id, dto, merchantId)
   }
 
   // ── Routes publiques avec paramètre dynamique (:slug) ───────────────────────

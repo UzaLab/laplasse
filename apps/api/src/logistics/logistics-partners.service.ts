@@ -60,6 +60,17 @@ export class LogisticsPartnersService {
     return partner
   }
 
+  async resolveMyPartner(userId: string) {
+    const staff = await this.prisma.logisticsPartnerStaff.findUnique({
+      where: { user_id: userId },
+      select: { logistics_partner_id: true },
+    })
+    if (!staff) throw new NotFoundException('Aucun prestataire logistique trouvé pour cet utilisateur')
+    const partner = await this.prisma.logisticsPartner.findUnique({ where: { id: staff.logistics_partner_id } })
+    if (!partner) throw new NotFoundException('Prestataire introuvable')
+    return partner
+  }
+
   async saveOnboarding(userId: string, dto: SaveLogisticsOnboardingDto) {
     let staff = await this.prisma.logisticsPartnerStaff.findUnique({ where: { user_id: userId } })
 

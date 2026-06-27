@@ -177,7 +177,8 @@ model Merchant {
   organization_id     String?
   is_active           Boolean            @default(true)
   is_sponsored        Boolean            @default(false)
-  food_prep_minutes   Int                @default(25)
+  food_prep_minutes           Int                    @default(25)
+  delivery_fulfilment_default DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -277,6 +278,7 @@ model GeoCity {
   user_addresses UserAddress[]
   courier_service_zones CourierServiceZone[]
   shops Shop[]
+  platform_delivery_rates PlatformDeliveryRate[]
 
   @@unique([country, slug])
   @@index([country, is_active])
@@ -298,6 +300,7 @@ model GeoCommune {
   courier_zone_links CourierServiceZoneCommune[]
   partner_service_areas LogisticsPartnerServiceArea[]
   shops Shop[]
+  platform_delivery_rates PlatformDeliveryRate[]
 
   @@unique([city_id, slug])
   @@index([city_id, is_active])
@@ -1291,7 +1294,8 @@ enum DeliveryFulfilmentMode {
 
 model ShopDeliveryZone {
   id                      String          @id @default(cuid())
-  shop_id                 String
+  shop_id                 String?
+  logistics_partner_id    String?
   name                    String
   description             String?
   fee                     Int
@@ -1306,10 +1310,12 @@ model ShopDeliveryZone {
   created_at              DateTime        @default(now())
   updated_at              DateTime        @updatedAt
 
-  shop  Shop                   @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  rules ShopDeliveryZoneRule[]
+  shop              Shop?                  @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  logistics_partner LogisticsPartner?      @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
+  rules             ShopDeliveryZoneRule[]
 
   @@index([shop_id, is_active])
+  @@index([logistics_partner_id, is_active])
 }
 
 model ShopDeliveryZoneRule {
@@ -1334,6 +1340,26 @@ model ShopDeliveryZoneCommune {
   commune GeoCommune           @relation(fields: [commune_id], references: [id], onDelete: Cascade)
 
   @@id([zone_rule_id, commune_id])
+}
+
+/// Tarifs de livraison du réseau LaPlasse (PLATFORM_RIDER) par zone géographique.
+/// Gérés par les admins. Utilisés quand delivery_fulfilment_mode = PLATFORM_RIDER.
+model PlatformDeliveryRate {
+  id         String          @id @default(cuid())
+  city_id    String
+  commune_id String?
+  vehicle    DeliveryVehicle @default(MOTO)
+  fee        Int
+  min_order  Int?
+  is_active  Boolean         @default(true)
+  created_at DateTime        @default(now())
+  updated_at DateTime        @updatedAt
+
+  city    GeoCity     @relation(fields: [city_id], references: [id], onDelete: Cascade)
+  commune GeoCommune? @relation(fields: [commune_id], references: [id], onDelete: SetNull)
+
+  @@index([city_id, is_active])
+  @@index([commune_id, is_active])
 }
 
 model Product {
@@ -1767,8 +1793,9 @@ model LogisticsPartner {
   contracts DeliveryPartnerContract[]
   orders    Order[]
   jobs      DeliveryJob[]
-  service_areas LogisticsPartnerServiceArea[]
-  payouts   LogisticsPartnerPayout[]
+  service_areas  LogisticsPartnerServiceArea[]
+  payouts        LogisticsPartnerPayout[]
+  delivery_zones ShopDeliveryZone[]
 
   @@index([country, city, is_active])
   @@index([verification])

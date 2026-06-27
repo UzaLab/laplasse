@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { shopAccessibleWhere } from '../shops/shop-access.util'
 import { NotificationQueueService } from '../queue/notification-queue.service'
 import {
   merchantOrderNotificationData,
@@ -769,6 +770,84 @@ export class MarketplaceService {
       }
     }
     return { shop_id: shop.id }
+  }
+
+  /** Résout le périmètre commandes marchand (boutique liée ou établissement food seul). */
+  private async resolveOrderContext(userId: string, shopOrMerchantId?: string) {
+    const shopSelect = {
+      id: true,
+      merchant_id: true,
+      owner_id: true,
+      name: true,
+      delivery_fulfilment_default: true,
+    } as const
+
+    if (shopOrMerchantId) {
+      const shop = await this.prisma.shop.findFirst({
+        where: shopAccessibleWhere(userId, shopOrMerchantId),
+        select: shopSelect,
+      })
+      if (shop) {
+        return {
+          scope: this.merchantOrderScope(shop),
+          shop,
+          merchantId: shop.merchant_id,
+        }
+      }
+
+      const merchant = await this.prisma.merchant.findFirst({
+        where: { id: shopOrMerchantId, owner_id: userId },
+        select: { id: true, owner_id: true, delivery_fulfilment_default: true },
+      })
+      if (!merchant) {
+        throw new NotFoundException('Boutique ou établissement introuvable')
+      }
+
+      const linkedShop = await this.prisma.shop.findFirst({
+        where: { merchant_id: merchant.id, ...shopAccessibleWhere(userId) },
+        select: shopSelect,
+      })
+      if (linkedShop) {
+        return {
+          scope: this.merchantOrderScope(linkedShop),
+          shop: linkedShop,
+          merchantId: merchant.id,
+        }
+      }
+
+      return {
+        scope: { merchant_id: merchant.id, order_source: 'FOOD' as const },
+        shop: null,
+        merchantId: merchant.id,
+      }
+    }
+
+    const shop = await this.prisma.shop.findFirst({
+      where: shopAccessibleWhere(userId),
+      orderBy: { created_at: 'asc' },
+      select: shopSelect,
+    })
+    if (shop) {
+      return {
+        scope: this.merchantOrderScope(shop),
+        shop,
+        merchantId: shop.merchant_id,
+      }
+    }
+
+    const merchant = await this.prisma.merchant.findFirst({
+      where: { owner_id: userId },
+      select: { id: true, owner_id: true, delivery_fulfilment_default: true },
+    })
+    if (!merchant) {
+      throw new NotFoundException('Aucune boutique ou établissement trouvé')
+    }
+
+    return {
+      scope: { merchant_id: merchant.id, order_source: 'FOOD' as const },
+      shop: null,
+      merchantId: merchant.id,
+    }
   }
 
   private async resolveShopBySlug(slug: string) {
@@ -2243,6 +2322,22 @@ export class MarketplaceService {
     }
   }
 
+  /** Vérifie si un établissement est ouvert à l'heure donnée selon ses BusinessHour. */
+  private isMerchantOpenAt(
+    hours: Array<{ day: number; open_time: string | null; close_time: string | null; is_closed: boolean }>,
+    at: Date,
+  ): boolean {
+    if (!hours.length) return true // pas d'horaires configurés → toujours ouvert
+    const day = at.getDay() // 0=Dimanche, convention JS
+    const hh = String(at.getHours()).padStart(2, '0')
+    const mm = String(at.getMinutes()).padStart(2, '0')
+    const timeStr = `${hh}:${mm}`
+    const entry = hours.find(h => h.day === day)
+    if (!entry || entry.is_closed) return false
+    if (!entry.open_time || !entry.close_time) return false
+    return timeStr >= entry.open_time && timeStr <= entry.close_time
+  }
+
   private async checkoutFoodOrder(
     userId: string,
     dto: CheckoutDto,
@@ -2270,6 +2365,51 @@ export class MarketplaceService {
       list.push(item)
       groups.set(mid, list)
       subtotals[mid] = (subtotals[mid] ?? 0) + item.line_total
+    }
+
+    // ── Vérification horaires d'ouverture ────────────────────────────────────
+    const checkAt = dto.preorder_for ? new Date(dto.preorder_for) : new Date()
+    const isPreorder = !!dto.preorder_for
+
+    const merchantIds = Array.from(groups.keys())
+    const merchantHourRows = await this.prisma.merchant.findMany({
+      where: { id: { in: merchantIds } },
+      select: { id: true, business_name: true, hours: true, delivery_fulfilment_default: true },
+    })
+
+    for (const m of merchantHourRows) {
+      if (!this.isMerchantOpenAt(m.hours, checkAt)) {
+        if (isPreorder) {
+          const timeLabel = checkAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          throw new BadRequestException(
+            `${m.business_name} n'est pas ouvert à ${timeLabel}. Choisissez un créneau pendant les heures d'ouverture.`,
+          )
+        }
+        throw new BadRequestException(
+          `${m.business_name} est actuellement fermé. Commandez pendant les heures d'ouverture ou activez la pré-commande.`,
+        )
+      }
+    }
+
+    // ── Code promo food ───────────────────────────────────────────────────────
+    const foodPromoMap = new Map<string, { discount: number; promotionId: string; free_delivery: boolean }>()
+    if (dto.food_promo_code) {
+      const code = dto.food_promo_code.trim().toUpperCase()
+      for (const merchantId of merchantIds) {
+        const result = await this.promotionsService.validateForMerchant({
+          code,
+          merchantId,
+          subtotal: subtotals[merchantId] ?? 0,
+          userId,
+        })
+        if (result.valid) {
+          foodPromoMap.set(merchantId, {
+            discount: result.discount,
+            promotionId: result.promotion.id,
+            free_delivery: result.free_delivery,
+          })
+        }
+      }
     }
 
     let deliveryQuotes: Awaited<ReturnType<DeliveryZonesService['quote']>> | null = null
@@ -2326,15 +2466,21 @@ export class MarketplaceService {
         const reference = generatePaymentReference()
         const merchantInfo = items[0].product.merchant
 
+        const promoApplied = foodPromoMap.get(merchantId)
+        const discountAmount = promoApplied?.discount ?? 0
+
         let deliveryFee = 0
         if (isDelivery && deliveryQuotes) {
           const quote = deliveryQuotes.quotes.find(
             q => q.merchant_id === merchantId || q.shop_id === merchantId,
           )
-          deliveryFee = quote?.fee ?? 0
+          deliveryFee = promoApplied?.free_delivery ? 0 : (quote?.fee ?? 0)
         }
 
-        const total = subtotal + deliveryFee
+        const total = Math.max(0, subtotal - discountAmount + deliveryFee)
+
+        const merchantRow = merchantHourRows.find(m => m.id === merchantId)
+        const fulfilmentMode = merchantRow?.delivery_fulfilment_default ?? 'PLATFORM_RIDER'
 
         const order = await tx.order.create({
           data: {
@@ -2344,7 +2490,7 @@ export class MarketplaceService {
             order_source: 'FOOD',
             status: 'PENDING',
             delivery_type: dto.delivery_type,
-            delivery_fulfilment_mode: 'PLATFORM_RIDER',
+            delivery_fulfilment_mode: fulfilmentMode,
             delivery_address: deliveryAddress,
             delivery_city_id: dto.delivery_city_id,
             delivery_commune_id: dto.delivery_commune_id,
@@ -2354,7 +2500,7 @@ export class MarketplaceService {
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
             subtotal,
-            discount_amount: 0,
+            discount_amount: discountAmount,
             delivery_fee: deliveryFee,
             total,
             items: {
@@ -2374,6 +2520,23 @@ export class MarketplaceService {
           },
         })
 
+        if (promoApplied && userId) {
+          await Promise.all([
+            tx.promotionRedemption.create({
+              data: {
+                promotion_id: promoApplied.promotionId,
+                order_id: order.id,
+                user_id: userId,
+                amount_saved: promoApplied.discount,
+              },
+            }),
+            tx.promotion.update({
+              where: { id: promoApplied.promotionId },
+              data: { uses_count: { increment: 1 } },
+            }),
+          ])
+        }
+
         const payment = await tx.paymentTransaction.create({
           data: {
             user_id: userId,
@@ -2388,6 +2551,7 @@ export class MarketplaceService {
               order_id: order.id,
               order_source: 'FOOD',
               delivery_fee: deliveryFee,
+              discount_amount: discountAmount,
             },
           },
         })
@@ -2403,7 +2567,7 @@ export class MarketplaceService {
           reference: payment.reference,
           amount: payment.amount,
           subtotal,
-          discount_amount: 0,
+          discount_amount: discountAmount,
           delivery_fee: deliveryFee,
           shop: {
             id: merchantPayload.id,
@@ -2419,12 +2583,13 @@ export class MarketplaceService {
 
     const total = checkoutOrders.reduce((sum, o) => sum + o.amount, 0)
     const totalDelivery = checkoutOrders.reduce((sum, o) => sum + o.delivery_fee, 0)
+    const totalDiscount = checkoutOrders.reduce((sum, o) => sum + o.discount_amount, 0)
     const first = checkoutOrders[0]
 
     return {
       orders: checkoutOrders,
       total,
-      total_discount: 0,
+      total_discount: totalDiscount,
       total_delivery_fee: totalDelivery,
       currency: 'XOF',
       provider: 'SIMULATOR',
@@ -2862,10 +3027,10 @@ export class MarketplaceService {
     }
   }
 
-  async getMerchantOrder(userId: string, orderId: string, shopId?: string) {
-    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+  async getMerchantOrder(userId: string, orderId: string, shopOrMerchantId?: string) {
+    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, ...this.merchantOrderScope(shop) },
+      where: { id: orderId, ...ctx.scope },
       include: {
         items: {
           include: {
@@ -2920,11 +3085,11 @@ export class MarketplaceService {
     return { ...order, delivery_city, delivery_commune }
   }
 
-  async listMerchantOrders(userId: string, shopId?: string, status?: OrderStatus) {
-    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+  async listMerchantOrders(userId: string, shopOrMerchantId?: string, status?: OrderStatus) {
+    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
     return this.prisma.order.findMany({
       where: {
-        ...this.merchantOrderScope(shop),
+        ...ctx.scope,
         ...(status ? { status } : {}),
       },
       orderBy: { created_at: 'desc' },
@@ -2937,15 +3102,25 @@ export class MarketplaceService {
     })
   }
 
-  async exportMerchantOrdersCsv(userId: string, shopId?: string, days = 90) {
-    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+  /** @deprecated alias — utilise listMerchantOrders avec merchantId */
+  async listMerchantFoodOrders(userId: string, merchantId?: string, status?: OrderStatus) {
+    return this.listMerchantOrders(userId, merchantId, status)
+  }
+
+  /** @deprecated alias — utilise updateOrderStatus avec merchantId */
+  async updateFoodOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, merchantId?: string) {
+    return this.updateOrderStatus(userId, orderId, dto, merchantId)
+  }
+
+  async exportMerchantOrdersCsv(userId: string, shopOrMerchantId?: string, days = 90) {
+    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
     const periodDays = Math.min(Math.max(days, 1), 365)
     const since = new Date()
     since.setDate(since.getDate() - periodDays)
 
     const orders = await this.prisma.order.findMany({
       where: {
-        ...this.merchantOrderScope(shop),
+        ...ctx.scope,
         created_at: { gte: since },
       },
       orderBy: { created_at: 'desc' },
@@ -3150,10 +3325,10 @@ export class MarketplaceService {
     }
   }
 
-  async updateOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, shopId?: string) {
-    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+  async updateOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, shopOrMerchantId?: string) {
+    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, ...this.merchantOrderScope(shop) },
+      where: { id: orderId, ...ctx.scope },
       include: {
         user: { select: { id: true } },
         merchant: { select: { food_prep_minutes: true, business_name: true } },
@@ -3217,10 +3392,10 @@ export class MarketplaceService {
     return this.deliveryEta.getOrderEta(orderId, userId)
   }
 
-  async getMerchantOrderEta(userId: string, orderId: string, shopId?: string) {
-    const shop = await this.shopsService.resolveOwnerShop(userId, shopId)
+  async getMerchantOrderEta(userId: string, orderId: string, shopOrMerchantId?: string) {
+    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, ...this.merchantOrderScope(shop) },
+      where: { id: orderId, ...ctx.scope },
       select: { id: true },
     })
     if (!order) return null

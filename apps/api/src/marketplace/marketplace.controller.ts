@@ -423,6 +423,27 @@ export class MarketplaceController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('orders/merchant/food')
+  merchantFoodOrders(
+    @CurrentUser('id') userId: string,
+    @Query('merchantId') merchantId?: string,
+    @Query('status') status?: OrderStatus,
+  ) {
+    return this.svc.listMerchantFoodOrders(userId, merchantId, status)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('orders/merchant/food/:id/status')
+  updateFoodOrderStatus(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderStatusDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    return this.svc.updateFoodOrderStatus(userId, id, dto, merchantId)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('orders/merchant/export')
   async exportMerchantOrders(
     @CurrentUser('id') userId: string,

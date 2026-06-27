@@ -40,10 +40,15 @@ import {
   PLACEHOLDER_PRODUCT_IMAGE,
   updateOrderStatus,
   type OrderStatus,
+  type MerchantOrderScope,
 } from '@/lib/marketplaceApi'
 import { DeliveryDispatchPanel } from '@/features/merchant/components/shop/DeliveryDispatchPanel'
 import { OrderDeliveryEtaBanner } from '@/features/profile/components/orders/OrderDeliveryEtaBanner'
 import { notify } from '@/lib/notify'
+import {
+  buildMerchantOrderScope,
+  type MerchantOrderRoutes,
+} from '@/lib/merchantOrderScope'
 
 const MERCHANT_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   PENDING: ['CONFIRMED', 'CANCELLED'],
@@ -59,19 +64,29 @@ const MERCHANT_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 interface ShopOrderDetailPanelProps {
   orderId: string
+  scope?: MerchantOrderScope
+  routes?: MerchantOrderRoutes
 }
 
-export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
+export function ShopOrderDetailPanel({
+  orderId,
+  scope: scopeProp,
+  routes: routesProp,
+}: ShopOrderDetailPanelProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const routes = getShopRoutesFromPathname(pathname)
-  const { activeShopId } = useAuthStore()
+  const routes = routesProp ?? getShopRoutesFromPathname(pathname)
+  const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const scope = useMemo(
+    () => scopeProp ?? buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
+    [scopeProp, activeMerchantId, user?.shops, activeShopId],
+  )
   const [processing, setProcessing] = useState(false)
 
   const { data: order, isLoading, isError, refetch } = useQuery({
-    queryKey: ['merchant-order', activeShopId, orderId],
-    queryFn: () => fetchMerchantOrder(orderId, activeShopId),
-    enabled: !!activeShopId && !!orderId,
+    queryKey: ['merchant-order', scope.shopId, scope.merchantId, orderId],
+    queryFn: () => fetchMerchantOrder(orderId, scope),
+    enabled: !!(scope.shopId || scope.merchantId) && !!orderId,
   })
 
   const allowedTargets = useMemo(() => {
@@ -91,9 +106,8 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
   const rollbackTarget = order ? MERCHANT_ROLLBACK[order.status] : null
 
   const handleStatus = async (status: OrderStatus) => {
-    if (!activeShopId) return
     setProcessing(true)
-    const { error } = await updateOrderStatus(orderId, status, activeShopId)
+    const { error } = await updateOrderStatus(orderId, status, scope)
     setProcessing(false)
     if (error) {
       notify.error(error)
@@ -180,7 +194,7 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
           orderId={order.id}
           enabled
           variant="merchant"
-          shopId={activeShopId}
+          scope={scope}
           showPrepOnly={order.status === 'PREPARING'}
         />
       )}
@@ -195,12 +209,15 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
           </p>
         )}
 
-        {order.delivery_type === 'DELIVERY' && activeShopId && (
+        {(order.delivery_type === 'DELIVERY' && (scope.shopId || scope.merchantId)) && (
           <DeliveryDispatchPanel
             orderId={order.id}
-            shopId={activeShopId}
+            shopId={scope.shopId ?? undefined}
+            merchantId={scope.merchantId ?? undefined}
+            fulfilmentMode={order.delivery_fulfilment_mode}
             deliveryJob={order.delivery_job}
             onDispatched={() => void refetch()}
+            settingsHref={scope.merchantId && !scope.shopId ? '/merchant/delivery-zones' : undefined}
           />
         )}
 
@@ -254,7 +271,10 @@ export function ShopOrderDetailPanel({ orderId }: ShopOrderDetailPanelProps) {
           </h2>
           <div className="space-y-4">
             {order.items.map((item, index) => {
-              const image = item.product?.image_url ?? order.merchant?.logo ?? PLACEHOLDER_PRODUCT_IMAGE
+              const image = item.product?.image_url
+                ?? item.menu_item?.image_url
+                ?? order.merchant?.logo
+                ?? PLACEHOLDER_PRODUCT_IMAGE
               const productHref =
                 merchantSlug && item.product?.slug
                   ? `/m/${merchantSlug}/p/${item.product.slug}`

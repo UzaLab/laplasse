@@ -17,6 +17,7 @@ import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryDisputesService } from '../delivery/delivery-disputes.service'
 import { DeliveryService } from '../delivery/delivery.service'
 import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
+import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { CourierStatus, DeliveryDisputeStatus, AdCampaignStatus, OrderStatus, ShopStatus, ProductStatus } from '../../generated/prisma/client'
 import { AdsService } from '../ads/ads.service'
 import { UpdateAdminShopActiveDto, UpdateAdminShopStatusDto } from './dto/admin-shop.dto'
@@ -40,6 +41,7 @@ export class AdminController {
     private readonly deliveryDisputes: DeliveryDisputesService,
     private readonly deliveryService: DeliveryService,
     private readonly logisticsPartners: LogisticsPartnersService,
+    private readonly deliveryZones: DeliveryZonesService,
     private readonly ads: AdsService,
   ) {}
 
@@ -1776,5 +1778,27 @@ export class AdminController {
     })
 
     return { ...order, delivery_job: deliveryJob ?? null }
+  }
+
+  // ── Tarifs réseau LaPlasse (PLATFORM_RIDER) ─────────────────────────────────
+
+  @Get('platform-delivery-rates')
+  listPlatformRates() {
+    return this.deliveryZones.listPlatformRates()
+  }
+
+  @Post('platform-delivery-rates')
+  createPlatformRate(@Body() dto: { city_id: string; commune_id?: string; vehicle?: 'MOTO' | 'TRICYCLE' | 'CAR' | 'VAN'; fee: number; min_order?: number }) {
+    return this.deliveryZones.createPlatformRate(dto)
+  }
+
+  @Patch('platform-delivery-rates/:id')
+  updatePlatformRate(@Param('id') id: string, @Body() dto: { fee?: number; min_order?: number; is_active?: boolean }) {
+    return this.deliveryZones.updatePlatformRate(id, dto)
+  }
+
+  @Delete('platform-delivery-rates/:id')
+  deletePlatformRate(@Param('id') id: string) {
+    return this.deliveryZones.deletePlatformRate(id)
   }
 }

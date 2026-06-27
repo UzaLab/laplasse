@@ -1,24 +1,30 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   BedDouble,
   Calendar,
   CalendarCheck,
+  CalendarOff,
   ChevronRight,
   Clock,
   Filter,
   Loader2,
+  Settings2,
   Stethoscope,
+  Trash2,
   UtensilsCrossed,
   Users,
+  X,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { matchesSearchQuery } from '@/lib/merchantListFilters'
 import { merchantApiFetch } from '@/lib/merchantApi'
+import { getMerchantVertical } from '@/lib/merchantVertical'
+import { notify } from '@/lib/notify'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { MerchantBookingDetailSheet } from '@/features/merchant/components/MerchantBookingDetailSheet'
 import {
@@ -26,6 +32,8 @@ import {
   MerchantBookingsViewToggle,
 } from '@/features/merchant/components/MerchantBookingAgenda'
 import { MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
+import { BookingPaymentSettingsFields } from '@/features/merchant/components/BookingPaymentSettingsFields'
+import { toBookingSettingsPatch, type MerchantBookingSettings } from '@/lib/bookingSettingsApi'
 import type { BookingType } from '@/lib/bookingConfig'
 import { BOOKING_TYPE_LABELS } from '@/lib/bookingConfig'
 import {
@@ -39,6 +47,26 @@ import {
   getBookingWhenDisplay,
   isMerchantBookingHistory,
 } from '@/lib/bookingDisplay'
+
+type PageView = 'list' | 'settings' | 'blocks'
+
+interface BookingSettings extends MerchantBookingSettings {
+  max_capacity: number
+  slot_duration_min: number
+  buffer_min: number
+  booking_window_days: number
+  auto_confirm: boolean
+}
+
+interface AvailabilityBlock {
+  id: string
+  starts_at: string
+  ends_at: string
+  all_day: boolean
+  reason: string | null
+}
+
+const INPUT = 'w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm bg-white outline-none focus:border-amber-400'
 
 type StatusTab = 'active' | 'pending' | 'history' | 'all'
 
@@ -88,7 +116,7 @@ function matchesStatusTab(booking: BookingDisplaySource, tab: StatusTab): boolea
 
 export default function MerchantBookingsPage() {
   const router = useRouter()
-  const { isAuthenticated, activeMerchantId } = useAuthStore()
+  const { isAuthenticated, activeMerchantId, user } = useAuthStore()
   const { hydrated } = useAuthReady()
   const [bookings, setBookings] = useState<BookingDisplaySource[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,9 +126,22 @@ export default function MerchantBookingsPage() {
   const [typeFilter, setTypeFilter] = useState<BookingType | 'ALL'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [selected, setSelected] = useState<BookingDisplaySource | null>(null)
+  const [pageView, setPageView] = useState<PageView>('list')
+
+  // Settings panel state
+  const [settings, setSettings] = useState<BookingSettings | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+
+  // Blocks panel state
+  const [blocks, setBlocks] = useState<AvailabilityBlock[]>([])
+  const [blockForm, setBlockForm] = useState({ starts_at: '', ends_at: '', all_day: false, reason: '' })
+
+  const activeMerchant = user?.merchants?.find(m => m.id === activeMerchantId)
+  const isFood = getMerchantVertical(activeMerchant?.category_slug ?? '') === 'food'
+
   const debouncedSearch = useDebounce(searchQuery, 250)
 
-  const fetchBookings = async (): Promise<BookingDisplaySource[]> => {
+  const fetchBookings = useCallback(async (): Promise<BookingDisplaySource[]> => {
     setLoading(true)
     const res = await merchantApiFetch('/bookings/merchant', activeMerchantId)
     let list: BookingDisplaySource[] = []
@@ -111,16 +152,70 @@ export default function MerchantBookingsPage() {
     }
     setLoading(false)
     return list
-  }
+  }, [activeMerchantId])
+
+  const fetchSettings = useCallback(async () => {
+    if (!activeMerchantId) return
+    const res = await merchantApiFetch('/merchants/me/booking-settings', activeMerchantId)
+    if (res.ok) setSettings(await res.json())
+  }, [activeMerchantId])
+
+  const fetchBlocks = useCallback(async () => {
+    if (!activeMerchantId) return
+    const res = await merchantApiFetch('/merchants/me/availability-blocks', activeMerchantId)
+    if (res.ok) setBlocks(await res.json())
+  }, [activeMerchantId])
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
       router.push('/login?redirect=/merchant/bookings')
       return
     }
-    if (hydrated && isAuthenticated) fetchBookings()
+    if (hydrated && isAuthenticated) {
+      void fetchBookings()
+      void fetchSettings()
+      void fetchBlocks()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, activeMerchantId, hydrated])
+
+  const saveSettings = async () => {
+    if (!settings || !activeMerchantId) return
+    setSavingSettings(true)
+    try {
+      const res = await merchantApiFetch('/merchants/me/booking-settings', activeMerchantId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toBookingSettingsPatch(settings)),
+      })
+      if (!res.ok) { notify.error('Erreur lors de l\'enregistrement'); return }
+      setSettings(await res.json())
+      notify.success('Paramètres enregistrés.')
+    } catch { notify.error('Erreur réseau.') }
+    finally { setSavingSettings(false) }
+  }
+
+  const addBlock = async () => {
+    if (!activeMerchantId || !blockForm.starts_at || !blockForm.ends_at) return
+    await merchantApiFetch('/merchants/me/availability-blocks', activeMerchantId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        starts_at: new Date(blockForm.starts_at).toISOString(),
+        ends_at: new Date(blockForm.ends_at).toISOString(),
+        all_day: blockForm.all_day,
+        reason: blockForm.reason.trim() || undefined,
+      }),
+    })
+    setBlockForm({ starts_at: '', ends_at: '', all_day: false, reason: '' })
+    void fetchBlocks()
+  }
+
+  const deleteBlock = async (id: string) => {
+    if (!activeMerchantId) return
+    await merchantApiFetch(`/merchants/me/availability-blocks/${id}`, activeMerchantId, { method: 'DELETE' })
+    void fetchBlocks()
+  }
 
   const availableTypes = useMemo(() => {
     const types = new Set(bookings.map(b => b.booking_type))
@@ -170,17 +265,131 @@ export default function MerchantBookingsPage() {
 
   return (
     <MerchantShell>
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-2 sm:gap-3">
-          <CalendarCheck size={22} className="text-amber-500 shrink-0" />
-          Réservations
-        </h1>
-        <p className="text-slate-400 mt-1 text-sm">
-          {loading
-            ? 'Chargement…'
-            : `${bookings.length} demande${bookings.length > 1 ? 's' : ''} · ${counts.pending} en attente`}
-        </p>
+      <div className="mb-6 sm:mb-8 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-2 sm:gap-3">
+            <CalendarCheck size={22} className="text-amber-500 shrink-0" />
+            Réservations
+          </h1>
+          <p className="text-slate-400 mt-1 text-sm">
+            {loading
+              ? 'Chargement…'
+              : `${bookings.length} demande${bookings.length > 1 ? 's' : ''} · ${counts.pending} en attente`}
+          </p>
+        </div>
+        {isFood && (
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setPageView(v => v === 'blocks' ? 'list' : 'blocks')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors ${
+                pageView === 'blocks' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <CalendarOff size={15} />
+              <span className="hidden sm:inline">Blocages</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPageView(v => v === 'settings' ? 'list' : 'settings')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition-colors ${
+                pageView === 'settings' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <Settings2 size={15} />
+              <span className="hidden sm:inline">Paramètres</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Settings panel */}
+      {pageView === 'settings' && settings && (
+        <section className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-5 space-y-5 mb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-extrabold text-slate-900">Paramètres des créneaux</h2>
+            <button type="button" onClick={() => setPageView('list')} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"><X size={18} /></button>
+          </div>
+
+          {/* Explication slots TABLE */}
+          {isFood && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm">
+              <div className="flex items-start gap-2">
+                <Clock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-amber-900">Comment fonctionnent les créneaux ?</p>
+                  <p className="text-amber-800 mt-1">
+                    Les créneaux disponibles sont calculés automatiquement à partir de vos <strong>horaires d&apos;ouverture</strong>.
+                    Si aucun créneau n&apos;apparaît, vérifiez que vos horaires sont bien renseignés.
+                  </p>
+                  <a
+                    href="/merchant/hours"
+                    className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-amber-700 underline hover:text-amber-900"
+                  >
+                    <ChevronRight size={13} /> Configurer les horaires d&apos;ouverture
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Tables disponibles</span>
+              <input type="number" min={1} value={settings.max_capacity} onChange={e => setSettings(s => s ? { ...s, max_capacity: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Durée créneau (min)</span>
+              <input type="number" min={15} step={15} value={settings.slot_duration_min} onChange={e => setSettings(s => s ? { ...s, slot_duration_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Tampon entre créneaux (min)</span>
+              <input type="number" min={0} value={settings.buffer_min} onChange={e => setSettings(s => s ? { ...s, buffer_min: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Fenêtre de réservation (jours)</span>
+              <input type="number" min={1} value={settings.booking_window_days} onChange={e => setSettings(s => s ? { ...s, booking_window_days: Number(e.target.value) } : s)} className="mt-1 w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-sm" />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <input type="checkbox" checked={settings.auto_confirm} onChange={e => setSettings(s => s ? { ...s, auto_confirm: e.target.checked } : s)} />
+            Confirmation automatique
+          </label>
+          <BookingPaymentSettingsFields settings={settings} onChange={patch => setSettings(s => s ? { ...s, ...patch } : s)} />
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Politique d&apos;annulation</span>
+            <textarea rows={2} value={settings.cancellation_policy ?? ''} onChange={e => setSettings(s => s ? { ...s, cancellation_policy: e.target.value || null } : s)} placeholder="Ex. Annulation gratuite jusqu'à 2 h avant." className={`mt-1 ${INPUT} resize-y`} />
+          </label>
+          <button type="button" onClick={() => void saveSettings()} disabled={savingSettings} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-60">
+            {savingSettings ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </section>
+      )}
+
+      {/* Blocks panel */}
+      {pageView === 'blocks' && (
+        <section className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-5 space-y-4 mb-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-extrabold text-slate-900">Indisponibilités</h2>
+            <button type="button" onClick={() => setPageView('list')} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"><X size={18} /></button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <input type="datetime-local" value={blockForm.starts_at} onChange={e => setBlockForm(f => ({ ...f, starts_at: e.target.value }))} className={INPUT} />
+            <input type="datetime-local" value={blockForm.ends_at} onChange={e => setBlockForm(f => ({ ...f, ends_at: e.target.value }))} className={INPUT} />
+            <input placeholder="Motif (optionnel)" value={blockForm.reason} onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))} className={`${INPUT} sm:col-span-2`} />
+          </div>
+          <button type="button" onClick={() => void addBlock()} disabled={!blockForm.starts_at || !blockForm.ends_at} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-50">Ajouter blocage</button>
+          <ul className="space-y-2">
+            {blocks.length === 0 && <li className="text-sm text-slate-400 py-2">Aucune indisponibilité configurée.</li>}
+            {blocks.map(b => (
+              <li key={b.id} className="flex items-center justify-between gap-2 text-sm border border-slate-100 rounded-xl px-3 py-2">
+                <span className="text-slate-700">{new Date(b.starts_at).toLocaleString('fr-FR')} → {new Date(b.ends_at).toLocaleString('fr-FR')}{b.reason ? ` · ${b.reason}` : ''}</span>
+                <button type="button" onClick={() => void deleteBlock(b.id)} className="p-1.5 text-red-400 hover:text-red-600 rounded-lg"><Trash2 size={14} /></button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <MerchantListToolbar
         value={searchQuery}

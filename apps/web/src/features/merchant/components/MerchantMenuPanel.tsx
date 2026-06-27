@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
+  CircleCheck,
   Clock,
   ExternalLink,
   Eye,
@@ -437,8 +439,8 @@ export function MerchantMenuPanel() {
             <div className="flex flex-wrap items-center gap-1.5">
               <p className="font-bold text-slate-900 text-sm sm:text-base leading-tight">{item.name}</p>
               {!item.is_available && (
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                  Masqué
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                  <AlertTriangle size={9} />Rupture
                 </span>
               )}
               {(item.modifier_groups?.length ?? 0) > 0 && (
@@ -484,21 +486,21 @@ export function MerchantMenuPanel() {
             </div>
             <button
               type="button"
-              title={item.is_available ? 'Masquer' : 'Afficher'}
+              title={item.is_available ? 'Marquer en rupture de stock' : 'Remettre disponible'}
               disabled={savingId === item.id}
               onClick={() => void toggleItemAvailable(item)}
               className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
                 item.is_available
-                  ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
-                  : 'border-slate-200 text-slate-400 bg-white hover:bg-slate-50'
+                  ? 'border-emerald-200 text-emerald-600 bg-emerald-50 hover:bg-red-50 hover:border-red-200 hover:text-red-500'
+                  : 'border-red-200 text-red-500 bg-red-50 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600'
               }`}
             >
               {savingId === item.id ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : item.is_available ? (
-                <Eye size={15} />
+                <CircleCheck size={15} />
               ) : (
-                <EyeOff size={15} />
+                <AlertTriangle size={15} />
               )}
             </button>
             <button
@@ -547,20 +549,20 @@ export function MerchantMenuPanel() {
             type="button"
             disabled={savingId === item.id}
             onClick={() => void toggleItemAvailable(item)}
-            title={item.is_available ? 'Masquer' : 'Afficher'}
-            aria-label={item.is_available ? 'Masquer' : 'Afficher'}
+            title={item.is_available ? 'Marquer en rupture' : 'Remettre disponible'}
+            aria-label={item.is_available ? 'Marquer en rupture' : 'Remettre disponible'}
             className={`w-10 h-10 rounded-xl border flex items-center justify-center ${
               item.is_available
                 ? 'border-emerald-200 text-emerald-600 bg-emerald-50'
-                : 'border-slate-200 text-slate-500 bg-white'
+                : 'border-red-200 text-red-500 bg-red-50'
             }`}
           >
             {savingId === item.id ? (
               <Loader2 size={16} className="animate-spin" />
             ) : item.is_available ? (
-              <Eye size={16} />
+              <CircleCheck size={16} />
             ) : (
-              <EyeOff size={16} />
+              <AlertTriangle size={16} />
             )}
           </button>
           <button

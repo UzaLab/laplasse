@@ -2,8 +2,11 @@ import { authApiFetch } from './authFetch'
 import { authUrl } from './authClient'
 import { countryRequestHeaders } from './country'
 import { shopApiFetch } from './shopApi'
+import { withOrderScope, type MerchantOrderScope } from './merchantOrderScope'
 import { fetchWithTimeout } from './fetchWithTimeout'
 import type { SelectedMenuModifier } from './menuModifiers'
+
+export type { MerchantOrderScope } from './merchantOrderScope'
 
 export type FetchResult<T> =
   | { ok: true; data: T }
@@ -279,6 +282,7 @@ export interface Order {
   id: string
   status: OrderStatus
   delivery_type: DeliveryType
+  delivery_fulfilment_mode?: 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
   delivery_address?: string | null
   delivery_city_id?: string | null
   delivery_commune_id?: string | null
@@ -473,6 +477,8 @@ export interface CheckoutInput {
   customer_phone: string
   applied_promotions?: AppliedPromotionInput[]
   shop_deliveries?: ShopCheckoutDeliveryInput[]
+  food_promo_code?: string
+  preorder_for?: string
 }
 
 export interface GuestCartItemInput {
@@ -835,10 +841,9 @@ export async function fetchOrderEta(orderId: string): Promise<OrderEtaSnapshot |
 
 export async function fetchMerchantOrderEta(
   orderId: string,
-  shopId?: string | null,
+  scope: MerchantOrderScope,
 ): Promise<OrderEtaSnapshot | null> {
-  const qs = shopId ? `?shopId=${encodeURIComponent(shopId)}` : ''
-  const res = await authApiFetch(`/orders/merchant/${orderId}/eta${qs}`)
+  const res = await authApiFetch(withOrderScope(`/orders/merchant/${orderId}/eta`, scope))
   if (!res.ok) return null
   return res.json() as Promise<OrderEtaSnapshot>
 }
@@ -853,23 +858,23 @@ export async function reorderFromOrder(
 }
 
 export async function fetchMerchantOrders(
-  shopId: string | null | undefined,
+  scope: MerchantOrderScope,
   status?: OrderStatus,
 ): Promise<Order[]> {
-  const path = status
+  const base = status
     ? `/orders/merchant/mine?status=${status}`
     : '/orders/merchant/mine'
-  const res = await shopApiFetch(path, shopId)
+  const res = await authApiFetch(withOrderScope(base, scope))
   const data = await parseJson<Order[]>(res)
   return data ?? []
 }
 
 export async function downloadMerchantOrdersCsv(
-  shopId: string | null | undefined,
+  scope: MerchantOrderScope,
   days = 90,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const qs = new URLSearchParams({ days: String(days) })
-  const res = await shopApiFetch(`/orders/merchant/export?${qs}`, shopId)
+  const res = await authApiFetch(withOrderScope(`/orders/merchant/export?${qs}`, scope))
   if (!res.ok) {
     const err = await res.text().catch(() => '')
     return { ok: false, error: err || 'Export impossible' }
@@ -922,18 +927,18 @@ export async function fetchShopAnalytics(
 
 export async function fetchMerchantOrder(
   orderId: string,
-  shopId: string | null | undefined,
+  scope: MerchantOrderScope,
 ): Promise<Order | null> {
-  const res = await shopApiFetch(`/orders/merchant/${orderId}`, shopId)
+  const res = await authApiFetch(withOrderScope(`/orders/merchant/${orderId}`, scope))
   return parseJson<Order>(res)
 }
 
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,
-  shopId: string | null | undefined,
+  scope: MerchantOrderScope,
 ): Promise<{ order: Order | null; error?: string }> {
-  const res = await shopApiFetch(`/orders/${orderId}/status`, shopId, {
+  const res = await authApiFetch(withOrderScope(`/orders/${orderId}/status`, scope), {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   })

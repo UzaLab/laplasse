@@ -5,7 +5,7 @@ import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, Loader2, UtensilsCrossed } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Loader2, Tag, UtensilsCrossed, X } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
@@ -128,6 +128,10 @@ function CheckoutPageContent() {
   const [shopDeliveries, setShopDeliveries] = useState<Record<string, ShopDeliveryState>>({})
   const [communesByShop, setCommunesByShop] = useState<Record<string, GeoCommune[]>>({})
 
+  const [foodPromoCode, setFoodPromoCode] = useState('')
+  const [foodPromoApplied, setFoodPromoApplied] = useState<{ code: string; discount: number; message: string } | null>(null)
+  const [foodPromoLoading, setFoodPromoLoading] = useState(false)
+
   const cartShopIds = useMemo(
     () => cart?.merchants.map(m => m.id) ?? [],
     [cart?.merchants],
@@ -166,12 +170,14 @@ function CheckoutPageContent() {
     return deliveryType === 'DELIVERY'
   }, [useSplitDelivery, cart?.merchants, shopDeliveries, deliveryType])
 
+  const foodPromoDiscount = foodPromoApplied?.discount ?? 0
+
   const checkoutTotal = useMemo(() => {
     const subtotal = cart?.subtotal ?? 0
     const fee = hasAnyDelivery ? deliveryFee : 0
-    const discount = routeFlow === 'food' ? 0 : promoDiscount
+    const discount = isFoodFlow ? foodPromoDiscount : promoDiscount
     return Math.max(0, subtotal - discount + fee)
-  }, [cart?.subtotal, promoDiscount, deliveryFee, hasAnyDelivery, routeFlow])
+  }, [cart?.subtotal, promoDiscount, foodPromoDiscount, deliveryFee, hasAnyDelivery, isFoodFlow])
 
   useEffect(() => {
     if (!hydrated || submitting) return
@@ -471,6 +477,39 @@ function CheckoutPageContent() {
     communes,
   ])
 
+  const applyFoodPromo = async () => {
+    const code = foodPromoCode.trim().toUpperCase()
+    if (!code || !cart) return
+    const merchantId = cart.merchants[0]?.id
+    if (!merchantId) return
+    setFoodPromoLoading(true)
+    try {
+      const { authUrl } = await import('@/lib/authClient')
+      const res = await fetch(authUrl('/promotions/validate-food'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, merchant_id: merchantId, subtotal: cart.subtotal }),
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json() as { valid: boolean; discount?: number; message?: string }
+        if (data.valid && data.discount != null) {
+          setFoodPromoApplied({ code, discount: data.discount, message: data.message ?? `−${data.discount.toLocaleString('fr-FR')} FCFA` })
+          notify.success(data.message ?? 'Code promo appliqué !')
+        } else {
+          notify.error(data.message ?? 'Code promo invalide')
+        }
+      } else {
+        const err = await res.json().catch(() => ({})) as { message?: string }
+        notify.error(err.message ?? 'Code promo invalide ou expiré')
+      }
+    } catch {
+      notify.error('Erreur réseau')
+    } finally {
+      setFoodPromoLoading(false)
+    }
+  }
+
   const handleCheckout = async () => {
     if (!cart) return
 
@@ -588,6 +627,7 @@ function CheckoutPageContent() {
       customer_phone: phone,
       applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
       shop_deliveries: splitPayload,
+      food_promo_code: isFoodFlow && foodPromoApplied ? foodPromoApplied.code : undefined,
     }
 
     let result = null as Awaited<ReturnType<typeof checkout>>['result']
@@ -638,7 +678,7 @@ function CheckoutPageContent() {
         selectedAddressId: selectedAddressId ?? undefined,
         saveNewAddress: saveNewAddress || undefined,
         newAddressLabel: newAddressLabel || undefined,
-        discountAmount: isFoodFlow ? 0 : promoDiscount,
+        discountAmount: isFoodFlow ? foodPromoDiscount : promoDiscount,
         deliveryFee: hasAnyDelivery ? deliveryFee : 0,
         deliveryQuotes: hasAnyDelivery ? deliveryQuotes : undefined,
       }),
@@ -1082,6 +1122,54 @@ function CheckoutPageContent() {
                   </div>
                 )}
 
+                {isFoodFlow && (
+                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+                    <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                      <Tag size={15} className="text-orange-500" />
+                      Code promo
+                    </p>
+                    {foodPromoApplied ? (
+                      <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                          <div>
+                            <p className="text-sm font-bold text-emerald-800">{foodPromoApplied.code}</p>
+                            <p className="text-xs text-emerald-700">{foodPromoApplied.message}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setFoodPromoApplied(null); setFoodPromoCode('') }}
+                          className="p-1.5 rounded-full hover:bg-emerald-100 text-emerald-600"
+                          title="Retirer le code"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={foodPromoCode}
+                          onChange={e => setFoodPromoCode(e.target.value.toUpperCase())}
+                          onKeyDown={e => e.key === 'Enter' && void applyFoodPromo()}
+                          placeholder="Code promo"
+                          className="flex-1 h-11 border border-slate-200 rounded-xl px-4 text-sm font-mono tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-orange-500/10 focus:border-orange-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void applyFoodPromo()}
+                          disabled={!foodPromoCode.trim() || foodPromoLoading}
+                          className="h-11 px-4 bg-slate-900 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {foodPromoLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                          Appliquer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">
                     Note pour le commerce (optionnel)
@@ -1116,7 +1204,7 @@ function CheckoutPageContent() {
               deliveryAddress={formattedDeliveryAddress}
               customerPhone={customerPhone || undefined}
               customerNote={customerNote || undefined}
-              discountAmount={isFoodFlow ? 0 : promoDiscount}
+              discountAmount={isFoodFlow ? foodPromoDiscount : promoDiscount}
               deliveryFee={hasAnyDelivery ? deliveryFee : 0}
               deliveryQuotes={hasAnyDelivery ? deliveryQuotes : undefined}
               freeDeliveryShopIds={isFoodFlow ? [] : [...freeDeliveryShopIds]}

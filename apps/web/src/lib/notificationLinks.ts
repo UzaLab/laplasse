@@ -3,6 +3,7 @@ export interface NotificationLinkData {
   type?: string
   order_id?: string
   merchant_id?: string | null
+  order_source?: string | null
   booking_id?: string
   job_id?: string
   shop_id?: string
@@ -57,8 +58,15 @@ export function resolveNotificationHref(data?: NotificationLinkData | null, type
   }
 
   if (notifType === 'order_created') {
+    if (data?.order_source === 'FOOD' && data?.order_id) {
+      return `/merchant/orders/${data.order_id}`
+    }
     if (data?.merchant_id && data.order_id) return `/merchant/shop/orders/${data.order_id}`
     if (data?.order_id) return '/shop/manage/orders'
+  }
+
+  if (notifType === 'order_status' && data?.order_source === 'FOOD' && data?.order_id) {
+    return `/merchant/orders/${data.order_id}`
   }
 
   if (notifType === 'booking_created' || notifType === 'booking_updated') {
