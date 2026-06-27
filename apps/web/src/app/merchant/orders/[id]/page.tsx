@@ -6,17 +6,17 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { useAuthStore } from '@/stores/authStore'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { ShopOrderDetailPanel } from '@/features/merchant/components/shop/ShopOrderDetailPanel'
-import { buildMerchantOrderScope, FOOD_ORDER_ROUTES } from '@/lib/merchantOrderScope'
+import { buildFoodOrderScope, FOOD_ORDER_ROUTES } from '@/lib/merchantOrderScope'
 
 export default function MerchantOrderDetailPage() {
   const params = useParams()
   const orderId = params.id as string
   const { ready, isAuthenticated } = useAuthReady()
-  const { activeMerchantId, activeShopId, user } = useAuthStore()
+  const { activeMerchantId } = useAuthStore()
 
   const scope = useMemo(
-    () => buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
-    [activeMerchantId, user?.shops, activeShopId],
+    () => buildFoodOrderScope(activeMerchantId),
+    [activeMerchantId],
   )
 
   if (!ready || !isAuthenticated) return null

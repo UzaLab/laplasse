@@ -77,7 +77,7 @@ export function ShopOverview() {
 
     const [products, orders, promosRes] = await Promise.all([
       fetchMyProducts(manageShopId),
-      fetchMerchantOrders({ shopId: manageShopId, merchantId: activeMerchantId ?? null }),
+      fetchMerchantOrders({ shopId: manageShopId, merchantId: null }),
       promosFetch,
     ])
     const promos = promosRes?.ok ? await promosRes.json() : []

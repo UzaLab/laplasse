@@ -760,20 +760,19 @@ export class MarketplaceService {
     }
   }
 
-  private merchantOrderScope(shop: { id: string; merchant_id: string | null }) {
-    if (shop.merchant_id) {
-      return {
-        OR: [
-          { shop_id: shop.id },
-          { order_source: 'FOOD' as const, merchant_id: shop.merchant_id },
-        ],
-      }
-    }
-    return { shop_id: shop.id }
+  private shopOrderScope(shopId: string) {
+    return { shop_id: shopId }
   }
 
-  /** Résout le périmètre commandes marchand (boutique liée ou établissement food seul). */
-  private async resolveOrderContext(userId: string, shopOrMerchantId?: string) {
+  private foodOrderScope(merchantId: string) {
+    return { merchant_id: merchantId, order_source: 'FOOD' as const }
+  }
+
+  /** Résout le périmètre commandes : boutique (produits) ou établissement (menu), jamais les deux. */
+  private async resolveOrderContext(
+    userId: string,
+    scope?: { shopId?: string; merchantId?: string },
+  ) {
     const shopSelect = {
       id: true,
       merchant_id: true,
@@ -782,42 +781,38 @@ export class MarketplaceService {
       delivery_fulfilment_default: true,
     } as const
 
-    if (shopOrMerchantId) {
+    if (scope?.shopId) {
       const shop = await this.prisma.shop.findFirst({
-        where: shopAccessibleWhere(userId, shopOrMerchantId),
+        where: shopAccessibleWhere(userId, scope.shopId),
         select: shopSelect,
       })
-      if (shop) {
-        return {
-          scope: this.merchantOrderScope(shop),
-          shop,
-          merchantId: shop.merchant_id,
-        }
+      if (!shop) {
+        throw new NotFoundException('Boutique introuvable')
       }
+      return {
+        scope: this.shopOrderScope(shop.id),
+        shop,
+        merchantId: shop.merchant_id,
+      }
+    }
 
+    if (scope?.merchantId) {
       const merchant = await this.prisma.merchant.findFirst({
-        where: { id: shopOrMerchantId, owner_id: userId },
+        where: { id: scope.merchantId, owner_id: userId },
         select: { id: true, owner_id: true, delivery_fulfilment_default: true },
       })
       if (!merchant) {
-        throw new NotFoundException('Boutique ou établissement introuvable')
+        throw new NotFoundException('Établissement introuvable')
       }
 
       const linkedShop = await this.prisma.shop.findFirst({
         where: { merchant_id: merchant.id, ...shopAccessibleWhere(userId) },
         select: shopSelect,
       })
-      if (linkedShop) {
-        return {
-          scope: this.merchantOrderScope(linkedShop),
-          shop: linkedShop,
-          merchantId: merchant.id,
-        }
-      }
 
       return {
-        scope: { merchant_id: merchant.id, order_source: 'FOOD' as const },
-        shop: null,
+        scope: this.foodOrderScope(merchant.id),
+        shop: linkedShop,
         merchantId: merchant.id,
       }
     }
@@ -829,7 +824,7 @@ export class MarketplaceService {
     })
     if (shop) {
       return {
-        scope: this.merchantOrderScope(shop),
+        scope: this.shopOrderScope(shop.id),
         shop,
         merchantId: shop.merchant_id,
       }
@@ -844,7 +839,7 @@ export class MarketplaceService {
     }
 
     return {
-      scope: { merchant_id: merchant.id, order_source: 'FOOD' as const },
+      scope: this.foodOrderScope(merchant.id),
       shop: null,
       merchantId: merchant.id,
     }
@@ -3027,8 +3022,12 @@ export class MarketplaceService {
     }
   }
 
-  async getMerchantOrder(userId: string, orderId: string, shopOrMerchantId?: string) {
-    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
+  async getMerchantOrder(
+    userId: string,
+    orderId: string,
+    scope?: { shopId?: string; merchantId?: string },
+  ) {
+    const ctx = await this.resolveOrderContext(userId, scope)
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, ...ctx.scope },
       include: {
@@ -3085,8 +3084,12 @@ export class MarketplaceService {
     return { ...order, delivery_city, delivery_commune }
   }
 
-  async listMerchantOrders(userId: string, shopOrMerchantId?: string, status?: OrderStatus) {
-    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
+  async listMerchantOrders(
+    userId: string,
+    scope?: { shopId?: string; merchantId?: string },
+    status?: OrderStatus,
+  ) {
+    const ctx = await this.resolveOrderContext(userId, scope)
     return this.prisma.order.findMany({
       where: {
         ...ctx.scope,
@@ -3104,16 +3107,20 @@ export class MarketplaceService {
 
   /** @deprecated alias — utilise listMerchantOrders avec merchantId */
   async listMerchantFoodOrders(userId: string, merchantId?: string, status?: OrderStatus) {
-    return this.listMerchantOrders(userId, merchantId, status)
+    return this.listMerchantOrders(userId, merchantId ? { merchantId } : undefined, status)
   }
 
   /** @deprecated alias — utilise updateOrderStatus avec merchantId */
   async updateFoodOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, merchantId?: string) {
-    return this.updateOrderStatus(userId, orderId, dto, merchantId)
+    return this.updateOrderStatus(userId, orderId, dto, merchantId ? { merchantId } : undefined)
   }
 
-  async exportMerchantOrdersCsv(userId: string, shopOrMerchantId?: string, days = 90) {
-    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
+  async exportMerchantOrdersCsv(
+    userId: string,
+    scope?: { shopId?: string; merchantId?: string },
+    days = 90,
+  ) {
+    const ctx = await this.resolveOrderContext(userId, scope)
     const periodDays = Math.min(Math.max(days, 1), 365)
     const since = new Date()
     since.setDate(since.getDate() - periodDays)
@@ -3182,7 +3189,7 @@ export class MarketplaceService {
     since.setDate(since.getDate() - periodDays)
     since.setHours(0, 0, 0, 0)
 
-    const scope = this.merchantOrderScope(shop)
+    const scope = this.shopOrderScope(shop.id)
     const periodWhere = { ...scope, created_at: { gte: since } }
 
     const completedStatuses = [
@@ -3325,8 +3332,13 @@ export class MarketplaceService {
     }
   }
 
-  async updateOrderStatus(userId: string, orderId: string, dto: UpdateOrderStatusDto, shopOrMerchantId?: string) {
-    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
+  async updateOrderStatus(
+    userId: string,
+    orderId: string,
+    dto: UpdateOrderStatusDto,
+    scope?: { shopId?: string; merchantId?: string },
+  ) {
+    const ctx = await this.resolveOrderContext(userId, scope)
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, ...ctx.scope },
       include: {
@@ -3392,8 +3404,12 @@ export class MarketplaceService {
     return this.deliveryEta.getOrderEta(orderId, userId)
   }
 
-  async getMerchantOrderEta(userId: string, orderId: string, shopOrMerchantId?: string) {
-    const ctx = await this.resolveOrderContext(userId, shopOrMerchantId)
+  async getMerchantOrderEta(
+    userId: string,
+    orderId: string,
+    scope?: { shopId?: string; merchantId?: string },
+  ) {
+    const ctx = await this.resolveOrderContext(userId, scope)
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, ...ctx.scope },
       select: { id: true },

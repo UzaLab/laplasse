@@ -20,7 +20,7 @@ import {
   type MerchantOrderScope,
 } from '@/lib/marketplaceApi'
 import {
-  buildMerchantOrderScope,
+  buildShopOrderScope,
   type MerchantOrderRoutes,
 } from '@/lib/merchantOrderScope'
 import { getShopRoutesFromPathname } from '@/lib/shopApi'
@@ -91,7 +91,7 @@ export function ShopOrdersPanel({
   const routes = routesProp ?? getShopRoutesFromPathname(pathname)
   const { activeShopId, activeMerchantId, user } = useAuthStore()
   const scope = useMemo(
-    () => scopeProp ?? buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
+    () => scopeProp ?? buildShopOrderScope(activeMerchantId, user?.shops, activeShopId),
     [scopeProp, activeMerchantId, user?.shops, activeShopId],
   )
   const [orders, setOrders] = useState<Order[]>([])

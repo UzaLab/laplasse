@@ -46,6 +46,12 @@ import { ProductDiscoveryService } from './product-discovery.service'
 import { CreateCourierReviewDto } from '../couriers/dto/create-courier-review.dto'
 import { CreateDeliveryDisputeDto } from '../delivery/dto/create-delivery-dispute.dto'
 
+function merchantOrderScopeQuery(shopId?: string, merchantId?: string) {
+  if (shopId) return { shopId }
+  if (merchantId) return { merchantId }
+  return undefined
+}
+
 @Controller()
 export class MarketplaceController {
   constructor(
@@ -419,7 +425,7 @@ export class MarketplaceController {
     @Query('merchantId') merchantId?: string,
     @Query('status') status?: OrderStatus,
   ) {
-    return this.svc.listMerchantOrders(userId, shopId ?? merchantId, status)
+    return this.svc.listMerchantOrders(userId, merchantOrderScopeQuery(shopId, merchantId), status)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -455,7 +461,7 @@ export class MarketplaceController {
     const parsedDays = days ? Number(days) : 90
     const csv = await this.svc.exportMerchantOrdersCsv(
       userId,
-      shopId ?? merchantId,
+      merchantOrderScopeQuery(shopId, merchantId),
       Number.isFinite(parsedDays) ? parsedDays : 90,
     )
     const stamp = new Date().toISOString().slice(0, 10)
@@ -541,7 +547,7 @@ export class MarketplaceController {
     @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.getMerchantOrder(userId, orderId, shopId ?? merchantId)
+    return this.svc.getMerchantOrder(userId, orderId, merchantOrderScopeQuery(shopId, merchantId))
   }
 
   @UseGuards(JwtAuthGuard)
@@ -564,7 +570,7 @@ export class MarketplaceController {
     @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.getMerchantOrderEta(userId, orderId, shopId ?? merchantId)
+    return this.svc.getMerchantOrderEta(userId, orderId, merchantOrderScopeQuery(shopId, merchantId))
   }
 
   @UseGuards(JwtAuthGuard)
@@ -582,7 +588,7 @@ export class MarketplaceController {
     @Query('shopId') shopId?: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    return this.svc.updateOrderStatus(userId, id, dto, shopId ?? merchantId)
+    return this.svc.updateOrderStatus(userId, id, dto, merchantOrderScopeQuery(shopId, merchantId))
   }
 
   // ─── Adresses utilisateur (checkout / paramètres) ───────────────────────────

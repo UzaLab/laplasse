@@ -1,4 +1,7 @@
-import { getActiveMerchantShopId, type ShopSummary } from './shopApi'
+import {
+  getActiveShopIdForManage,
+  type ShopSummary,
+} from './shopApi'
 
 export interface MerchantOrderScope {
   shopId: string | null
@@ -15,16 +18,35 @@ export const FOOD_ORDER_ROUTES: MerchantOrderRoutes = {
   orderDetail: id => `/merchant/orders/${id}`,
 }
 
+/** Commandes boutique (produits) — standalone ou boutique liée à un établissement. */
+export function buildShopOrderScope(
+  activeMerchantId: string | null | undefined,
+  shops: ShopSummary[] | undefined,
+  activeShopId: string | null | undefined,
+): MerchantOrderScope {
+  return {
+    shopId: getActiveShopIdForManage(shops, activeMerchantId, activeShopId),
+    merchantId: null,
+  }
+}
+
+/** Commandes menu (food) — établissement uniquement. */
+export function buildFoodOrderScope(
+  activeMerchantId: string | null | undefined,
+): MerchantOrderScope {
+  return {
+    shopId: null,
+    merchantId: activeMerchantId ?? null,
+  }
+}
+
+/** @deprecated Préférer buildShopOrderScope ou buildFoodOrderScope selon le contexte. */
 export function buildMerchantOrderScope(
   activeMerchantId: string | null | undefined,
   shops: ShopSummary[] | undefined,
   activeShopId: string | null | undefined,
 ): MerchantOrderScope {
-  const shopId = getActiveMerchantShopId(shops, activeMerchantId, activeShopId)
-  return {
-    shopId,
-    merchantId: activeMerchantId ?? null,
-  }
+  return buildShopOrderScope(activeMerchantId, shops, activeShopId)
 }
 
 /** Ajoute shopId ou merchantId à un chemin API commandes marchand. */

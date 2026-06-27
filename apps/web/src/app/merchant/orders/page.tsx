@@ -8,18 +8,18 @@ import { useEffect, useMemo } from 'react'
 import { getMerchantVertical } from '@/lib/merchantVertical'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { ShopOrdersPanel } from '@/features/merchant/components/shop/ShopOrdersPanel'
-import { buildMerchantOrderScope, FOOD_ORDER_ROUTES } from '@/lib/merchantOrderScope'
+import { buildFoodOrderScope, FOOD_ORDER_ROUTES } from '@/lib/merchantOrderScope'
 
 export default function MerchantOrdersPage() {
   const { ready } = useAuthReady()
-  const { user, activeMerchantId, activeShopId } = useAuthStore()
+  const { user, activeMerchantId } = useAuthStore()
   const router = useRouter()
 
   const activeMerchant = user?.merchants?.find(m => m.id === activeMerchantId) ?? user?.merchants?.[0]
   const vertical = getMerchantVertical(activeMerchant?.category_slug ?? '')
   const scope = useMemo(
-    () => buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
-    [activeMerchantId, user?.shops, activeShopId],
+    () => buildFoodOrderScope(activeMerchantId),
+    [activeMerchantId],
   )
 
   useEffect(() => {

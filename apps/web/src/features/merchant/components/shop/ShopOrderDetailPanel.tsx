@@ -46,7 +46,8 @@ import { DeliveryDispatchPanel } from '@/features/merchant/components/shop/Deliv
 import { OrderDeliveryEtaBanner } from '@/features/profile/components/orders/OrderDeliveryEtaBanner'
 import { notify } from '@/lib/notify'
 import {
-  buildMerchantOrderScope,
+  buildFoodOrderScope,
+  buildShopOrderScope,
   type MerchantOrderRoutes,
 } from '@/lib/merchantOrderScope'
 
@@ -77,9 +78,14 @@ export function ShopOrderDetailPanel({
   const pathname = usePathname()
   const routes = routesProp ?? getShopRoutesFromPathname(pathname)
   const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const isFoodOrders = pathname.startsWith('/merchant/orders')
   const scope = useMemo(
-    () => scopeProp ?? buildMerchantOrderScope(activeMerchantId, user?.shops, activeShopId),
-    [scopeProp, activeMerchantId, user?.shops, activeShopId],
+    () =>
+      scopeProp
+      ?? (isFoodOrders
+        ? buildFoodOrderScope(activeMerchantId)
+        : buildShopOrderScope(activeMerchantId, user?.shops, activeShopId)),
+    [scopeProp, isFoodOrders, activeMerchantId, user?.shops, activeShopId],
   )
   const [processing, setProcessing] = useState(false)
 
