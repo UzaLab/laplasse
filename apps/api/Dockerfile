@@ -16,16 +16,14 @@ RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
 
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM base AS builder
-# 768 Mo : évite le swap sur VPS 2 Go quand Coolify build plusieurs services
-ENV NODE_OPTIONS="--max-old-space-size=768"
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/api ./apps/api
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 WORKDIR /app/apps/api
 RUN pnpm exec prisma generate
-# Deux passes tsc séparées : évite OOM sur VPS 2 Go (heap ~768 Mo par process)
-RUN pnpm exec tsc -p tsconfig.build.app.json
+# Deux passes tsc : app (~1 Go heap) + prisma (512 Mo) — un seul process à la fois sur VPS 2 Go
+RUN NODE_OPTIONS="--max-old-space-size=1024" pnpm exec tsc -p tsconfig.build.app.json
 RUN NODE_OPTIONS="--max-old-space-size=512" pnpm exec tsc -p tsconfig.build.prisma.json
 
 # ── Deps production (image finale légère) ──────────────────────────────────────
