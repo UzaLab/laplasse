@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowRight, Search } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { api, ApiCategory, ApiMerchant } from '@/lib/api'
-import { getDefaultCity, getServerCountryCode } from '@/lib/country'
+import { getDefaultCity } from '@/lib/country'
+import { getRequestCountry, getRequestCountryAndCity } from '@/lib/serverCountry'
 import {
   BRAND_OG_LOCALE,
   categoryPageDescription,
@@ -22,7 +23,7 @@ interface Props {
 
 export default async function CategoryPage({ params }: Props) {
   const { slug } = await params
-  const defaultCity = getDefaultCity(getServerCountryCode())
+  const { country, city: defaultCity } = await getRequestCountryAndCity()
 
   let category: ApiCategory
   let merchants: { data: ApiMerchant[]; meta: { total: number } }
@@ -30,7 +31,7 @@ export default async function CategoryPage({ params }: Props) {
   try {
     [category, merchants] = await Promise.all([
       api.categories.bySlug(slug),
-      api.merchants.list({ category: slug, city: defaultCity, limit: 24, sort: 'trust_score' }),
+      api.merchants.list({ category: slug, city: defaultCity, country, limit: 24, sort: 'trust_score' }),
     ])
   } catch {
     notFound()
@@ -116,7 +117,8 @@ export default async function CategoryPage({ params }: Props) {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
-  const defaultCity = getDefaultCity(getServerCountryCode())
+  const country = await getRequestCountry()
+  const defaultCity = getDefaultCity(country)
   try {
     const cat = await api.categories.bySlug(slug)
     const title = categoryPageTitle(cat.name, defaultCity)

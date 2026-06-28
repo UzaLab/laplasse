@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { api } from '@/lib/api'
-import { getDefaultCity, getServerCountryCode } from '@/lib/country'
+import { getRequestCountryAndCity } from '@/lib/serverCountry'
 import { RestaurationHubPage } from '@/features/food-hub/components/RestaurationHubPage'
 import { RestaurationDesktopRedirect } from '@/features/food-hub/components/RestaurationDesktopRedirect'
 import {
@@ -27,7 +27,7 @@ interface Props {
 
 export default async function RestaurationPage({ searchParams }: Props) {
   const { cat, q } = await searchParams
-  const defaultCity = getDefaultCity(getServerCountryCode())
+  const { country, city: defaultCity } = await getRequestCountryAndCity()
   const desktopFallback = restaurationHubDesktopFallback(cat)
 
   let merchants: Awaited<ReturnType<typeof api.merchants.list>>['data'] = []
@@ -35,6 +35,7 @@ export default async function RestaurationPage({ searchParams }: Props) {
     const res = await api.merchants.list({
       vertical: 'food',
       city: defaultCity,
+      country,
       limit: 50,
       sort: 'trust_score',
     })

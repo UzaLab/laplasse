@@ -1,4 +1,4 @@
-import { cookies, headers } from 'next/headers'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -15,12 +15,8 @@ import { B2BSection } from '@/features/discovery/components/B2BSection'
 import { HomeMobilePage } from '@/features/discovery/home-mobile-v2/HomeMobileV2Page'
 import { fetchHomeMobileData } from '@/features/discovery/home-mobile-v2/fetchHomeMobileData'
 import { api, ApiMerchant, ApiCategory } from '@/lib/api'
-import {
-  getDefaultCity,
-  getCountryFromCookieStore,
-  COUNTRY_COOKIE,
-  isRootDomainHost,
-} from '@/lib/country'
+import { isRootDomainHost } from '@/lib/country'
+import { getRequestCountryAndCity } from '@/lib/serverCountry'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,9 +141,7 @@ export default async function HomePage() {
     return <HubHomePage />
   }
 
-  const cookieStore = await cookies()
-  const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
-  const defaultCity = getDefaultCity(country)
+  const { country, city: defaultCity } = await getRequestCountryAndCity()
 
   const [categoriesRaw, merchantsRaw, mobileData] = await Promise.allSettled([
     api.categories.list(),

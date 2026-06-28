@@ -1,19 +1,11 @@
-import { cookies } from 'next/headers'
-
 import { SearchPageClient } from './SearchPageClient'
 import { fetchSearchMobileData } from '@/features/discovery/search-mobile-v2/fetchSearchMobileData'
-import {
-  COUNTRY_COOKIE,
-  getCountryFromCookieStore,
-  getDefaultCity,
-} from '@/lib/country'
+import { getRequestCountryAndCity } from '@/lib/serverCountry'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SearchPage() {
-  const cookieStore = await cookies()
-  const country = getCountryFromCookieStore(cookieStore.get(COUNTRY_COOKIE)?.value)
-  const defaultCity = getDefaultCity(country)
+  const { country, city: defaultCity } = await getRequestCountryAndCity()
   const mapData = await fetchSearchMobileData(defaultCity, country)
 
   return (
