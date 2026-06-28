@@ -34,10 +34,7 @@ import { notify } from '@/lib/notify'
 import { isFoodOrderCart } from '@/lib/orderFlow'
 import { captureCheckoutStep } from '@/lib/analytics'
 import {
-  cashTenderOptions,
   cashChangeDue,
-  formatCashTenderLabel,
-  XOF_MAX_BILL,
 } from '@/lib/foodCashTender'
 
 function CheckoutPaymentContent() {
@@ -118,8 +115,7 @@ function CheckoutPaymentPageContent() {
 
   useEffect(() => {
     if (!session || !isFoodFlow) return
-    const options = cashTenderOptions(session.checkoutResult.total)
-    setCashTenderAmount(prev => (prev != null && options.includes(prev) ? prev : options[0] ?? null))
+    setCashTenderAmount(null)
   }, [session?.checkoutResult.total, isFoodFlow])
 
   const cashTenderReady = !isFoodFlow || cashExact || (cashTenderAmount != null && cashTenderAmount >= (session?.checkoutResult.total ?? 0))
@@ -185,7 +181,6 @@ function CheckoutPaymentPageContent() {
   }
 
   const { checkoutResult, cartSnapshot } = session
-  const tenderOptions = isFoodFlow ? cashTenderOptions(checkoutResult.total) : []
   const changeDue = cashTenderAmount != null ? cashChangeDue(cashTenderAmount, checkoutResult.total) : 0
 
   return (
@@ -263,14 +258,14 @@ function CheckoutPaymentPageContent() {
                     <div>
                       <p className="text-sm font-bold text-slate-900">Paiement cash à la livraison</p>
                       <p className="text-xs text-slate-500 mt-1">
-                        Indiquez la monnaie que vous présenterez au livreur (billets de {XOF_MAX_BILL.toLocaleString('fr-FR')} FCFA max).
+                        Indiquez le montant que vous présenterez au livreur.
                       </p>
                     </div>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={cashExact}
-                        onChange={e => setCashExact(e.target.checked)}
+                        onChange={e => { setCashExact(e.target.checked); if (e.target.checked) setCashTenderAmount(null) }}
                         className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
                       />
                       <span className="text-sm font-semibold text-slate-800">
@@ -280,19 +275,22 @@ function CheckoutPaymentPageContent() {
                     {!cashExact && (
                       <label className="block">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
-                          Montant que je présenterai
+                          Montant que je présenterai (FCFA)
                         </span>
-                        <select
+                        <input
+                          type="number"
+                          min={0}
+                          step={500}
+                          placeholder="Ex : 10000"
                           value={cashTenderAmount ?? ''}
-                          onChange={e => setCashTenderAmount(Number(e.target.value))}
+                          onChange={e => setCashTenderAmount(e.target.value === '' ? null : Number(e.target.value))}
                           className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-200"
-                        >
-                          {tenderOptions.map(amount => (
-                            <option key={amount} value={amount}>
-                              {formatCashTenderLabel(amount)}
-                            </option>
-                          ))}
-                        </select>
+                        />
+                        {cashTenderAmount != null && cashTenderAmount < checkoutResult.total && (
+                          <p className="text-xs text-red-600 mt-2 font-medium">
+                            Le montant saisi est inférieur au total ({formatPrice(checkoutResult.total, checkoutResult.currency)}).
+                          </p>
+                        )}
                         {cashTenderAmount != null && changeDue > 0 && (
                           <p className="text-xs text-amber-800 mt-2 font-medium">
                             Monnaie à rendre : {formatPrice(changeDue, checkoutResult.currency)}

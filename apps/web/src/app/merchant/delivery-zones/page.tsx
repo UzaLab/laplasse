@@ -10,7 +10,7 @@ import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 
 function MerchantDeliveryContent() {
   const { user } = useAuthStore()
-  const { shopId, loading, countryCode } = useDeliveryShopId('merchant')
+  const { shopId, loading, initializing, countryCode, initShop } = useDeliveryShopId('merchant')
 
   if (!user) return null
 
@@ -19,6 +19,8 @@ function MerchantDeliveryContent() {
       <DeliveryHubPanel
         shopId={shopId}
         shopLoading={loading}
+        initializing={initializing}
+        onInitShop={initShop}
         basePath="/merchant/delivery-zones"
         countryCode={countryCode}
       />

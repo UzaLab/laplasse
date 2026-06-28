@@ -3801,7 +3801,10 @@ export class MarketplaceService {
     if (dto.status === 'PREPARING') {
       const prepMinutes = order.merchant?.food_prep_minutes ?? 25
       await this.deliveryEta.startPrepTimer(orderId, prepMinutes).catch(() => {})
-    } else if (['READY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(dto.status)) {
+    } else if (
+      ['READY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(dto.status) &&
+      order.delivery_type !== 'PICKUP'
+    ) {
       void this.deliveryEta.refreshOrderEta(orderId).catch(() => {})
     }
 

@@ -124,11 +124,24 @@ export class MerchantsService {
   }
 
   async resolveMyShop(userId: string, merchantId?: string) {
-    return this.ensureMerchantDeliveryShop(userId, merchantId)
+    const shop = await this.findMerchantLinkedShop(userId, merchantId)
+    if (!shop) throw new NotFoundException('Aucune boutique liée à cet établissement.')
+    return shop
   }
 
-  /** Boutique liée à l'établissement — créée à la volée pour les restaurants sans shop (zones livraison). */
-  async ensureMerchantDeliveryShop(userId: string, merchantId?: string) {
+  /** Retourne la boutique liée au marchand, sans jamais en créer une automatiquement. */
+  async findMerchantLinkedShop(userId: string, merchantId?: string) {
+    const merchant = await this.resolveMyMerchant(userId, merchantId)
+    return this.prisma.shop.findUnique({
+      where: { merchant_id: merchant.id },
+    })
+  }
+
+  /**
+   * Crée explicitement une boutique de livraison pour l'établissement si elle n'existe pas encore.
+   * Déclenchée uniquement à la demande du marchand — jamais automatiquement lors d'une commande.
+   */
+  async initMerchantDeliveryShop(userId: string, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
     const existing = await this.prisma.shop.findUnique({
       where: { merchant_id: merchant.id },
@@ -151,8 +164,8 @@ export class MerchantsService {
         name: merchant.business_name,
         slug,
         merchant_id: merchant.id,
-        status: 'ACTIVE',
-        is_active: true,
+        status: 'DRAFT',
+        is_active: false,
         enabled_modules: ['food'],
         city: location?.city ?? defaultCityForCountry(location?.country ?? 'CI'),
         country: location?.country ?? 'CI',

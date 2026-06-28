@@ -292,7 +292,24 @@ export class MerchantsController {
     @CurrentUser() user: { id: string },
     @Query('merchantId') merchantId?: string,
   ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    const shop = await this.merchantsService.findMerchantLinkedShop(user.id, merchantId)
+    if (!shop) return null
+    return {
+      id: shop.id,
+      slug: shop.slug,
+      name: shop.name,
+      country: shop.country,
+      delivery_fulfilment_default: shop.delivery_fulfilment_default,
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/delivery-shop')
+  async initMyDeliveryShop(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.initMerchantDeliveryShop(user.id, merchantId)
     return {
       id: shop.id,
       slug: shop.slug,

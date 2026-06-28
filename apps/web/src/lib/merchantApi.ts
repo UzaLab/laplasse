@@ -31,6 +31,18 @@ export async function fetchMerchantDeliveryShop(
 ): Promise<MerchantDeliveryShop | null> {
   const res = await merchantApiFetch('/merchants/me/delivery-shop', activeMerchantId)
   if (!res.ok) return null
+  const data = await res.json()
+  if (!data) return null
+  return data as MerchantDeliveryShop
+}
+
+export async function initMerchantDeliveryShop(
+  activeMerchantId?: string | null,
+): Promise<MerchantDeliveryShop | null> {
+  const res = await merchantApiFetch('/merchants/me/delivery-shop', activeMerchantId, {
+    method: 'POST',
+  })
+  if (!res.ok) return null
   return res.json() as Promise<MerchantDeliveryShop>
 }
 
