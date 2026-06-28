@@ -233,6 +233,11 @@ export class UpdateMenuSettingsDto {
   @Min(0)
   food_cash_max_amount?: number | null
 
+  /** Pré-commandes acceptées hors horaires d'ouverture. */
+  @IsOptional()
+  @IsBoolean()
+  food_accepts_preorders?: boolean
+
   /**
    * Horaires d'ouverture JSON.
    * Format : { mon: { open: "11:00", close: "22:00" }, tue: null, ... }

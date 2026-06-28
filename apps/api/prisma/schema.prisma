@@ -187,6 +187,8 @@ model Merchant {
   /// Horaires d'ouverture JSON. Format: {mon:{open:"11:00",close:"22:00"},tue:null,...}
   /// Jours: mon tue wed thu fri sat sun. null = fermé ce jour-là.
   food_opening_hours          Json?
+  /// Accepte les pré-commandes hors horaires d'ouverture (sinon refus strict quand fermé).
+  food_accepts_preorders      Boolean                @default(true)
   delivery_fulfilment_default DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
@@ -1690,6 +1692,8 @@ model Order {
   eta_initial_arrival_at DateTime?
   eta_delay_notified_at  DateTime?
   eta_delayed         Boolean      @default(false)
+  /// Créneau souhaité pour une pré-commande food (ISO, heure d'ouverture choisie).
+  food_preorder_for   DateTime?
   created_at          DateTime     @default(now())
   updated_at          DateTime     @updatedAt
 

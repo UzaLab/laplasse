@@ -48,6 +48,12 @@ import { DeliveryService } from '../delivery/delivery.service'
 import { DeliveryEtaService } from '../delivery/delivery-eta.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
 import { buildOrderStatusPushMessage } from '../common/order-push-messages'
+import {
+  buildFoodSchedulingContext,
+  isMerchantOpenAtSchedule,
+  isValidPreorderSlot,
+  type FoodScheduleSource,
+} from '../food/food-scheduling.util'
 import { LoyaltyService } from '../loyalty/loyalty.service'
 import { CourierReviewsService } from '../couriers/courier-reviews.service'
 import { DeliveryProofService } from '../delivery/delivery-proof.service'
@@ -541,6 +547,16 @@ export class MarketplaceService {
           logo?: string | null
           food_prep_minutes?: number
           food_min_order_amount?: number | null
+          food_accepts_preorders?: boolean
+          food_opening_hours?: unknown
+          food_is_paused?: boolean
+          food_pause_until?: Date | null
+          hours?: Array<{
+            day: number
+            open_time: string | null
+            close_time: string | null
+            is_closed: boolean
+          }>
         }
       } | null
       product?: {
@@ -613,6 +629,11 @@ export class MarketplaceService {
             logo: m.merchant.logo ?? null,
             food_prep_minutes: m.merchant.food_prep_minutes ?? 25,
             food_min_order_amount: m.merchant.food_min_order_amount ?? null,
+            food_accepts_preorders: m.merchant.food_accepts_preorders ?? true,
+            food_opening_hours: m.merchant.food_opening_hours ?? null,
+            food_is_paused: m.merchant.food_is_paused ?? false,
+            food_pause_until: m.merchant.food_pause_until ?? null,
+            hours: m.merchant.hours ?? [],
           },
         },
       }
@@ -709,6 +730,16 @@ export class MarketplaceService {
       const estimated_prep_minutes = prepSource.length
         ? estimateFoodPrepMinutes(merchantPrepDefault, prepSource)
         : null
+      const menuMerchant = items.find(i => i.line_kind === 'menu')?.product.merchant
+      const food_scheduling = menuMerchant
+        ? buildFoodSchedulingContext({
+            food_is_paused: menuMerchant.food_is_paused ?? false,
+            food_pause_until: menuMerchant.food_pause_until ?? null,
+            food_accepts_preorders: menuMerchant.food_accepts_preorders ?? true,
+            food_opening_hours: menuMerchant.food_opening_hours,
+            hours: menuMerchant.hours,
+          })
+        : null
       return {
         id: cart.id,
         items,
@@ -716,6 +747,7 @@ export class MarketplaceService {
         currency: 'XOF',
         kind,
         estimated_prep_minutes,
+        food_scheduling,
         shops: [],
         shop_count: 0,
         shop_id: null,
@@ -1616,9 +1648,21 @@ export class MarketplaceService {
             slug: true,
             logo: true,
             is_active: true,
-            food_prep_minutes: true,
-            food_min_order_amount: true,
+          food_prep_minutes: true,
+          food_min_order_amount: true,
+          food_accepts_preorders: true,
+          food_opening_hours: true,
+          food_is_paused: true,
+          food_pause_until: true,
+          hours: {
+            select: {
+              day: true,
+              open_time: true,
+              close_time: true,
+              is_closed: true,
+            },
           },
+        },
         },
       },
     },
@@ -1879,6 +1923,7 @@ export class MarketplaceService {
       customer_phone: dto.customer_phone,
       applied_promotions: dto.applied_promotions,
       shop_deliveries: dto.shop_deliveries,
+      preorder_for: dto.preorder_for,
     }
 
     const checkout = await this.checkout(userId, checkoutPayload)
@@ -2548,20 +2593,12 @@ export class MarketplaceService {
     }
   }
 
-  /** Vérifie si un établissement est ouvert à l'heure donnée selon ses BusinessHour. */
+  /** @deprecated Utiliser isMerchantOpenAtSchedule depuis food-scheduling.util */
   private isMerchantOpenAt(
     hours: Array<{ day: number; open_time: string | null; close_time: string | null; is_closed: boolean }>,
     at: Date,
   ): boolean {
-    if (!hours.length) return true // pas d'horaires configurés → toujours ouvert
-    const day = at.getDay() // 0=Dimanche, convention JS
-    const hh = String(at.getHours()).padStart(2, '0')
-    const mm = String(at.getMinutes()).padStart(2, '0')
-    const timeStr = `${hh}:${mm}`
-    const entry = hours.find(h => h.day === day)
-    if (!entry || entry.is_closed) return false
-    if (!entry.open_time || !entry.close_time) return false
-    return timeStr >= entry.open_time && timeStr <= entry.close_time
+    return isMerchantOpenAtSchedule(at, { hours })
   }
 
   private async checkoutFoodOrder(
@@ -2604,6 +2641,8 @@ export class MarketplaceService {
         id: true,
         business_name: true,
         hours: true,
+        food_opening_hours: true,
+        food_accepts_preorders: true,
         delivery_fulfilment_default: true,
         food_min_order_amount: true,
         food_is_paused: true,
@@ -2611,17 +2650,61 @@ export class MarketplaceService {
       },
     })
 
-    // ── Vérification disponibilité (pause / fermeture manuelle) ──────────────
     for (const m of merchantHourRows) {
-      const status = computeFoodStatus(m.food_is_paused, m.food_pause_until ?? null)
-      if (status === 'closed') {
+      const scheduleSource: FoodScheduleSource = {
+        food_opening_hours: m.food_opening_hours as FoodScheduleSource['food_opening_hours'],
+        hours: m.hours,
+      }
+      const scheduling = buildFoodSchedulingContext(
+        {
+          food_is_paused: m.food_is_paused,
+          food_pause_until: m.food_pause_until,
+          food_accepts_preorders: m.food_accepts_preorders,
+          food_opening_hours: m.food_opening_hours,
+          hours: m.hours,
+        },
+        new Date(),
+      )
+
+      if (scheduling.blocked && scheduling.block_reason !== 'preorders_disabled' && scheduling.block_reason !== 'no_slots') {
+        if (scheduling.block_reason === 'paused') {
+          const eta = m.food_pause_until
+            ? m.food_pause_until.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+            : ''
+          throw new BadRequestException(`${m.business_name} est en pause jusqu'à ${eta}. Réessayez dans quelques minutes.`)
+        }
         throw new BadRequestException(`${m.business_name} est temporairement fermé et n'accepte plus de commandes`)
       }
-      if (status === 'paused') {
-        const eta = m.food_pause_until
-          ? m.food_pause_until.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-          : ''
-        throw new BadRequestException(`${m.business_name} est en pause jusqu'à ${eta}. Réessayez dans quelques minutes.`)
+
+      const openAtCheck = isMerchantOpenAtSchedule(checkAt, scheduleSource)
+
+      if (!scheduling.is_open_now) {
+        if (scheduling.block_reason === 'no_slots') {
+          throw new BadRequestException(
+            `${m.business_name} est fermé et aucun créneau d'ouverture n'est configuré pour les pré-commandes.`,
+          )
+        }
+        if (!m.food_accepts_preorders) {
+          throw new BadRequestException(
+            `${m.business_name} est fermé et n'accepte pas les pré-commandes.`,
+          )
+        }
+        if (!isPreorder) {
+          throw new BadRequestException(
+            `Sélectionnez un créneau de livraison pour votre pré-commande chez ${m.business_name}.`,
+          )
+        }
+        if (!openAtCheck || !isValidPreorderSlot(checkAt, scheduleSource)) {
+          const timeLabel = checkAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          throw new BadRequestException(
+            `${m.business_name} n'est pas ouvert à ${timeLabel}. Choisissez un créneau pendant les heures d'ouverture.`,
+          )
+        }
+      } else if (isPreorder && !openAtCheck) {
+        const timeLabel = checkAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        throw new BadRequestException(
+          `${m.business_name} n'est pas ouvert à ${timeLabel}. Choisissez un créneau pendant les heures d'ouverture.`,
+        )
       }
     }
 
@@ -2632,20 +2715,6 @@ export class MarketplaceService {
         const remaining = minOrder - sub
         throw new BadRequestException(
           `Commande minimum ${minOrder.toLocaleString('fr-FR')} FCFA pour ${m.business_name}. Encore ${remaining.toLocaleString('fr-FR')} FCFA d'articles.`,
-        )
-      }
-    }
-
-    for (const m of merchantHourRows) {
-      if (!this.isMerchantOpenAt(m.hours, checkAt)) {
-        if (isPreorder) {
-          const timeLabel = checkAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-          throw new BadRequestException(
-            `${m.business_name} n'est pas ouvert à ${timeLabel}. Choisissez un créneau pendant les heures d'ouverture.`,
-          )
-        }
-        throw new BadRequestException(
-          `${m.business_name} est actuellement fermé. Commandez pendant les heures d'ouverture ou activez la pré-commande.`,
         )
       }
     }
@@ -2740,6 +2809,7 @@ export class MarketplaceService {
 
         const merchantRow = merchantHourRows.find(m => m.id === merchantId)
         const fulfilmentMode = merchantRow?.delivery_fulfilment_default ?? 'PLATFORM_RIDER'
+        const preorderFor = dto.preorder_for && isPreorder ? new Date(dto.preorder_for) : null
 
         const order = await tx.order.create({
           data: {
@@ -2758,6 +2828,7 @@ export class MarketplaceService {
             delivery_longitude: dto.delivery_longitude,
             customer_note: dto.customer_note,
             customer_phone: dto.customer_phone,
+            food_preorder_for: preorderFor,
             subtotal,
             discount_amount: discountAmount,
             delivery_fee: deliveryFee,

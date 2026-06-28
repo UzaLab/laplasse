@@ -130,6 +130,7 @@ export function MerchantMenuPanel() {
   const [foodPrepMinutes, setFoodPrepMinutes] = useState('25')
   const [foodMinOrderAmount, setFoodMinOrderAmount] = useState('')
   const [foodAcceptsCash, setFoodAcceptsCash] = useState(false)
+  const [foodAcceptsPreorders, setFoodAcceptsPreorders] = useState(true)
   const [foodCashMaxAmount, setFoodCashMaxAmount] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const [foodStatus, setFoodStatus] = useState<'open' | 'paused' | 'closed'>('open')
@@ -158,6 +159,7 @@ export function MerchantMenuPanel() {
           : '',
       )
       setFoodAcceptsCash(data.food_accepts_cash ?? false)
+      setFoodAcceptsPreorders(data.food_accepts_preorders ?? true)
       setFoodCashMaxAmount(
         data.food_cash_max_amount != null && data.food_cash_max_amount > 0
           ? String(data.food_cash_max_amount)
@@ -501,6 +503,7 @@ export function MerchantMenuPanel() {
           food_min_order_amount: minOrder,
           food_accepts_cash: foodAcceptsCash,
           food_cash_max_amount: cashMax,
+          food_accepts_preorders: foodAcceptsPreorders,
         }),
       })
       if (!settingsRes.ok) throw new Error(await parseApiError(settingsRes))
@@ -1168,6 +1171,32 @@ export function MerchantMenuPanel() {
                     onChange={e => setFoodMinOrderAmount(e.target.value)}
                     className={`mt-1.5 ${INPUT}`}
                   />
+                </label>
+              </section>
+
+              <section className="lg:col-span-2">
+                <h2 className="text-lg font-extrabold text-slate-900 mb-1">Pré-commandes hors horaires</h2>
+                <p className="text-sm text-slate-500 mb-4">
+                  Quand votre restaurant est fermé selon ses horaires, autorisez-vous les clients à commander pour un prochain créneau d&apos;ouverture ?
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    role="switch"
+                    aria-checked={foodAcceptsPreorders}
+                    tabIndex={0}
+                    onClick={() => setFoodAcceptsPreorders(v => !v)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setFoodAcceptsPreorders(v => !v) }}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${foodAcceptsPreorders ? 'bg-blue-500' : 'bg-slate-200'}`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${foodAcceptsPreorders ? 'translate-x-6' : 'translate-x-1'}`}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-700">
+                    {foodAcceptsPreorders
+                      ? 'Pré-commandes acceptées sur les prochains créneaux'
+                      : 'Refus strict — aucune commande quand fermé'}
+                  </span>
                 </label>
               </section>
 

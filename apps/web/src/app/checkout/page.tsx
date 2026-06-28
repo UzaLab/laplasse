@@ -11,6 +11,7 @@ import { AppFooter } from '@/components/layout/AppFooter'
 import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
+import { FoodPreorderSlotPicker } from '@/features/marketplace/components/FoodPreorderSlotPicker'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
@@ -131,6 +132,7 @@ function CheckoutPageContent() {
   const [foodPromoCode, setFoodPromoCode] = useState('')
   const [foodPromoApplied, setFoodPromoApplied] = useState<{ code: string; discount: number; message: string } | null>(null)
   const [foodPromoLoading, setFoodPromoLoading] = useState(false)
+  const [foodPreorderFor, setFoodPreorderFor] = useState<string | null>(null)
 
   const cartShopIds = useMemo(
     () => cart?.merchants.map(m => m.id) ?? [],
@@ -160,6 +162,12 @@ function CheckoutPageContent() {
     () => routeFlow === 'food' || foodFlowParam || cartKind === 'food',
     [routeFlow, foodFlowParam, cartKind],
   )
+
+  const foodScheduling = cart?.food_scheduling ?? null
+  const foodSchedulingBlocked = isFoodFlow && (foodScheduling?.blocked ?? false)
+  const foodRequiresPreorder = isFoodFlow && (foodScheduling?.requires_preorder ?? false)
+  const canContinueCheckout =
+    !foodSchedulingBlocked && (!foodRequiresPreorder || !!foodPreorderFor)
 
   const useSplitDelivery = !isFoodFlow && (cart?.merchant_count ?? 0) > 1
 
@@ -233,7 +241,15 @@ function CheckoutPageContent() {
     setSelectedAddressId(saved.selectedAddressId ?? null)
     setSaveNewAddress(saved.saveNewAddress ?? false)
     setNewAddressLabel(saved.newAddressLabel ?? '')
+    if (saved.foodPreorderFor) setFoodPreorderFor(saved.foodPreorderFor)
   }, [])
+
+  useEffect(() => {
+    if (!cart?.food_scheduling?.requires_preorder) return
+    if (foodPreorderFor) return
+    const suggested = cart.food_scheduling.suggested_preorder_for
+    if (suggested) setFoodPreorderFor(suggested)
+  }, [cart?.food_scheduling, foodPreorderFor])
 
   useEffect(() => {
     if (!hydrated) return
@@ -290,6 +306,7 @@ function CheckoutPageContent() {
       selectedAddressId: selectedAddressId ?? undefined,
       saveNewAddress: saveNewAddress || undefined,
       newAddressLabel: newAddressLabel || undefined,
+      foodPreorderFor: foodPreorderFor ?? undefined,
     }
     saveCheckoutDraft(draft)
   }, [
@@ -306,6 +323,7 @@ function CheckoutPageContent() {
     selectedAddressId,
     saveNewAddress,
     newAddressLabel,
+    foodPreorderFor,
   ])
 
   const selectedCity = cities.find(c => c.id === deliveryCityId)
@@ -513,6 +531,15 @@ function CheckoutPageContent() {
   const handleCheckout = async () => {
     if (!cart) return
 
+    if (foodSchedulingBlocked) {
+      notify.error('Ce restaurant n\'accepte pas de commandes pour le moment.')
+      return
+    }
+    if (foodRequiresPreorder && !foodPreorderFor) {
+      notify.error('Sélectionnez un créneau de livraison pour votre pré-commande.')
+      return
+    }
+
     const phone = customerPhone.trim()
     if (!phone) {
       notify.error('Le numéro de téléphone est obligatoire')
@@ -628,6 +655,7 @@ function CheckoutPageContent() {
       applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
       shop_deliveries: splitPayload,
       food_promo_code: isFoodFlow && foodPromoApplied ? foodPromoApplied.code : undefined,
+      preorder_for: isFoodFlow && foodPreorderFor ? foodPreorderFor : undefined,
     }
 
     let result = null as Awaited<ReturnType<typeof checkout>>['result']
@@ -695,6 +723,7 @@ function CheckoutPageContent() {
       selectedAddressId: selectedAddressId ?? undefined,
       saveNewAddress: saveNewAddress || undefined,
       newAddressLabel: newAddressLabel || undefined,
+      foodPreorderFor: foodPreorderFor ?? undefined,
     })
 
     captureCheckoutStep('checkout_delivery_completed', {
@@ -745,6 +774,23 @@ function CheckoutPageContent() {
 
       <main className={`${PAGE_CONTAINER} py-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="mb-8">
+          {isFoodFlow && foodSchedulingBlocked && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-100 flex gap-3">
+              <span className="text-red-600 text-lg shrink-0">⛔</span>
+              <div>
+                <p className="font-bold text-red-900 text-sm">Commandes indisponibles</p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  {foodScheduling?.block_reason === 'paused'
+                    ? 'Le restaurant est en pause et n\'accepte pas de commandes pour le moment.'
+                    : foodScheduling?.block_reason === 'preorders_disabled'
+                      ? 'Le restaurant est fermé et n\'accepte pas les pré-commandes.'
+                      : foodScheduling?.block_reason === 'no_slots'
+                        ? 'Le restaurant est fermé et aucun créneau d\'ouverture n\'est configuré.'
+                        : 'Le restaurant est temporairement fermé.'}
+                </p>
+              </div>
+            </div>
+          )}
           {isFoodFlow && (
             <div className="mb-6 p-4 rounded-2xl bg-orange-50 border border-orange-100 flex gap-3">
               <UtensilsCrossed size={22} className="text-orange-600 shrink-0 mt-0.5" />
@@ -780,6 +826,13 @@ function CheckoutPageContent() {
               </div>
             ) : (
               <div className="space-y-6">
+                {isFoodFlow && foodScheduling && (
+                  <FoodPreorderSlotPicker
+                    scheduling={foodScheduling}
+                    value={foodPreorderFor}
+                    onChange={setFoodPreorderFor}
+                  />
+                )}
                 {useSplitDelivery && cart ? (
                   <ShopSplitDeliveryForm
                     cart={cart}
@@ -1186,7 +1239,7 @@ function CheckoutPageContent() {
                 <button
                   type="button"
                   onClick={handleCheckout}
-                  disabled={submitting}
+                  disabled={submitting || !canContinueCheckout}
                   className="w-full h-14 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 flex items-center justify-center gap-2 group lg:hidden disabled:opacity-50"
                 >
                   Continuer vers le paiement
@@ -1213,7 +1266,8 @@ function CheckoutPageContent() {
               <button
                 type="button"
                 onClick={handleCheckout}
-                className="hidden lg:flex w-full h-14 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 items-center justify-center gap-2 group"
+                disabled={!canContinueCheckout}
+                className="hidden lg:flex w-full h-14 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 items-center justify-center gap-2 group disabled:opacity-50"
               >
                 Continuer vers le paiement
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

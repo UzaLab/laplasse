@@ -194,6 +194,7 @@ export class ShopMenuService {
         food_accepts_cash: true,
         food_cash_max_amount: true,
         food_opening_hours: true,
+        food_accepts_preorders: true,
       },
     })
     if (!merchant) throw new NotFoundException('Établissement introuvable')
@@ -219,8 +220,11 @@ export class ShopMenuService {
         food_min_order_amount: merchant.food_min_order_amount,
         food_accepts_cash: merchant.food_accepts_cash,
         food_cash_max_amount: merchant.food_cash_max_amount ?? null,
-        food_status: computeFoodStatus(merchant.food_is_paused, merchant.food_pause_until ?? null),
+        food_opening_hours: merchant.food_opening_hours,
+        food_accepts_preorders: merchant.food_accepts_preorders,
+        food_is_paused: merchant.food_is_paused,
         food_pause_until: merchant.food_pause_until ?? null,
+        food_status: computeFoodStatus(merchant.food_is_paused, merchant.food_pause_until ?? null),
       },
       sections: sections.map(s => ({
         id: s.id,
@@ -258,6 +262,9 @@ export class ShopMenuService {
     return {
       food_prep_minutes: merchant.food_prep_minutes,
       food_min_order_amount: merchant.food_min_order_amount,
+      food_accepts_cash: merchant.food_accepts_cash,
+      food_cash_max_amount: merchant.food_cash_max_amount,
+      food_accepts_preorders: merchant.food_accepts_preorders,
       food_status: computeFoodStatus(merchant.food_is_paused, merchant.food_pause_until ?? null),
       food_pause_until: merchant.food_pause_until ?? null,
       cuisine_tags,
@@ -293,6 +300,9 @@ export class ShopMenuService {
           ? Prisma.DbNull
           : (dto.food_opening_hours as Prisma.InputJsonValue)
     }
+    if (dto.food_accepts_preorders !== undefined) {
+      data.food_accepts_preorders = dto.food_accepts_preorders
+    }
     if (Object.keys(data).length === 0) {
       return {
         food_prep_minutes: merchant.food_prep_minutes,
@@ -300,6 +310,7 @@ export class ShopMenuService {
         food_accepts_cash: merchant.food_accepts_cash,
         food_cash_max_amount: merchant.food_cash_max_amount,
         food_opening_hours: merchant.food_opening_hours,
+        food_accepts_preorders: merchant.food_accepts_preorders,
       }
     }
     const updated = await this.prisma.merchant.update({
@@ -311,6 +322,7 @@ export class ShopMenuService {
         food_accepts_cash: true,
         food_cash_max_amount: true,
         food_opening_hours: true,
+        food_accepts_preorders: true,
       },
     })
     return updated

@@ -265,6 +265,21 @@ export interface CartMerchantGroup {
   item_count: number
 }
 
+export interface FoodPreorderSlot {
+  at: string
+  label: string
+}
+
+export interface FoodScheduling {
+  is_open_now: boolean
+  accepts_preorders: boolean
+  requires_preorder: boolean
+  blocked: boolean
+  block_reason?: 'paused' | 'manual_closed' | 'preorders_disabled' | 'no_slots'
+  slots: FoodPreorderSlot[]
+  suggested_preorder_for?: string
+}
+
 export interface CartItem {
   id: string
   quantity: number
@@ -303,6 +318,7 @@ export interface Cart {
   currency: string
   kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   estimated_prep_minutes?: number | null
+  food_scheduling?: FoodScheduling | null
   merchant: {
     id: string
     business_name: string

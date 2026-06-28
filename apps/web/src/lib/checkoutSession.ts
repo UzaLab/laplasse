@@ -19,6 +19,7 @@ export interface CheckoutDraft {
   selectedAddressId?: string
   saveNewAddress?: boolean
   newAddressLabel?: string
+  foodPreorderFor?: string
 }
 
 export interface CheckoutSession {

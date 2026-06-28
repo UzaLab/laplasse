@@ -67,7 +67,9 @@ export function isOpenFromMerchantHours(
  * Statut food affichable : pause manuelle + horaires food_opening_hours ou hours établissement.
  */
 export function resolveMerchantFoodStatus(
-  merchant: Pick<ApiMerchant, 'food_is_paused' | 'food_pause_until' | 'food_opening_hours' | 'hours'>,
+  merchant: Pick<ApiMerchant, 'food_is_paused' | 'food_pause_until' | 'food_opening_hours'> & {
+    hours?: ApiMerchant['hours']
+  },
   now: Date = new Date(),
 ): FoodStatus {
   const pauseStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
@@ -225,6 +227,57 @@ export function foodMinOrderMessage(
 
 export function formatFoodMinOrderLabel(minOrder: number): string {
   return `Min. ${minOrder.toLocaleString('fr-FR')} FCFA`
+}
+
+/** Créneaux de pré-commande disponibles (côté client, miroir API). */
+export function getUpcomingPreorderSlots(
+  hours: OpeningHours | null | undefined,
+  now: Date = new Date(),
+  maxSlots = 12,
+): Array<{ at: string; label: string }> {
+  if (!hours) return []
+  const slots: Array<{ at: string; label: string }> = []
+  const minLeadMinutes = 45
+  const stepMinutes = 90
+  const earliest = new Date(now.getTime() + minLeadMinutes * 60_000)
+
+  for (let daysAhead = 0; daysAhead <= 7 && slots.length < maxSlots; daysAhead++) {
+    const candidate = new Date(now)
+    candidate.setDate(candidate.getDate() + daysAhead)
+    candidate.setHours(0, 0, 0, 0)
+
+    const dayKey = DAY_KEYS[candidate.getDay()]
+    const schedule = hours[dayKey]
+    if (!schedule) continue
+
+    const { h: oh, m: om } = parseHHMM(schedule.open)
+    const { h: ch, m: cm } = parseHHMM(schedule.close)
+    const openMin = oh * 60 + om
+    const closeMin = ch * 60 + cm
+
+    for (let t = openMin; t < closeMin && slots.length < maxSlots; t += stepMinutes) {
+      const slotDate = new Date(candidate)
+      slotDate.setHours(Math.floor(t / 60), t % 60, 0, 0)
+      if (slotDate <= earliest) continue
+      slots.push({
+        at: slotDate.toISOString(),
+        label: formatPreorderSlotLabel(slotDate, now),
+      })
+    }
+  }
+  return slots
+}
+
+function formatPreorderSlotLabel(slotDate: Date, now: Date): string {
+  const isToday = slotDate.toDateString() === now.toDateString()
+  const tomorrow = new Date(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const isTomorrow = slotDate.toDateString() === tomorrow.toDateString()
+  const time = slotDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return `Aujourd'hui · ${time}`
+  if (isTomorrow) return `Demain · ${time}`
+  const days = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
+  return `${days[slotDate.getDay()]} ${time}`
 }
 
 export function merchantCuisineLabel(merchant: ApiMerchant): string {

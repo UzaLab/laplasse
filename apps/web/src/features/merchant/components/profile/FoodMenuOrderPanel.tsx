@@ -11,10 +11,13 @@ import { setMerchantBottomDock } from '@/lib/merchantMobileChrome'
 import { cn } from '@/lib/utils'
 import { menuItemDomId, restaurationMenuItemHref } from '@/lib/restaurationLinks'
 import {
+  computeFoodStatusClient,
   foodMinOrderMessage,
   foodPauseUntilLabel,
+  getUpcomingPreorderSlots,
   nextOpeningTime,
   nextOpeningLabel,
+  resolveMerchantFoodStatus,
   type OpeningHours,
 } from '@/lib/foodHub'
 import { MenuItemModifierSheet } from '@/features/marketplace/components/MenuItemModifierSheet'
@@ -54,9 +57,11 @@ interface MenuData {
     food_min_order_amount?: number | null
     food_status?: 'open' | 'paused' | 'closed'
     food_pause_until?: string | null
+    food_is_paused?: boolean
     food_accepts_cash?: boolean
     food_cash_max_amount?: number | null
     food_opening_hours?: OpeningHours | null
+    food_accepts_preorders?: boolean
   }
   sections: Array<{ id: string; name: string; items: MenuItemRow[] }>
   uncategorized: MenuItemRow[]
@@ -150,23 +155,44 @@ export function FoodMenuOrderPanel({
 
   const minOrderAmount = menu?.merchant.food_min_order_amount ?? null
   const minOrderMessage = foodMinOrderMessage(minOrderAmount, cartSummary.total)
-  const foodStatus = menu?.merchant.food_status ?? 'open'
+  const pauseStatus = computeFoodStatusClient(
+    menu?.merchant.food_is_paused,
+    menu?.merchant.food_pause_until,
+  )
+  const effectiveStatus = menu
+    ? resolveMerchantFoodStatus({
+        food_is_paused: menu.merchant.food_is_paused,
+        food_pause_until: menu.merchant.food_pause_until,
+        food_opening_hours: menu.merchant.food_opening_hours,
+      })
+    : 'open'
+  const openingHours = menu?.merchant.food_opening_hours ?? null
+  const acceptsPreorders = menu?.merchant.food_accepts_preorders ?? true
+  const preorderSlots = openingHours ? getUpcomingPreorderSlots(openingHours) : []
+  const isScheduleClosed = pauseStatus === 'open' && effectiveStatus === 'closed'
+  const isHardClosed = pauseStatus !== 'open'
+  const isPreorder =
+    isScheduleClosed && acceptsPreorders && preorderSlots.length > 0
+  const nextOpen = isScheduleClosed ? nextOpeningTime(openingHours) : null
+  const nextOpenLabel = nextOpen ? nextOpeningLabel(nextOpen) : null
+  const restaurantUnavailableMsg = pauseStatus === 'paused'
+    ? `Restaurant en pause jusqu'à ${foodPauseUntilLabel(menu?.merchant.food_pause_until)}`
+    : pauseStatus === 'closed'
+      ? 'Ce restaurant est temporairement fermé'
+      : isScheduleClosed
+        ? acceptsPreorders && preorderSlots.length > 0
+          ? `Fermé — pré-commande disponible`
+          : acceptsPreorders
+            ? 'Fermé — aucun créneau configuré'
+            : 'Fermé — pré-commandes non acceptées'
+        : null
+  const canCheckout =
+    cartSummary.count > 0 &&
+    !minOrderMessage &&
+    !isHardClosed &&
+    (effectiveStatus === 'open' || isPreorder)
   const acceptsCash = menu?.merchant.food_accepts_cash ?? false
   const cashMaxAmount = menu?.merchant.food_cash_max_amount ?? null
-  const restaurantUnavailable = foodStatus !== 'open'
-  const openingHours = (menu?.merchant as { food_opening_hours?: OpeningHours | null } | undefined)?.food_opening_hours ?? null
-  const nextOpen = foodStatus === 'closed' ? nextOpeningTime(openingHours) : null
-  const nextOpenLabel = nextOpen ? nextOpeningLabel(nextOpen) : null
-  const restaurantUnavailableMsg = foodStatus === 'paused'
-    ? `Restaurant en pause jusqu'à ${foodPauseUntilLabel(menu?.merchant.food_pause_until)}`
-    : foodStatus === 'closed'
-      ? nextOpenLabel
-        ? `Fermé — ${nextOpenLabel}`
-        : 'Ce restaurant est temporairement fermé'
-      : null
-  // Quand fermé avec un prochain créneau connu, on autorise le panier (pré-commande)
-  const isPreorder = foodStatus === 'closed' && nextOpen != null
-  const canCheckout = cartSummary.count > 0 && !minOrderMessage && (foodStatus === 'open' || isPreorder)
 
   const estimatedPrepMinutes = useMemo(() => {
     const base = menu?.merchant.food_prep_minutes ?? 25
@@ -522,7 +548,13 @@ export function FoodMenuOrderPanel({
           <span className="text-amber-600 text-lg shrink-0">⏸</span>
           <div>
             <p className="text-sm font-bold text-amber-900">{restaurantUnavailableMsg}</p>
-            <p className="text-xs text-amber-700 mt-0.5">Vous pouvez parcourir la carte mais les commandes sont suspendues.</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {isPreorder
+                ? 'Le restaurant est fermé — vous pourrez choisir un créneau à l\'étape suivante.'
+                : isHardClosed || (isScheduleClosed && !isPreorder)
+                  ? 'Vous pouvez parcourir la carte mais les commandes sont suspendues.'
+                  : 'Parcourez la carte et commandez vos plats.'}
+            </p>
           </div>
         </div>
       )}
@@ -671,13 +703,13 @@ export function FoodMenuOrderPanel({
               </p>
               {isPreorder && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full mt-0.5">
-                  🕐 Pré-commande · {nextOpenLabel}
+                  🕐 Pré-commande{nextOpenLabel ? ` · ${nextOpenLabel}` : ''}
                 </span>
               )}
               {restaurantUnavailableMsg && !isPreorder && (
                 <p className="text-xs font-medium text-amber-700 mt-0.5">{restaurantUnavailableMsg}</p>
               )}
-              {!restaurantUnavailable && minOrderMessage && (
+              {!isHardClosed && !isScheduleClosed && minOrderMessage && (
                 <p className="text-xs font-medium text-amber-700 mt-0.5">{minOrderMessage}</p>
               )}
               {acceptsCash && (

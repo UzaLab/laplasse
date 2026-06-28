@@ -75,7 +75,9 @@ export default function FoodOrderCartPage() {
   const merchantName = cart?.merchant?.business_name ?? 'Restaurant'
   const minOrderAmount = cart?.merchant?.food_min_order_amount ?? null
   const minOrderMessage = foodMinOrderMessage(minOrderAmount, cart?.subtotal ?? 0)
-  const canProceed = (cart?.items?.length ?? 0) > 0 && !minOrderMessage
+  const foodScheduling = cart?.food_scheduling ?? null
+  const foodBlocked = foodScheduling?.blocked ?? false
+  const canProceed = (cart?.items?.length ?? 0) > 0 && !minOrderMessage && !foodBlocked
 
   const updateQty = async (itemId: string, quantity: number) => {
     setUpdatingId(itemId)
@@ -239,6 +241,16 @@ export default function FoodOrderCartPage() {
                 {minOrderMessage && (
                   <p className="text-sm font-medium text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-4">
                     {minOrderMessage}
+                  </p>
+                )}
+                {foodScheduling?.requires_preorder && (
+                  <p className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-4">
+                    Restaurant fermé — vous choisirez votre créneau à l&apos;étape livraison.
+                  </p>
+                )}
+                {foodBlocked && (
+                  <p className="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
+                    Ce restaurant n&apos;accepte pas de commandes pour le moment.
                   </p>
                 )}
                 <button
