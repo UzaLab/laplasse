@@ -655,9 +655,9 @@ export function FoodMenuOrderPanel({
         <div
           id="food-menu-cart-dock"
           className={cn(
-            'fixed left-0 right-0 z-50 p-4 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]',
+            'fixed left-0 right-0 z-[45] p-4 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.08)]',
             isHub
-              ? 'bottom-[calc(var(--mobile-bottom-nav-height)+env(safe-area-inset-bottom,0px))] pb-3'
+              ? 'bottom-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-bottom))] pb-3'
               : 'bottom-0 pb-[max(1rem,env(safe-area-inset-bottom))]',
           )}
         >

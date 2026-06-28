@@ -46,6 +46,45 @@ export function computeFoodStatusClient(
   return new Date(food_pause_until) > new Date() ? 'paused' : 'open'
 }
 
+/** Horaires génériques établissement (MerchantHour, jour 0 = dimanche). */
+export function isOpenFromMerchantHours(
+  hours: Array<{ day: number; open_time: string | null; close_time: string | null; is_closed: boolean }>,
+  now: Date = new Date(),
+): boolean {
+  if (!hours.length) return true
+  const dayOfWeek = now.getDay()
+  const todayHours = hours.find(h => h.day === dayOfWeek)
+  if (!todayHours || todayHours.is_closed) return false
+  if (!todayHours.open_time || !todayHours.close_time) return true
+
+  const nowNum = now.getHours() * 100 + now.getMinutes()
+  const [oh, om] = todayHours.open_time.split(':').map(Number)
+  const [ch, cm] = todayHours.close_time.split(':').map(Number)
+  return nowNum >= oh * 100 + om && nowNum < ch * 100 + cm
+}
+
+/**
+ * Statut food affichable : pause manuelle + horaires food_opening_hours ou hours établissement.
+ */
+export function resolveMerchantFoodStatus(
+  merchant: Pick<ApiMerchant, 'food_is_paused' | 'food_pause_until' | 'food_opening_hours' | 'hours'>,
+  now: Date = new Date(),
+): FoodStatus {
+  const pauseStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
+  if (pauseStatus !== 'open') return pauseStatus
+
+  const foodHours = merchant.food_opening_hours
+  if (foodHours && Object.keys(foodHours).length > 0) {
+    return isWithinOpeningHours(foodHours as OpeningHours, now) ? 'open' : 'closed'
+  }
+
+  if (merchant.hours?.length) {
+    return isOpenFromMerchantHours(merchant.hours, now) ? 'open' : 'closed'
+  }
+
+  return 'open'
+}
+
 export function foodStatusLabel(status: FoodStatus): string {
   if (status === 'paused') return 'En pause'
   if (status === 'closed') return 'Fermé'

@@ -5,8 +5,6 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { Menu, SlidersHorizontal } from 'lucide-react'
 
-import { CartDrawer } from '@/components/layout/CartDrawer'
-import { CartSync } from '@/components/layout/CartSync'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { HOME_MOBILE_GUTTER, HOME_MOBILE_TRACK } from '@/features/discovery/home-mobile-v2/homeMobileLayout'
@@ -111,7 +109,6 @@ export function SearchMobilePage({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-[#FAFAFA] overflow-hidden touch-manipulation">
-      <CartSync />
 
       <SearchMobileMap
         merchants={filteredMerchants}
@@ -269,8 +266,6 @@ export function SearchMobilePage({
           </div>
         )}
       </div>
-
-      <CartDrawer />
 
       <MobileNav
         open={mobileOpen}

@@ -15,7 +15,7 @@ import type { ApiMerchantDetail } from '@/lib/api'
 import { FoodMenuOrderPanel } from '@/features/merchant/components/profile/FoodMenuOrderPanel'
 import { RESTAURATION_MENU_ITEM_PARAM } from '@/lib/restaurationLinks'
 import {
-  computeFoodStatusClient,
+  resolveMerchantFoodStatus,
   FOOD_HUB_DELIVERY_FEE_ESTIMATE,
   foodPauseUntilLabel,
   foodStatusLabel,
@@ -28,18 +28,6 @@ import { FavoriteButton } from '@/features/discovery/components/FavoriteButton'
 import { cn } from '@/lib/utils'
 import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 
-function isCurrentlyOpen(merchant: ApiMerchantDetail): boolean {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const hour = now.getHours() * 100 + now.getMinutes()
-  const todayHours = merchant.hours.find(h => h.day === dayOfWeek)
-  if (!todayHours || todayHours.is_closed) return false
-  if (!todayHours.open_time || !todayHours.close_time) return true
-  const [oh, om] = todayHours.open_time.split(':').map(Number)
-  const [ch, cm] = todayHours.close_time.split(':').map(Number)
-  return hour >= oh * 100 + om && hour < ch * 100 + cm
-}
-
 interface Props {
   merchant: ApiMerchantDetail
 }
@@ -49,9 +37,8 @@ export function RestaurationDetailPage({ merchant }: Props) {
   const searchParams = useSearchParams()
   const focusItemId = searchParams.get(RESTAURATION_MENU_ITEM_PARAM)?.trim() || undefined
   const [scrolled, setScrolled] = useState(false)
-  const open = isCurrentlyOpen(merchant)
-  const foodStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
-  const isAvailable = foodStatus === 'open' && open
+  const foodStatus = resolveMerchantFoodStatus(merchant)
+  const isAvailable = foodStatus === 'open'
   const rating = merchantDisplayRating(merchant)
   const prep = merchant.food_prep_minutes ?? 25
   const minOrder = merchant.food_min_order_amount
@@ -141,9 +128,7 @@ export function RestaurationDetailPage({ merchant }: Props) {
             >
               {foodStatus === 'paused'
                 ? `En pause jusqu'à ${foodPauseUntilLabel(merchant.food_pause_until)}`
-                : foodStatus === 'closed'
-                  ? 'Fermé temporairement'
-                  : open ? 'Ouvert' : 'Fermé'}
+                : foodStatusLabel(foodStatus)}
             </span>
             <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-semibold">
               {merchant.category.name}

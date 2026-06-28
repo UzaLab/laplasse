@@ -8,8 +8,6 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useCartStore, useCartItemCount } from '@/stores/cartStore'
 import { MobileNav } from './MobileNav'
-import { CartDrawer } from './CartDrawer'
-import { CartSync } from './CartSync'
 import { CountrySwitcher } from './CountrySwitcher'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { GLOBAL_NAV_ITEMS } from './navConfig'
@@ -55,7 +53,6 @@ export function Navbar() {
 
   return (
     <>
-      <CartSync />
     <nav
       className={cn(
         'fixed top-0 left-0 right-0 z-50 glass-panel border-b border-slate-200/50 transition-all duration-300 safe-area-top',
@@ -228,7 +225,6 @@ export function Navbar() {
         onCartClick={handleCartClick}
       />
 
-      <CartDrawer />
     </>
   )
 }

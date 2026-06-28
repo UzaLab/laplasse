@@ -5,7 +5,7 @@ import { Clock, Star, Bike, Tag, ChefHat } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
 import { FavoriteButton } from '@/features/discovery/components/FavoriteButton'
 import {
-  computeFoodStatusClient,
+  resolveMerchantFoodStatus,
   FOOD_HUB_DELIVERY_FEE_ESTIMATE,
   foodStatusLabel,
   formatFoodEtaFromDistance,
@@ -28,7 +28,7 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
   const prep = merchant.food_prep_minutes ?? 25
   const rating = merchantDisplayRating(merchant)
   const eta = formatFoodEtaFromDistance(prep, merchant.distance_km)
-  const foodStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
+  const foodStatus = resolveMerchantFoodStatus(merchant)
   const unavailable = foodStatus !== 'open'
   const showPromo = merchant.has_active_promo && !unavailable
   const nextOpen = foodStatus === 'closed'
@@ -42,7 +42,6 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
         href={`/restauration/${merchant.slug}`}
         className={cn(
           'bg-white rounded-xl p-3 flex gap-4 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)] border border-amber-100/60 active:scale-[0.98] transition-transform',
-          unavailable && 'opacity-60',
           className,
         )}
         style={{ textDecoration: 'none', color: 'inherit' }}
@@ -61,8 +60,8 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
             </div>
           )}
           {unavailable && (
-            <div className={`absolute inset-0 flex items-center justify-center rounded-lg ${foodStatus === 'closed' ? 'bg-slate-900/55 backdrop-grayscale' : 'bg-black/25'}`}>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${foodStatus === 'closed' ? 'text-white bg-slate-900/80' : 'text-white bg-amber-700/85'}`}>
+            <div className={`absolute inset-0 z-10 flex items-center justify-center rounded-lg ${foodStatus === 'closed' ? 'bg-slate-900/60 backdrop-grayscale' : 'bg-black/30'}`}>
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-md ${foodStatus === 'closed' ? 'text-white bg-slate-900/90' : 'text-white bg-amber-700/90'}`}>
                 {foodStatusLabel(foodStatus)}
               </span>
             </div>
@@ -97,7 +96,6 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
     <article
       className={cn(
         'bg-white rounded-3xl overflow-hidden shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05)] border border-amber-100/50 flex flex-col',
-        unavailable && 'opacity-70',
         className,
       )}
     >
@@ -121,8 +119,8 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
             </div>
           )}
           {unavailable && (
-            <div className={`absolute inset-0 flex items-center justify-center ${foodStatus === 'closed' ? 'bg-slate-900/55 backdrop-grayscale' : 'bg-black/25'}`}>
-              <span className={`px-4 py-2 rounded-2xl text-sm font-bold ${foodStatus === 'closed' ? 'text-white bg-slate-900/80 border border-white/10' : 'text-white bg-amber-700/85'}`}>
+            <div className={`absolute inset-0 z-10 flex items-center justify-center ${foodStatus === 'closed' ? 'bg-slate-900/60 backdrop-grayscale' : 'bg-black/30'}`}>
+              <span className={`px-4 py-2 rounded-2xl text-sm font-bold ${foodStatus === 'closed' ? 'text-white bg-slate-900/90 border border-white/10' : 'text-white bg-amber-700/90'}`}>
                 {foodStatusLabel(foodStatus)}
               </span>
             </div>

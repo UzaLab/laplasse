@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react'
 
-import { CartDrawer } from '@/components/layout/CartDrawer'
-import { CartSync } from '@/components/layout/CartSync'
 import { NearbyCard } from '@/features/discovery/components/NearbyCard'
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { SpotlightShopsCarousel } from '@/features/marketplace/components/SpotlightShopsCarousel'
@@ -57,8 +55,6 @@ export function HomeMobilePage({
 
   return (
     <div className="min-h-dvh flex flex-col bg-[#FAFAFA] text-slate-900 antialiased selection:bg-brand-200 selection:text-brand-900 overflow-x-hidden">
-      <CartSync />
-
       <HomeMobileHeader />
 
       <main className={cn('flex-1 overflow-y-auto no-scrollbar overflow-x-hidden', MOBILE_COMPACT_HEADER_PAD_LOOSE, MOBILE_BOTTOM_NAV_PAD)}>
@@ -154,8 +150,6 @@ export function HomeMobilePage({
           </section>
         )}
       </main>
-
-      <CartDrawer />
     </div>
   )
 }

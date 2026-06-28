@@ -23,7 +23,7 @@ export function MobileBottomNav() {
   const showBadge = mounted && itemCount > 0
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-40 mobile-bottom-nav">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-[52] mobile-bottom-nav isolate">
       <div className="mobile-bottom-nav-inner">
         {MOBILE_BOTTOM_NAV_ITEMS.map(({ href, labelKey, icon: Icon, match }) => {
           const active = match(pathname)
@@ -47,9 +47,9 @@ export function MobileBottomNav() {
 
         <button
           type="button"
-          onClick={openDrawer}
+          onClick={() => openDrawer()}
           className={cn(
-            'relative flex flex-col items-center gap-0.5 transition-colors min-w-[56px]',
+            'relative flex flex-col items-center justify-center gap-0.5 transition-colors min-w-[56px] min-h-[44px] touch-manipulation',
             pathname === '/cart' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700',
           )}
           aria-label={t('nav.openCart')}
