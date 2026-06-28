@@ -97,7 +97,7 @@ export function CheckoutOrderSummary({
                   {q.available ? (
                     <>
                       {' '}— {q.zone_name && `${q.zone_name} · `}
-                      {formatDeliveryVehicleDisplay(q.vehicle ?? 'MOTO', q.eta_min_minutes, q.eta_max_minutes)}
+                      {formatDeliveryVehicleDisplay(q.vehicle ?? 'MOTO', q.eta_min, q.eta_max, q.eta_unit ?? 'MINUTES')}
                       {' '}·{' '}
                       {promoFree ? (
                         <>

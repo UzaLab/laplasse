@@ -14,6 +14,7 @@ import { AdminNotificationsService } from '../notifications/admin-notifications.
 import { getPlanLimits, isWithinLimit } from '../common/plan-limits'
 import {
   DeliveryType,
+  DeliveryVehicle,
   OrderStatus,
   Prisma,
   ProductStatus,
@@ -1705,6 +1706,31 @@ export class MarketplaceService {
     return order.shop?.owner_id ?? order.merchant?.owner_id
   }
 
+  private static readonly XOF_MAX_BILL = 10_000
+
+  private resolveFoodCashTender(
+    order: { order_source: string; total: number },
+    dto: { food_cash_exact?: boolean; food_cash_tender_amount?: number },
+  ): { food_cash_exact: boolean | null; food_cash_tender_amount: number | null } {
+    if (order.order_source !== 'FOOD') {
+      return { food_cash_exact: null, food_cash_tender_amount: null }
+    }
+    if (dto.food_cash_exact) {
+      return { food_cash_exact: true, food_cash_tender_amount: null }
+    }
+    const amount = dto.food_cash_tender_amount
+    if (amount == null) {
+      throw new BadRequestException('Indiquez si vous avez le montant exact ou le billet que vous présenterez.')
+    }
+    if (amount % MarketplaceService.XOF_MAX_BILL !== 0) {
+      throw new BadRequestException(`Le montant doit être un multiple de ${MarketplaceService.XOF_MAX_BILL.toLocaleString('fr-FR')} FCFA.`)
+    }
+    if (amount < order.total) {
+      throw new BadRequestException('Le montant présenté doit couvrir le total de la commande.')
+    }
+    return { food_cash_exact: false, food_cash_tender_amount: amount }
+  }
+
   private resolveOrderMerchantMeta(order: {
     merchant?: { id: string; business_name: string; slug: string } | null
     shop?: { id: string; name: string; slug: string } | null
@@ -2002,6 +2028,17 @@ export class MarketplaceService {
     const cart = await this.getOrCreateCart(userId)
     this.assertHomogeneousCartFromRaw(cart.items, true)
 
+    const existingMerchantIds = new Set(
+      cart.items
+        .filter(i => i.menu_item?.merchant?.id)
+        .map(i => i.menu_item!.merchant!.id),
+    )
+    if (existingMerchantIds.size > 0 && !existingMerchantIds.has(menuItem.merchant.id)) {
+      throw new BadRequestException(
+        'Votre panier contient déjà des plats d\'un autre restaurant. Finalisez ou videz le panier avant d\'en ajouter d\'un autre établissement.',
+      )
+    }
+
     const targetSignature = modifiersSignature(selectedModifiers)
     const existing = cart.items.find(i => {
       if (i.menu_item_id !== menuItemId) return false
@@ -2221,7 +2258,7 @@ export class MarketplaceService {
   private async enrichShopDeliveryPlans(
     plans: ReturnType<MarketplaceService['resolveShopDeliveries']>,
   ) {
-    for (const plan of plans.values()) {
+    for (const [shopId, plan] of plans) {
       if (plan.delivery_type !== 'DELIVERY') continue
 
       const hasStructured =
@@ -2234,12 +2271,18 @@ export class MarketplaceService {
       }
 
       if (plan.delivery_city_id && plan.delivery_commune_id) {
-        const [city, commune] = await Promise.all([
+        const [city, commune, shop] = await Promise.all([
           this.prisma.geoCity.findUnique({ where: { id: plan.delivery_city_id } }),
           this.prisma.geoCommune.findUnique({ where: { id: plan.delivery_commune_id } }),
+          this.prisma.shop.findUnique({ where: { id: shopId }, select: { country: true } }),
         ])
         plan.city_name = city?.name
         plan.commune_name = commune?.name
+        if (city && shop && city.country.toUpperCase() !== shop.country.toUpperCase()) {
+          throw new BadRequestException(
+            'La ville de livraison sélectionnée ne correspond pas au pays de la boutique',
+          )
+        }
       }
 
       plan.formatted_address =
@@ -2378,12 +2421,18 @@ export class MarketplaceService {
       if (plan.delivery_type !== 'DELIVERY') continue
       if (!plan.delivery_city_id || !plan.delivery_commune_id) continue
 
+      const shopRow = await this.prisma.shop.findUnique({
+        where: { id: shopId },
+        select: { country: true },
+      })
+
       const quoteResult = await this.deliveryZones.quote({
         shop_ids: [shopId],
         city_id: plan.delivery_city_id,
         commune_id: plan.delivery_commune_id,
         subtotals: { [shopId]: subtotals[shopId] ?? 0 },
         order_flow: 'marketplace',
+        country: shopRow?.country ?? 'CI',
       })
 
       const unavailable = quoteResult.quotes.filter(q => !q.available)
@@ -2432,9 +2481,11 @@ export class MarketplaceService {
         const isShopDelivery = plan.delivery_type === 'DELIVERY'
 
         let deliveryFee = 0
+        let requiredVehicle: DeliveryVehicle | undefined
         if (isShopDelivery) {
           const quote = deliveryQuotes.find(q => q.shop_id === groupShopId)
           deliveryFee = quote?.fee ?? 0
+          requiredVehicle = quote?.vehicle
         }
 
         let discountAmount = 0
@@ -2494,6 +2545,7 @@ export class MarketplaceService {
             subtotal,
             discount_amount: discountAmount,
             delivery_fee: deliveryFee,
+            required_vehicle: requiredVehicle,
             total,
             items: {
               create: items.map(item => ({
@@ -2630,6 +2682,12 @@ export class MarketplaceService {
       subtotals[mid] = (subtotals[mid] ?? 0) + item.line_total
     }
 
+    if (groups.size > 1) {
+      throw new BadRequestException(
+        'Un seul restaurant par commande. Retirez les plats des autres établissements ou videz votre panier.',
+      )
+    }
+
     // ── Vérification horaires d'ouverture ────────────────────────────────────
     const checkAt = dto.preorder_for ? new Date(dto.preorder_for) : new Date()
     const isPreorder = !!dto.preorder_for
@@ -2694,7 +2752,7 @@ export class MarketplaceService {
             `Sélectionnez un créneau de livraison pour votre pré-commande chez ${m.business_name}.`,
           )
         }
-        if (!openAtCheck || !isValidPreorderSlot(checkAt, scheduleSource)) {
+        if (!openAtCheck || !isValidPreorderSlot(checkAt, scheduleSource, { closedPreorder: true })) {
           const timeLabel = checkAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
           throw new BadRequestException(
             `${m.business_name} n'est pas ouvert à ${timeLabel}. Choisissez un créneau pendant les heures d'ouverture.`,
@@ -2752,12 +2810,26 @@ export class MarketplaceService {
       cityName = city?.name
       communeName = commune?.name
 
+      const merchantCountries = await this.prisma.merchant.findMany({
+        where: { id: { in: Array.from(groups.keys()) } },
+        select: { id: true, location: { select: { country: true } } },
+      })
+      for (const m of merchantCountries) {
+        const mCountry = m.location?.country?.toUpperCase()
+        if (city && mCountry && city.country.toUpperCase() !== mCountry) {
+          throw new BadRequestException(
+            'La ville de livraison sélectionnée ne correspond pas au pays du restaurant',
+          )
+        }
+      }
+
       deliveryQuotes = await this.deliveryZones.quote({
         merchant_ids: Array.from(groups.keys()),
         city_id: dto.delivery_city_id,
         commune_id: dto.delivery_commune_id,
         subtotals,
         order_flow: 'food',
+        country: city?.country ?? 'CI',
       })
 
       const unavailable = deliveryQuotes.quotes.filter(q => !q.available)
@@ -2798,11 +2870,13 @@ export class MarketplaceService {
         const discountAmount = promoApplied?.discount ?? 0
 
         let deliveryFee = 0
+        let requiredVehicle: DeliveryVehicle | undefined
         if (isDelivery && deliveryQuotes) {
           const quote = deliveryQuotes.quotes.find(
             q => q.merchant_id === merchantId || q.shop_id === merchantId,
           )
           deliveryFee = promoApplied?.free_delivery ? 0 : (quote?.fee ?? 0)
+          requiredVehicle = quote?.vehicle
         }
 
         const total = Math.max(0, subtotal - discountAmount + deliveryFee)
@@ -2832,6 +2906,7 @@ export class MarketplaceService {
             subtotal,
             discount_amount: discountAmount,
             delivery_fee: deliveryFee,
+            required_vehicle: requiredVehicle,
             total,
             items: {
               create: items.map(item => ({
@@ -3033,6 +3108,7 @@ export class MarketplaceService {
 
     const order = payment.order
     const now = new Date()
+    const cashTender = this.resolveFoodCashTender(order, dto)
 
     await this.prisma.$transaction(async tx => {
       await tx.paymentTransaction.update({
@@ -3041,7 +3117,11 @@ export class MarketplaceService {
       })
       await tx.order.update({
         where: { id: order.id },
-        data: { status: 'CONFIRMED' },
+        data: {
+          status: 'CONFIRMED',
+          food_cash_exact: cashTender.food_cash_exact,
+          food_cash_tender_amount: cashTender.food_cash_tender_amount,
+        },
       })
 
       for (const item of order.items) {
@@ -3119,11 +3199,17 @@ export class MarketplaceService {
 
     const now = new Date()
     const orderIds: string[] = []
+    const cashByOrderId = new Map<string, ReturnType<MarketplaceService['resolveFoodCashTender']>>()
+
+    for (const payment of payments) {
+      cashByOrderId.set(payment.order!.id, this.resolveFoodCashTender(payment.order!, dto))
+    }
 
     await this.prisma.$transaction(async tx => {
       for (const payment of payments) {
         const order = payment.order!
         orderIds.push(order.id)
+        const cashTender = cashByOrderId.get(order.id)!
 
         await tx.paymentTransaction.update({
           where: { id: payment.id },
@@ -3131,7 +3217,11 @@ export class MarketplaceService {
         })
         await tx.order.update({
           where: { id: order.id },
-          data: { status: 'CONFIRMED' },
+          data: {
+            status: 'CONFIRMED',
+            food_cash_exact: cashTender.food_cash_exact,
+            food_cash_tender_amount: cashTender.food_cash_tender_amount,
+          },
         })
 
         for (const item of order.items) {

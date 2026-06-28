@@ -7,9 +7,11 @@ import { DeliveryVehicle, Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 
 import { CreateDeliveryZoneDto, DeliveryZoneRuleDto } from './dto/create-delivery-zone.dto'
+import { UpdateDeliveryZoneDto } from './dto/update-delivery-zone.dto'
+import { DeliveryFulfilmentMode } from '../../generated/prisma/client'
 
 export type DeliveryZoneRuleInput = DeliveryZoneRuleDto
-export type { CreateDeliveryZoneDto }
+export type { CreateDeliveryZoneDto, UpdateDeliveryZoneDto }
 
 export interface DeliveryQuoteRequest {
   shop_ids?: string[]
@@ -42,8 +44,9 @@ export interface DeliveryQuoteItem {
   available: boolean
   fee: number
   zone_name?: string
-  eta_min_minutes?: number
-  eta_max_minutes?: number
+  eta_min?: number
+  eta_max?: number
+  eta_unit?: 'MINUTES' | 'HOURS' | 'DAYS'
   vehicle?: DeliveryVehicle
   message?: string
 }
@@ -79,6 +82,9 @@ export class DeliveryZonesService {
 
   private buildZoneCreateData(dto: CreateDeliveryZoneDto, owner: { shopId?: string; partnerId?: string }) {
     this.assertRules(dto.rules)
+    if (dto.eta_max < dto.eta_min) {
+      throw new BadRequestException('Le délai maximum doit être supérieur ou égal au délai minimum')
+    }
     return {
       shop_id: owner.shopId,
       logistics_partner_id: owner.partnerId,
@@ -87,8 +93,9 @@ export class DeliveryZonesService {
       fee: dto.fee,
       min_order_amount: dto.min_order_amount,
       free_delivery_threshold: dto.free_delivery_threshold,
-      eta_min_minutes: dto.eta_min_minutes,
-      eta_max_minutes: dto.eta_max_minutes,
+      eta_min: dto.eta_min,
+      eta_max: dto.eta_max,
+      eta_unit: dto.eta_unit ?? 'MINUTES',
       vehicle: dto.vehicle ?? 'MOTO',
       priority: dto.priority ?? 0,
       is_active: dto.is_active ?? true,
@@ -138,13 +145,78 @@ export class DeliveryZonesService {
     return { success: true }
   }
 
+  async updateForShop(shopId: string, zoneId: string, dto: UpdateDeliveryZoneDto) {
+    const zone = await this.prisma.shopDeliveryZone.findFirst({
+      where: { id: zoneId, shop_id: shopId, logistics_partner_id: null },
+    })
+    if (!zone) throw new NotFoundException('Zone introuvable')
+    return this.applyZoneUpdate(zoneId, dto)
+  }
+
+  async updateForPartner(partnerId: string, zoneId: string, dto: UpdateDeliveryZoneDto) {
+    const zone = await this.prisma.shopDeliveryZone.findFirst({
+      where: { id: zoneId, logistics_partner_id: partnerId, shop_id: null },
+    })
+    if (!zone) throw new NotFoundException('Zone introuvable')
+    return this.applyZoneUpdate(zoneId, dto)
+  }
+
+  private async applyZoneUpdate(zoneId: string, dto: UpdateDeliveryZoneDto) {
+    if (dto.rules) this.assertRules(dto.rules)
+    const etaMin = dto.eta_min ?? undefined
+    const etaMax = dto.eta_max ?? undefined
+    if (etaMin != null && etaMax != null && etaMax < etaMin) {
+      throw new BadRequestException('Le délai maximum doit être supérieur ou égal au délai minimum')
+    }
+
+    return this.prisma.$transaction(async tx => {
+      if (dto.rules) {
+        await tx.shopDeliveryZoneRule.deleteMany({ where: { zone_id: zoneId } })
+      }
+      return tx.shopDeliveryZone.update({
+        where: { id: zoneId },
+        data: {
+          ...(dto.name != null ? { name: dto.name.trim() } : {}),
+          ...(dto.description !== undefined ? { description: dto.description?.trim() ?? null } : {}),
+          ...(dto.fee != null ? { fee: dto.fee } : {}),
+          ...(dto.min_order_amount !== undefined ? { min_order_amount: dto.min_order_amount } : {}),
+          ...(dto.free_delivery_threshold !== undefined
+            ? { free_delivery_threshold: dto.free_delivery_threshold }
+            : {}),
+          ...(dto.eta_min != null ? { eta_min: dto.eta_min } : {}),
+          ...(dto.eta_max != null ? { eta_max: dto.eta_max } : {}),
+          ...(dto.eta_unit != null ? { eta_unit: dto.eta_unit } : {}),
+          ...(dto.vehicle != null ? { vehicle: dto.vehicle } : {}),
+          ...(dto.priority != null ? { priority: dto.priority } : {}),
+          ...(dto.is_active != null ? { is_active: dto.is_active } : {}),
+          ...(dto.rules
+            ? {
+                rules: {
+                  create: dto.rules.map(rule => ({
+                    city_id: rule.city_id,
+                    all_communes: rule.all_communes ?? false,
+                    communes: rule.all_communes || !rule.commune_ids?.length
+                      ? undefined
+                      : { create: rule.commune_ids.map(commune_id => ({ commune_id })) },
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: zoneInclude,
+      })
+    })
+  }
+
   // ─── Platform delivery rates (réseau LaPlasse) ─────────────────────────────
 
-  async listPlatformRates() {
+  async listPlatformRates(country?: string) {
+    const countryCode = country?.toUpperCase()
     return this.prisma.platformDeliveryRate.findMany({
+      where: countryCode ? { city: { country: countryCode } } : undefined,
       orderBy: [{ city_id: 'asc' }],
       include: {
-        city: { select: { id: true, name: true } },
+        city: { select: { id: true, name: true, country: true } },
         commune: { select: { id: true, name: true } },
       },
     })
@@ -225,7 +297,22 @@ export class DeliveryZonesService {
         id: { in: shopIds },
         ...(input.order_flow !== 'food' ? { is_active: true } : {}),
       },
-      select: { id: true, name: true, enabled_modules: true },
+      select: {
+        id: true,
+        name: true,
+        enabled_modules: true,
+        delivery_fulfilment_default: true,
+        delivery_contracts: {
+          where: { status: 'ACTIVE' },
+          orderBy: { signed_at: 'desc' },
+          take: 1,
+          select: {
+            logistics_partner_id: true,
+            fee_override: true,
+            sla_eta_max_minutes: true,
+          },
+        },
+      },
     })
     const shopById = Object.fromEntries(shops.map(s => [s.id, s]))
 
@@ -245,66 +332,20 @@ export class DeliveryZonesService {
         continue
       }
 
-      const subtotal = input.subtotals?.[shopId] ?? 0
-      const zone = await this.resolveZone(shopId, input.city_id, input.commune_id)
-
-      if (!zone) {
-        if (input.order_flow === 'food' || shop.enabled_modules.includes('food')) {
-          const fallback = foodFallbackFee(input.country ?? null)
-          quotes.push({
-            shop_id: shopId,
-            shop_name: shop.name,
-            available: true,
-            fee: fallback,
-            zone_name: 'Livraison restaurant',
-            eta_min_minutes: 30,
-            eta_max_minutes: 45,
-            vehicle: 'MOTO',
-          })
-          total_delivery_fee += fallback
-          continue
-        }
-        quotes.push({
-          shop_id: shopId,
-          shop_name: shop.name,
-          available: false,
-          fee: 0,
-          message: 'Livraison indisponible à cette adresse',
-        })
-        continue
-      }
-
-      if (zone.min_order_amount != null && subtotal > 0 && subtotal < zone.min_order_amount) {
-        quotes.push({
-          shop_id: shopId,
-          shop_name: shop.name,
-          available: false,
-          fee: 0,
-          zone_name: zone.name,
-          message: `Commande minimum ${zone.min_order_amount.toLocaleString('fr-FR')} FCFA`,
-        })
-        continue
-      }
-
-      let fee = zone.fee
-      if (
-        zone.free_delivery_threshold != null
-        && subtotal >= zone.free_delivery_threshold
-      ) {
-        fee = 0
-      }
-
-      quotes.push({
-        shop_id: shopId,
-        shop_name: shop.name,
-        available: true,
-        fee,
-        zone_name: zone.name,
-        eta_min_minutes: zone.eta_min_minutes,
-        eta_max_minutes: zone.eta_max_minutes,
-        vehicle: zone.vehicle,
+      const quote = await this.resolveFulfilmentQuote({
+        fulfilmentMode: shop.delivery_fulfilment_default ?? 'PLATFORM_RIDER',
+        shopId: shop.id,
+        displayName: shop.name,
+        contract: shop.delivery_contracts[0] ?? null,
+        cityId: input.city_id,
+        communeId: input.commune_id,
+        subtotal: input.subtotals?.[shopId] ?? 0,
+        country: input.country,
+        orderFlow: input.order_flow ?? 'marketplace',
+        isFoodCapable: shop.enabled_modules.includes('food'),
       })
-      total_delivery_fee += fee
+      quotes.push(quote)
+      if (quote.available) total_delivery_fee += quote.fee
     }
 
     return { quotes, total_delivery_fee }
@@ -328,6 +369,7 @@ export class DeliveryZonesService {
             enabled_modules: true,
             delivery_contracts: {
               where: { status: 'ACTIVE' },
+              orderBy: { signed_at: 'desc' },
               take: 1,
               select: {
                 logistics_partner_id: true,
@@ -358,69 +400,188 @@ export class DeliveryZonesService {
         continue
       }
 
-      const subtotal = input.subtotals?.[merchantId] ?? 0
       const linkedShop = merchant.shop
-      const fulfilmentMode = merchant.delivery_fulfilment_default ?? 'PLATFORM_RIDER'
-
-      // ── MERCHANT_OWN : tarif de zone du marchand (via son shop lié) ──────────
-      if (fulfilmentMode === 'MERCHANT_OWN' && linkedShop) {
-        const zone = await this.resolveZone(linkedShop.id, input.city_id, input.commune_id)
-        if (zone) {
-          if (zone.min_order_amount != null && subtotal > 0 && subtotal < zone.min_order_amount) {
-            quotes.push({ shop_id: linkedShop.id, merchant_id: merchantId, shop_name: merchant.business_name, available: false, fee: 0, zone_name: zone.name, message: `Commande minimum ${zone.min_order_amount.toLocaleString('fr-FR')} FCFA` })
-            continue
-          }
-          const fee = zone.free_delivery_threshold != null && subtotal >= zone.free_delivery_threshold ? 0 : zone.fee
-          quotes.push({ shop_id: linkedShop.id, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee, zone_name: zone.name, eta_min_minutes: zone.eta_min_minutes, eta_max_minutes: zone.eta_max_minutes, vehicle: zone.vehicle })
-          total_delivery_fee += fee
-          continue
-        }
-        // Pas de zone configurée pour flotte dédiée → indisponible
-        quotes.push({ shop_id: linkedShop.id, merchant_id: merchantId, shop_name: merchant.business_name, available: false, fee: 0, message: 'Zone de livraison non configurée pour la flotte dédiée' })
-        continue
-      }
-
-      // ── LOGISTICS_PARTNER : tarif du contrat ou zones du partenaire ──────────
-      if (fulfilmentMode === 'LOGISTICS_PARTNER') {
-        const contract = linkedShop?.delivery_contracts?.[0]
-        if (contract) {
-          if (contract.fee_override != null) {
-            const fee = subtotal > 0 && input.subtotals != null ? contract.fee_override : contract.fee_override
-            quotes.push({ shop_id: linkedShop!.id, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee, zone_name: 'Prestataire logistique', eta_min_minutes: contract.sla_eta_max_minutes ?? 45, eta_max_minutes: contract.sla_eta_max_minutes ?? 60, vehicle: 'MOTO' })
-            total_delivery_fee += fee
-            continue
-          }
-          // Pas de fee_override : cherche les zones du partenaire
-          const partnerZone = await this.resolvePartnerZone(contract.logistics_partner_id, input.city_id, input.commune_id)
-          if (partnerZone) {
-            const fee = partnerZone.free_delivery_threshold != null && subtotal >= partnerZone.free_delivery_threshold ? 0 : partnerZone.fee
-            quotes.push({ shop_id: linkedShop!.id, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee, zone_name: partnerZone.name, eta_min_minutes: partnerZone.eta_min_minutes, eta_max_minutes: partnerZone.eta_max_minutes, vehicle: partnerZone.vehicle })
-            total_delivery_fee += fee
-            continue
-          }
-        }
-        // Pas de contrat actif → repli plateforme
-      }
-
-      // ── PLATFORM_RIDER (défaut) : tarif admin ou fallback 1500 ───────────────
-      const platformRate = await this.resolvePlatformRate(input.city_id, input.commune_id)
-      if (platformRate) {
-        if (platformRate.min_order != null && subtotal > 0 && subtotal < platformRate.min_order) {
-          quotes.push({ shop_id: linkedShop?.id ?? merchantId, merchant_id: merchantId, shop_name: merchant.business_name, available: false, fee: 0, zone_name: 'Réseau LaPlasse', message: `Commande minimum ${platformRate.min_order.toLocaleString('fr-FR')} FCFA` })
-          continue
-        }
-        quotes.push({ shop_id: linkedShop?.id ?? merchantId, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee: platformRate.fee, zone_name: 'Réseau LaPlasse', eta_min_minutes: 30, eta_max_minutes: 45, vehicle: platformRate.vehicle })
-        total_delivery_fee += platformRate.fee
-        continue
-      }
-
-      // Fallback pays-aware
-      const fallbackFee = foodFallbackFee(input.country ?? null)
-      quotes.push({ shop_id: linkedShop?.id ?? merchantId, merchant_id: merchantId, shop_name: merchant.business_name, available: true, fee: fallbackFee, zone_name: 'Livraison restaurant', eta_min_minutes: 30, eta_max_minutes: 45, vehicle: 'MOTO' })
-      total_delivery_fee += fallbackFee
+      const quote = await this.resolveFulfilmentQuote({
+        fulfilmentMode: merchant.delivery_fulfilment_default ?? 'PLATFORM_RIDER',
+        shopId: linkedShop?.id ?? null,
+        displayName: merchant.business_name,
+        merchantId: merchant.id,
+        contract: linkedShop?.delivery_contracts[0] ?? null,
+        cityId: input.city_id,
+        communeId: input.commune_id,
+        subtotal: input.subtotals?.[merchantId] ?? 0,
+        country: input.country,
+        orderFlow: 'food',
+        isFoodCapable: true,
+      })
+      quotes.push(quote)
+      if (quote.available) total_delivery_fee += quote.fee
     }
 
     return { quotes, total_delivery_fee }
+  }
+
+  /** Résolution tarif/délai selon le mode d'expédition — source unique food + marketplace. */
+  private async resolveFulfilmentQuote(ctx: {
+    fulfilmentMode: DeliveryFulfilmentMode
+    shopId: string | null
+    displayName: string
+    merchantId?: string
+    contract: {
+      logistics_partner_id: string
+      fee_override: number | null
+      sla_eta_max_minutes: number | null
+    } | null
+    cityId: string
+    communeId: string
+    subtotal: number
+    country?: string
+    orderFlow: 'food' | 'marketplace'
+    isFoodCapable: boolean
+  }): Promise<DeliveryQuoteItem> {
+    const base = {
+      shop_id: ctx.shopId ?? ctx.merchantId ?? '',
+      merchant_id: ctx.merchantId,
+      shop_name: ctx.displayName,
+    }
+
+    if (ctx.fulfilmentMode === 'MERCHANT_OWN') {
+      if (!ctx.shopId) {
+        return { ...base, available: false, fee: 0, message: 'Boutique liée requise pour la flotte dédiée' }
+      }
+      const zone = await this.resolveZone(ctx.shopId, ctx.cityId, ctx.communeId)
+      if (!zone) {
+        return {
+          ...base,
+          available: false,
+          fee: 0,
+          message: 'Zone de livraison non configurée pour votre flotte',
+        }
+      }
+      return this.quoteFromZone(base, zone, ctx.subtotal)
+    }
+
+    if (ctx.fulfilmentMode === 'LOGISTICS_PARTNER') {
+      if (!ctx.contract) {
+        return {
+          ...base,
+          available: false,
+          fee: 0,
+          message: 'Aucun contrat logistique actif. Signez un partenaire ou changez de mode d\'expédition.',
+        }
+      }
+      if (ctx.contract.fee_override != null) {
+        const sla = ctx.contract.sla_eta_max_minutes ?? 45
+        return {
+          ...base,
+          available: true,
+          fee: ctx.contract.fee_override,
+          zone_name: 'Prestataire logistique (forfait contrat)',
+          eta_min: sla,
+          eta_max: sla,
+          eta_unit: 'MINUTES',
+          vehicle: 'MOTO',
+        }
+      }
+      const partnerZone = await this.resolvePartnerZone(
+        ctx.contract.logistics_partner_id,
+        ctx.cityId,
+        ctx.communeId,
+      )
+      if (partnerZone) {
+        return this.quoteFromZone(base, partnerZone, ctx.subtotal)
+      }
+      return {
+        ...base,
+        available: false,
+        fee: 0,
+        message: 'Adresse non couverte par les zones de votre partenaire logistique',
+      }
+    }
+
+    // PLATFORM_RIDER
+    const platformRate = await this.resolvePlatformRate(ctx.cityId, ctx.communeId)
+    if (platformRate) {
+      if (platformRate.min_order != null && ctx.subtotal > 0 && ctx.subtotal < platformRate.min_order) {
+        return {
+          ...base,
+          available: false,
+          fee: 0,
+          zone_name: 'Réseau LaPlasse',
+          message: `Commande minimum ${platformRate.min_order.toLocaleString('fr-FR')} FCFA`,
+        }
+      }
+      return {
+        ...base,
+        available: true,
+        fee: platformRate.fee,
+        zone_name: 'Réseau LaPlasse',
+        eta_min: 30,
+        eta_max: 45,
+        eta_unit: 'MINUTES',
+        vehicle: platformRate.vehicle,
+      }
+    }
+
+    if (ctx.orderFlow === 'food' || ctx.isFoodCapable) {
+      const fallbackFee = foodFallbackFee(ctx.country ?? null)
+      return {
+        ...base,
+        available: true,
+        fee: fallbackFee,
+        zone_name: 'Livraison restaurant',
+        eta_min: 30,
+        eta_max: 45,
+        eta_unit: 'MINUTES',
+        vehicle: 'MOTO',
+      }
+    }
+
+    return {
+      ...base,
+      available: false,
+      fee: 0,
+      message: 'Livraison indisponible à cette adresse (réseau LaPlasse)',
+    }
+  }
+
+  private quoteFromZone(
+    base: { shop_id: string; merchant_id?: string; shop_name: string },
+    zone: {
+      name: string
+      fee: number
+      min_order_amount: number | null
+      free_delivery_threshold: number | null
+      eta_min: number
+      eta_max: number
+      eta_unit: 'MINUTES' | 'HOURS' | 'DAYS'
+      vehicle: DeliveryVehicle
+    },
+    subtotal: number,
+  ): DeliveryQuoteItem {
+    if (zone.min_order_amount != null && subtotal > 0 && subtotal < zone.min_order_amount) {
+      return {
+        ...base,
+        available: false,
+        fee: 0,
+        zone_name: zone.name,
+        message: `Commande minimum ${zone.min_order_amount.toLocaleString('fr-FR')} FCFA`,
+      }
+    }
+    let fee = zone.fee
+    if (zone.free_delivery_threshold != null && subtotal >= zone.free_delivery_threshold) {
+      fee = 0
+    }
+    return {
+      ...base,
+      available: true,
+      fee,
+      zone_name: zone.name,
+      eta_min: zone.eta_min,
+      eta_max: zone.eta_max,
+      eta_unit: zone.eta_unit,
+      vehicle: zone.vehicle,
+    }
   }
 
   applyFreeDelivery(quotes: DeliveryQuoteItem[], shopIds: string[]): DeliveryQuoteItem[] {
@@ -437,7 +598,7 @@ export class DeliveryZonesService {
 
   private async resolveZone(shopId: string, cityId: string, communeId: string) {
     const zones = await this.prisma.shopDeliveryZone.findMany({
-      where: { shop_id: shopId, is_active: true },
+      where: { shop_id: shopId, logistics_partner_id: null, is_active: true },
       include: zoneInclude,
       orderBy: [{ priority: 'desc' }, { sort_order: 'asc' }],
     })

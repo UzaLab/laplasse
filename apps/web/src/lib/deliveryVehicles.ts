@@ -1,3 +1,6 @@
+import type { DeliveryEtaUnit } from '@/lib/deliveryEta'
+import { formatDeliveryEtaRange } from '@/lib/deliveryEta'
+
 export type DeliveryVehicle = 'MOTO' | 'TRICYCLE' | 'CAR' | 'VAN'
 
 export const DELIVERY_VEHICLE_OPTIONS: {
@@ -15,10 +18,15 @@ export function getDeliveryVehicleLabel(vehicle: string): string {
   return DELIVERY_VEHICLE_OPTIONS.find(v => v.value === vehicle)?.label ?? vehicle
 }
 
-export function formatDeliveryVehicleDisplay(vehicle: string, etaMin?: number, etaMax?: number): string {
+export function formatDeliveryVehicleDisplay(
+  vehicle: string,
+  etaMin?: number,
+  etaMax?: number,
+  etaUnit: DeliveryEtaUnit = 'MINUTES',
+): string {
   const label = getDeliveryVehicleLabel(vehicle).toLowerCase()
   if (etaMin != null && etaMax != null) {
-    return `Livraison ${label} — ${etaMin} à ${etaMax} min`
+    return `Livraison ${label} — ${formatDeliveryEtaRange(etaMin, etaMax, etaUnit)}`
   }
   return `Livraison ${label}`
 }

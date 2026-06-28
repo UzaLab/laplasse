@@ -16,6 +16,7 @@ export interface CourierJobRow {
   pickup_address: string | null
   dropoff_address: string | null
   eta_minutes: number | null
+  required_vehicle: string | null
   assigned_at: string | null
   picked_up_at: string | null
   delivered_at: string | null
@@ -34,6 +35,8 @@ export interface CourierJobRow {
     customer_phone: string | null
     customer_name: string | null
     customer_note: string | null
+    food_cash_exact: boolean | null
+    food_cash_tender_amount: number | null
     item_count: number
     shop_name: string
     shop_address: string | null

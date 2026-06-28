@@ -46,6 +46,18 @@ export async function registerCourier(payload: {
   return res.json() as Promise<{ profile: CourierProfileSummary; role: string }>
 }
 
+export async function updateCourierProfile(payload: {
+  vehicle?: string
+  plate_number?: string
+}): Promise<CourierProfileSummary | { error: string }> {
+  const res = await authApiFetch('/couriers/me/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) return { error: await parseError(res) }
+  return res.json() as Promise<CourierProfileSummary>
+}
+
 export async function fetchCourierProfile(): Promise<CourierProfileSummary | null> {
   const res = await authApiFetch('/couriers/me')
   if (!res.ok) return null

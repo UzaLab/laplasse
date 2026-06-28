@@ -168,8 +168,8 @@ export function FoodMenuOrderPanel({
     : 'open'
   const openingHours = menu?.merchant.food_opening_hours ?? null
   const acceptsPreorders = menu?.merchant.food_accepts_preorders ?? true
-  const preorderSlots = openingHours ? getUpcomingPreorderSlots(openingHours) : []
   const isScheduleClosed = pauseStatus === 'open' && effectiveStatus === 'closed'
+  const preorderSlots = openingHours ? getUpcomingPreorderSlots(openingHours, new Date(), 12, isScheduleClosed) : []
   const isHardClosed = pauseStatus !== 'open'
   const isPreorder =
     isScheduleClosed && acceptsPreorders && preorderSlots.length > 0

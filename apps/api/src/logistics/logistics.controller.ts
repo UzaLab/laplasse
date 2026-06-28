@@ -19,6 +19,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { LogisticsPartnersService } from './logistics-partners.service'
 import { LogisticsPartnerOpsService } from './logistics-partner-ops.service'
 import { DeliveryZonesService, type CreateDeliveryZoneDto } from '../delivery-zones/delivery-zones.service'
+import { UpdateDeliveryZoneDto } from '../delivery-zones/dto/update-delivery-zone.dto'
 import {
   LinkPartnerCourierDto,
   RegisterLogisticsPartnerDto,
@@ -283,6 +284,16 @@ export class LogisticsController {
   async createMyDeliveryZone(@CurrentUser('id') userId: string, @Body() dto: CreateDeliveryZoneDto) {
     const partner = await this.partners.resolveMyPartner(userId)
     return this.deliveryZones.createForLogisticsPartner(partner.id, dto)
+  }
+
+  @Patch('me/delivery-zones/:zoneId')
+  async updateMyDeliveryZone(
+    @CurrentUser('id') userId: string,
+    @Param('zoneId') zoneId: string,
+    @Body() dto: UpdateDeliveryZoneDto,
+  ) {
+    const partner = await this.partners.resolveMyPartner(userId)
+    return this.deliveryZones.updateForPartner(partner.id, zoneId, dto)
   }
 
   @Delete('me/delivery-zones/:zoneId')

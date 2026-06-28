@@ -18,6 +18,7 @@ import {
   Megaphone,
   ShoppingCart,
   Banknote,
+  DollarSign,
 } from 'lucide-react'
 
 export interface AdminNavItem {
@@ -74,6 +75,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { href: '/admin/delivery', label: 'Vue livraison', icon: Truck, exact: true },
       { href: '/admin/delivery/equipes', label: 'Équipes', icon: Users, badgeKey: 'couriersKycPending' },
       { href: '/admin/delivery/operations', label: 'Opérations', icon: ClipboardList },
+      { href: '/admin/delivery/rates', label: 'Tarifs réseau', icon: DollarSign },
       { href: '/admin/delivery/payouts', label: 'Versements', icon: Banknote },
     ],
   },

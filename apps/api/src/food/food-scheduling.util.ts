@@ -108,16 +108,19 @@ export function getUpcomingPreorderSlots(
     maxSlots?: number
     stepMinutes?: number
     minLeadMinutes?: number
+    /** Quand le restaurant est fermé : créneaux à partir du lendemain uniquement. */
+    startFromNextDay?: boolean
   },
 ): PreorderSlot[] {
   const now = opts?.now ?? new Date()
   const maxSlots = opts?.maxSlots ?? 12
   const stepMinutes = opts?.stepMinutes ?? 90
   const minLeadMinutes = opts?.minLeadMinutes ?? 45
+  const startDayOffset = opts?.startFromNextDay ? 1 : 0
   const earliest = new Date(now.getTime() + minLeadMinutes * 60_000)
   const slots: PreorderSlot[] = []
 
-  for (let dayOffset = 0; dayOffset < 7 && slots.length < maxSlots; dayOffset++) {
+  for (let dayOffset = startDayOffset; dayOffset < 7 + startDayOffset && slots.length < maxSlots; dayOffset++) {
     const day = new Date(now)
     day.setDate(day.getDate() + dayOffset)
     day.setHours(0, 0, 0, 0)
@@ -145,10 +148,13 @@ export function getUpcomingPreorderSlots(
 export function isValidPreorderSlot(
   at: Date,
   source: FoodScheduleSource,
-  opts?: { now?: Date; maxSlots?: number },
+  opts?: { now?: Date; maxSlots?: number; closedPreorder?: boolean },
 ): boolean {
   if (!isMerchantOpenAtSchedule(at, source)) return false
-  const slots = getUpcomingPreorderSlots(source, opts)
+  const slots = getUpcomingPreorderSlots(source, {
+    ...opts,
+    startFromNextDay: opts?.closedPreorder ?? false,
+  })
   return slots.some(slot => slot.at === at.toISOString())
 }
 
@@ -191,7 +197,7 @@ export function buildFoodSchedulingContext(
   }
 
   const slots = merchant.food_accepts_preorders
-    ? getUpcomingPreorderSlots(source, { now })
+    ? getUpcomingPreorderSlots(source, { now, startFromNextDay: true })
     : []
 
   return {

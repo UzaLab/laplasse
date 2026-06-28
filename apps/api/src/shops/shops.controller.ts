@@ -22,6 +22,7 @@ import { ShopsService } from './shops.service'
 import { CreateShopDto, LinkShopMerchantDto, SetShopProductCategoriesDto, UpdateShopDto } from './dto/shops.dto'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { CreateDeliveryZoneDto } from '../delivery-zones/dto/create-delivery-zone.dto'
+import { UpdateDeliveryZoneDto } from '../delivery-zones/dto/update-delivery-zone.dto'
 import { ShopCourierStaffService } from './shop-courier-staff.service'
 import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
 import { LinkShopCourierStaffDto, CreateDeliveryContractDto } from '../delivery/dto/delivery-stakeholders.dto'
@@ -67,6 +68,19 @@ export class ShopsController {
   ) {
     return this.svc.withOwnerShop(userId, shopId, shop =>
       this.deliveryZones.createForShop(shop.id, dto),
+    )
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':shopId/delivery-zones/:zoneId')
+  updateDeliveryZone(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+    @Param('zoneId') zoneId: string,
+    @Body() dto: UpdateDeliveryZoneDto,
+  ) {
+    return this.svc.withOwnerShop(userId, shopId, shop =>
+      this.deliveryZones.updateForShop(shop.id, zoneId, dto),
     )
   }
 

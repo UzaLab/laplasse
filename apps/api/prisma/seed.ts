@@ -501,8 +501,9 @@ async function main() {
             fee: merchantSlug === 'yale-design' ? 1500 : 2000,
             min_order_amount: 5000,
             free_delivery_threshold: 50000,
-            eta_min_minutes: 45,
-            eta_max_minutes: 75,
+            eta_min: 45,
+            eta_max: 75,
+            eta_unit: 'MINUTES',
             vehicle: 'MOTO',
             priority: 10,
             rules: {
@@ -534,8 +535,9 @@ async function main() {
             shop_id: shopId,
             name: 'Abidjan — Yopougon',
             fee: 2500,
-            eta_min_minutes: 60,
-            eta_max_minutes: 90,
+            eta_min: 60,
+            eta_max: 90,
+            eta_unit: 'MINUTES',
             vehicle: 'MOTO',
             rules: {
               create: [{ city_id: abidjan.id, all_communes: false, communes: { create: [{ commune_id: yopougon.id }] } }],

@@ -31,6 +31,7 @@ import {
 } from '@/lib/marketplaceApi'
 import { clearCartPromos } from '@/lib/cartPromo'
 import { foodMinOrderMessage } from '@/lib/foodHub'
+import { foodSchedulingBlockMessage } from '@/lib/foodSchedulingMessages'
 import { useCartStore } from '@/stores/cartStore'
 import { notify } from '@/lib/notify'
 
@@ -250,7 +251,7 @@ export default function FoodOrderCartPage() {
                 )}
                 {foodBlocked && (
                   <p className="text-sm font-medium text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
-                    Ce restaurant n&apos;accepte pas de commandes pour le moment.
+                    {foodSchedulingBlockMessage(foodScheduling)}
                   </p>
                 )}
                 <button

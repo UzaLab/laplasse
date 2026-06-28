@@ -858,10 +858,14 @@ export async function guestCheckout(
 export async function confirmOrderPayment(
   paymentId: string,
   simulateResult: 'success' | 'failure',
+  cashTender?: { exact?: boolean; tenderAmount?: number },
 ): Promise<{ result: ConfirmPaymentResult | null; error?: string }> {
+  const body: Record<string, unknown> = { paymentId, simulateResult }
+  if (cashTender?.exact != null) body.food_cash_exact = cashTender.exact
+  if (cashTender?.tenderAmount != null) body.food_cash_tender_amount = cashTender.tenderAmount
   const res = await authApiFetch('/orders/pay/confirm', {
     method: 'POST',
-    body: JSON.stringify({ paymentId, simulateResult }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) return { result: null, error: await parseError(res) }
   const result = await res.json() as ConfirmPaymentResult
@@ -871,10 +875,14 @@ export async function confirmOrderPayment(
 export async function confirmBatchOrderPayments(
   paymentIds: string[],
   simulateResult: 'success' | 'failure',
+  cashTender?: { exact?: boolean; tenderAmount?: number },
 ): Promise<{ result: ConfirmPaymentResult | null; error?: string }> {
+  const body: Record<string, unknown> = { paymentIds, simulateResult }
+  if (cashTender?.exact != null) body.food_cash_exact = cashTender.exact
+  if (cashTender?.tenderAmount != null) body.food_cash_tender_amount = cashTender.tenderAmount
   const res = await authApiFetch('/orders/pay/confirm-batch', {
     method: 'POST',
-    body: JSON.stringify({ paymentIds, simulateResult }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) return { result: null, error: await parseError(res) }
   const result = await res.json() as ConfirmPaymentResult

@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { NotificationQueueService } from '../queue/notification-queue.service'
+import { orderMatchesZones, resolveOrderCountry } from './delivery-zone-match.util'
+import { vehiclesCompatible } from './delivery-vehicle.util'
 
 export const DELIVERY_OFFER_TIMEOUT_SEC = 30
 const MAX_OFFER_ATTEMPTS = 15
@@ -159,7 +161,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
             delivery_city_id: true,
             delivery_commune_id: true,
             shop: { select: { name: true, city: true, country: true } },
-            merchant: { select: { business_name: true } },
+            merchant: { select: { business_name: true, location: { select: { country: true } } } },
           },
         },
         offer_rejections: { select: { courier_profile_id: true } },
@@ -172,7 +174,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
    * score = distScore*0.5 + loadScore*0.3 + ratingScore*0.15 + completedScore*0.05
    * Plus haut = meilleur candidat.
    */
-  private scorePlatformCourier(
+  private scoreCourier(
     pickup: { lat: number | null; lng: number | null },
     courier: {
       current_latitude: number | null
@@ -182,7 +184,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
       completed_jobs: number
     },
   ): number {
-    let distScore = 0.5 // par défaut si pas de GPS
+    let distScore = 0.5
     if (
       pickup.lat != null && pickup.lng != null
       && courier.current_latitude != null && courier.current_longitude != null
@@ -207,12 +209,14 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
     job: NonNullable<Awaited<ReturnType<DeliveryOfferService['loadJobForOffer']>>>,
   ) {
     if (job.rejected_count >= MAX_OFFER_ATTEMPTS) {
-      this.logger.log(`Job ${job.id}: max offer attempts reached`)
+      this.logger.warn(`Job ${job.id}: max offer attempts reached — escalade admin`)
+      await this.escalateStuckJob(job)
       return
     }
 
     if (this.isOfferActive(job)) return
 
+    const orderCountry = await resolveOrderCountry(this.prisma, job.order)
     const rejectedIds = new Set(job.offer_rejections.map(r => r.courier_profile_id))
     const couriers = await this.prisma.courierProfile.findMany({
       where: {
@@ -220,6 +224,8 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
         is_online: true,
         kind: 'INDEPENDENT',
         id: { notIn: [...rejectedIds] },
+        ...(orderCountry ? { country: orderCountry } : {}),
+        ...(job.required_vehicle ? { vehicle: { in: vehiclesCompatible(job.required_vehicle) } } : {}),
       },
       include: {
         _count: {
@@ -235,23 +241,21 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
 
     const zoneMatched: typeof couriers = []
     for (const c of couriers) {
-      if (await this.orderMatchesZones(job.order, c.id, c.country)) {
+      if (await orderMatchesZones(this.prisma, job.order, c.id, c.country)) {
         zoneMatched.push(c)
       }
     }
 
-    // Tri par score composite — distance GPS pickup, charge, note, expérience
     const pickup = { lat: job.pickup_latitude, lng: job.pickup_longitude }
-    zoneMatched.sort((a, b) => {
-      const scoreA = this.scorePlatformCourier(pickup, { ...a, _count: a._count })
-      const scoreB = this.scorePlatformCourier(pickup, { ...b, _count: b._count })
-      return scoreB - scoreA
-    })
+    zoneMatched.sort((a, b) =>
+      this.scoreCourier(pickup, { ...b, _count: { jobs: b._count.jobs } })
+      - this.scoreCourier(pickup, { ...a, _count: { jobs: a._count.jobs } }),
+    )
 
     const candidate = zoneMatched[0] ?? null
 
     if (!candidate) {
-      this.logger.log(`Job ${job.id}: no online courier in zone`)
+      this.logger.log(`Job ${job.id}: no online courier in zone (vehicle=${job.required_vehicle ?? 'any'})`)
       return
     }
 
@@ -286,9 +290,13 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Job ${job.id}: logistics partner missing`)
       return
     }
-    if (job.rejected_count >= MAX_OFFER_ATTEMPTS) return
+    if (job.rejected_count >= MAX_OFFER_ATTEMPTS) {
+      await this.escalateStuckJob(job)
+      return
+    }
     if (this.isOfferActive(job)) return
 
+    const orderCountry = await resolveOrderCountry(this.prisma, job.order)
     const rejectedIds = new Set(job.offer_rejections.map(r => r.courier_profile_id))
     const couriers = await this.prisma.courierProfile.findMany({
       where: {
@@ -297,6 +305,8 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
         kind: 'PARTNER_FLEET',
         logistics_partner_id: job.logistics_partner_id,
         id: { notIn: [...rejectedIds] },
+        ...(orderCountry ? { country: orderCountry } : {}),
+        ...(job.required_vehicle ? { vehicle: { in: vehiclesCompatible(job.required_vehicle) } } : {}),
       },
       include: {
         _count: {
@@ -308,10 +318,12 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
       take: 40,
     })
 
-    couriers.sort((a, b) => {
-      if (a._count.jobs !== b._count.jobs) return a._count.jobs - b._count.jobs
-      return b.rating_avg - a.rating_avg
-    })
+    // Même scoring composite que les platform riders (distance + charge + note + expérience)
+    const pickup = { lat: job.pickup_latitude, lng: job.pickup_longitude }
+    couriers.sort((a, b) =>
+      this.scoreCourier(pickup, { ...b, _count: { jobs: b._count.jobs } })
+      - this.scoreCourier(pickup, { ...a, _count: { jobs: a._count.jobs } }),
+    )
 
     const candidate = couriers[0] ?? null
     if (!candidate) {
@@ -343,49 +355,34 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Job ${job.id} offered to partner courier ${candidate.id}`)
   }
 
-  private async orderMatchesZones(
-    order: {
-      delivery_city_id: string | null
-      delivery_commune_id: string | null
-      shop: { city: string | null; country: string | null } | null
-    },
-    profileId: string,
-    profileCountry: string,
-  ): Promise<boolean> {
-    if (order.shop?.country && order.shop.country.toUpperCase() !== profileCountry.toUpperCase()) {
-      return false
+  /**
+   * Notifie les admins lorsqu'un job atteint la limite de tentatives sans être accepté.
+   * Enregistre aussi un log pour le suivi ops.
+   */
+  private async escalateStuckJob(
+    job: NonNullable<Awaited<ReturnType<DeliveryOfferService['loadJobForOffer']>>>,
+  ) {
+    const shopName = job.order.merchant?.business_name ?? job.order.shop?.name ?? 'Commerce'
+
+    // Notifie les admins via push (type dédié pour filtrage côté admin)
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'ADMIN' },
+      select: { id: true },
+      take: 10,
+    })
+    for (const admin of admins) {
+      await this.notificationQueue.enqueuePush({
+        userId: admin.id,
+        type: 'delivery_job_stuck',
+        title: '⚠️ Course sans livreur',
+        body: `Job ${job.id.slice(0, 8)} (${shopName}) : ${MAX_OFFER_ATTEMPTS} tentatives sans réponse`,
+        data: { job_id: job.id, type: 'delivery_job_stuck' },
+      })
     }
 
-    const zones = await this.prisma.courierServiceZone.findMany({
-      where: { courier_id: profileId, is_active: true },
-      include: {
-        communes: { select: { commune_id: true } },
-        city: { select: { id: true, name: true, slug: true } },
-      },
-    })
-    if (!zones.length) return false
-
-    if (order.delivery_city_id) {
-      for (const zone of zones) {
-        if (zone.city_id !== order.delivery_city_id) continue
-        if (zone.all_communes) return true
-        if (
-          order.delivery_commune_id
-          && zone.communes.some(c => c.commune_id === order.delivery_commune_id)
-        ) {
-          return true
-        }
-      }
-      return false
-    }
-
-    const shopCity = order.shop?.city?.toLowerCase().trim()
-    if (!shopCity) return false
-    return zones.some(z => {
-      const name = z.city.name.toLowerCase()
-      const slug = z.city.slug.toLowerCase()
-      return shopCity.includes(name) || name.includes(shopCity) || shopCity === slug
-    })
+    this.logger.error(
+      `Job ${job.id} STUCK — ${job.rejected_count} rejections, vehicle=${job.required_vehicle ?? 'any'}, mode=${job.fulfilment_mode}`,
+    )
   }
 
   private async clearOffer(jobId: string) {

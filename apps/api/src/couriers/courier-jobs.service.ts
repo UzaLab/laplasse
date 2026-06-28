@@ -14,6 +14,8 @@ import { DeliveryEtaService } from '../delivery/delivery-eta.service'
 import { StorageService } from '../storage/storage.service'
 import { DeliveryJobStatus } from '../../generated/prisma/client'
 import { COURIER_ADVANCE_STATUSES } from './dto/update-courier-job-status.dto'
+import { orderMatchesZones, resolveOrderCountry } from '../delivery/delivery-zone-match.util'
+import { isVehicleCompatible } from '../delivery/delivery-vehicle.util'
 
 const ACTIVE_JOB_STATUSES: DeliveryJobStatus[] = ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT']
 
@@ -31,6 +33,9 @@ const JOB_INCLUDE = {
       customer_phone: true,
       customer_note: true,
       order_source: true,
+      food_cash_exact: true,
+      food_cash_tender_amount: true,
+      required_vehicle: true,
       created_at: true,
       user: { select: { full_name: true } },
       shop: {
@@ -48,7 +53,7 @@ const JOB_INCLUDE = {
         select: {
           id: true,
           business_name: true,
-          location: { select: { address: true, district: true, city: true } },
+          location: { select: { address: true, district: true, city: true, country: true } },
         },
       },
       _count: { select: { items: true } },
@@ -80,51 +85,6 @@ export class CourierJobsService {
     return profile
   }
 
-  private async orderMatchesZones(
-    order: {
-      delivery_city_id: string | null
-      delivery_commune_id: string | null
-      shop: { city: string | null; country: string | null } | null
-    },
-    profileId: string,
-    profileCountry: string,
-  ): Promise<boolean> {
-    if (order.shop?.country && order.shop.country.toUpperCase() !== profileCountry.toUpperCase()) {
-      return false
-    }
-
-    const zones = await this.prisma.courierServiceZone.findMany({
-      where: { courier_id: profileId, is_active: true },
-      include: {
-        communes: { select: { commune_id: true } },
-        city: { select: { id: true, name: true, slug: true } },
-      },
-    })
-    if (!zones.length) return false
-
-    if (order.delivery_city_id) {
-      for (const zone of zones) {
-        if (zone.city_id !== order.delivery_city_id) continue
-        if (zone.all_communes) return true
-        if (
-          order.delivery_commune_id
-          && zone.communes.some(c => c.commune_id === order.delivery_commune_id)
-        ) {
-          return true
-        }
-      }
-      return false
-    }
-
-    const shopCity = order.shop?.city?.toLowerCase().trim()
-    if (!shopCity) return false
-    return zones.some(z => {
-      const name = z.city.name.toLowerCase()
-      const slug = z.city.slug.toLowerCase()
-      return shopCity.includes(name) || name.includes(shopCity) || shopCity === slug
-    })
-  }
-
   async listAvailable(userId: string) {
     const profile = await this.requireOnlineCourier(userId)
     if (!profile.is_online) {
@@ -146,6 +106,14 @@ export class CourierJobsService {
         status: 'PENDING',
         courier_profile_id: null,
         ...fulfilmentFilter,
+        // Ne montrer que les jobs compatibles avec le véhicule du livreur
+        OR: [
+          { required_vehicle: null },
+          { required_vehicle: profile.vehicle },
+          ...(profile.vehicle === 'VAN' ? [{ required_vehicle: 'CAR' as const }, { required_vehicle: 'TRICYCLE' as const }, { required_vehicle: 'MOTO' as const }] : []),
+          ...(profile.vehicle === 'CAR' ? [{ required_vehicle: 'TRICYCLE' as const }, { required_vehicle: 'MOTO' as const }] : []),
+          ...(profile.vehicle === 'TRICYCLE' ? [{ required_vehicle: 'MOTO' as const }] : []),
+        ],
         order: {
           delivery_type: 'DELIVERY',
           status: { in: ['CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'] },
@@ -159,7 +127,7 @@ export class CourierJobsService {
     const matched = []
     for (const job of pending) {
       if (profile.kind === 'INDEPENDENT') {
-        if (!(await this.orderMatchesZones(job.order, profile.id, profile.country))) continue
+        if (!(await orderMatchesZones(this.prisma, job.order, profile.id, profile.country))) continue
       } else if (profile.kind === 'PARTNER_FLEET') {
         if (job.logistics_partner_id !== profile.logistics_partner_id) continue
       }
@@ -239,7 +207,14 @@ export class CourierJobsService {
 
     const job = await this.prisma.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { order: { include: { shop: { select: { city: true, country: true } } } } },
+      include: {
+        order: {
+          include: {
+            shop: { select: { city: true, country: true } },
+            merchant: { select: { location: { select: { country: true } } } },
+          },
+        },
+      },
     })
     if (!job) throw new NotFoundException('Mission introuvable')
     if (job.status !== 'PENDING' || job.courier_profile_id) {
@@ -250,8 +225,13 @@ export class CourierJobsService {
       throw new BadRequestException('Cette offre a expiré ou est destinée à un autre livreur')
     }
 
+    // Vérifier que le véhicule du livreur est compatible avec le véhicule requis par le job
+    if (job.required_vehicle && !isVehicleCompatible(profile.vehicle, job.required_vehicle)) {
+      throw new ForbiddenException(`Ce job requiert un ${job.required_vehicle} — votre véhicule (${profile.vehicle}) n'est pas compatible`)
+    }
+
     if (profile.kind === 'INDEPENDENT') {
-      const matches = await this.orderMatchesZones(job.order, profile.id, profile.country)
+      const matches = await orderMatchesZones(this.prisma, job.order, profile.id, profile.country)
       if (!matches) {
         throw new ForbiddenException('Cette mission est hors de vos zones de service')
       }
@@ -365,6 +345,7 @@ export class CourierJobsService {
       pickup_address: string | null
       dropoff_address: string | null
       eta_minutes: number | null
+      required_vehicle?: string | null
       assigned_at: Date | null
       picked_up_at: Date | null
       delivered_at: Date | null
@@ -382,6 +363,8 @@ export class CourierJobsService {
         customer_phone: string | null
         customer_note: string | null
         order_source: string
+        food_cash_exact: boolean | null
+        food_cash_tender_amount: number | null
         created_at: Date
         user: { full_name: string | null } | null
         shop: {
@@ -439,6 +422,7 @@ export class CourierJobsService {
       delivered_at: job.delivered_at,
       created_at: job.created_at,
       proof_photo_url: job.proof_photo_url ?? null,
+      required_vehicle: job.required_vehicle ?? null,
       offered_to_me: offeredToMe,
       offer_expires_at: job.offer_expires_at,
       offer_seconds_left: secondsLeft,
@@ -455,6 +439,8 @@ export class CourierJobsService {
         item_count: job.order._count.items,
         shop_name: shopName,
         shop_address: shopAddress,
+        food_cash_exact: job.order.food_cash_exact ?? null,
+        food_cash_tender_amount: job.order.food_cash_tender_amount ?? null,
         created_at: job.order.created_at,
       },
     }

@@ -6,11 +6,14 @@ import { useAdminSession } from '@/features/admin/hooks/useAdminSession'
 import { adminFetch } from '@/lib/adminApi'
 import { JOB_STATUS_LABELS } from '@/lib/courierJobLabels'
 import { AdminPageContainer } from '@/features/admin/components/AdminPageContainer'
+import { vehicleLabel, VEHICLE_OPTIONS } from '@/lib/courierLabels'
+import { SUPPORTED_COUNTRIES, getCountryLabel } from '@/lib/country'
 
 interface AdminDeliveryJob {
   id: string
   status: string
   fulfilment_mode: string
+  required_vehicle: string | null
   created_at: string
   updated_at: string
   offer_expires_at: string | null
@@ -24,6 +27,7 @@ interface AdminDeliveryJob {
   courier_profile: {
     id: string
     phone: string
+    vehicle: string
     user: { full_name: string | null; email: string }
   } | null
   offered_to: {
@@ -36,12 +40,23 @@ interface AdminCourierOption {
   id: string
   phone: string
   city: string
+  vehicle: string
   is_online: boolean
   user: { full_name: string | null; email: string }
 }
 
+// Hiérarchie capacité véhicule
+const VEHICLE_HIERARCHY = ['MOTO', 'TRICYCLE', 'CAR', 'VAN']
+function isCompatible(courierVehicle: string, required: string | null) {
+  if (!required) return true
+  const ci = VEHICLE_HIERARCHY.indexOf(courierVehicle)
+  const ri = VEHICLE_HIERARCHY.indexOf(required)
+  return ci >= ri
+}
+
 export default function AdminDeliveryAssignmentsPage() {
   const { ready } = useAdminSession()
+  const [country, setCountry] = useState('CI')
   const [jobs, setJobs] = useState<AdminDeliveryJob[]>([])
   const [couriers, setCouriers] = useState<AdminCourierOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -52,14 +67,14 @@ export default function AdminDeliveryAssignmentsPage() {
     if (!ready) return
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready])
+  }, [ready, country])
 
   const load = async () => {
     if (!ready) return
     setLoading(true)
     const [jobsData, couriersData] = await Promise.all([
-      adminFetch<AdminDeliveryJob[]>('/admin/delivery/jobs?filter=active'),
-      adminFetch<AdminCourierOption[]>('/admin/couriers?filter=active'),
+      adminFetch<AdminDeliveryJob[]>(`/admin/delivery/jobs?filter=active&country=${country}`),
+      adminFetch<AdminCourierOption[]>(`/admin/couriers?filter=active&country=${country}`),
     ])
     if (jobsData) setJobs(jobsData)
     if (couriersData) setCouriers(couriersData)
@@ -96,6 +111,15 @@ export default function AdminDeliveryAssignmentsPage() {
           >
             <RefreshCw size={16} /> Actualiser
           </button>
+          <select
+            value={country}
+            onChange={e => setCountry(e.target.value)}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold"
+          >
+            {SUPPORTED_COUNTRIES.map(c => (
+              <option key={c.code} value={c.code}>{c.label}</option>
+            ))}
+          </select>
         </div>
 
         {loading ? (
@@ -118,6 +142,11 @@ export default function AdminDeliveryAssignmentsPage() {
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
                       Mode : {job.fulfilment_mode === 'MERCHANT_OWN' ? 'Flotte marchand' : 'Réseau LaPlasse'}
+                      {job.required_vehicle && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100">
+                          {vehicleLabel(job.required_vehicle)} requis
+                        </span>
+                      )}
                     </p>
                   </div>
                   <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
@@ -131,6 +160,7 @@ export default function AdminDeliveryAssignmentsPage() {
                       <span className="font-bold">Assigné :</span>{' '}
                       {job.courier_profile.user.full_name ?? job.courier_profile.user.email}
                       {' · '}{job.courier_profile.phone}
+                      {' · '}<span className="text-slate-500">{vehicleLabel(job.courier_profile.vehicle)}</span>
                     </p>
                   ) : job.offered_to ? (
                     <p>
@@ -150,12 +180,20 @@ export default function AdminDeliveryAssignmentsPage() {
                       className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm"
                     >
                       <option value="">Choisir un livreur…</option>
-                      {couriers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.user.full_name ?? c.user.email} · {c.city}
-                          {c.is_online ? ' · en ligne' : ''}
-                        </option>
-                      ))}
+                      {VEHICLE_OPTIONS.map(group => {
+                        const groupCouriers = couriers.filter(c => c.vehicle === group.value && isCompatible(c.vehicle, job.required_vehicle))
+                        if (!groupCouriers.length) return null
+                        return (
+                          <optgroup key={group.value} label={`${group.label}${!isCompatible(group.value, job.required_vehicle) ? ' ⚠ incompatible' : ''}`}>
+                            {groupCouriers.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.user.full_name ?? c.user.email} · {c.city}
+                                {c.is_online ? ' · en ligne' : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )
+                      })}
                     </select>
                     <button
                       type="button"

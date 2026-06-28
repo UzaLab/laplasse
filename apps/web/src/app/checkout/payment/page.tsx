@@ -33,6 +33,12 @@ import {
 import { notify } from '@/lib/notify'
 import { isFoodOrderCart } from '@/lib/orderFlow'
 import { captureCheckoutStep } from '@/lib/analytics'
+import {
+  cashTenderOptions,
+  cashChangeDue,
+  formatCashTenderLabel,
+  XOF_MAX_BILL,
+} from '@/lib/foodCashTender'
 
 function CheckoutPaymentContent() {
   return (
@@ -60,6 +66,8 @@ function CheckoutPaymentPageContent() {
   const [ready, setReady] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [resumeMode, setResumeMode] = useState(false)
+  const [cashExact, setCashExact] = useState(false)
+  const [cashTenderAmount, setCashTenderAmount] = useState<number | null>(null)
 
   useEffect(() => {
     if (!hydrated || !isAuthenticated) return
@@ -108,15 +116,33 @@ function CheckoutPaymentPageContent() {
       : false)
   const Steps = isFoodFlow ? FoodCheckoutSteps : CheckoutSteps
 
+  useEffect(() => {
+    if (!session || !isFoodFlow) return
+    const options = cashTenderOptions(session.checkoutResult.total)
+    setCashTenderAmount(prev => (prev != null && options.includes(prev) ? prev : options[0] ?? null))
+  }, [session?.checkoutResult.total, isFoodFlow])
+
+  const cashTenderReady = !isFoodFlow || cashExact || (cashTenderAmount != null && cashTenderAmount >= (session?.checkoutResult.total ?? 0))
+
   const handleConfirm = async (simulateResult: 'success' | 'failure') => {
     if (!session) return
+    if (simulateResult === 'success' && isFoodFlow && !cashTenderReady) {
+      notify.error('Indiquez si vous avez le montant exact ou choisissez un billet.')
+      return
+    }
     setProcessing(true)
 
     const paymentIds = session.checkoutResult.orders.map(o => o.paymentId)
+    const cashTender = isFoodFlow && simulateResult === 'success'
+      ? {
+          exact: cashExact,
+          tenderAmount: cashExact ? undefined : (cashTenderAmount ?? undefined),
+        }
+      : undefined
     const { result, error: err } =
       paymentIds.length > 1
-        ? await confirmBatchOrderPayments(paymentIds, simulateResult)
-        : await confirmOrderPayment(paymentIds[0], simulateResult)
+        ? await confirmBatchOrderPayments(paymentIds, simulateResult, cashTender)
+        : await confirmOrderPayment(paymentIds[0], simulateResult, cashTender)
 
     if (!result) {
       notify.error(err ?? 'Erreur de paiement')
@@ -159,6 +185,8 @@ function CheckoutPaymentPageContent() {
   }
 
   const { checkoutResult, cartSnapshot } = session
+  const tenderOptions = isFoodFlow ? cashTenderOptions(checkoutResult.total) : []
+  const changeDue = cashTenderAmount != null ? cashChangeDue(cashTenderAmount, checkoutResult.total) : 0
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -230,6 +258,51 @@ function CheckoutPaymentPageContent() {
                   </div>
                 </div>
 
+                {isFoodFlow && (
+                  <div className="bg-white rounded-3xl border border-amber-100 shadow-sm p-6 space-y-4">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">Paiement cash à la livraison</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Indiquez la monnaie que vous présenterez au livreur (billets de {XOF_MAX_BILL.toLocaleString('fr-FR')} FCFA max).
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cashExact}
+                        onChange={e => setCashExact(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
+                      />
+                      <span className="text-sm font-semibold text-slate-800">
+                        J&apos;ai le montant exact ({formatPrice(checkoutResult.total, checkoutResult.currency)})
+                      </span>
+                    </label>
+                    {!cashExact && (
+                      <label className="block">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                          Montant que je présenterai
+                        </span>
+                        <select
+                          value={cashTenderAmount ?? ''}
+                          onChange={e => setCashTenderAmount(Number(e.target.value))}
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                        >
+                          {tenderOptions.map(amount => (
+                            <option key={amount} value={amount}>
+                              {formatCashTenderLabel(amount)}
+                            </option>
+                          ))}
+                        </select>
+                        {cashTenderAmount != null && changeDue > 0 && (
+                          <p className="text-xs text-amber-800 mt-2 font-medium">
+                            Monnaie à rendre : {formatPrice(changeDue, checkoutResult.currency)}
+                          </p>
+                        )}
+                      </label>
+                    )}
+                  </div>
+                )}
+
                 <p className="text-sm text-slate-500 text-center">
                   Choisissez le résultat du simulateur :
                 </p>
@@ -238,7 +311,8 @@ function CheckoutPaymentPageContent() {
                   <button
                     type="button"
                     onClick={() => handleConfirm('success')}
-                    className="flex flex-col items-center gap-2 p-5 rounded-2xl border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                    disabled={isFoodFlow && !cashTenderReady}
+                    className="flex flex-col items-center gap-2 p-5 rounded-2xl border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Smartphone size={24} className="text-emerald-600" />
                     <span className="text-sm font-bold text-emerald-700">Paiement OK</span>
@@ -268,7 +342,7 @@ function CheckoutPaymentPageContent() {
                     </Link>
                   ) : (
                     <Link
-                      href="/checkout"
+                      href={isFoodRoute ? '/commande/livraison' : '/checkout'}
                       className="text-sm font-bold text-slate-500 hover:text-slate-800"
                       style={{ textDecoration: 'none' }}
                     >

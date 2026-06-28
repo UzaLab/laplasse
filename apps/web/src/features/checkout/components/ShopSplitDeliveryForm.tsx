@@ -5,6 +5,7 @@ import type { Cart } from '@/lib/marketplaceApi'
 import { formatPrice } from '@/lib/marketplaceApi'
 import type { DeliveryQuoteItem, GeoCity, GeoCommune } from '@/lib/geoApi'
 import { getDeliveryVehicleLabel } from '@/lib/deliveryVehicles'
+import { formatDeliveryEtaShort } from '@/lib/deliveryEta'
 
 export interface ShopDeliveryState {
   deliveryType: 'PICKUP' | 'DELIVERY'
@@ -150,9 +151,9 @@ export function ShopSplitDeliveryForm({
                             <span className="font-medium text-slate-500"> · {quote.zone_name}</span>
                           )}
                         </p>
-                        {quote.eta_min_minutes != null && (
+                        {quote.eta_min != null && quote.eta_max != null && (
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {getDeliveryVehicleLabel(quote.vehicle ?? 'MOTO').toLowerCase()} · {quote.eta_min_minutes}–{quote.eta_max_minutes} min
+                            {getDeliveryVehicleLabel(quote.vehicle ?? 'MOTO').toLowerCase()} · {formatDeliveryEtaShort(quote.eta_min, quote.eta_max, quote.eta_unit ?? 'MINUTES')}
                           </p>
                         )}
                       </>

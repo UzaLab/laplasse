@@ -72,8 +72,9 @@ export interface DeliveryQuoteItem {
   available: boolean
   fee: number
   zone_name?: string
-  eta_min_minutes?: number
-  eta_max_minutes?: number
+  eta_min?: number
+  eta_max?: number
+  eta_unit?: 'MINUTES' | 'HOURS' | 'DAYS'
   vehicle?: string
   message?: string
 }
@@ -85,13 +86,15 @@ export async function fetchDeliveryQuote(input: {
   commune_id: string
   subtotals?: Record<string, number>
   order_flow?: 'food' | 'marketplace'
+  country?: string
 }) {
+  const country = input.country ?? getCountryCode()
   return fetchPublicJson<{ quotes: DeliveryQuoteItem[]; total_delivery_fee: number }>(
     '/checkout/delivery-quote',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ ...input, country }),
     },
   )
 }

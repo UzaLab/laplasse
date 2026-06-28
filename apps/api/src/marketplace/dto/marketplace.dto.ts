@@ -577,6 +577,17 @@ export class ConfirmOrderPaymentDto {
 
   @IsIn(['success', 'failure'])
   simulateResult!: 'success' | 'failure'
+
+  /** Paiement cash à la livraison : le client a le montant exact. */
+  @IsOptional()
+  @IsBoolean()
+  food_cash_exact?: boolean
+
+  /** Montant total des billets que le client présentera (multiples de 10 000 FCFA). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  food_cash_tender_amount?: number
 }
 
 export class ConfirmBatchOrderPaymentDto {
@@ -586,6 +597,15 @@ export class ConfirmBatchOrderPaymentDto {
 
   @IsIn(['success', 'failure'])
   simulateResult!: 'success' | 'failure'
+
+  @IsOptional()
+  @IsBoolean()
+  food_cash_exact?: boolean
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  food_cash_tender_amount?: number
 }
 
 export class UpdateOrderStatusDto {

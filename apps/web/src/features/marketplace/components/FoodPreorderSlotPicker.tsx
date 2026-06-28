@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock } from 'lucide-react'
+import { Clock, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FoodScheduling } from '@/lib/marketplaceApi'
 
@@ -26,30 +26,35 @@ export function FoodPreorderSlotPicker({ scheduling, value, onChange, className 
         <div>
           <p className="text-sm font-bold text-slate-900">Créneau de livraison / retrait</p>
           <p className="text-xs text-slate-500 mt-0.5">
-            Le restaurant est fermé — choisissez un créneau pendant ses prochaines heures d&apos;ouverture.
+            Le restaurant est fermé — choisissez un créneau lors de ses prochaines ouvertures.
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {slots.map(slot => {
-          const selected = value === slot.at
-          return (
-            <button
-              key={slot.at}
-              type="button"
-              onClick={() => onChange(slot.at)}
-              className={cn(
-                'text-left px-4 py-3 rounded-xl border text-sm font-semibold transition-colors',
-                selected
-                  ? 'border-blue-600 bg-blue-50 text-blue-900 ring-2 ring-blue-200'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-200 hover:bg-blue-50/50',
-              )}
-            >
-              {slot.label}
-            </button>
-          )
-        })}
-      </div>
+      <label className="block">
+        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+          Date et heure
+        </span>
+        <div className="relative">
+          <select
+            value={value ?? ''}
+            onChange={e => onChange(e.target.value)}
+            className="w-full appearance-none border border-slate-200 rounded-xl px-4 py-3.5 pr-10 text-sm font-semibold text-slate-900 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+          >
+            <option value="" disabled>
+              Sélectionnez un créneau…
+            </option>
+            {slots.map(slot => (
+              <option key={slot.at} value={slot.at}>
+                {slot.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={18}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+        </div>
+      </label>
       {!value && (
         <p className="text-xs font-medium text-amber-700">
           Sélectionnez un créneau pour continuer.

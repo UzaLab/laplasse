@@ -12,7 +12,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator'
-import { DeliveryVehicle } from '../../../generated/prisma/client'
+import { DeliveryVehicle, DeliveryEtaUnit } from '../../../generated/prisma/client'
 
 export class DeliveryZoneRuleDto {
   @IsString()
@@ -53,11 +53,15 @@ export class CreateDeliveryZoneDto {
 
   @IsInt()
   @Min(1)
-  eta_min_minutes!: number
+  eta_min!: number
 
   @IsInt()
   @Min(1)
-  eta_max_minutes!: number
+  eta_max!: number
+
+  @IsOptional()
+  @IsEnum(DeliveryEtaUnit)
+  eta_unit?: DeliveryEtaUnit
 
   @IsOptional()
   @IsEnum(DeliveryVehicle)

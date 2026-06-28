@@ -8,6 +8,8 @@ import { DeliveryFeeSplitService } from './delivery-fee-split.service'
 import { LogisticsPartnersService } from '../logistics/logistics-partners.service'
 import { orderStatusLabelFr } from '../common/order-status-labels'
 import { coordsFromCityName, courierCoordsForStatus } from './delivery-gps.util'
+import { orderMatchesZones, resolveOrderCountry } from './delivery-zone-match.util'
+import { isVehicleCompatible } from './delivery-vehicle.util'
 import { DeliveryJobStatus, OrderStatus } from '../../generated/prisma/client'
 
 const DELIVERY_JOB_MESSAGES: Partial<Record<DeliveryJobStatus, string>> = {
@@ -138,6 +140,7 @@ export class DeliveryService {
         order_id: orderId,
         fulfilment_mode: fulfilmentMode,
         logistics_partner_id: order.logistics_partner_id ?? undefined,
+        required_vehicle: order.required_vehicle ?? undefined,
         pickup_address: pickup || undefined,
         pickup_latitude: pickupCoords.lat,
         pickup_longitude: pickupCoords.lng,
@@ -722,15 +725,31 @@ export class DeliveryService {
     })
   }
 
-  async listJobsForAdmin(filter?: string) {
+  async listJobsForAdmin(filter?: string, country?: string) {
     const activeStatuses: DeliveryJobStatus[] = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT']
-    const where = filter === 'active'
-      ? { status: { in: activeStatuses } }
-      : {}
+    const countryCode = country?.toUpperCase()
+    const where = {
+      ...(filter === 'active' ? { status: { in: activeStatuses } } : {}),
+      ...(countryCode
+        ? {
+            OR: [
+              { order: { shop: { country: countryCode } } },
+              { order: { merchant: { location: { country: countryCode } } } },
+            ],
+          }
+        : {}),
+    }
 
     return this.prisma.deliveryJob.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        status: true,
+        fulfilment_mode: true,
+        required_vehicle: true,
+        created_at: true,
+        updated_at: true,
+        offer_expires_at: true,
         order: {
           select: {
             id: true,
@@ -744,6 +763,7 @@ export class DeliveryService {
           select: {
             id: true,
             phone: true,
+            vehicle: true,
             user: { select: { full_name: true, email: true } },
           },
         },
@@ -762,7 +782,19 @@ export class DeliveryService {
   async reassignJobToCourierProfile(jobId: string, courierProfileId: string) {
     const job = await this.prisma.deliveryJob.findUnique({
       where: { id: jobId },
-      include: { order: { select: { id: true, user_id: true, status: true } } },
+      include: {
+        order: {
+          select: {
+            id: true,
+            user_id: true,
+            status: true,
+            delivery_city_id: true,
+            delivery_commune_id: true,
+            shop: { select: { city: true, country: true } },
+            merchant: { select: { location: { select: { country: true } } } },
+          },
+        },
+      },
     })
     if (!job) throw new NotFoundException('Course introuvable')
     if (!['PENDING', 'ASSIGNED'].includes(job.status)) {
@@ -773,6 +805,28 @@ export class DeliveryService {
       where: { id: courierProfileId, status: 'ACTIVE' },
     })
     if (!profile) throw new NotFoundException('Livreur introuvable ou inactif')
+
+    const orderCountry = await resolveOrderCountry(this.prisma, job.order)
+    if (orderCountry && profile.country.toUpperCase() !== orderCountry) {
+      throw new BadRequestException('Ce livreur n\'opère pas dans le pays de cette commande')
+    }
+
+    if (job.required_vehicle && !isVehicleCompatible(profile.vehicle, job.required_vehicle)) {
+      throw new BadRequestException(
+        `Véhicule incompatible : ${job.required_vehicle} requis, livreur en ${profile.vehicle}`,
+      )
+    }
+
+    if (profile.kind === 'INDEPENDENT') {
+      const matches = await orderMatchesZones(this.prisma, job.order, profile.id, profile.country)
+      if (!matches) {
+        throw new BadRequestException('Ce livreur ne couvre pas la zone de livraison')
+      }
+    } else if (profile.kind === 'PARTNER_FLEET') {
+      if (job.fulfilment_mode !== 'LOGISTICS_PARTNER' || job.logistics_partner_id !== profile.logistics_partner_id) {
+        throw new BadRequestException('Ce livreur n\'appartient pas à la flotte partenaire de cette course')
+      }
+    }
 
     const active = await this.prisma.deliveryJob.findFirst({
       where: {

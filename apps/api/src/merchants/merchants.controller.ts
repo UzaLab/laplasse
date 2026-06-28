@@ -13,6 +13,7 @@ import { ShopMenuService } from '../shop-menu/shop-menu.service'
 import { ComposedMenuService } from '../shop-menu/composed-menu.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { CreateDeliveryZoneDto } from '../delivery-zones/dto/create-delivery-zone.dto'
+import { UpdateDeliveryZoneDto } from '../delivery-zones/dto/update-delivery-zone.dto'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 
 @Controller('merchants')
@@ -302,6 +303,18 @@ export class MerchantsController {
   ) {
     const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
     return this.deliveryZones.createForShop(shop.id, dto)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/delivery-zones/:zoneId')
+  async updateMyDeliveryZone(
+    @CurrentUser() user: { id: string },
+    @Param('zoneId') zoneId: string,
+    @Body() dto: UpdateDeliveryZoneDto,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return this.deliveryZones.updateForShop(shop.id, zoneId, dto)
   }
 
   @UseGuards(JwtAuthGuard)

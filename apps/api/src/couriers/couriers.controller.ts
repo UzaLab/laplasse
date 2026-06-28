@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { DeliveryVehicle } from '../../generated/prisma/client'
 import { SkipThrottle } from '@nestjs/throttler'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
@@ -36,6 +37,15 @@ export class CouriersController {
     @Body() dto: RegisterCourierDto,
   ) {
     return this.couriersService.register(user.id, dto)
+  }
+
+  @Patch('me/profile')
+  @Roles('COURIER')
+  updateProfile(
+    @CurrentUser() user: { id: string },
+    @Body() body: { vehicle?: DeliveryVehicle; plate_number?: string },
+  ) {
+    return this.couriersService.updateProfile(user.id, body)
   }
 
   @Patch('me/online')

@@ -124,10 +124,43 @@ export class MerchantsService {
   }
 
   async resolveMyShop(userId: string, merchantId?: string) {
+    return this.ensureMerchantDeliveryShop(userId, merchantId)
+  }
+
+  /** Boutique liée à l'établissement — créée à la volée pour les restaurants sans shop (zones livraison). */
+  async ensureMerchantDeliveryShop(userId: string, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    const shop = await this.prisma.shop.findUnique({ where: { merchant_id: merchant.id } })
-    if (!shop) throw new NotFoundException('Aucune boutique liée à cet établissement')
-    return shop
+    const existing = await this.prisma.shop.findUnique({
+      where: { merchant_id: merchant.id },
+    })
+    if (existing) return existing
+
+    const location = await this.prisma.merchantLocation.findUnique({
+      where: { merchant_id: merchant.id },
+    })
+
+    let slug = merchant.slug
+    let n = 1
+    while (await this.prisma.shop.findUnique({ where: { slug } })) {
+      slug = `${merchant.slug}-${n++}`
+    }
+
+    return this.prisma.shop.create({
+      data: {
+        owner_id: merchant.owner_id,
+        name: merchant.business_name,
+        slug,
+        merchant_id: merchant.id,
+        status: 'ACTIVE',
+        is_active: true,
+        enabled_modules: ['food'],
+        city: location?.city ?? defaultCityForCountry(location?.country ?? 'CI'),
+        country: location?.country ?? 'CI',
+        district: location?.district ?? null,
+        address: location?.address ?? null,
+        delivery_fulfilment_default: merchant.delivery_fulfilment_default,
+      },
+    })
   }
 
   async updateDeliverySettings(
@@ -136,11 +169,22 @@ export class MerchantsService {
     merchantId?: string,
   ) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    return this.prisma.merchant.update({
+    const updated = await this.prisma.merchant.update({
       where: { id: merchant.id },
       data: { delivery_fulfilment_default: dto.delivery_fulfilment_default },
       select: { id: true, delivery_fulfilment_default: true },
     })
+    const linkedShop = await this.prisma.shop.findUnique({
+      where: { merchant_id: merchant.id },
+      select: { id: true },
+    })
+    if (linkedShop) {
+      await this.prisma.shop.update({
+        where: { id: linkedShop.id },
+        data: { delivery_fulfilment_default: dto.delivery_fulfilment_default },
+      })
+    }
+    return updated
   }
 
   // ── Liste publique ──────────────────────────────────────────────────────────

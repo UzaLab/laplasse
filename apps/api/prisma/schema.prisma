@@ -1289,6 +1289,12 @@ enum DeliveryVehicle {
   VAN
 }
 
+enum DeliveryEtaUnit {
+  MINUTES
+  HOURS
+  DAYS
+}
+
 enum ShopStatus {
   DRAFT
   PENDING_REVIEW
@@ -1391,8 +1397,9 @@ model ShopDeliveryZone {
   fee                     Int
   min_order_amount        Int?
   free_delivery_threshold Int?
-  eta_min_minutes         Int
-  eta_max_minutes         Int
+  eta_min                 Int
+  eta_max                 Int
+  eta_unit                DeliveryEtaUnit @default(MINUTES)
   vehicle                 DeliveryVehicle @default(MOTO)
   is_active               Boolean         @default(true)
   priority                Int             @default(0)
@@ -1694,6 +1701,11 @@ model Order {
   eta_delayed         Boolean      @default(false)
   /// Créneau souhaité pour une pré-commande food (ISO, heure d'ouverture choisie).
   food_preorder_for   DateTime?
+  /// Client paie cash : montant exact (true) ou billet(s) d'un montant donné.
+  food_cash_exact     Boolean?
+  food_cash_tender_amount Int?
+  /// Véhicule requis pour cette livraison (issu du devis au checkout).
+  required_vehicle    DeliveryVehicle?
   created_at          DateTime     @default(now())
   updated_at          DateTime     @updatedAt
 
@@ -1991,6 +2003,7 @@ model DeliveryJob {
   courier_profile_id String?
   fulfilment_mode   DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   logistics_partner_id String?
+  required_vehicle DeliveryVehicle?
   status          DeliveryJobStatus @default(PENDING)
   tracking_token  String            @unique @default(cuid())
   pickup_address  String?

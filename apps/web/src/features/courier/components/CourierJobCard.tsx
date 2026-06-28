@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  ArrowRight, Camera, Clock, Loader2, MapPin, MessageSquare, Package, Phone, Store, User, X,
+  ArrowRight, Camera, Clock, Loader2, MapPin, MessageSquare, Package, Phone, Store, User, X, Truck,
 } from 'lucide-react'
 import type { CourierJobRow, DeliveryJobStatus } from '@/lib/courierJobsApi'
 import {
@@ -11,6 +11,8 @@ import {
   JOB_STATUS_STYLES,
   NEXT_JOB_ACTION,
 } from '@/lib/courierJobLabels'
+import { courierCashTenderMessage } from '@/lib/foodCashTender'
+import { vehicleLabel } from '@/lib/courierLabels'
 
 interface Props {
   job: CourierJobRow
@@ -33,6 +35,11 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
   const next = mode === 'active' ? NEXT_JOB_ACTION[job.status] : null
   const needsProofOtp = next?.status === 'DELIVERED'
   const urgentOffer = mode === 'available' && job.offered_to_me && (secondsLeft ?? 0) > 0
+  const cashTenderNote = courierCashTenderMessage(
+    job.order.total,
+    job.order.food_cash_exact,
+    job.order.food_cash_tender_amount,
+  )
 
   useEffect(() => {
     setSecondsLeft(job.offer_seconds_left)
@@ -118,6 +125,11 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
           <p className="text-xs text-slate-400 mt-1">
             {job.order.item_count} article{job.order.item_count > 1 ? 's' : ''} · {formatFcfa(job.order.total)}
           </p>
+          {job.required_vehicle && (
+            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100">
+              <Truck size={10} /> {vehicleLabel(job.required_vehicle)} requis
+            </span>
+          )}
         </div>
         <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full shrink-0 ${JOB_STATUS_STYLES[job.status]}`}>
           {JOB_STATUS_LABELS[job.status]}
@@ -164,6 +176,11 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
           <div className="flex gap-2">
             <MessageSquare size={15} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-slate-600 italic text-xs">{job.order.customer_note}</p>
+          </div>
+        )}
+        {cashTenderNote && (
+          <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+            <p className="text-xs font-bold text-emerald-900">{cashTenderNote}</p>
           </div>
         )}
       </div>

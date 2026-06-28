@@ -1254,8 +1254,11 @@ export class AdminController {
   }
 
   @Get('delivery/jobs')
-  getDeliveryJobs(@Query('filter') filter?: string) {
-    return this.deliveryService.listJobsForAdmin(filter)
+  getDeliveryJobs(
+    @Query('filter') filter?: string,
+    @Query('country') country?: string,
+  ) {
+    return this.deliveryService.listJobsForAdmin(filter, country)
   }
 
   @Patch('delivery/jobs/:id/reassign')
@@ -1796,8 +1799,8 @@ export class AdminController {
   // ── Tarifs réseau LaPlasse (PLATFORM_RIDER) ─────────────────────────────────
 
   @Get('platform-delivery-rates')
-  listPlatformRates() {
-    return this.deliveryZones.listPlatformRates()
+  listPlatformRates(@Query('country') country?: string) {
+    return this.deliveryZones.listPlatformRates(country)
   }
 
   @Post('platform-delivery-rates')

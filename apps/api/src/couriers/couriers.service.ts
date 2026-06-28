@@ -287,6 +287,20 @@ export class CouriersService {
     })
   }
 
+  async updateProfile(userId: string, dto: { vehicle?: DeliveryVehicle; plate_number?: string }) {
+    const profile = await this.requireProfile(userId)
+    const data: { vehicle?: DeliveryVehicle; plate_number?: string | null } = {}
+    if (dto.vehicle) data.vehicle = dto.vehicle
+    if (dto.plate_number !== undefined) data.plate_number = dto.plate_number.trim() || null
+
+    const updated = await this.prisma.courierProfile.update({
+      where: { id: profile.id },
+      data,
+      select: COURIER_PROFILE_SELECT,
+    })
+    return updated
+  }
+
   async deleteServiceZone(userId: string, zoneId: string) {
     const profile = await this.requireProfile(userId)
     const zone = await this.prisma.courierServiceZone.findFirst({

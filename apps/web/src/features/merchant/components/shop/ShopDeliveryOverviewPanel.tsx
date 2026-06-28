@@ -7,7 +7,9 @@ import { shopApiFetch } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 import { useEffect, useState } from 'react'
 
-type FulfilmentMode = 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
+import type { FulfilmentMode } from '@/lib/deliveryFulfilmentModes'
+import { fulfilmentPricingExplanation } from '@/lib/deliveryFulfilmentModes'
+import { FulfilmentPricingBanner } from '@/features/merchant/components/FulfilmentPricingBanner'
 
 const MODES: Array<{
   value: FulfilmentMode
@@ -109,9 +111,9 @@ export function ShopDeliveryOverviewPanel({ onNavigateTab }: ShopDeliveryOvervie
 
       <section className="bg-white rounded-2xl border border-slate-100 p-5 space-y-4">
         <div>
-          <h3 className="font-bold text-slate-900">Mode d&apos;expédition par défaut</h3>
+          <h3 className="font-bold text-slate-900">1. Mode d&apos;expédition par défaut</h3>
           <p className="text-xs text-slate-500 mt-1">
-            Utilisé lors du dispatch d&apos;une commande. Modifiable à chaque envoi.
+            Détermine qui livre et quelle source de tarif s&apos;applique au checkout.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-3">
@@ -150,12 +152,10 @@ export function ShopDeliveryOverviewPanel({ onNavigateTab }: ShopDeliveryOvervie
         </div>
       </section>
 
+      <FulfilmentPricingBanner mode={mode} zoneCount={zoneCount} />
+
       <p className="text-xs text-slate-400 text-center">
-        Les frais de livraison affichés au client dépendent de vos{' '}
-        <button type="button" onClick={() => onNavigateTab('zones')} className="font-bold text-amber-600 underline">
-          zones & tarifs
-        </button>
-        .
+        {fulfilmentPricingExplanation(mode).zonesHint}
       </p>
     </div>
   )

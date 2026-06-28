@@ -12,6 +12,7 @@ import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicC
 import { CheckoutSteps } from '@/features/marketplace/components/CheckoutSteps'
 import { FoodCheckoutSteps } from '@/features/marketplace/components/FoodCheckoutSteps'
 import { FoodPreorderSlotPicker } from '@/features/marketplace/components/FoodPreorderSlotPicker'
+import { foodSchedulingBlockMessage } from '@/lib/foodSchedulingMessages'
 import { CheckoutOrderSummary } from '@/features/marketplace/components/CheckoutOrderSummary'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
@@ -63,6 +64,7 @@ import { AddressLocationPickerLazy } from '@/features/addresses/components/Addre
 import {
   getDeliveryVehicleLabel,
 } from '@/lib/deliveryVehicles'
+import { formatDeliveryEtaShort } from '@/lib/deliveryEta'
 import {
   detectCartKind,
   getCartRoute,
@@ -780,13 +782,7 @@ function CheckoutPageContent() {
               <div>
                 <p className="font-bold text-red-900 text-sm">Commandes indisponibles</p>
                 <p className="text-xs text-red-700 mt-0.5">
-                  {foodScheduling?.block_reason === 'paused'
-                    ? 'Le restaurant est en pause et n\'accepte pas de commandes pour le moment.'
-                    : foodScheduling?.block_reason === 'preorders_disabled'
-                      ? 'Le restaurant est fermé et n\'accepte pas les pré-commandes.'
-                      : foodScheduling?.block_reason === 'no_slots'
-                        ? 'Le restaurant est fermé et aucun créneau d\'ouverture n\'est configuré.'
-                        : 'Le restaurant est temporairement fermé.'}
+                  {foodSchedulingBlockMessage(foodScheduling)}
                 </p>
               </div>
             </div>
@@ -1071,8 +1067,8 @@ function CheckoutPageContent() {
                                 {q.available && q.zone_name && (
                                   <p className="text-xs text-slate-500 mt-0.5">
                                     {q.zone_name}
-                                    {q.vehicle && q.eta_min_minutes != null && (
-                                      <> · {getDeliveryVehicleLabel(q.vehicle ?? 'MOTO').toLowerCase()} · {q.eta_min_minutes}–{q.eta_max_minutes} min</>
+                                    {q.vehicle && q.eta_min != null && q.eta_max != null && (
+                                      <> · {getDeliveryVehicleLabel(q.vehicle ?? 'MOTO').toLowerCase()} · {formatDeliveryEtaShort(q.eta_min, q.eta_max, q.eta_unit ?? 'MINUTES')}</>
                                     )}
                                   </p>
                                 )}

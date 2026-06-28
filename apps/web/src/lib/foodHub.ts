@@ -234,14 +234,16 @@ export function getUpcomingPreorderSlots(
   hours: OpeningHours | null | undefined,
   now: Date = new Date(),
   maxSlots = 12,
+  startFromNextDay = false,
 ): Array<{ at: string; label: string }> {
   if (!hours) return []
   const slots: Array<{ at: string; label: string }> = []
   const minLeadMinutes = 45
   const stepMinutes = 90
   const earliest = new Date(now.getTime() + minLeadMinutes * 60_000)
+  const startDayOffset = startFromNextDay ? 1 : 0
 
-  for (let daysAhead = 0; daysAhead <= 7 && slots.length < maxSlots; daysAhead++) {
+  for (let daysAhead = startDayOffset; daysAhead < 7 + startDayOffset && slots.length < maxSlots; daysAhead++) {
     const candidate = new Date(now)
     candidate.setDate(candidate.getDate() + daysAhead)
     candidate.setHours(0, 0, 0, 0)
