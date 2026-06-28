@@ -14,6 +14,7 @@ import { ComposedMenuService } from '../shop-menu/composed-menu.service'
 import { DeliveryZonesService } from '../delivery-zones/delivery-zones.service'
 import { CreateDeliveryZoneDto } from '../delivery-zones/dto/create-delivery-zone.dto'
 import { UpdateDeliveryZoneDto } from '../delivery-zones/dto/update-delivery-zone.dto'
+import { ShopCourierStaffService } from '../shops/shop-courier-staff.service'
 import { DEFAULT_COUNTRY, type RequestWithCountry } from '../common/country/country.interceptor'
 
 @Controller('merchants')
@@ -23,6 +24,7 @@ export class MerchantsController {
     private readonly shopMenu: ShopMenuService,
     private readonly deliveryZones: DeliveryZonesService,
     private readonly composedMenuSvc: ComposedMenuService,
+    private readonly courierStaff: ShopCourierStaffService,
   ) {}
 
   @Public()
@@ -283,6 +285,32 @@ export class MerchantsController {
   }
 
   // ── Livraison : zones & réglages fleet (restaurants) ────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/delivery-shop')
+  async getMyDeliveryShop(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return {
+      id: shop.id,
+      slug: shop.slug,
+      name: shop.name,
+      country: shop.country,
+      delivery_fulfilment_default: shop.delivery_fulfilment_default,
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/fleet/invite-link')
+  async getMyFleetInviteLink(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
+    return this.courierStaff.getFleetInviteLink(shop.id)
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/delivery-zones')

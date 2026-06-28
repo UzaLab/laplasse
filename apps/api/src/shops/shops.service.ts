@@ -273,7 +273,16 @@ export class ShopsService {
         delivery_fulfilment_default: dto.delivery_fulfilment_default,
       },
       select: SHOP_PUBLIC_SELECT,
-    }).then(updated => {
+    }).then(async updated => {
+      if (
+        dto.delivery_fulfilment_default !== undefined
+        && shop.merchant_id
+      ) {
+        await this.prisma.merchant.update({
+          where: { id: shop.merchant_id },
+          data: { delivery_fulfilment_default: dto.delivery_fulfilment_default },
+        })
+      }
       if (updated.status === 'PENDING_REVIEW' && shop.status !== 'PENDING_REVIEW') {
         void this.adminNotifications.shopPendingReview(updated.id, updated.name)
       }
@@ -431,7 +440,9 @@ export class ShopsService {
       'general',
     )
 
-    const order = await this.prisma.shopMedia.count({ where: { shop_id: shop.id } })
+    const order = await this.prisma.shopMedia.count({
+      where: { shop_id: shop.id, uploaded_by: userId },
+    })
     const media = await this.prisma.shopMedia.create({
       data: {
         shop_id: shop.id,
@@ -455,7 +466,7 @@ export class ShopsService {
     const limit = Math.min(48, Math.max(1, opts?.limit ?? 24))
     const skip = (page - 1) * limit
 
-    const where = { shop_id: shop.id, type: 'IMAGE' as const }
+    const where = { shop_id: shop.id, type: 'IMAGE' as const, uploaded_by: userId }
     const [gallery, total] = await Promise.all([
       this.prisma.shopMedia.findMany({
         where,
@@ -483,7 +494,7 @@ export class ShopsService {
   async deleteShopMedia(userId: string, shopId: string, mediaId: string) {
     const shop = await this.resolveOwnerShop(userId, shopId)
     const media = await this.prisma.shopMedia.findFirst({
-      where: { id: mediaId, shop_id: shop.id },
+      where: { id: mediaId, shop_id: shop.id, uploaded_by: userId },
     })
     if (!media) throw new NotFoundException('Image introuvable')
     await this.prisma.shopMedia.delete({ where: { id: mediaId } })

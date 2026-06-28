@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   BarChart3, ExternalLink, LayoutGrid,
@@ -9,7 +10,7 @@ import {
 import { ShopShell } from '@/features/shop/components/ShopShell'
 import { useAuthStore } from '@/stores/authStore'
 import { useCenterActiveTab } from '@/hooks/useCenterActiveTab'
-import { getIndependentShops, getShopPublicHref } from '@/lib/shopApi'
+import { getIndependentShops, getShopPublicHref, getActiveStandaloneShopId } from '@/lib/shopApi'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -30,10 +31,17 @@ interface Props {
 
 export function ShopManageSectionLayout({ children, hideTabs = false }: Props) {
   const pathname = usePathname()
-  const { user, activeShopId } = useAuthStore()
+  const { user, activeShopId, setActiveShop } = useAuthStore()
   const independentShops = getIndependentShops(user?.shops)
-  const activeShop = independentShops.find(s => s.id === activeShopId) ?? independentShops[0] ?? null
+  const standaloneShopId = getActiveStandaloneShopId(user?.shops, activeShopId)
+  const activeShop = independentShops.find(s => s.id === standaloneShopId) ?? independentShops[0] ?? null
   const { navRef, tabRef } = useCenterActiveTab(pathname, !hideTabs && !!activeShop)
+
+  useEffect(() => {
+    if (standaloneShopId && standaloneShopId !== activeShopId) {
+      setActiveShop(standaloneShopId)
+    }
+  }, [standaloneShopId, activeShopId, setActiveShop])
 
   const isTabActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)

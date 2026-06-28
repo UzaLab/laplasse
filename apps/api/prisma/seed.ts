@@ -457,6 +457,9 @@ async function main() {
   }
   console.log(`✅ ${productCount} produits marketplace créés`)
 
+  const { seedMarketplaceCatalog } = await import('./seed-marketplace-catalog')
+  await seedMarketplaceCatalog(prisma, merchantMap)
+
   await prisma.platformSetting.upsert({
     where: { key: 'marketplace_spotlight_limit' },
     create: { key: 'marketplace_spotlight_limit', value: '8' },

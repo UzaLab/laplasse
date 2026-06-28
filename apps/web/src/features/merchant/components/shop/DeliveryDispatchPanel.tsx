@@ -76,28 +76,43 @@ export function DeliveryDispatchPanel({
       let shopMode: DeliveryFulfilmentMode = 'PLATFORM_RIDER'
       let staffList: ShopCourierStaff[] = []
       let contractList: DeliveryPartnerContract[] = []
+      let effectiveShopId = shopId
 
-      if (shopId) {
-        const [, staff, contracts] = await Promise.all([
-          shopApiFetch(`/shops/${shopId}/manage`, shopId),
-          fetchShopCourierStaff(shopId),
-          fetchShopDeliveryContracts(shopId),
+      if (merchantId && !effectiveShopId) {
+        const deliveryShopRes = await merchantApiFetch('/merchants/me/delivery-shop', merchantId)
+        if (deliveryShopRes.ok) {
+          const deliveryShop = await deliveryShopRes.json() as {
+            id: string
+            delivery_fulfilment_default?: DeliveryFulfilmentMode
+          }
+          effectiveShopId = deliveryShop.id
+          shopMode = deliveryShop.delivery_fulfilment_default ?? shopMode
+        } else {
+          const profileRes = await merchantApiFetch('/merchants/me/profile', merchantId)
+          if (profileRes.ok) {
+            const merchant = await profileRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
+            shopMode = merchant.delivery_fulfilment_default ?? shopMode
+          }
+        }
+      }
+
+      if (effectiveShopId) {
+        const shopRes = await shopApiFetch(`/shops/${effectiveShopId}/manage`, effectiveShopId)
+        const [staff, contracts] = await Promise.all([
+          fetchShopCourierStaff(effectiveShopId),
+          fetchShopDeliveryContracts(effectiveShopId),
         ])
         staffList = staff
         contractList = contracts
-      }
-
-      if (merchantId) {
+        if (shopRes.ok) {
+          const shop = await shopRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
+          shopMode = shop.delivery_fulfilment_default ?? shopMode
+        }
+      } else if (merchantId) {
         const profileRes = await merchantApiFetch('/merchants/me/profile', merchantId)
         if (profileRes.ok) {
           const merchant = await profileRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
           shopMode = merchant.delivery_fulfilment_default ?? shopMode
-        }
-      } else if (shopId) {
-        const shopRes = await shopApiFetch(`/shops/${shopId}/manage`, shopId)
-        if (shopRes.ok) {
-          const shop = await shopRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
-          shopMode = shop.delivery_fulfilment_default ?? 'PLATFORM_RIDER'
         }
       }
 

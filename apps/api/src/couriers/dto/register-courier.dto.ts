@@ -27,4 +27,16 @@ export class RegisterCourierDto {
   @IsString()
   @MaxLength(80)
   partner_ref?: string
+
+  /** Slug boutique — ex. ref=shop:ma-boutique */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  shop_ref?: string
+
+  /** Slug établissement — ex. ref=merchant:mon-restaurant */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  merchant_ref?: string
 }

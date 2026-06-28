@@ -5,24 +5,32 @@ import { Loader2, Trash2, UserPlus, Users } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import {
   fetchShopCourierStaff,
+  fetchShopFleetInviteLink,
   linkShopCourierStaff,
   unlinkShopCourierStaff,
   type ShopCourierStaff,
 } from '@/lib/deliveryStakeholdersApi'
+import { LogisticsFleetInviteCard } from '@/features/logistics/components/LogisticsFleetInviteCard'
 import { notify } from '@/lib/notify'
 
-export function ShopCourierStaffPanel() {
+interface ShopCourierStaffPanelProps {
+  shopId?: string | null
+}
+
+export function ShopCourierStaffPanel({ shopId: shopIdProp }: ShopCourierStaffPanelProps) {
   const { activeShopId } = useAuthStore()
+  const shopId = shopIdProp ?? activeShopId
   const [staff, setStaff] = useState<ShopCourierStaff[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [linking, setLinking] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [invite, setInvite] = useState<{ url: string; shop_name: string } | null>(null)
 
   const load = async () => {
-    if (!activeShopId) return
+    if (!shopId) return
     setLoading(true)
-    const list = await fetchShopCourierStaff(activeShopId)
+    const list = await fetchShopCourierStaff(shopId)
     setStaff(list)
     setLoading(false)
   }
@@ -30,13 +38,20 @@ export function ShopCourierStaffPanel() {
   useEffect(() => {
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeShopId])
+  }, [shopId])
+
+  useEffect(() => {
+    if (!shopId) return
+    void fetchShopFleetInviteLink(shopId).then(data => {
+      if (data) setInvite({ url: data.url, shop_name: data.shop_name })
+    })
+  }, [shopId])
 
   const handleLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeShopId || !email.trim()) return
+    if (!shopId || !email.trim()) return
     setLinking(true)
-    const { staff: linked, error } = await linkShopCourierStaff(activeShopId, email.trim())
+    const { staff: linked, error } = await linkShopCourierStaff(shopId, email.trim())
     setLinking(false)
     if (error) {
       notify.error(error)
@@ -48,9 +63,9 @@ export function ShopCourierStaffPanel() {
   }
 
   const handleUnlink = async (profileId: string) => {
-    if (!activeShopId) return
+    if (!shopId) return
     setRemoving(profileId)
-    const { error } = await unlinkShopCourierStaff(activeShopId, profileId)
+    const { error } = await unlinkShopCourierStaff(shopId, profileId)
     setRemoving(null)
     if (error) {
       notify.error(error)
@@ -60,7 +75,7 @@ export function ShopCourierStaffPanel() {
     void load()
   }
 
-  if (!activeShopId) {
+  if (!shopId) {
     return <p className="text-slate-500 text-sm">Aucune boutique active.</p>
   }
 
@@ -68,17 +83,24 @@ export function ShopCourierStaffPanel() {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-          <Users size={22} /> Flotte interne
+          <Users size={22} /> Ma flotte
         </h2>
         <p className="text-slate-500 text-sm mt-1">
-          Rattachez des livreurs avec compte app (/courier/signup). Ils recevront les courses assignées directement.
+          Recrutez des livreurs via le lien d&apos;invitation ou rattachez un compte existant après validation KYC.
         </p>
       </div>
 
+      {invite && (
+        <LogisticsFleetInviteCard partnerName={invite.shop_name} url={invite.url} />
+      )}
+
       <form onSubmit={handleLink} className="bg-white border border-slate-100 rounded-xl p-6 space-y-3">
         <h3 className="font-bold text-slate-900 flex items-center gap-2">
-          <UserPlus size={18} /> Ajouter un livreur
+          <UserPlus size={18} /> Rattacher un livreur existant
         </h3>
+        <p className="text-xs text-slate-500">
+          Pour un compte déjà inscrit et validé sur LaPlasse.
+        </p>
         <input
           type="email"
           required
@@ -92,7 +114,7 @@ export function ShopCourierStaffPanel() {
           disabled={linking}
           className="w-full py-3 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 disabled:opacity-50"
         >
-          {linking ? 'Rattachement…' : 'Rattacher à ma boutique'}
+          {linking ? 'Rattachement…' : 'Rattacher à ma flotte'}
         </button>
       </form>
 
@@ -101,7 +123,9 @@ export function ShopCourierStaffPanel() {
           <Loader2 className="animate-spin text-slate-300" size={28} />
         </div>
       ) : staff.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-8">Aucun livreur interne configuré.</p>
+        <p className="text-sm text-slate-500 text-center py-8">
+          Aucun livreur interne. Partagez le lien d&apos;invitation ci-dessus pour recruter.
+        </p>
       ) : (
         <ul className="space-y-3">
           {staff.map(c => (
@@ -118,6 +142,9 @@ export function ShopCourierStaffPanel() {
                   <span className={c.is_online ? 'text-emerald-600' : 'text-slate-400'}>
                     {c.is_online ? 'En ligne' : 'Hors ligne'}
                   </span>
+                  {c.status === 'PENDING_REVIEW' && (
+                    <span className="text-amber-600"> · En attente validation</span>
+                  )}
                 </p>
               </div>
               <button

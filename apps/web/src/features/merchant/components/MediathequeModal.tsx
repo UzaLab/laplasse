@@ -47,12 +47,6 @@ export interface MediathequeModalProps {
 
 function collectEntries(data: MediaPageResponse, seen: Set<string>): MediathequeEntry[] {
   const entries: MediathequeEntry[] = []
-  for (const url of [data.logo, data.cover_image]) {
-    if (url && !seen.has(url)) {
-      seen.add(url)
-      entries.push({ url, deletable: false })
-    }
-  }
   for (const item of data.gallery) {
     if (!seen.has(item.url)) {
       seen.add(item.url)

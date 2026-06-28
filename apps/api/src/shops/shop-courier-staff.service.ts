@@ -79,6 +79,20 @@ export class ShopCourierStaffService {
     })
   }
 
+  async getFleetInviteLink(shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { slug: true, name: true },
+    })
+    if (!shop) throw new NotFoundException('Boutique introuvable')
+    const baseUrl = (process.env.WEB_URL ?? process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+    return {
+      slug: shop.slug,
+      shop_name: shop.name,
+      url: `${baseUrl}/courier/signup?ref=shop:${shop.slug}`,
+    }
+  }
+
   async unlink(shopId: string, profileId: string) {
     const profile = await this.prisma.courierProfile.findFirst({
       where: { id: profileId, shop_id: shopId, kind: 'MERCHANT_STAFF' },

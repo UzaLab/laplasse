@@ -19,10 +19,30 @@ import { registerCourier } from '@/lib/courierApi'
 import { VEHICLE_OPTIONS, type DeliveryVehicle } from '@/lib/courierLabels'
 import { buildLoginUrl } from '@/lib/authIntent'
 
+type SignupRef =
+  | { type: 'partner'; value: string }
+  | { type: 'shop'; value: string }
+  | { type: 'merchant'; value: string }
+
+function parseSignupRef(raw: string | null): SignupRef | null {
+  if (!raw?.trim()) return null
+  const ref = raw.trim()
+  if (ref.startsWith('partner:')) return { type: 'partner', value: ref.slice(8) }
+  if (ref.startsWith('shop:')) return { type: 'shop', value: ref.slice(5) }
+  if (ref.startsWith('merchant:')) return { type: 'merchant', value: ref.slice(9) }
+  return { type: 'partner', value: ref }
+}
+
+function signupRedirectPath(refRaw: string | null): string {
+  if (!refRaw?.trim()) return '/courier/signup'
+  return `/courier/signup?ref=${encodeURIComponent(refRaw.trim())}`
+}
+
 export function CourierSignupWizard() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const partnerRef = searchParams.get('ref')?.replace(/^partner:/, '') ?? undefined
+  const refRaw = searchParams.get('ref')
+  const signupRef = parseSignupRef(refRaw)
   const { isAuthenticated, user, updateUser } = useAuthStore()
   const countryCode = getCountryCode()
   const countryLabel = getCountryLabel(countryCode)
@@ -40,16 +60,13 @@ export function CourierSignupWizard() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      const redirect = partnerRef
-        ? `/courier/signup?ref=partner:${partnerRef}`
-        : '/courier/signup'
-      router.push(buildLoginUrl(redirect, 'courier'))
+      router.push(buildLoginUrl(signupRedirectPath(refRaw), 'courier'))
       return
     }
     if (user?.courier_profile) {
       router.replace('/courier/dashboard')
     }
-  }, [isAuthenticated, user, router, partnerRef])
+  }, [isAuthenticated, user, router, refRaw])
 
   const { data: cities = [], isLoading: citiesLoading } = useQuery({
     queryKey: ['courier-signup-cities', countryCode],
@@ -84,10 +101,7 @@ export function CourierSignupWizard() {
 
   const handleSubmit = async () => {
     if (!isAuthenticated) {
-      const redirect = partnerRef
-        ? `/courier/signup?ref=partner:${partnerRef}`
-        : '/courier/signup'
-      router.push(buildLoginUrl(redirect, 'courier'))
+      router.push(buildLoginUrl(signupRedirectPath(refRaw), 'courier'))
       return
     }
     if (!phone.trim() || phone.trim().length < 8) {
@@ -104,7 +118,9 @@ export function CourierSignupWizard() {
       country_code: countryCode,
       vehicle,
       plate_number: plateNumber.trim() || undefined,
-      partner_ref: partnerRef,
+      partner_ref: signupRef?.type === 'partner' ? signupRef.value : undefined,
+      shop_ref: signupRef?.type === 'shop' ? signupRef.value : undefined,
+      merchant_ref: signupRef?.type === 'merchant' ? signupRef.value : undefined,
     })
 
     if ('error' in result) {
@@ -140,9 +156,17 @@ export function CourierSignupWizard() {
           <span>Réseau LaPlasse — livraisons last-mile</span>
         </div>
 
-        {partnerRef && (
+        {signupRef && (
           <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-sm text-indigo-900">
-            Vous rejoignez la flotte <strong>{partnerRef}</strong> sur LaPlasse.
+            {signupRef.type === 'partner' && (
+              <>Vous rejoignez la flotte partenaire <strong>{signupRef.value}</strong> sur LaPlasse.</>
+            )}
+            {signupRef.type === 'shop' && (
+              <>Vous rejoignez la flotte de <strong>{signupRef.value}</strong> sur LaPlasse.</>
+            )}
+            {signupRef.type === 'merchant' && (
+              <>Vous rejoignez la flotte de l&apos;établissement <strong>{signupRef.value}</strong> sur LaPlasse.</>
+            )}
           </div>
         )}
 

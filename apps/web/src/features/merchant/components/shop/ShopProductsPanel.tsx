@@ -22,6 +22,7 @@ import {
 import {
   fetchShopProductCategories,
   getActiveShopIdForManage,
+  resolveManageShopId,
   getShopRoutesFromPathname,
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
@@ -77,7 +78,7 @@ export function ShopProductsPanel() {
   const routes = getShopRoutesFromPathname(pathname)
   const tab: CatalogTab = searchParams.get('tab') === 'collections' ? 'collections' : 'products'
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
+  const shopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [categories, setCategories] = useState<ShopProductCategoryOption[]>([])
   const [filterCategoryIds, setFilterCategoryIds] = useState<string[]>([])
@@ -192,17 +193,17 @@ export function ShopProductsPanel() {
           </p>
         </div>
         {tab === 'products' && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:justify-self-end">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch sm:justify-end lg:justify-self-end">
             <Link
               href={routes.productsNew}
-              className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap bg-slate-900 px-5 text-sm font-bold text-white rounded-full hover:bg-slate-800 transition-colors"
+              className="inline-flex h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap bg-slate-900 px-5 text-sm font-bold text-white rounded-full hover:bg-slate-800 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               <Plus size={16} /> Nouveau produit
             </Link>
             <Link
               href={routes.productsCategories}
-              className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
+              className="inline-flex h-11 w-full sm:w-auto items-center justify-center gap-2 whitespace-nowrap border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 rounded-full hover:bg-slate-50 transition-colors"
               style={{ textDecoration: 'none' }}
             >
               <Settings2 size={16} /> Gestion des catégories
@@ -353,7 +354,7 @@ export function ShopProductsPanel() {
           {filteredProducts.map(product => (
             <div
               key={product.id}
-              className="bg-white border border-slate-100 rounded-2xl p-4 flex gap-3 sm:gap-4 items-center"
+              className="bg-white border border-slate-100 rounded-2xl p-4 flex gap-3 sm:gap-4"
             >
               <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -363,7 +364,7 @@ export function ShopProductsPanel() {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 flex flex-col gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
                     href={routes.productsEdit(product.id)}
@@ -386,48 +387,52 @@ export function ShopProductsPanel() {
                   )}>
                     {PRODUCT_STATUS_LABELS[product.status]}
                   </span>
-                  {product.category ? (
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-100">
-                      {product.category.name}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-red-50 text-red-600">
-                      Sans catégorie
-                    </span>
-                  )}
                   {isProductLowStock(product) && (
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-orange-50 text-orange-700 border border-orange-100">
                       Stock bas
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-amber-600 font-bold mt-0.5">
+                <p className="text-sm text-amber-600 font-bold">
                   {formatPrice(product.price, product.currency)}
                 </p>
-                <p className={`text-xs mt-0.5 ${isProductLowStock(product) ? 'text-orange-600 font-semibold' : 'text-slate-400'}`}>
+                <p className={`text-xs ${isProductLowStock(product) ? 'text-orange-600 font-semibold' : 'text-slate-400'}`}>
                   Stock : {getProductStockQuantity(product)}
                   {(product.variants?.length ?? 0) > 0 && (
                     <> · {product.variants!.length} variantes</>
                   )}
                 </p>
-              </div>
-              <div className="flex gap-1.5 sm:gap-2 shrink-0">
-                <Link
-                  href={routes.productsEdit(product.id)}
-                  className="p-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-                  style={{ textDecoration: 'none' }}
-                  aria-label="Modifier"
-                >
-                  <Pencil size={16} />
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(product.id)}
-                  className="p-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
-                  aria-label="Archiver"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    {product.category ? (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-100">
+                        {product.category.name}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-red-50 text-red-600">
+                        Sans catégorie
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={routes.productsEdit(product.id)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                      style={{ textDecoration: 'none' }}
+                      aria-label="Modifier"
+                    >
+                      <Pencil size={16} />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(product.id)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors"
+                      aria-label="Archiver"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}

@@ -137,6 +137,17 @@ export function getShopRoutesForShop(shop: ShopSummary | null | undefined): Shop
   return buildShopRoutes(getShopManageHref(shop) as ShopManageBase)
 }
 
+/** Boutique active en contexte gestion standalone (/shop/manage). */
+export function getActiveStandaloneShopId(
+  shops: ShopSummary[] | undefined,
+  activeShopId: string | null | undefined,
+): string | null {
+  const independent = getIndependentShops(shops)
+  if (!independent.length) return null
+  if (activeShopId && independent.some(s => s.id === activeShopId)) return activeShopId
+  return independent[0]?.id ?? null
+}
+
 /** Boutique active en contexte gestion (marchand lié ou boutique indépendante). */
 export function getActiveShopIdForManage(
   shops: ShopSummary[] | undefined,
@@ -149,6 +160,19 @@ export function getActiveShopIdForManage(
   if (!independent.length) return null
   if (activeShopId && independent.some(s => s.id === activeShopId)) return activeShopId
   return independent[0]?.id ?? null
+}
+
+/** Résout la boutique selon le parcours UI (standalone vs marchand lié). */
+export function resolveManageShopId(
+  pathname: string,
+  shops: ShopSummary[] | undefined,
+  activeMerchantId: string | null | undefined,
+  activeShopId: string | null | undefined,
+): string | null {
+  if (pathname.startsWith('/shop/manage')) {
+    return getActiveStandaloneShopId(shops, activeShopId)
+  }
+  return getActiveShopIdForManage(shops, activeMerchantId, activeShopId)
 }
 
 export interface CreateShopInput {

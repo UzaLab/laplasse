@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import {
   ChevronDown,
   ChevronUp,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { fetchMyProducts, type MarketplaceProduct } from '@/lib/marketplaceApi'
+import { resolveManageShopId } from '@/lib/shopApi'
 import type { ShopCollectionMine } from '@/lib/marketplaceApi'
 import {
   createShopCollection,
@@ -194,7 +196,9 @@ function CollectionProductsPanel({
 }
 
 export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean }) {
-  const { activeShopId } = useAuthStore()
+  const pathname = usePathname()
+  const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const shopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const [collections, setCollections] = useState<ShopCollectionMine[]>([])
   const [products, setProducts] = useState<MarketplaceProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -206,16 +210,16 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
   const [creating, setCreating] = useState(false)
 
   const load = useCallback(async () => {
-    if (!activeShopId) return
+    if (!shopId) return
     setLoading(true)
     const [cols, prods] = await Promise.all([
-      fetchMyShopCollections(activeShopId),
-      fetchMyProducts(activeShopId),
+      fetchMyShopCollections(shopId),
+      fetchMyProducts(shopId),
     ])
     setCollections(cols)
     setProducts(prods.filter(p => p.status !== 'ARCHIVED'))
     setLoading(false)
-  }, [activeShopId])
+  }, [shopId])
 
   useEffect(() => { void load() }, [load])
 
@@ -233,9 +237,9 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeShopId || !form.name.trim()) return
+    if (!shopId || !form.name.trim()) return
     setCreating(true)
-    const result = await createShopCollection(activeShopId, {
+    const result = await createShopCollection(shopId, {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
     })
@@ -250,8 +254,8 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
   }
 
   const toggleActive = async (col: ShopCollectionMine) => {
-    if (!activeShopId) return
-    const result = await updateShopCollection(activeShopId, col.id, {
+    if (!shopId) return
+    const result = await updateShopCollection(shopId, col.id, {
       is_active: !col.is_active,
     })
     if ('error' in result && result.error) notify.error(result.error)
@@ -259,8 +263,8 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
   }
 
   const remove = async (id: string) => {
-    if (!activeShopId) return
-    const result = await deleteShopCollection(activeShopId, id)
+    if (!shopId) return
+    const result = await deleteShopCollection(shopId, id)
     if ('error' in result && result.error) {
       notify.error(result.error)
       return
@@ -271,12 +275,12 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
   }
 
   const move = async (index: number, direction: -1 | 1) => {
-    if (!activeShopId) return
+    if (!shopId) return
     const next = index + direction
     if (next < 0 || next >= collections.length) return
     const ids = collections.map(c => c.id)
     ;[ids[index], ids[next]] = [ids[next], ids[index]]
-    const result = await reorderShopCollections(activeShopId, ids)
+    const result = await reorderShopCollections(shopId, ids)
     if ('error' in result && result.error) notify.error(result.error)
     else if ('collections' in result && result.collections) setCollections(result.collections)
   }
@@ -290,10 +294,10 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
   }
 
   const saveProducts = async () => {
-    if (!activeShopId || !editingCollection) return
+    if (!shopId || !editingCollection) return
     setSavingProducts(true)
     const result = await setShopCollectionProducts(
-      activeShopId,
+      shopId,
       editingCollection.id,
       draftProductIds,
     )

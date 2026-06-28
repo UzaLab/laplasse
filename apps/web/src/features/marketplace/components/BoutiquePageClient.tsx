@@ -420,8 +420,8 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
           <div className="absolute bottom-0 left-0 right-0 pb-5 md:pb-8">
             <div className={`${PAGE_CONTAINER} flex items-end justify-between gap-4 md:gap-6`}>
               <div className="flex items-end gap-4 md:gap-6 min-w-0 flex-1">
-                <div className="w-20 h-20 md:w-32 md:h-32 rounded-full bg-white p-2 shadow-xl border-4 border-[#FAFAFA] shrink-0">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-slate-100">
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white p-0.5 shadow-lg border border-white shrink-0">
+                  <div className="w-full h-full rounded-xl overflow-hidden bg-slate-100">
                     {logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={logo} alt={merchant.business_name} className="w-full h-full object-cover" />

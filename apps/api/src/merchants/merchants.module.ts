@@ -7,9 +7,10 @@ import { AdsModule } from '../ads/ads.module'
 import { CrmModule } from '../crm/crm.module'
 import { NotificationsModule } from '../notifications/notifications.module'
 import { DeliveryZonesModule } from '../delivery-zones/delivery-zones.module'
+import { ShopsModule } from '../shops/shops.module'
 
 @Module({
-  imports: [StorageModule, ShopMenuModule, AdsModule, CrmModule, NotificationsModule, DeliveryZonesModule],
+  imports: [StorageModule, ShopMenuModule, AdsModule, CrmModule, NotificationsModule, DeliveryZonesModule, ShopsModule],
   controllers: [MerchantsController],
   providers: [MerchantsService],
   exports: [MerchantsService],

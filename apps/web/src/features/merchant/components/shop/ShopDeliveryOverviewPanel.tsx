@@ -41,11 +41,13 @@ const MODES: Array<{
 ]
 
 interface ShopDeliveryOverviewPanelProps {
+  shopId?: string | null
   onNavigateTab: (tab: string) => void
 }
 
-export function ShopDeliveryOverviewPanel({ onNavigateTab }: ShopDeliveryOverviewPanelProps) {
+export function ShopDeliveryOverviewPanel({ shopId: shopIdProp, onNavigateTab }: ShopDeliveryOverviewPanelProps) {
   const { activeShopId } = useAuthStore()
+  const shopId = shopIdProp ?? activeShopId
   const [mode, setMode] = useState<FulfilmentMode>('PLATFORM_RIDER')
   const [saving, setSaving] = useState(false)
   const [zoneCount, setZoneCount] = useState(0)

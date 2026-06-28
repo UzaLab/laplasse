@@ -77,7 +77,9 @@ export class CouriersService {
 
     const profile = await this.prisma.$transaction(async (tx) => {
       let logisticsPartnerId: string | null = null
-      let partnerKind: 'PARTNER_FLEET' | 'INDEPENDENT' = 'INDEPENDENT'
+      let shopId: string | null = null
+      let merchantId: string | null = null
+      let kind: 'PARTNER_FLEET' | 'MERCHANT_STAFF' | 'INDEPENDENT' = 'INDEPENDENT'
 
       if (dto.partner_ref?.trim()) {
         const slug = dto.partner_ref.trim().replace(/^partner:/, '')
@@ -87,7 +89,35 @@ export class CouriersService {
         })
         if (partner) {
           logisticsPartnerId = partner.id
-          partnerKind = 'PARTNER_FLEET'
+          kind = 'PARTNER_FLEET'
+        }
+      } else if (dto.merchant_ref?.trim()) {
+        const slug = dto.merchant_ref.trim().replace(/^merchant:/, '')
+        const merchant = await tx.merchant.findFirst({
+          where: { slug, is_active: true },
+          select: { id: true },
+        })
+        if (merchant) {
+          const shop = await tx.shop.findUnique({
+            where: { merchant_id: merchant.id },
+            select: { id: true },
+          })
+          if (shop) {
+            kind = 'MERCHANT_STAFF'
+            shopId = shop.id
+            merchantId = merchant.id
+          }
+        }
+      } else if (dto.shop_ref?.trim()) {
+        const slug = dto.shop_ref.trim().replace(/^shop:/, '')
+        const shop = await tx.shop.findFirst({
+          where: { slug, is_active: true },
+          select: { id: true, merchant_id: true },
+        })
+        if (shop) {
+          kind = 'MERCHANT_STAFF'
+          shopId = shop.id
+          merchantId = shop.merchant_id
         }
       }
 
@@ -100,8 +130,10 @@ export class CouriersService {
           vehicle: dto.vehicle ?? DeliveryVehicle.MOTO,
           plate_number: dto.plate_number?.trim() || null,
           status: 'PENDING_REVIEW',
-          kind: partnerKind,
+          kind,
           logistics_partner_id: logisticsPartnerId,
+          shop_id: shopId,
+          merchant_id: merchantId,
         },
         select: COURIER_PROFILE_SELECT,
       })

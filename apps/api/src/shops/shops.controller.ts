@@ -190,6 +190,17 @@ export class ShopsController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get(':shopId/fleet/invite-link')
+  getFleetInviteLink(
+    @CurrentUser('id') userId: string,
+    @Param('shopId') shopId: string,
+  ) {
+    return this.svc.withOwnerShop(userId, shopId, shop =>
+      this.courierStaff.getFleetInviteLink(shop.id),
+    )
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get(':shopId/courier-staff')
   listCourierStaff(
     @CurrentUser('id') userId: string,

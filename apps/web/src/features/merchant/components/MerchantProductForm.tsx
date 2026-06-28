@@ -39,7 +39,7 @@ import {
   PRODUCT_CONDITION_LABELS,
   PRODUCT_ORIGIN_LABELS,
 } from '@/lib/marketplaceApi'
-import { fetchShopProductCategories, getShopRoutesFromPathname, type ShopProductCategoryOption } from '@/lib/shopApi'
+import { fetchShopProductCategories, getShopRoutesFromPathname, resolveManageShopId, type ShopProductCategoryOption } from '@/lib/shopApi'
 import { FilterLiveMultiSelect } from '@/features/discovery/search-results-mobile-v2/FilterLiveMultiSelect'
 import { notify } from '@/lib/notify'
 import { MerchantMediathequeField } from '@/features/merchant/components/MerchantMediathequeField'
@@ -377,7 +377,8 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   const pathname = usePathname()
   const routes = getShopRoutesFromPathname(pathname)
   const isEdit = Boolean(productId)
-  const { activeShopId, user } = useAuthStore()
+  const { activeShopId, activeMerchantId, user } = useAuthStore()
+  const manageShopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const authPath = isEdit ? routes.productsEdit(productId!) : routes.productsNew
   const { ready, hydrated, isAuthenticated } = useRequireAuth(authPath)
 
@@ -395,11 +396,11 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   )
 
   useEffect(() => {
-    if (!activeShopId) return
-    void fetchShopProductCategories(activeShopId).then(({ categories }) => {
+    if (!manageShopId) return
+    void fetchShopProductCategories(manageShopId).then(({ categories }) => {
       setCategoryOptions(flattenShopCategories(categories))
     })
-  }, [activeShopId])
+  }, [manageShopId])
 
   // Load category-specific attributes when category changes
   useEffect(() => {
@@ -411,9 +412,9 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
   }, [form.category_id])
 
   const loadProduct = useCallback(async () => {
-    if (!productId || !activeShopId) return
+    if (!productId || !manageShopId) return
     setLoading(true)
-    const list = await fetchMyProducts(activeShopId)
+    const list = await fetchMyProducts(manageShopId)
     const product = list.find(p => p.id === productId)
     if (!product || product.status === 'ARCHIVED') {
       setNotFound(true)
@@ -422,15 +423,15 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
       setInitialHadVariants((product.variants?.length ?? 0) > 0)
     }
     setLoading(false)
-  }, [productId, activeShopId])
+  }, [productId, manageShopId])
 
   useEffect(() => {
     if (!ready) return
     if (isEdit) loadProduct()
   }, [ready, isEdit, loadProduct])
 
-  const uploadMerchantId = user?.shops?.find(s => s.id === activeShopId)?.merchant_id ?? undefined
-  const uploadShopId = uploadMerchantId ? undefined : activeShopId
+  const uploadMerchantId = user?.shops?.find(s => s.id === manageShopId)?.merchant_id ?? undefined
+  const uploadShopId = uploadMerchantId ? undefined : manageShopId
 
   const handleSave = async (targetStatus: 'DRAFT' | 'ACTIVE') => {
     if (!form.name.trim()) {
@@ -531,8 +532,8 @@ export function MerchantProductForm({ productId, skipShellLayout = false }: Merc
     }
 
     const result = isEdit && productId
-      ? await updateProduct(productId, payload, activeShopId)
-      : await createProduct(payload, activeShopId)
+      ? await updateProduct(productId, payload, manageShopId)
+      : await createProduct(payload, manageShopId)
 
     if (result.error) {
       notify.error(result.error)

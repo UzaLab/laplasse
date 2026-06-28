@@ -591,7 +591,7 @@ export class MerchantsService {
     const page = Math.max(1, opts?.page ?? 1)
     const limit = Math.min(48, Math.max(1, opts?.limit ?? 24))
     const skip = (page - 1) * limit
-    const where = { merchant_id: merchant.id, type: 'IMAGE' as const }
+    const where = { merchant_id: merchant.id, type: 'IMAGE' as const, uploaded_by: userId }
 
     const [media, total] = await Promise.all([
       this.prisma.merchantMedia.findMany({
@@ -656,7 +656,7 @@ export class MerchantsService {
 
     if (mediaType === 'IMAGE') {
       const photoCount = await this.prisma.merchantMedia.count({
-        where: { merchant_id: merchant.id, type: 'IMAGE' },
+        where: { merchant_id: merchant.id, type: 'IMAGE', uploaded_by: userId },
       })
       const limits = getPlanLimits(merchant.subscription_plan)
       if (!isWithinLimit(photoCount, limits.maxPhotos)) {
@@ -682,7 +682,7 @@ export class MerchantsService {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
 
     const media = await this.prisma.merchantMedia.findFirst({
-      where: { id: mediaId, merchant_id: merchant.id },
+      where: { id: mediaId, merchant_id: merchant.id, uploaded_by: userId },
     })
     if (!media) throw new NotFoundException('Media not found')
 

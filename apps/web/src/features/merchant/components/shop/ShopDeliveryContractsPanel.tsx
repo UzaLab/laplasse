@@ -22,8 +22,27 @@ const CONTRACT_STATUS: Record<string, string> = {
   TERMINATED: 'Terminé',
 }
 
-export function ShopDeliveryContractsPanel() {
+function ContractStatusBadge({ status }: { status: string }) {
+  const label = CONTRACT_STATUS[status] ?? status
+  if (status === 'ACTIVE') {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+        {label}
+      </span>
+    )
+  }
+  return <span className="font-medium text-slate-600">{label}</span>
+}
+
+export function ShopDeliveryContractsPanel({
+  shopId: shopIdProp,
+  countryCode: countryCodeProp,
+}: {
+  shopId?: string | null
+  countryCode?: string
+}) {
   const { activeShopId } = useAuthStore()
+  const shopId = shopIdProp ?? activeShopId
   const [contracts, setContracts] = useState<DeliveryPartnerContract[]>([])
   const [partners, setPartners] = useState<PublicLogisticsPartner[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,11 +51,12 @@ export function ShopDeliveryContractsPanel() {
   const [accepting, setAccepting] = useState<string | null>(null)
 
   const load = async () => {
-    if (!activeShopId) return
+    if (!shopId) return
     setLoading(true)
+    const country = (countryCodeProp ?? 'CI').toUpperCase()
     const [contractList, partnerList] = await Promise.all([
-      fetchShopDeliveryContracts(activeShopId),
-      fetchPublicLogisticsPartners('CI'),
+      fetchShopDeliveryContracts(shopId),
+      fetchPublicLogisticsPartners(country),
     ])
     setContracts(contractList)
     setPartners(partnerList)
@@ -46,7 +66,7 @@ export function ShopDeliveryContractsPanel() {
   useEffect(() => {
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeShopId])
+  }, [shopId, countryCodeProp])
 
   const partnerById = useMemo(
     () => new Map(partners.map(p => [p.id, p])),
@@ -71,9 +91,9 @@ export function ShopDeliveryContractsPanel() {
   }, [partners, existingPartnerIds, search])
 
   const handleRequest = async (partnerId: string) => {
-    if (!activeShopId) return
+    if (!shopId) return
     setRequesting(partnerId)
-    const { error } = await requestDeliveryContract(activeShopId, partnerId)
+    const { error } = await requestDeliveryContract(shopId, partnerId)
     setRequesting(null)
     if (error) {
       notify.error(error)
@@ -84,9 +104,9 @@ export function ShopDeliveryContractsPanel() {
   }
 
   const handleAccept = async (contractId: string) => {
-    if (!activeShopId) return
+    if (!shopId) return
     setAccepting(contractId)
-    const { error } = await acceptDeliveryContract(activeShopId, contractId)
+    const { error } = await acceptDeliveryContract(shopId, contractId)
     setAccepting(null)
     if (error) {
       notify.error(error)
@@ -96,7 +116,7 @@ export function ShopDeliveryContractsPanel() {
     void load()
   }
 
-  if (!activeShopId) {
+  if (!shopId) {
     return <p className="text-slate-500 text-sm">Aucune boutique active.</p>
   }
 
@@ -136,10 +156,9 @@ export function ShopDeliveryContractsPanel() {
                           <p className="font-bold text-slate-900">
                             {c.partner.trade_name ?? c.partner.legal_name}
                           </p>
-                          <p className="text-sm text-slate-500">
-                            {c.partner.city} · {c.partner.phone}
-                            {' · '}
-                            <span className="font-medium">{CONTRACT_STATUS[c.status] ?? c.status}</span>
+                          <p className="text-sm text-slate-500 flex flex-wrap items-center gap-2">
+                            <span>{c.partner.city} · {c.partner.phone}</span>
+                            <ContractStatusBadge status={c.status} />
                           </p>
                         </div>
                         {c.status === 'PENDING_MERCHANT' && (

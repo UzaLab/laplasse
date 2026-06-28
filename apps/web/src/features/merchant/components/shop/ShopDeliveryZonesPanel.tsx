@@ -12,8 +12,9 @@ import { DeliveryZonesManager } from '@/features/merchant/components/DeliveryZon
 import type { DeliveryZoneRow } from '@/lib/deliveryZoneUtils'
 import { buildZoneApiBody } from '@/lib/deliveryZoneUtils'
 
-export function ShopDeliveryZonesPanel() {
+export function ShopDeliveryZonesPanel({ shopId: shopIdProp }: { shopId?: string | null }) {
   const { activeShopId } = useAuthStore()
+  const shopId = shopIdProp ?? activeShopId
   const [zones, setZones] = useState<DeliveryZoneRow[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<FulfilmentMode>('PLATFORM_RIDER')

@@ -217,6 +217,14 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
+export async function fetchShopFleetInviteLink(
+  shopId: string,
+): Promise<{ url: string; slug: string; shop_name: string } | null> {
+  const res = await shopApiFetch(`/shops/${shopId}/fleet/invite-link`, shopId)
+  if (!res.ok) return null
+  return res.json() as Promise<{ url: string; slug: string; shop_name: string }>
+}
+
 export async function fetchShopCourierStaff(shopId: string): Promise<ShopCourierStaff[]> {
   const res = await shopApiFetch(`/shops/${shopId}/courier-staff`, shopId)
   if (!res.ok) return []

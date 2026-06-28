@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import {
   Calendar,
   Loader2,
@@ -25,6 +26,7 @@ import { fetchMyProducts, parseApiError, type MarketplaceProduct } from '@/lib/m
 import {
   fetchShopProductCategories,
   getActiveShopIdForManage,
+  resolveManageShopId,
   shopApiFetch,
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
@@ -461,8 +463,9 @@ function PromoList({
 }
 
 export function ShopPromotionsPanel() {
+  const pathname = usePathname()
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
+  const shopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const isStandaloneShop = useMemo(() => {
     const shop = user?.shops?.find(s => s.id === shopId)
     return !!shop && !shop.merchant_id

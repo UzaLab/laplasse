@@ -453,11 +453,6 @@ export default function ProductDetailPage() {
                       <span className="text-xl text-slate-400 line-through font-semibold">
                         {formatPrice(displayPrice, product.currency)}
                       </span>
-                      {product.promotion && (
-                        <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-rose-500 text-white">
-                          {getPromoBadgeLabel(product.promotion)}
-                        </span>
-                      )}
                     </div>
                     {product.promotion?.code && (
                       <p className="text-sm text-amber-700 font-semibold mt-2">
@@ -471,7 +466,6 @@ export default function ProductDetailPage() {
                       product={product}
                       currency={product.currency}
                       priceClassName="text-4xl font-extrabold text-brand-600"
-                      showBadge
                       layout="stacked"
                     />
                   </div>
@@ -567,7 +561,7 @@ export default function ProductDetailPage() {
                               type="button"
                               disabled={variantOut}
                               onClick={() => selectVariant(variant)}
-                              className={`min-h-[48px] px-3 py-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all text-left sm:text-center ${
+                              className={`min-h-[48px] px-3 py-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all flex flex-col items-center justify-center text-center w-full ${
                                 selected
                                   ? 'bg-slate-900 text-white border-slate-900'
                                   : variantOut
@@ -575,7 +569,7 @@ export default function ProductDetailPage() {
                                     : 'bg-white text-slate-700 border-slate-200 hover:border-brand-300'
                               }`}
                             >
-                              <span className="flex items-center justify-center gap-2">
+                              <span className="flex items-center justify-center gap-2 w-full">
                                 {colorHex && (
                                   <span
                                     className="w-4 h-4 rounded-md border border-slate-200 shrink-0"
@@ -592,7 +586,7 @@ export default function ProductDetailPage() {
                                 )}
                                 <span>{variant.name}</span>
                               </span>
-                              <span className="block text-[10px] font-medium opacity-80 mt-0.5">
+                              <span className="block text-[10px] font-medium opacity-80 mt-0.5 text-center w-full">
                                 {variantPromoPrice ? (
                                   <>
                                     {formatPrice(variantPromoPrice.promoPrice, product.currency)}

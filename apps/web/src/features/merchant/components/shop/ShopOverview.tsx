@@ -15,13 +15,13 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { fetchMerchantOrders, fetchMyProducts } from '@/lib/marketplaceApi'
 import { merchantApiFetch } from '@/lib/merchantApi'
-import { getActiveShopIdForManage, getShopRoutesFromPathname, shopApiFetch } from '@/lib/shopApi'
+import { getActiveShopIdForManage, getShopRoutesFromPathname, resolveManageShopId, shopApiFetch } from '@/lib/shopApi'
 
 export function ShopOverview() {
   const pathname = usePathname()
   const routes = getShopRoutesFromPathname(pathname)
   const { activeShopId, activeMerchantId, user } = useAuthStore()
-  const manageShopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
+  const manageShopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const isStandalone = useMemo(() => {
     const shop = user?.shops?.find(s => s.id === manageShopId)
     return !!shop && !shop.merchant_id

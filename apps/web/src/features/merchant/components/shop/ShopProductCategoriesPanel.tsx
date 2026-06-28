@@ -11,6 +11,7 @@ import {
   fetchShopProductCategories,
   getActiveShopIdForManage,
   getShopRoutesFromPathname,
+  resolveManageShopId,
   saveShopProductCategories,
   type ShopProductCategoryOption,
 } from '@/lib/shopApi'
@@ -34,7 +35,7 @@ export function ShopProductCategoriesPanel() {
   const pathname = usePathname()
   const routes = getShopRoutesFromPathname(pathname)
   const { user, activeMerchantId, activeShopId } = useAuthStore()
-  const shopId = getActiveShopIdForManage(user?.shops, activeMerchantId, activeShopId)
+  const shopId = resolveManageShopId(pathname, user?.shops, activeMerchantId, activeShopId)
   const [categories, setCategories] = useState<ShopProductCategoryOption[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
