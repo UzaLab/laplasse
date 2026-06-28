@@ -64,6 +64,7 @@ const MERCHANT_PUBLIC_SELECT = {
   avg_rating: true,
   food_accepts_cash: true,
   food_cash_max_amount: true,
+  food_opening_hours: true,
   subscription_plan: true,
   delivery_fulfilment_default: true,
   created_at: true,

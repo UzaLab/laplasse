@@ -129,6 +129,7 @@ export interface ApiMerchant {
   has_active_promo?: boolean
   food_accepts_cash?: boolean
   food_cash_max_amount?: number | null
+  food_opening_hours?: Record<string, { open: string; close: string } | null> | null
   has_marketplace?: boolean
   featured_product?: ApiShopFeaturedProduct
   featured_vertical?: ApiVerticalFeaturedItem

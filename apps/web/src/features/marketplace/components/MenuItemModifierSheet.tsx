@@ -134,7 +134,7 @@ export function MenuItemModifierSheet({ item, open, onClose, onConfirm, submitti
           )}
         </div>
 
-        <div className="p-5 border-t border-slate-100 flex items-center gap-3">
+        <div className="p-5 pb-[calc(1.25rem+var(--mobile-bottom-nav-height,0px)+env(safe-area-inset-bottom,0px))] md:pb-5 border-t border-slate-100 flex items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-100 rounded-xl p-1">
             <button
               type="button"

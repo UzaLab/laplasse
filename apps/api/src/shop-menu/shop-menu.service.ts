@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { Prisma } from '../../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { SearchService } from '../search/search.service'
 import {
@@ -192,6 +193,7 @@ export class ShopMenuService {
         food_pause_until: true,
         food_accepts_cash: true,
         food_cash_max_amount: true,
+        food_opening_hours: true,
       },
     })
     if (!merchant) throw new NotFoundException('Établissement introuvable')
@@ -266,12 +268,7 @@ export class ShopMenuService {
 
   async updateSettings(userId: string, dto: UpdateMenuSettingsDto, merchantId?: string) {
     const merchant = await this.resolveMyMerchant(userId, merchantId)
-    const data: {
-      food_prep_minutes?: number
-      food_min_order_amount?: number | null
-      food_accepts_cash?: boolean
-      food_cash_max_amount?: number | null
-    } = {}
+    const data: Prisma.MerchantUpdateInput = {}
     if (dto.food_prep_minutes !== undefined) {
       data.food_prep_minutes = dto.food_prep_minutes
     }
@@ -290,12 +287,19 @@ export class ShopMenuService {
           ? null
           : dto.food_cash_max_amount
     }
+    if (dto.food_opening_hours !== undefined) {
+      data.food_opening_hours =
+        dto.food_opening_hours == null
+          ? Prisma.DbNull
+          : (dto.food_opening_hours as Prisma.InputJsonValue)
+    }
     if (Object.keys(data).length === 0) {
       return {
         food_prep_minutes: merchant.food_prep_minutes,
         food_min_order_amount: merchant.food_min_order_amount,
         food_accepts_cash: merchant.food_accepts_cash,
         food_cash_max_amount: merchant.food_cash_max_amount,
+        food_opening_hours: merchant.food_opening_hours,
       }
     }
     const updated = await this.prisma.merchant.update({
@@ -306,6 +310,7 @@ export class ShopMenuService {
         food_min_order_amount: true,
         food_accepts_cash: true,
         food_cash_max_amount: true,
+        food_opening_hours: true,
       },
     })
     return updated

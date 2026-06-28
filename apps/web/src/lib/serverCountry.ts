@@ -1,7 +1,7 @@
 /**
  * Résolution du pays côté serveur (Server Components / Route Handlers).
  *
- * Lit l'header `X-LaPlasse-Country` injecté par le middleware Edge,
+ * Lit l'header `X-LaPlasse-Country` injecté par le proxy Edge (`src/proxy.ts`),
  * qui a déjà résolu la priorité : sous-domaine > cookie > défaut.
  *
  * Usage :

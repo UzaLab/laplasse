@@ -184,6 +184,9 @@ model Merchant {
   avg_rating                  Float?
   food_accepts_cash           Boolean                @default(false)
   food_cash_max_amount        Int?
+  /// Horaires d'ouverture JSON. Format: {mon:{open:"11:00",close:"22:00"},tue:null,...}
+  /// Jours: mon tue wed thu fri sat sun. null = fermé ce jour-là.
+  food_opening_hours          Json?
   delivery_fulfilment_default DeliveryFulfilmentMode @default(PLATFORM_RIDER)
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt

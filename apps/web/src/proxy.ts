@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server'
 import {
   COUNTRY_BY_SUBDOMAIN,
   COUNTRY_COOKIE,
+  COUNTRY_HEADER,
+  DEFAULT_COUNTRY,
   getCountrySubdomain,
   isRootDomainHost,
   isSupportedCountryCode,
@@ -13,6 +15,35 @@ function redirectToHost(request: NextRequest, hostname: string): NextResponse {
   const proto = request.headers.get('x-forwarded-proto') ?? 'https'
   const path = `${request.nextUrl.pathname}${request.nextUrl.search}`
   return NextResponse.redirect(`${proto}://${hostname}${path}`)
+}
+
+function resolveCountry(request: NextRequest, hostHeader: string): string {
+  const host = hostHeader.split(':')[0]?.toLowerCase() ?? ''
+  const root = ROOT_DOMAIN.toLowerCase()
+
+  if (host.endsWith(`.${root}`) && !isRootDomainHost(hostHeader)) {
+    const sub = host.slice(0, -(`.${root}`.length)).split('.').pop()
+    const fromSub = sub ? COUNTRY_BY_SUBDOMAIN[sub] : null
+    if (fromSub) return fromSub
+  }
+
+  const cookieCountry = request.cookies.get(COUNTRY_COOKIE)?.value?.trim().toUpperCase()
+  if (cookieCountry && isSupportedCountryCode(cookieCountry)) {
+    return cookieCountry
+  }
+
+  return DEFAULT_COUNTRY
+}
+
+function nextWithCountry(request: NextRequest, country: string): NextResponse {
+  return NextResponse.next({
+    request: {
+      headers: new Headers({
+        ...Object.fromEntries(request.headers.entries()),
+        [COUNTRY_HEADER]: country,
+      }),
+    },
+  })
 }
 
 export function proxy(request: NextRequest) {
@@ -31,10 +62,6 @@ export function proxy(request: NextRequest) {
   const isRootHost = isRootDomainHost(hostHeader)
   const isCountryHost = host.endsWith(`.${root}`) && !isRootHost
 
-  if (!isRootHost && !isCountryHost) {
-    return NextResponse.next()
-  }
-
   if (host === `www.${root}`) {
     return redirectToHost(request, root)
   }
@@ -45,23 +72,25 @@ export function proxy(request: NextRequest) {
       const sub = getCountrySubdomain(savedCountry)
       return redirectToHost(request, `${sub}.${root}`)
     }
-    return NextResponse.next()
+    return nextWithCountry(request, DEFAULT_COUNTRY)
   }
 
-  const sub = host.slice(0, -(`.${root}`.length)).split('.').pop()
-  const country = sub ? COUNTRY_BY_SUBDOMAIN[sub] : null
+  const country = resolveCountry(request, hostHeader)
+  const response = nextWithCountry(request, country)
 
-  if (country) {
-    const response = NextResponse.next()
-    response.cookies.set(COUNTRY_COOKIE, country, {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    })
-    return response
+  if (isCountryHost) {
+    const sub = host.slice(0, -(`.${root}`.length)).split('.').pop()
+    const subdomainCountry = sub ? COUNTRY_BY_SUBDOMAIN[sub] : null
+    if (subdomainCountry) {
+      response.cookies.set(COUNTRY_COOKIE, subdomainCountry, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+      })
+    }
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {

@@ -58,6 +58,91 @@ export function foodPauseUntilLabel(food_pause_until?: string | null): string {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// ─── Horaires d'ouverture & pre-commande ───────────────────────────────────
+
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+type DayKey = typeof DAY_KEYS[number]
+
+export interface DaySchedule {
+  open: string  // "HH:MM"
+  close: string // "HH:MM"
+}
+export type OpeningHours = Partial<Record<DayKey, DaySchedule | null>>
+
+/**
+ * Parse une chaîne "HH:MM" en {h, m}.
+ */
+function parseHHMM(time: string): { h: number; m: number } {
+  const [h, m] = time.split(':').map(Number)
+  return { h: h ?? 0, m: m ?? 0 }
+}
+
+/**
+ * Calcule la prochaine heure d'ouverture à partir de `now`.
+ * Retourne null si aucun créneau défini dans les 7 prochains jours.
+ */
+export function nextOpeningTime(
+  hours: OpeningHours | null | undefined,
+  now: Date = new Date(),
+): Date | null {
+  if (!hours) return null
+
+  for (let daysAhead = 0; daysAhead <= 7; daysAhead++) {
+    const candidate = new Date(now)
+    candidate.setDate(candidate.getDate() + daysAhead)
+
+    const dayKey = DAY_KEYS[candidate.getDay()]
+    const schedule = hours[dayKey]
+    if (!schedule) continue
+
+    const { h, m } = parseHHMM(schedule.open)
+    const openTime = new Date(candidate)
+    openTime.setHours(h, m, 0, 0)
+
+    if (openTime > now) return openTime
+  }
+  return null
+}
+
+/**
+ * Vérifie si le restaurant est actuellement dans ses heures d'ouverture.
+ * Ne remplace pas food_is_paused — c'est une couche supplémentaire.
+ */
+export function isWithinOpeningHours(
+  hours: OpeningHours | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!hours) return true // pas d'horaires configurés → considéré ouvert
+
+  const dayKey = DAY_KEYS[now.getDay()]
+  const schedule = hours[dayKey]
+  if (!schedule) return false // fermé ce jour
+
+  const { h: oh, m: om } = parseHHMM(schedule.open)
+  const { h: ch, m: cm } = parseHHMM(schedule.close)
+
+  const openMin = oh * 60 + om
+  const closeMin = ch * 60 + cm
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+
+  return nowMin >= openMin && nowMin < closeMin
+}
+
+/** Formate la prochaine ouverture pour l'affichage UI. */
+export function nextOpeningLabel(nextOpen: Date | null): string {
+  if (!nextOpen) return ''
+  const now = new Date()
+  const diffH = (nextOpen.getTime() - now.getTime()) / 3_600_000
+
+  if (diffH < 24) {
+    return `Ouvre à ${nextOpen.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  const days = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
+  const day = days[nextOpen.getDay()]
+  const time = nextOpen.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return `Ouvre ${day}. à ${time}`
+}
+
 /**
  * Phase 4 — ETA dynamique.
  * Si distanceKm est connu, adapte le buffer livraison :

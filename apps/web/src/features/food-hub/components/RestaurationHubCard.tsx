@@ -11,6 +11,9 @@ import {
   formatFoodEtaFromDistance,
   merchantCuisineLabel,
   merchantDisplayRating,
+  nextOpeningTime,
+  nextOpeningLabel,
+  type OpeningHours,
 } from '@/lib/foodHub'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +31,10 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
   const foodStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
   const unavailable = foodStatus !== 'open'
   const showPromo = merchant.has_active_promo && !unavailable
+  const nextOpen = foodStatus === 'closed'
+    ? nextOpeningTime(merchant.food_opening_hours as OpeningHours | null)
+    : null
+  const nextOpenLabel = nextOpen ? nextOpeningLabel(nextOpen) : null
 
   if (variant === 'compact') {
     return (
@@ -54,8 +61,8 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
             </div>
           )}
           {unavailable && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
-              <span className="text-[10px] font-bold text-white bg-slate-800/90 px-1.5 py-0.5 rounded-md">
+            <div className={`absolute inset-0 flex items-center justify-center rounded-lg ${foodStatus === 'closed' ? 'bg-slate-900/55 backdrop-grayscale' : 'bg-black/25'}`}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${foodStatus === 'closed' ? 'text-white bg-slate-900/80' : 'text-white bg-amber-700/85'}`}>
                 {foodStatusLabel(foodStatus)}
               </span>
             </div>
@@ -114,8 +121,8 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
             </div>
           )}
           {unavailable && (
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-              <span className="px-4 py-2 rounded-2xl text-sm font-bold text-white bg-slate-800/90">
+            <div className={`absolute inset-0 flex items-center justify-center ${foodStatus === 'closed' ? 'bg-slate-900/55 backdrop-grayscale' : 'bg-black/25'}`}>
+              <span className={`px-4 py-2 rounded-2xl text-sm font-bold ${foodStatus === 'closed' ? 'text-white bg-slate-900/80 border border-white/10' : 'text-white bg-amber-700/85'}`}>
                 {foodStatusLabel(foodStatus)}
               </span>
             </div>
@@ -151,6 +158,9 @@ export function RestaurationHubCard({ merchant, variant = 'featured', className 
               Livraison dès {FOOD_HUB_DELIVERY_FEE_ESTIMATE.toLocaleString('fr-FR')} FCFA
             </span>
           </div>
+          {nextOpenLabel && (
+            <p className="text-xs font-semibold text-slate-400 mt-0.5">{nextOpenLabel}</p>
+          )}
         </div>
       </Link>
     </article>

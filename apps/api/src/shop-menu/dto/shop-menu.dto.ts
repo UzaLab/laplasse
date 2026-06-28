@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Min,
@@ -231,4 +232,13 @@ export class UpdateMenuSettingsDto {
   @IsInt()
   @Min(0)
   food_cash_max_amount?: number | null
+
+  /**
+   * Horaires d'ouverture JSON.
+   * Format : { mon: { open: "11:00", close: "22:00" }, tue: null, ... }
+   * null pour un jour = fermé ce jour-là.
+   */
+  @IsOptional()
+  @IsObject()
+  food_opening_hours?: Record<string, { open: string; close: string } | null> | null
 }

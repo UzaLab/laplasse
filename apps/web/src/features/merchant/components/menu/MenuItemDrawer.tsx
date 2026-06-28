@@ -99,7 +99,7 @@ export function MenuItemDrawer({
   const title = mode === 'create' ? 'Nouveau plat' : 'Modifier le plat'
 
   return createPortal(
-    <div className="fixed inset-0 z-[300] flex flex-col sm:flex-row sm:justify-end pt-6 sm:pt-0">
+    <div className="fixed inset-0 z-[300] flex flex-col sm:flex-row sm:justify-end">
       <div
         role="presentation"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
@@ -109,9 +109,9 @@ export function MenuItemDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="menu-item-drawer-title"
-        className="relative ml-auto flex flex-col w-full sm:max-w-lg h-[calc(100dvh-1.5rem)] sm:h-full rounded-t-2xl sm:rounded-none bg-white shadow-2xl min-h-0 overflow-hidden"
+        className="relative ml-auto flex flex-col w-full sm:max-w-lg h-dvh sm:h-full rounded-t-2xl sm:rounded-none bg-white shadow-2xl min-h-0 overflow-hidden"
       >
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-7 pb-3 sm:py-4 border-b border-slate-100 shrink-0 safe-area-top">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 pt-10 pb-3 sm:pt-8 sm:pb-4 border-b border-slate-100 shrink-0 safe-area-top">
           <div className="min-w-0">
             <p id="menu-item-drawer-title" className="text-lg font-extrabold text-slate-900 truncate">{title}</p>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -131,7 +131,7 @@ export function MenuItemDrawer({
 
         <form
           id="menu-item-drawer-form"
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 pt-8 pb-5 space-y-4"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-5 space-y-4"
           onSubmit={e => {
             e.preventDefault()
             void onSubmit(form, modifiers)

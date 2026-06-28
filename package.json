@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev:kill": "fuser -k 3001/tcp 3000/tcp 2>/dev/null || true",
+    "dev:kill": "fuser -k 3001/tcp 3000/tcp 2>/dev/null || true; for port in 3000 3001; do lsof -ti:$port 2>/dev/null | xargs -r kill -9; done 2>/dev/null || true",
     "dev": "pnpm dev:kill && pnpm --parallel --filter web --filter api dev",
     "dev:web": "pnpm --filter web dev",
     "dev:api": "pnpm --filter api start:dev",
