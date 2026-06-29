@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard, TrendingUp, Edit, Clock, Image,
   Crown, Menu, X, LogOut, Compass, ExternalLink, Users, UserCircle2,
@@ -30,8 +30,13 @@ interface MerchantShellProps {
   merchantName?: string
 }
 
-export function MerchantShell({ children, merchantSlug, merchantName }: MerchantShellProps) {
+/**
+ * Inner component — uses useSearchParams, must run inside a Suspense boundary.
+ * MerchantShell provides that boundary automatically.
+ */
+function MerchantShellInner({ children, merchantSlug, merchantName }: MerchantShellProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const { user, logoutRemote, activeMerchantId, activeShopId, setActiveMerchant, setActiveShop, updateUser } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -57,6 +62,39 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
     if (hasMerchantEstablishment(user)) return
     router.replace(hasStandaloneShopOnly(user) ? '/shop/manage' : '/profile')
   }, [user, pathname, router])
+
+  // Helper : construit une URL en injectant ou remplaçant ?m=merchantId
+  const withMerchant = useCallback((href: string, mid?: string | null) => {
+    const id = mid ?? activeMerchantId
+    if (!id) return href
+    const [base, qs = ''] = href.split('?')
+    const params = new URLSearchParams(qs)
+    params.set('m', id)
+    return `${base}?${params.toString()}`
+  }, [activeMerchantId])
+
+  // 1. Au chargement (ou refresh) : si ?m= présent dans l'URL, restaurer l'établissement actif
+  useEffect(() => {
+    const mParam = searchParams.get('m')
+    if (!mParam) return
+    if (!user?.merchants) return
+    const valid = user.merchants.some(m => m.id === mParam)
+    if (valid && mParam !== activeMerchantId) {
+      setActiveMerchant(mParam)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user?.merchants])
+
+  // 2. Quand activeMerchantId change (switcher), mettre à jour ?m= dans l'URL
+  useEffect(() => {
+    if (!activeMerchantId) return
+    const current = searchParams.get('m')
+    if (current === activeMerchantId) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('m', activeMerchantId)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMerchantId])
 
   // Synchronise la liste d'établissements et l'organisation depuis l'API
   useEffect(() => {
@@ -206,7 +244,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
   const navLink = (item: NavItem) => (
     <Link
       key={item.href}
-      href={item.href}
+      href={withMerchant(item.href)}
       onClick={() => setSidebarOpen(false)}
       className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
         isActive(item.href)
@@ -295,7 +333,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
                     {orgMerchants.map(m => (
                       <button
                         key={m.id}
-                        onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false) }}
+                        onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false); router.replace(withMerchant(pathname, m.id), { scroll: false }) }}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
                           m.id === activeMerchantId
                             ? 'bg-amber-50 text-slate-900 font-bold'
@@ -314,7 +352,7 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
                 {independentMerchants.map(m => (
                   <button
                     key={m.id}
-                    onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false) }}
+                    onClick={() => { setActiveMerchant(m.id); setSwitcherOpen(false); router.replace(withMerchant(pathname, m.id), { scroll: false }) }}
                     className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
                       m.id === activeMerchantId
                         ? 'bg-amber-50 text-slate-900 font-bold'
@@ -509,5 +547,13 @@ export function MerchantShell({ children, merchantSlug, merchantName }: Merchant
 
       <MerchantMobileNav />
     </div>
+  )
+}
+
+export function MerchantShell(props: MerchantShellProps) {
+  return (
+    <Suspense fallback={null}>
+      <MerchantShellInner {...props} />
+    </Suspense>
   )
 }

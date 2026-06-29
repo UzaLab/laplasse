@@ -1,23 +1,22 @@
 'use client'
 
 import { useRequireAuth } from '@/hooks/useRequireAuth'
+import { useAuthStore } from '@/stores/authStore'
 import { ShopManageSectionLayout } from '@/features/shop/components/ShopManageSectionLayout'
 import { DeliveryHubPanel } from '@/features/merchant/components/delivery/DeliveryHubPanel'
-import { useDeliveryShopId } from '@/features/merchant/components/delivery/useDeliveryShopId'
 import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 import { Loader2 } from 'lucide-react'
 
 function ShopManageDeliveryContent() {
   const { hydrated, isAuthenticated, ready } = useRequireAuth('/shop/manage/delivery-zones')
-  const { shopId, loading } = useDeliveryShopId('shop')
+  const { activeMerchantId } = useAuthStore()
 
-  if (!hydrated || !isAuthenticated || !ready) return null
+  if (!hydrated || !isAuthenticated || !ready || !activeMerchantId) return null
 
   return (
     <ShopManageSectionLayout>
       <DeliveryHubPanel
-        shopId={shopId}
-        shopLoading={loading}
+        merchantId={activeMerchantId}
         basePath="/shop/manage/delivery-zones"
       />
     </ShopManageSectionLayout>

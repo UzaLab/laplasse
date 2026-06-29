@@ -409,7 +409,7 @@ export function NotificationsPageContent({
                           type="button"
                           disabled={!actionable}
                           className={cn(
-                            'w-full text-left rounded-full border transition-all',
+                            'w-full text-left rounded-2xl border transition-all',
                             'flex items-start gap-4 p-4 sm:p-5 min-h-[72px]',
                             actionable && 'hover:border-slate-200 hover:shadow-sm active:bg-slate-50',
                             !actionable && 'cursor-default',

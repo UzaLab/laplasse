@@ -605,15 +605,6 @@ export class DeliveryService {
       throw new BadRequestException('Commande non livrable')
     }
 
-    let contractShopId = order.shop_id
-    if (!contractShopId && order.merchant_id) {
-      const linkedShop = await this.prisma.shop.findFirst({
-        where: { merchant_id: order.merchant_id },
-        select: { id: true, name: true, delivery_fulfilment_default: true },
-      })
-      contractShopId = linkedShop?.id ?? null
-    }
-
     const mode = dto.fulfilment_mode
       ?? order.delivery_fulfilment_mode
       ?? order.shop?.delivery_fulfilment_default
@@ -622,9 +613,12 @@ export class DeliveryService {
 
     let partnerId = dto.logistics_partner_id ?? order.logistics_partner_id ?? null
     if (mode === 'LOGISTICS_PARTNER') {
-      if (!partnerId && contractShopId) {
+      if (!partnerId) {
+        const contractWhere: any = { status: 'ACTIVE' }
+        if (order.shop_id) contractWhere.shop_id = order.shop_id
+        else if (order.merchant_id) contractWhere.merchant_id = order.merchant_id
         const contract = await this.prisma.deliveryPartnerContract.findFirst({
-          where: { shop_id: contractShopId, status: 'ACTIVE' },
+          where: contractWhere,
           orderBy: { signed_at: 'desc' },
         })
         partnerId = contract?.logistics_partner_id ?? null
@@ -632,14 +626,11 @@ export class DeliveryService {
       if (!partnerId) {
         throw new BadRequestException('Sélectionnez un partenaire logistique ou activez un contrat')
       }
-      const active = await this.prisma.deliveryPartnerContract.findFirst({
-        where: {
-          shop_id: contractShopId ?? undefined,
-          logistics_partner_id: partnerId,
-          status: 'ACTIVE',
-        },
-      })
-      if (!active) throw new BadRequestException('Contrat partenaire non actif pour cette boutique')
+      const activeWhere: any = { logistics_partner_id: partnerId, status: 'ACTIVE' }
+      if (order.shop_id) activeWhere.shop_id = order.shop_id
+      else if (order.merchant_id) activeWhere.merchant_id = order.merchant_id
+      const active = await this.prisma.deliveryPartnerContract.findFirst({ where: activeWhere })
+      if (!active) throw new BadRequestException('Contrat partenaire non actif pour cet établissement')
     }
 
     if (mode === 'MERCHANT_OWN' && dto.courier_profile_id) {
@@ -651,7 +642,6 @@ export class DeliveryService {
           OR: [
             ...(order.shop_id ? [{ shop_id: order.shop_id }] : []),
             ...(order.merchant_id ? [{ merchant_id: order.merchant_id }] : []),
-            ...(contractShopId ? [{ shop_id: contractShopId }] : []),
           ],
         },
       })

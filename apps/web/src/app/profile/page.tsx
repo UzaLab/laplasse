@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Heart, Star, Trophy, Gift, Bell, Hand, Calendar,
-  Loader2, MapPin, ArrowRight, Award, ShoppingBag,
+  Loader2, MapPin, ArrowRight, Award, ShoppingBag, Package,
 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { useQuery } from '@tanstack/react-query'
 import { authApiFetch } from '@/lib/authFetch'
+import { fetchMyOrders, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES, type Order } from '@/lib/marketplaceApi'
+import { formatOrderRef } from '@/features/profile/components/orders/orderUtils'
 import { ProfileShell } from '@/features/profile/components/ProfileShell'
 import { BRAND_EXPLORE_EMPTY } from '@/lib/brandCopy'
 import {
@@ -20,15 +22,6 @@ import {
   BOOKING_STATUS_LABELS,
 } from '@/lib/bookingDisplay'
 
-interface UserReview {
-  id: string
-  rating: number
-  title: string | null
-  content: string | null
-  status: string
-  created_at: string
-  merchant: { business_name: string; slug: string; cover_image?: string | null }
-}
 
 interface FavMerchant {
   id: string
@@ -70,14 +63,11 @@ export default function ProfilePage() {
 
   useEffect(() => { setMounted(true) }, [])
 
-  const { data: reviews = [], isLoading: loadingReviews } = useQuery<UserReview[]>({
-    queryKey: ['my-reviews', user?.id],
-    queryFn: async () => {
-      const res = await authApiFetch('/reviews/mine')
-      if (!res.ok) return []
-      return res.json()
-    },
+  const { data: recentOrders = [], isLoading: loadingOrders } = useQuery<Order[]>({
+    queryKey: ['my-orders-recent', user?.id],
+    queryFn: fetchMyOrders,
     enabled: authReady,
+    select: (data) => data.slice(0, 3),
   })
 
   const { data: favorites = [], isLoading: loadingFavorites } = useQuery<FavMerchant[]>({
@@ -297,62 +287,70 @@ export default function ProfilePage() {
 
         {/* Row 2 — Avis + Favoris */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-10 min-w-0">
-          {/* Derniers avis */}
+          {/* Dernières commandes */}
           <div className="bg-white rounded-[32px] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                <Star size={20} className="text-amber-500 fill-amber-100" /> Mes avis récents
+                <ShoppingBag size={20} className="text-amber-500" /> Mes commandes récentes
               </h3>
-              <Link href="/profile/reviews" className="text-sm font-bold text-amber-600 hover:text-amber-700" style={{ textDecoration: 'none' }}>
+              <Link href="/profile/orders" className="text-sm font-bold text-amber-600 hover:text-amber-700" style={{ textDecoration: 'none' }}>
                 Tout voir
               </Link>
             </div>
-            <div className="p-4 space-y-3 flex-1">
-              {loadingReviews ? (
+            <div className="divide-y divide-slate-100 flex-1">
+              {loadingOrders ? (
                 <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-slate-300" /></div>
-              ) : reviews.length === 0 ? (
+              ) : recentOrders.length === 0 ? (
                 <div className="py-8 text-center">
-                  <Star size={28} className="mx-auto mb-2 text-slate-200" />
-                  <p className="text-sm text-slate-500">Aucun avis pour le moment</p>
+                  <Package size={28} className="mx-auto mb-2 text-slate-200" />
+                  <p className="text-sm text-slate-500">Aucune commande pour le moment</p>
                 </div>
               ) : (
-                reviews.slice(0, 2).map(r => (
-                  <Link
-                    key={r.id}
-                    href={`/m/${r.merchant.slug}`}
-                    className="block bg-slate-50 border border-slate-100 p-4 rounded-full hover:border-amber-200 transition-colors"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-12 h-12 bg-white rounded-xl overflow-hidden shrink-0 shadow-sm">
-                          {r.merchant.cover_image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={r.merchant.cover_image} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                              <MapPin size={14} className="text-slate-400" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-bold text-slate-900 text-sm truncate">{r.merchant.business_name}</h4>
-                          <div className="flex items-center gap-0.5 mt-0.5">
-                            {[1, 2, 3, 4, 5].map(n => (
-                              <Star key={n} size={10} className={n <= r.rating ? 'fill-amber-400 text-amber-400' : 'fill-slate-100 text-slate-200'} />
-                            ))}
+                recentOrders.map(order => {
+                  const sellerName = order.merchant?.business_name ?? order.shop?.name ?? 'Commande'
+                  const sellerHref = order.merchant?.slug ? `/m/${order.merchant.slug}` : order.shop?.slug ? `/shop/${order.shop.slug}` : null
+                  const thumb = order.items[0]?.image_url ?? order.items[0]?.product?.image_url ?? null
+                  const dt = new Date(order.created_at)
+                  const statusStyle = ORDER_STATUS_STYLES[order.status] ?? 'bg-slate-50 text-slate-600 border-slate-200'
+                  return (
+                    <Link
+                      key={order.id}
+                      href={`/profile/orders/${order.id}`}
+                      className="flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                        {thumb ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumb} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package size={16} className="text-slate-300" />
                           </div>
-                        </div>
+                        )}
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                        r.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                      }`}>
-                        {r.status === 'APPROVED' ? 'Publié' : 'En modération'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs font-bold text-slate-400">{formatOrderRef(order.id)}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          </span>
+                        </div>
+                        {sellerHref ? (
+                          <p className="text-sm font-bold text-slate-900 truncate">{sellerName}</p>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-900 truncate">{sellerName}</p>
+                        )}
+                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                          {order.items[0]?.product_name}{order.items.length > 1 ? ` +${order.items.length - 1}` : ''}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border shrink-0 ${statusStyle}`}>
+                        {ORDER_STATUS_LABELS[order.status]}
                       </span>
-                    </div>
-                    {r.content && <p className="text-xs text-slate-500 line-clamp-2">{r.content}</p>}
-                  </Link>
-                ))
+                    </Link>
+                  )
+                })
               )}
             </div>
           </div>

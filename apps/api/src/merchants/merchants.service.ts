@@ -114,66 +114,13 @@ export class MerchantsService {
   ) {}
 
   // ── Helper : résoudre l'établissement actif d'un utilisateur ────────────────
-  private async resolveMyMerchant(userId: string, merchantId?: string) {
+  async resolveMyMerchant(userId: string, merchantId?: string) {
     const where = merchantId
       ? { id: merchantId, owner_id: userId }
       : { owner_id: userId }
     const m = await this.prisma.merchant.findFirst({ where })
     if (!m) throw new NotFoundException('Merchant not found')
     return m
-  }
-
-  async resolveMyShop(userId: string, merchantId?: string) {
-    const shop = await this.findMerchantLinkedShop(userId, merchantId)
-    if (!shop) throw new NotFoundException('Aucune boutique liée à cet établissement.')
-    return shop
-  }
-
-  /** Retourne la boutique liée au marchand, sans jamais en créer une automatiquement. */
-  async findMerchantLinkedShop(userId: string, merchantId?: string) {
-    const merchant = await this.resolveMyMerchant(userId, merchantId)
-    return this.prisma.shop.findUnique({
-      where: { merchant_id: merchant.id },
-    })
-  }
-
-  /**
-   * Crée explicitement une boutique de livraison pour l'établissement si elle n'existe pas encore.
-   * Déclenchée uniquement à la demande du marchand — jamais automatiquement lors d'une commande.
-   */
-  async initMerchantDeliveryShop(userId: string, merchantId?: string) {
-    const merchant = await this.resolveMyMerchant(userId, merchantId)
-    const existing = await this.prisma.shop.findUnique({
-      where: { merchant_id: merchant.id },
-    })
-    if (existing) return existing
-
-    const location = await this.prisma.merchantLocation.findUnique({
-      where: { merchant_id: merchant.id },
-    })
-
-    let slug = merchant.slug
-    let n = 1
-    while (await this.prisma.shop.findUnique({ where: { slug } })) {
-      slug = `${merchant.slug}-${n++}`
-    }
-
-    return this.prisma.shop.create({
-      data: {
-        owner_id: merchant.owner_id,
-        name: merchant.business_name,
-        slug,
-        merchant_id: merchant.id,
-        status: 'DRAFT',
-        is_active: false,
-        enabled_modules: ['food'],
-        city: location?.city ?? defaultCityForCountry(location?.country ?? 'CI'),
-        country: location?.country ?? 'CI',
-        district: location?.district ?? null,
-        address: location?.address ?? null,
-        delivery_fulfilment_default: merchant.delivery_fulfilment_default,
-      },
-    })
   }
 
   async updateDeliverySettings(
@@ -198,6 +145,45 @@ export class MerchantsService {
       })
     }
     return updated
+  }
+
+  async listDeliveryContracts(merchantId: string) {
+    return this.prisma.deliveryPartnerContract.findMany({
+      where: { merchant_id: merchantId },
+      include: { partner: { select: { id: true, legal_name: true, trade_name: true, slug: true, logo: true } } },
+      orderBy: { created_at: 'desc' },
+    })
+  }
+
+  async requestDeliveryContract(merchantId: string, logisticsPartnerId: string) {
+    const existing = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { merchant_id: merchantId, logistics_partner_id: logisticsPartnerId },
+    })
+    if (existing) throw new BadRequestException('Un contrat existe déjà avec ce partenaire')
+
+    return this.prisma.deliveryPartnerContract.create({
+      data: {
+        merchant_id: merchantId,
+        logistics_partner_id: logisticsPartnerId,
+        status: 'PENDING_PARTNER',
+      },
+      include: { partner: { select: { id: true, legal_name: true, trade_name: true, slug: true, logo: true } } },
+    })
+  }
+
+  async acceptDeliveryContract(merchantId: string, contractId: string) {
+    const contract = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { id: contractId, merchant_id: merchantId },
+    })
+    if (!contract) throw new NotFoundException('Contrat introuvable')
+    if (contract.status !== 'PENDING_MERCHANT') {
+      throw new BadRequestException('Ce contrat ne peut pas être accepté dans son état actuel')
+    }
+    await this.prisma.deliveryPartnerContract.update({
+      where: { id: contractId },
+      data: { status: 'ACTIVE', signed_at: new Date() },
+    })
+    return { ok: true }
   }
 
   // ── Liste publique ──────────────────────────────────────────────────────────

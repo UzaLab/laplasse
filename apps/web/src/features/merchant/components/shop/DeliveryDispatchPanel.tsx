@@ -9,6 +9,8 @@ import {
   type DeliveryJobSummary,
 } from '@/lib/deliveryApi'
 import {
+  fetchMerchantCourierStaff,
+  fetchMerchantDeliveryContracts,
   fetchShopCourierStaff,
   fetchShopDeliveryContracts,
   type DeliveryFulfilmentMode,
@@ -70,70 +72,68 @@ export function DeliveryDispatchPanel({
     : '/merchant/shop/delivery-zones')
 
   useEffect(() => {
+    if (!merchantId && !shopId) {
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
+
     void (async () => {
-      let shopMode: DeliveryFulfilmentMode = 'PLATFORM_RIDER'
-      let staffList: ShopCourierStaff[] = []
-      let contractList: DeliveryPartnerContract[] = []
-      let effectiveShopId = shopId
+      try {
+        let resolvedMode: DeliveryFulfilmentMode = 'PLATFORM_RIDER'
+        let staffList: ShopCourierStaff[] = []
+        let contractList: DeliveryPartnerContract[] = []
 
-      if (merchantId && !effectiveShopId) {
-        const deliveryShopRes = await merchantApiFetch('/merchants/me/delivery-shop', merchantId)
-        if (deliveryShopRes.ok) {
-          const deliveryShop = await deliveryShopRes.json() as {
-            id: string
-            delivery_fulfilment_default?: DeliveryFulfilmentMode
-          }
-          effectiveShopId = deliveryShop.id
-          shopMode = deliveryShop.delivery_fulfilment_default ?? shopMode
-        } else {
-          const profileRes = await merchantApiFetch('/merchants/me/profile', merchantId)
+        if (merchantId) {
+          const [profileRes, staffResult, contractResult] = await Promise.all([
+            merchantApiFetch('/merchants/me/profile', merchantId),
+            fetchMerchantCourierStaff(merchantId),
+            fetchMerchantDeliveryContracts(merchantId),
+          ])
+          staffList = staffResult
+          contractList = contractResult
           if (profileRes.ok) {
-            const merchant = await profileRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
-            shopMode = merchant.delivery_fulfilment_default ?? shopMode
+            const profile = await profileRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode } | null
+            resolvedMode = profile?.delivery_fulfilment_default ?? resolvedMode
+          }
+        } else if (shopId) {
+          const [shopRes, staffResult, contractResult] = await Promise.all([
+            shopApiFetch(`/shops/${shopId}/manage`, shopId),
+            fetchShopCourierStaff(shopId),
+            fetchShopDeliveryContracts(shopId),
+          ])
+          staffList = staffResult
+          contractList = contractResult
+          if (shopRes.ok) {
+            const shop = await shopRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
+            resolvedMode = shop.delivery_fulfilment_default ?? resolvedMode
           }
         }
-      }
 
-      if (effectiveShopId) {
-        const shopRes = await shopApiFetch(`/shops/${effectiveShopId}/manage`, effectiveShopId)
-        const [staff, contracts] = await Promise.all([
-          fetchShopCourierStaff(effectiveShopId),
-          fetchShopDeliveryContracts(effectiveShopId),
-        ])
-        staffList = staff
-        contractList = contracts
-        if (shopRes.ok) {
-          const shop = await shopRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
-          shopMode = shop.delivery_fulfilment_default ?? shopMode
-        }
-      } else if (merchantId) {
-        const profileRes = await merchantApiFetch('/merchants/me/profile', merchantId)
-        if (profileRes.ok) {
-          const merchant = await profileRes.json() as { delivery_fulfilment_default?: DeliveryFulfilmentMode }
-          shopMode = merchant.delivery_fulfilment_default ?? shopMode
-        }
-      }
+        if (cancelled) return
 
-      if (cancelled) return
-      setLoadedDefaultMode(shopMode)
-      setStaff(staffList)
-      const activeContracts = contractList.filter(c => c.status === 'ACTIVE')
-      setContracts(activeContracts)
-      if (activeContracts.length === 1) {
-        setSelectedPartnerId(activeContracts[0].partner.id)
-      } else if (activeContracts.length > 0) {
-        setSelectedPartnerId(activeContracts[0].partner.id)
+        setLoadedDefaultMode(resolvedMode)
+        setStaff(staffList)
+        const activeContracts = contractList.filter(c => c.status === 'ACTIVE')
+        setContracts(activeContracts)
+        if (activeContracts.length >= 1) {
+          setSelectedPartnerId(activeContracts[0].partner.id)
+        }
+        if (staffList.length === 1) {
+          setSelectedStaffId(staffList[0].id)
+        } else {
+          const online = staffList.find(c => c.is_online)
+          if (online) setSelectedStaffId(online.id)
+        }
+      } catch {
+        if (!cancelled) notify.error('Impossible de charger la configuration livraison')
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      if (staffList.length === 1) {
-        setSelectedStaffId(staffList[0].id)
-      } else {
-        const online = staffList.find(c => c.is_online)
-        if (online) setSelectedStaffId(online.id)
-      }
-      setLoading(false)
     })()
+
     return () => { cancelled = true }
   }, [shopId, merchantId])
 

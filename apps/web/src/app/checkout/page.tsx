@@ -1059,7 +1059,7 @@ function CheckoutPageContent() {
                         <ul className="space-y-3">
                           {deliveryQuotes.map(q => (
                             <li
-                              key={q.shop_id}
+                              key={q.merchant_id ?? q.shop_id}
                               className="flex justify-between gap-3 text-sm bg-slate-50 rounded-xl px-4 py-3"
                             >
                               <div>

@@ -5,24 +5,18 @@ import { useAuthReady } from '@/hooks/useAuthReady'
 import { useAuthStore } from '@/stores/authStore'
 import { MerchantShell } from '@/features/merchant/components/MerchantShell'
 import { DeliveryHubPanel } from '@/features/merchant/components/delivery/DeliveryHubPanel'
-import { useDeliveryShopId } from '@/features/merchant/components/delivery/useDeliveryShopId'
 import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 
 function MerchantDeliveryContent() {
-  const { user } = useAuthStore()
-  const { shopId, loading, initializing, countryCode, initShop } = useDeliveryShopId('merchant')
+  const { user, activeMerchantId } = useAuthStore()
 
-  if (!user) return null
+  if (!user || !activeMerchantId) return null
 
   return (
     <MerchantShell>
       <DeliveryHubPanel
-        shopId={shopId}
-        shopLoading={loading}
-        initializing={initializing}
-        onInitShop={initShop}
+        merchantId={activeMerchantId}
         basePath="/merchant/delivery-zones"
-        countryCode={countryCode}
       />
     </MerchantShell>
   )

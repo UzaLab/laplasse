@@ -17,39 +17,3 @@ export function merchantApiFetch(
 ) {
   return authApiFetch(withMerchantId(path, activeMerchantId), options)
 }
-
-export interface MerchantDeliveryShop {
-  id: string
-  slug: string
-  name: string
-  country?: string
-  delivery_fulfilment_default?: string
-}
-
-export async function fetchMerchantDeliveryShop(
-  activeMerchantId?: string | null,
-): Promise<MerchantDeliveryShop | null> {
-  const res = await merchantApiFetch('/merchants/me/delivery-shop', activeMerchantId)
-  if (!res.ok) return null
-  const data = await res.json()
-  if (!data) return null
-  return data as MerchantDeliveryShop
-}
-
-export async function initMerchantDeliveryShop(
-  activeMerchantId?: string | null,
-): Promise<MerchantDeliveryShop | null> {
-  const res = await merchantApiFetch('/merchants/me/delivery-shop', activeMerchantId, {
-    method: 'POST',
-  })
-  if (!res.ok) return null
-  return res.json() as Promise<MerchantDeliveryShop>
-}
-
-export async function fetchMerchantFleetInviteLink(
-  activeMerchantId?: string | null,
-): Promise<{ url: string; slug: string; shop_name: string } | null> {
-  const res = await merchantApiFetch('/merchants/me/fleet/invite-link', activeMerchantId)
-  if (!res.ok) return null
-  return res.json() as Promise<{ url: string; slug: string; shop_name: string }>
-}

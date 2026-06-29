@@ -98,9 +98,9 @@ export function ProductCarousel({
 
   return (
     <section className={cn('space-y-4', className)}>
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h2 className="text-2xl font-extrabold text-slate-900">{title}</h2>
-        <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center justify-between gap-4 flex-nowrap">
+        <h2 className="text-2xl font-extrabold text-slate-900 min-w-0 truncate">{title}</h2>
+        <div className="flex items-center gap-2 shrink-0">
           {headerAction}
           {showNav && (
             <div className="flex items-center gap-1.5">

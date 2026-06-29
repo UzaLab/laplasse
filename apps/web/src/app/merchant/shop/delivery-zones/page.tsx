@@ -2,14 +2,14 @@
 
 import { Loader2 } from 'lucide-react'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
+import { useAuthStore } from '@/stores/authStore'
 import { ShopSectionLayout } from '@/features/merchant/components/shop/ShopSectionLayout'
 import { DeliveryHubPanel } from '@/features/merchant/components/delivery/DeliveryHubPanel'
-import { useDeliveryShopId } from '@/features/merchant/components/delivery/useDeliveryShopId'
 import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 
 function ShopDeliveryPageContent() {
   const { hydrated, isAuthenticated, ready } = useRequireAuth('/merchant/shop/delivery-zones')
-  const { shopId, loading } = useDeliveryShopId('shop')
+  const { activeMerchantId } = useAuthStore()
 
   if (!hydrated || !ready) {
     return (
@@ -19,13 +19,12 @@ function ShopDeliveryPageContent() {
     )
   }
 
-  if (!isAuthenticated) return null
+  if (!isAuthenticated || !activeMerchantId) return null
 
   return (
     <ShopSectionLayout>
       <DeliveryHubPanel
-        shopId={shopId}
-        shopLoading={loading}
+        merchantId={activeMerchantId}
         basePath="/merchant/shop/delivery-zones"
       />
     </ShopSectionLayout>

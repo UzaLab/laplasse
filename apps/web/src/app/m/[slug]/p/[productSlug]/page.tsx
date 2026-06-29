@@ -310,7 +310,7 @@ export default function ProductDetailPage() {
                   className="hover:text-slate-900 transition-colors"
                   style={{ textDecoration: 'none' }}
                 >
-                  {categoryName}
+                  {merchant?.business_name ?? merchantDetail?.business_name ?? categoryName}
                 </Link>
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </>
@@ -616,19 +616,19 @@ export default function ProductDetailPage() {
                       {t('product.quantity')}
                     </label>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
-                      <div className="inline-flex items-center p-1 bg-slate-50 border border-slate-200 rounded-full sm:rounded-xl shrink-0">
+                      <div className="flex items-center p-1 bg-slate-50 border border-slate-200 rounded-full w-full lg:w-auto shrink-0">
                         <button
                           type="button"
                           onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full sm:rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
                         >
                           <Minus size={16} />
                         </button>
-                        <span className="w-10 sm:w-12 text-center font-bold text-slate-900 text-sm sm:text-base">{quantity}</span>
+                        <span className="flex-1 lg:flex-none lg:w-12 text-center font-bold text-slate-900 text-sm sm:text-base">{quantity}</span>
                         <button
                           type="button"
                           onClick={() => setQuantity(q => Math.min(displayStock, q + 1))}
-                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full sm:rounded-lg flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
+                          className="w-11 h-11 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm transition-all"
                         >
                           <Plus size={16} />
                         </button>
@@ -876,10 +876,10 @@ export default function ProductDetailPage() {
               headerAction={
                 <Link
                   href={`/m/${slug}/boutique`}
-                  className="text-sm font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                  className="hidden lg:flex text-sm font-bold text-brand-600 hover:text-brand-700 items-center gap-1"
                   style={{ textDecoration: 'none' }}
                 >
-                  {t('product.viewShop')} {merchant?.business_name} <ArrowRight size={16} />
+                  Voir <ArrowRight size={16} />
                 </Link>
               }
               getCardProps={related => ({

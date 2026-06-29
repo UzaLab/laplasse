@@ -284,50 +284,7 @@ export class MerchantsController {
     return this.merchantsService.registerMerchant(body, user.id)
   }
 
-  // ── Livraison : zones & réglages fleet (restaurants) ────────────────────────
-
-  @UseGuards(JwtAuthGuard)
-  @Get('me/delivery-shop')
-  async getMyDeliveryShop(
-    @CurrentUser() user: { id: string },
-    @Query('merchantId') merchantId?: string,
-  ) {
-    const shop = await this.merchantsService.findMerchantLinkedShop(user.id, merchantId)
-    if (!shop) return null
-    return {
-      id: shop.id,
-      slug: shop.slug,
-      name: shop.name,
-      country: shop.country,
-      delivery_fulfilment_default: shop.delivery_fulfilment_default,
-    }
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('me/delivery-shop')
-  async initMyDeliveryShop(
-    @CurrentUser() user: { id: string },
-    @Query('merchantId') merchantId?: string,
-  ) {
-    const shop = await this.merchantsService.initMerchantDeliveryShop(user.id, merchantId)
-    return {
-      id: shop.id,
-      slug: shop.slug,
-      name: shop.name,
-      country: shop.country,
-      delivery_fulfilment_default: shop.delivery_fulfilment_default,
-    }
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('me/fleet/invite-link')
-  async getMyFleetInviteLink(
-    @CurrentUser() user: { id: string },
-    @Query('merchantId') merchantId?: string,
-  ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
-    return this.courierStaff.getFleetInviteLink(shop.id)
-  }
+  // ── Livraison : zones, livreurs, contrats (directement sur merchant) ────────
 
   @UseGuards(JwtAuthGuard)
   @Get('me/delivery-zones')
@@ -335,8 +292,8 @@ export class MerchantsController {
     @CurrentUser() user: { id: string },
     @Query('merchantId') merchantId?: string,
   ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
-    return this.deliveryZones.listForShop(shop.id)
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.deliveryZones.listForMerchant(merchant.id)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -346,8 +303,8 @@ export class MerchantsController {
     @Body() dto: CreateDeliveryZoneDto,
     @Query('merchantId') merchantId?: string,
   ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
-    return this.deliveryZones.createForShop(shop.id, dto)
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.deliveryZones.createForMerchant(merchant.id, dto)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -358,8 +315,8 @@ export class MerchantsController {
     @Body() dto: UpdateDeliveryZoneDto,
     @Query('merchantId') merchantId?: string,
   ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
-    return this.deliveryZones.updateForShop(shop.id, zoneId, dto)
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.deliveryZones.updateForMerchant(merchant.id, zoneId, dto)
   }
 
   @UseGuards(JwtAuthGuard)
@@ -369,8 +326,82 @@ export class MerchantsController {
     @Param('zoneId') zoneId: string,
     @Query('merchantId') merchantId?: string,
   ) {
-    const shop = await this.merchantsService.resolveMyShop(user.id, merchantId)
-    return this.deliveryZones.deleteZone(shop.id, zoneId)
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.deliveryZones.deleteZoneForMerchant(merchant.id, zoneId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/courier-staff')
+  async getMyCourierStaff(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.courierStaff.listForMerchant(merchant.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/courier-staff')
+  async linkCourierToMerchant(
+    @CurrentUser() user: { id: string },
+    @Body() body: { email: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.courierStaff.linkByEmailForMerchant(merchant.id, body.email)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/courier-staff/:profileId')
+  async unlinkCourierFromMerchant(
+    @CurrentUser() user: { id: string },
+    @Param('profileId') profileId: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.courierStaff.unlinkForMerchant(merchant.id, profileId)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/fleet/invite-link')
+  async getMyFleetInviteLink(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.courierStaff.getFleetInviteLinkForMerchant(merchant.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/delivery-contracts')
+  async getMyDeliveryContracts(
+    @CurrentUser() user: { id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.merchantsService.listDeliveryContracts(merchant.id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/delivery-contracts')
+  async requestMyDeliveryContract(
+    @CurrentUser() user: { id: string },
+    @Body() body: { logistics_partner_id: string },
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.merchantsService.requestDeliveryContract(merchant.id, body.logistics_partner_id)
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/delivery-contracts/:contractId/accept')
+  async acceptMyDeliveryContract(
+    @CurrentUser() user: { id: string },
+    @Param('contractId') contractId: string,
+    @Query('merchantId') merchantId?: string,
+  ) {
+    const merchant = await this.merchantsService.resolveMyMerchant(user.id, merchantId)
+    return this.merchantsService.acceptDeliveryContract(merchant.id, contractId)
   }
 
   @UseGuards(JwtAuthGuard)

@@ -72,21 +72,22 @@ async function main() {
   if (!shop) {
     console.warn(`No shop for merchant ${MERCHANT_EMAIL} — skip contract`)
   } else {
-    const contract = await prisma.deliveryPartnerContract.upsert({
-      where: {
-        shop_id_logistics_partner_id: {
-          shop_id: shop.id,
-          logistics_partner_id: partner.id,
-        },
-      },
-      create: {
-        shop_id: shop.id,
-        logistics_partner_id: partner.id,
-        status: 'ACTIVE',
-        signed_at: new Date(),
-      },
-      update: { status: 'ACTIVE', signed_at: new Date() },
+    const existingSeedContract = await prisma.deliveryPartnerContract.findFirst({
+      where: { shop_id: shop.id, logistics_partner_id: partner.id },
     })
+    const contract = existingSeedContract
+      ? await prisma.deliveryPartnerContract.update({
+          where: { id: existingSeedContract.id },
+          data: { status: 'ACTIVE', signed_at: new Date() },
+        })
+      : await prisma.deliveryPartnerContract.create({
+          data: {
+            shop_id: shop.id,
+            logistics_partner_id: partner.id,
+            status: 'ACTIVE',
+            signed_at: new Date(),
+          },
+        })
     console.log('Active contract shop ↔ partner:', contract.id)
   }
 

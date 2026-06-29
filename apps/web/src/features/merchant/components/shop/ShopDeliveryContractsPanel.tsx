@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Check, Loader2, Search } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import {
-  acceptDeliveryContract,
+  acceptMerchantDeliveryContract,
+  fetchMerchantDeliveryContracts,
   fetchPublicLogisticsPartners,
-  fetchShopDeliveryContracts,
-  requestDeliveryContract,
+  requestMerchantDeliveryContract,
   type DeliveryPartnerContract,
   type PublicLogisticsPartner,
 } from '@/lib/deliveryStakeholdersApi'
@@ -35,14 +34,12 @@ function ContractStatusBadge({ status }: { status: string }) {
 }
 
 export function ShopDeliveryContractsPanel({
-  shopId: shopIdProp,
+  merchantId,
   countryCode: countryCodeProp,
 }: {
-  shopId?: string | null
+  merchantId: string
   countryCode?: string
 }) {
-  const { activeShopId } = useAuthStore()
-  const shopId = shopIdProp ?? activeShopId
   const [contracts, setContracts] = useState<DeliveryPartnerContract[]>([])
   const [partners, setPartners] = useState<PublicLogisticsPartner[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,11 +48,11 @@ export function ShopDeliveryContractsPanel({
   const [accepting, setAccepting] = useState<string | null>(null)
 
   const load = async () => {
-    if (!shopId) return
+    if (!merchantId) return
     setLoading(true)
     const country = (countryCodeProp ?? 'CI').toUpperCase()
     const [contractList, partnerList] = await Promise.all([
-      fetchShopDeliveryContracts(shopId),
+      fetchMerchantDeliveryContracts(merchantId),
       fetchPublicLogisticsPartners(country),
     ])
     setContracts(contractList)
@@ -66,7 +63,7 @@ export function ShopDeliveryContractsPanel({
   useEffect(() => {
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopId, countryCodeProp])
+  }, [merchantId, countryCodeProp])
 
   const partnerById = useMemo(
     () => new Map(partners.map(p => [p.id, p])),
@@ -88,12 +85,13 @@ export function ShopDeliveryContractsPanel({
         )
       })
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partners, existingPartnerIds, search])
 
   const handleRequest = async (partnerId: string) => {
-    if (!shopId) return
+    if (!merchantId) return
     setRequesting(partnerId)
-    const { error } = await requestDeliveryContract(shopId, partnerId)
+    const { error } = await requestMerchantDeliveryContract(merchantId, partnerId)
     setRequesting(null)
     if (error) {
       notify.error(error)
@@ -104,9 +102,9 @@ export function ShopDeliveryContractsPanel({
   }
 
   const handleAccept = async (contractId: string) => {
-    if (!shopId) return
+    if (!merchantId) return
     setAccepting(contractId)
-    const { error } = await acceptDeliveryContract(shopId, contractId)
+    const { error } = await acceptMerchantDeliveryContract(merchantId, contractId)
     setAccepting(null)
     if (error) {
       notify.error(error)
@@ -114,10 +112,6 @@ export function ShopDeliveryContractsPanel({
     }
     notify.success('Contrat activé')
     void load()
-  }
-
-  if (!shopId) {
-    return <p className="text-slate-500 text-sm">Aucune boutique active.</p>
   }
 
   return (

@@ -1,5 +1,6 @@
 import { authApiFetch } from './authFetch'
 import { shopApiFetch } from './shopApi'
+import { merchantApiFetch } from './merchantApi'
 
 export type DeliveryFulfilmentMode = 'PLATFORM_RIDER' | 'MERCHANT_OWN' | 'LOGISTICS_PARTNER'
 
@@ -250,6 +251,74 @@ export async function unlinkShopCourierStaff(
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await shopApiFetch(`/shops/${shopId}/courier-staff/${profileId}`, shopId, {
     method: 'DELETE',
+  })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
+}
+
+export async function fetchMerchantFleetInviteLink(
+  merchantId: string,
+): Promise<{ url: string; slug: string; shop_name: string } | null> {
+  const res = await merchantApiFetch('/merchants/me/fleet/invite-link', merchantId)
+  if (!res.ok) return null
+  return res.json() as Promise<{ url: string; slug: string; shop_name: string }>
+}
+
+export async function fetchMerchantCourierStaff(merchantId: string): Promise<ShopCourierStaff[]> {
+  const res = await merchantApiFetch('/merchants/me/courier-staff', merchantId)
+  if (!res.ok) return []
+  return res.json() as Promise<ShopCourierStaff[]>
+}
+
+export async function linkMerchantCourierStaff(
+  merchantId: string,
+  email: string,
+): Promise<{ staff: ShopCourierStaff | null; error?: string }> {
+  const res = await merchantApiFetch('/merchants/me/courier-staff', merchantId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!res.ok) return { staff: null, error: await parseError(res) }
+  return { staff: await res.json() as ShopCourierStaff }
+}
+
+export async function unlinkMerchantCourierStaff(
+  merchantId: string,
+  profileId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await merchantApiFetch(`/merchants/me/courier-staff/${profileId}`, merchantId, {
+    method: 'DELETE',
+  })
+  if (!res.ok) return { ok: false, error: await parseError(res) }
+  return { ok: true }
+}
+
+export async function fetchMerchantDeliveryContracts(merchantId: string): Promise<DeliveryPartnerContract[]> {
+  const res = await merchantApiFetch('/merchants/me/delivery-contracts', merchantId)
+  if (!res.ok) return []
+  return res.json() as Promise<DeliveryPartnerContract[]>
+}
+
+export async function requestMerchantDeliveryContract(
+  merchantId: string,
+  logisticsPartnerId: string,
+): Promise<{ contract: DeliveryPartnerContract | null; error?: string }> {
+  const res = await merchantApiFetch('/merchants/me/delivery-contracts', merchantId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ logistics_partner_id: logisticsPartnerId }),
+  })
+  if (!res.ok) return { contract: null, error: await parseError(res) }
+  return { contract: await res.json() as DeliveryPartnerContract }
+}
+
+export async function acceptMerchantDeliveryContract(
+  merchantId: string,
+  contractId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await merchantApiFetch(`/merchants/me/delivery-contracts/${contractId}/accept`, merchantId, {
+    method: 'PATCH',
   })
   if (!res.ok) return { ok: false, error: await parseError(res) }
   return { ok: true }

@@ -2,24 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, Trash2, UserPlus, Users } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 import {
-  fetchShopCourierStaff,
-  fetchShopFleetInviteLink,
-  linkShopCourierStaff,
-  unlinkShopCourierStaff,
+  fetchMerchantCourierStaff,
+  fetchMerchantFleetInviteLink,
+  linkMerchantCourierStaff,
+  unlinkMerchantCourierStaff,
   type ShopCourierStaff,
 } from '@/lib/deliveryStakeholdersApi'
 import { LogisticsFleetInviteCard } from '@/features/logistics/components/LogisticsFleetInviteCard'
 import { notify } from '@/lib/notify'
 
 interface ShopCourierStaffPanelProps {
-  shopId?: string | null
+  merchantId: string
 }
 
-export function ShopCourierStaffPanel({ shopId: shopIdProp }: ShopCourierStaffPanelProps) {
-  const { activeShopId } = useAuthStore()
-  const shopId = shopIdProp ?? activeShopId
+export function ShopCourierStaffPanel({ merchantId }: ShopCourierStaffPanelProps) {
   const [staff, setStaff] = useState<ShopCourierStaff[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
@@ -28,9 +25,9 @@ export function ShopCourierStaffPanel({ shopId: shopIdProp }: ShopCourierStaffPa
   const [invite, setInvite] = useState<{ url: string; shop_name: string } | null>(null)
 
   const load = async () => {
-    if (!shopId) return
+    if (!merchantId) return
     setLoading(true)
-    const list = await fetchShopCourierStaff(shopId)
+    const list = await fetchMerchantCourierStaff(merchantId)
     setStaff(list)
     setLoading(false)
   }
@@ -38,34 +35,34 @@ export function ShopCourierStaffPanel({ shopId: shopIdProp }: ShopCourierStaffPa
   useEffect(() => {
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shopId])
+  }, [merchantId])
 
   useEffect(() => {
-    if (!shopId) return
-    void fetchShopFleetInviteLink(shopId).then(data => {
+    if (!merchantId) return
+    void fetchMerchantFleetInviteLink(merchantId).then(data => {
       if (data) setInvite({ url: data.url, shop_name: data.shop_name })
     })
-  }, [shopId])
+  }, [merchantId])
 
   const handleLink = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!shopId || !email.trim()) return
+    if (!merchantId || !email.trim()) return
     setLinking(true)
-    const { staff: linked, error } = await linkShopCourierStaff(shopId, email.trim())
+    const { staff: linked, error } = await linkMerchantCourierStaff(merchantId, email.trim())
     setLinking(false)
     if (error) {
       notify.error(error)
       return
     }
-    notify.success(`${linked?.user.full_name ?? 'Livreur'} rattaché à votre boutique`)
+    notify.success(`${linked?.user.full_name ?? 'Livreur'} rattaché à votre établissement`)
     setEmail('')
     void load()
   }
 
   const handleUnlink = async (profileId: string) => {
-    if (!shopId) return
+    if (!merchantId) return
     setRemoving(profileId)
-    const { error } = await unlinkShopCourierStaff(shopId, profileId)
+    const { error } = await unlinkMerchantCourierStaff(merchantId, profileId)
     setRemoving(null)
     if (error) {
       notify.error(error)
@@ -73,10 +70,6 @@ export function ShopCourierStaffPanel({ shopId: shopIdProp }: ShopCourierStaffPa
     }
     notify.success('Livreur détaché')
     void load()
-  }
-
-  if (!shopId) {
-    return <p className="text-slate-500 text-sm">Aucune boutique active.</p>
   }
 
   return (

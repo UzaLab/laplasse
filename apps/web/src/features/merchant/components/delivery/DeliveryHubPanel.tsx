@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, LayoutGrid, Loader2, MapPin, Truck, Users } from 'lucide-react'
+import { Building2, LayoutGrid, Loader2, MapPin, Users } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ShopDeliveryOverviewPanel } from '@/features/merchant/components/shop/ShopDeliveryOverviewPanel'
 import { ShopDeliveryZonesPanel } from '@/features/merchant/components/shop/ShopDeliveryZonesPanel'
@@ -42,19 +42,15 @@ const TABS = [
 export type DeliveryHubTabId = (typeof TABS)[number]['id']
 
 interface DeliveryHubPanelProps {
-  shopId: string | null
-  shopLoading?: boolean
-  initializing?: boolean
-  onInitShop?: () => void
+  merchantId: string
+  loading?: boolean
   basePath: string
   countryCode?: string
 }
 
 export function DeliveryHubPanel({
-  shopId,
-  shopLoading = false,
-  initializing = false,
-  onInitShop,
+  merchantId,
+  loading = false,
   basePath,
   countryCode,
 }: DeliveryHubPanelProps) {
@@ -70,40 +66,10 @@ export function DeliveryHubPanel({
     router.replace(`${basePath}${qs ? `?${qs}` : ''}`)
   }
 
-  if (shopLoading) {
+  if (loading || !merchantId) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 size={28} className="animate-spin text-slate-300" />
-      </div>
-    )
-  }
-
-  if (!shopId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
-          <Truck size={28} className="text-amber-500" />
-        </div>
-        <div>
-          <p className="font-extrabold text-slate-900 text-lg">Configurer la livraison</p>
-          <p className="text-sm text-slate-500 mt-1 max-w-sm">
-            Activez la gestion livraison pour définir vos zones, tarifs et livreurs.
-            Cette étape est indépendante de votre vitrine marketplace.
-          </p>
-        </div>
-        {onInitShop && (
-          <button
-            type="button"
-            onClick={onInitShop}
-            disabled={initializing}
-            className="inline-flex items-center gap-2 h-11 px-6 bg-slate-900 text-white text-sm font-bold rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50"
-          >
-            {initializing
-              ? <><Loader2 size={16} className="animate-spin" /> Initialisation…</>
-              : <><Truck size={16} /> Activer la livraison</>
-            }
-          </button>
-        )}
       </div>
     )
   }
@@ -162,12 +128,12 @@ export function DeliveryHubPanel({
       </p>
 
       {tab === 'overview' && (
-        <ShopDeliveryOverviewPanel shopId={shopId} onNavigateTab={id => setTab(id as DeliveryHubTabId)} />
+        <ShopDeliveryOverviewPanel merchantId={merchantId} onNavigateTab={id => setTab(id as DeliveryHubTabId)} />
       )}
-      {tab === 'zones' && <ShopDeliveryZonesPanel shopId={shopId} />}
-      {tab === 'team' && <ShopCourierStaffPanel shopId={shopId} />}
+      {tab === 'zones' && <ShopDeliveryZonesPanel merchantId={merchantId} />}
+      {tab === 'team' && <ShopCourierStaffPanel merchantId={merchantId} />}
       {tab === 'partners' && (
-        <ShopDeliveryContractsPanel shopId={shopId} countryCode={countryCode} />
+        <ShopDeliveryContractsPanel merchantId={merchantId} countryCode={countryCode} />
       )}
     </>
   )

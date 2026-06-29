@@ -72,6 +72,14 @@ export class DeliveryZonesService {
     })
   }
 
+  async listForMerchant(merchantId: string) {
+    return this.prisma.shopDeliveryZone.findMany({
+      where: { merchant_id: merchantId, shop_id: null, logistics_partner_id: null },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+      include: zoneInclude,
+    })
+  }
+
   async listForLogisticsPartner(partnerId: string) {
     return this.prisma.shopDeliveryZone.findMany({
       where: { logistics_partner_id: partnerId, shop_id: null },
@@ -80,13 +88,14 @@ export class DeliveryZonesService {
     })
   }
 
-  private buildZoneCreateData(dto: CreateDeliveryZoneDto, owner: { shopId?: string; partnerId?: string }) {
+  private buildZoneCreateData(dto: CreateDeliveryZoneDto, owner: { shopId?: string; merchantId?: string; partnerId?: string }) {
     this.assertRules(dto.rules)
     if (dto.eta_max < dto.eta_min) {
       throw new BadRequestException('Le délai maximum doit être supérieur ou égal au délai minimum')
     }
     return {
       shop_id: owner.shopId,
+      merchant_id: owner.merchantId,
       logistics_partner_id: owner.partnerId,
       name: dto.name.trim(),
       description: dto.description?.trim(),
@@ -120,6 +129,13 @@ export class DeliveryZonesService {
     })
   }
 
+  async createForMerchant(merchantId: string, dto: CreateDeliveryZoneDto) {
+    return this.prisma.shopDeliveryZone.create({
+      data: this.buildZoneCreateData(dto, { merchantId }),
+      include: zoneInclude,
+    })
+  }
+
   async createForLogisticsPartner(partnerId: string, dto: CreateDeliveryZoneDto) {
     return this.prisma.shopDeliveryZone.create({
       data: this.buildZoneCreateData(dto, { partnerId }),
@@ -130,6 +146,15 @@ export class DeliveryZonesService {
   async deleteZone(shopId: string, zoneId: string) {
     const zone = await this.prisma.shopDeliveryZone.findFirst({
       where: { id: zoneId, shop_id: shopId },
+    })
+    if (!zone) throw new NotFoundException('Zone introuvable')
+    await this.prisma.shopDeliveryZone.delete({ where: { id: zoneId } })
+    return { success: true }
+  }
+
+  async deleteZoneForMerchant(merchantId: string, zoneId: string) {
+    const zone = await this.prisma.shopDeliveryZone.findFirst({
+      where: { id: zoneId, merchant_id: merchantId },
     })
     if (!zone) throw new NotFoundException('Zone introuvable')
     await this.prisma.shopDeliveryZone.delete({ where: { id: zoneId } })
@@ -148,6 +173,14 @@ export class DeliveryZonesService {
   async updateForShop(shopId: string, zoneId: string, dto: UpdateDeliveryZoneDto) {
     const zone = await this.prisma.shopDeliveryZone.findFirst({
       where: { id: zoneId, shop_id: shopId, logistics_partner_id: null },
+    })
+    if (!zone) throw new NotFoundException('Zone introuvable')
+    return this.applyZoneUpdate(zoneId, dto)
+  }
+
+  async updateForMerchant(merchantId: string, zoneId: string, dto: UpdateDeliveryZoneDto) {
+    const zone = await this.prisma.shopDeliveryZone.findFirst({
+      where: { id: zoneId, merchant_id: merchantId, logistics_partner_id: null },
     })
     if (!zone) throw new NotFoundException('Zone introuvable')
     return this.applyZoneUpdate(zoneId, dto)
@@ -362,6 +395,16 @@ export class DeliveryZonesService {
         id: true,
         business_name: true,
         delivery_fulfilment_default: true,
+        delivery_contracts: {
+          where: { status: 'ACTIVE' },
+          orderBy: { signed_at: 'desc' },
+          take: 1,
+          select: {
+            logistics_partner_id: true,
+            fee_override: true,
+            sla_eta_max_minutes: true,
+          },
+        },
         shop: {
           select: {
             id: true,
@@ -401,12 +444,13 @@ export class DeliveryZonesService {
       }
 
       const linkedShop = merchant.shop
+      const contract = merchant.delivery_contracts[0] ?? linkedShop?.delivery_contracts[0] ?? null
       const quote = await this.resolveFulfilmentQuote({
         fulfilmentMode: merchant.delivery_fulfilment_default ?? 'PLATFORM_RIDER',
         shopId: linkedShop?.id ?? null,
         displayName: merchant.business_name,
         merchantId: merchant.id,
-        contract: linkedShop?.delivery_contracts[0] ?? null,
+        contract,
         cityId: input.city_id,
         communeId: input.commune_id,
         subtotal: input.subtotals?.[merchantId] ?? 0,
@@ -446,10 +490,14 @@ export class DeliveryZonesService {
     }
 
     if (ctx.fulfilmentMode === 'MERCHANT_OWN') {
-      if (!ctx.shopId) {
-        return { ...base, available: false, fee: 0, message: 'Boutique liée requise pour la flotte dédiée' }
+      if (!ctx.shopId && !ctx.merchantId) {
+        return { ...base, available: false, fee: 0, message: 'Configuration requise pour la flotte dédiée' }
       }
-      const zone = await this.resolveZone(ctx.shopId, ctx.cityId, ctx.communeId)
+      const zone = await this.resolveZone(
+        { shopId: ctx.shopId ?? undefined, merchantId: ctx.merchantId },
+        ctx.cityId,
+        ctx.communeId,
+      )
       if (!zone) {
         return {
           ...base,
@@ -596,9 +644,14 @@ export class DeliveryZonesService {
     return quotes.reduce((sum, q) => sum + (q.available ? q.fee : 0), 0)
   }
 
-  private async resolveZone(shopId: string, cityId: string, communeId: string) {
+  private async resolveZone(owner: { shopId?: string; merchantId?: string }, cityId: string, communeId: string) {
+    const where: any = { logistics_partner_id: null, is_active: true }
+    if (owner.shopId) where.shop_id = owner.shopId
+    else if (owner.merchantId) where.merchant_id = owner.merchantId
+    else return null
+
     const zones = await this.prisma.shopDeliveryZone.findMany({
-      where: { shop_id: shopId, logistics_partner_id: null, is_active: true },
+      where,
       include: zoneInclude,
       orderBy: [{ priority: 'desc' }, { sort_order: 'asc' }],
     })

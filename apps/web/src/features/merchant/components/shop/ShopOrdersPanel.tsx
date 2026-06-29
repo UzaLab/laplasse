@@ -7,7 +7,7 @@ import { ChevronRight, Download, Loader2, ShoppingBag } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { matchesSearchQuery } from '@/lib/merchantListFilters'
-import { FilterPill, MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
+import { MerchantListToolbar } from '@/features/merchant/components/MerchantListToolbar'
 import {
   fetchMerchantOrders,
   downloadMerchantOrdersCsv,
@@ -185,17 +185,19 @@ export function ShopOrdersPanel({
         showReset={hasExtraFilters}
         onReset={resetFilters}
       >
-        {visibleStatusFilters.map(status => (
-          <FilterPill
-            key={status}
-            active={statusFilter === status}
-            onClick={() => setStatusFilter(status)}
-          >
-            {status === 'all'
-              ? `Toutes (${statusCounts.all})`
-              : `${ORDER_STATUS_LABELS[status]} (${statusCounts[status] ?? 0})`}
-          </FilterPill>
-        ))}
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value as OrderStatus | 'all')}
+          className="appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2 pr-8 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 cursor-pointer"
+        >
+          {visibleStatusFilters.map(status => (
+            <option key={status} value={status}>
+              {status === 'all'
+                ? `Toutes (${statusCounts.all})`
+                : `${ORDER_STATUS_LABELS[status]} (${statusCounts[status] ?? 0})`}
+            </option>
+          ))}
+        </select>
       </MerchantListToolbar>
 
       {loading ? (

@@ -301,35 +301,37 @@ export class LogisticsPartnersService {
     })
     if (!partner) throw new NotFoundException('Partenaire logistique introuvable')
 
-    const contract = await this.prisma.deliveryPartnerContract.upsert({
-      where: {
-        shop_id_logistics_partner_id: { shop_id: shopId, logistics_partner_id: logisticsPartnerId },
-      },
-      create: {
-        shop_id: shopId,
-        logistics_partner_id: logisticsPartnerId,
-        status: 'PENDING_PARTNER',
-        fee_override: feeOverride ?? null,
-        sla_eta_max_minutes: sla ?? null,
-      },
-      update: {
-        status: 'PENDING_PARTNER',
-        fee_override: feeOverride ?? null,
-        sla_eta_max_minutes: sla ?? null,
-      },
-      include: {
-        partner: { select: { legal_name: true, trade_name: true, owner_user_id: true } },
-        shop: { select: { name: true } },
-      },
+    const existingContract = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { shop_id: shopId, logistics_partner_id: logisticsPartnerId },
     })
+
+    const contract = existingContract
+      ? await this.prisma.deliveryPartnerContract.update({
+          where: { id: existingContract.id },
+          data: {
+            status: 'PENDING_PARTNER',
+            fee_override: feeOverride ?? null,
+            sla_eta_max_minutes: sla ?? null,
+          },
+        })
+      : await this.prisma.deliveryPartnerContract.create({
+          data: {
+            shop_id: shopId,
+            logistics_partner_id: logisticsPartnerId,
+            status: 'PENDING_PARTNER',
+            fee_override: feeOverride ?? null,
+            sla_eta_max_minutes: sla ?? null,
+          },
+        })
 
     const staff = await this.prisma.logisticsPartnerStaff.findMany({
       where: { logistics_partner_id: logisticsPartnerId },
       select: { user_id: true },
     })
     const userIds = new Set(staff.map(s => s.user_id))
-    userIds.add(contract.partner.owner_user_id)
-    const shopName = contract.shop?.name ?? 'Commerce'
+    userIds.add(partner.owner_user_id)
+    const shopRes = await this.prisma.shop.findUnique({ where: { id: shopId }, select: { name: true } })
+    const shopName = shopRes?.name ?? 'Commerce'
 
     await Promise.all(
       [...userIds].map(userId =>
@@ -410,7 +412,7 @@ export class LogisticsPartnersService {
     })
     const stats = await this.computeContractStats(
       staff.logistics_partner_id,
-      contract.shop_id,
+      contract.shop_id ?? '',
       contract.sla_eta_max_minutes,
       partner?.sla_eta_default_minutes ?? 45,
     )
@@ -607,26 +609,29 @@ export class LogisticsPartnersService {
     })
     if (!shop) throw new NotFoundException('Commerce introuvable')
 
-    const contract = await this.prisma.deliveryPartnerContract.upsert({
-      where: {
-        shop_id_logistics_partner_id: {
-          shop_id: shopId,
-          logistics_partner_id: partner.id,
-        },
-      },
-      create: {
-        shop_id: shopId,
-        logistics_partner_id: partner.id,
-        status: 'PENDING_MERCHANT',
-        sla_eta_max_minutes: partner.sla_eta_default_minutes,
-        auto_dispatch: partner.auto_dispatch_default,
-      },
-      update: {
-        status: 'PENDING_MERCHANT',
-        sla_eta_max_minutes: partner.sla_eta_default_minutes,
-      },
-      include: { shop: { select: { name: true } } },
+    const existingProposal = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { shop_id: shopId, logistics_partner_id: partner.id },
     })
+
+    const contract = existingProposal
+      ? await this.prisma.deliveryPartnerContract.update({
+          where: { id: existingProposal.id },
+          data: {
+            status: 'PENDING_MERCHANT',
+            sla_eta_max_minutes: partner.sla_eta_default_minutes,
+          },
+          include: { shop: { select: { name: true } } },
+        })
+      : await this.prisma.deliveryPartnerContract.create({
+          data: {
+            shop_id: shopId,
+            logistics_partner_id: partner.id,
+            status: 'PENDING_MERCHANT',
+            sla_eta_max_minutes: partner.sla_eta_default_minutes,
+            auto_dispatch: partner.auto_dispatch_default,
+          },
+          include: { shop: { select: { name: true } } },
+        })
 
     const scoreDetail = await this.scoring.computeForPartner(partner.id)
     const partnerLabel = partner.trade_name ?? partner.legal_name

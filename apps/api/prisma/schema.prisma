@@ -218,8 +218,10 @@ model Merchant {
   orders           Order[]
   menu_sections    MenuSection[]
   menu_items       MenuItem[]
-  composed_menus   ComposedMenu[]
-  staff_couriers   CourierProfile[]
+  composed_menus      ComposedMenu[]
+  staff_couriers      CourierProfile[]
+  delivery_zones      ShopDeliveryZone[]
+  delivery_contracts  DeliveryPartnerContract[]
 
   @@index([slug])
   @@index([category_id])
@@ -1391,6 +1393,7 @@ enum DeliveryFulfilmentMode {
 model ShopDeliveryZone {
   id                      String          @id @default(cuid())
   shop_id                 String?
+  merchant_id             String?
   logistics_partner_id    String?
   name                    String
   description             String?
@@ -1408,10 +1411,12 @@ model ShopDeliveryZone {
   updated_at              DateTime        @updatedAt
 
   shop              Shop?                  @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  merchant          Merchant?              @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
   logistics_partner LogisticsPartner?      @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
   rules             ShopDeliveryZoneRule[]
 
   @@index([shop_id, is_active])
+  @@index([merchant_id, is_active])
   @@index([logistics_partner_id, is_active])
 }
 
@@ -1978,7 +1983,8 @@ model LogisticsPartnerStaff {
 
 model DeliveryPartnerContract {
   id                   String                 @id @default(cuid())
-  shop_id              String
+  shop_id              String?
+  merchant_id          String?
   logistics_partner_id String
   status               DeliveryContractStatus @default(DRAFT)
   fee_override         Int?
@@ -1988,11 +1994,12 @@ model DeliveryPartnerContract {
   created_at           DateTime               @default(now())
   updated_at           DateTime               @updatedAt
 
-  shop    Shop             @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  partner LogisticsPartner @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
+  shop     Shop?            @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+  merchant Merchant?        @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+  partner  LogisticsPartner @relation(fields: [logistics_partner_id], references: [id], onDelete: Cascade)
 
-  @@unique([shop_id, logistics_partner_id])
   @@index([shop_id, status])
+  @@index([merchant_id, status])
   @@index([logistics_partner_id, status])
 }
 
