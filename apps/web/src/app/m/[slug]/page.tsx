@@ -17,9 +17,9 @@ import { MerchantProfileTabs } from '@/features/merchant/components/profile/Merc
 import { MerchantContextualCTAs } from '@/features/merchant/components/MerchantContextualCTAs'
 import { MerchantMobileActionBar } from '@/features/merchant/components/MerchantMobileActionBar'
 import { MerchantReviewsSection } from '@/features/discovery/components/MerchantReviewsSection'
-import { getCategoryBookingCta, isBookingCategory } from '@/lib/categoryBooking'
+import { getCategoryBookingCta, getCategoryBookingCtaMobile, isBookingCategory } from '@/lib/categoryBooking'
 import { BRAND_OG_LOCALE, merchantMetaFallback } from '@/lib/brandCopy'
-import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
+import { MERCHANT_MOBILE_ACTION_BAR_SPACER, NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
 
 export const dynamic = 'force-dynamic'
 
@@ -199,7 +199,7 @@ export default async function MerchantPage({ params }: Props) {
       </header>
 
       {/* ── MAIN CONTENT ────────────────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-6 py-12 pb-28 lg:pb-12">
+      <main className="max-w-7xl mx-auto px-6 py-12 lg:pb-12">
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-12 items-start">
 
           {/* ── Onglets verticals ───────────────────────────────────────────── */}
@@ -323,15 +323,17 @@ export default async function MerchantPage({ params }: Props) {
         </div>
       </main>
 
-      <div className="max-w-7xl mx-auto px-6 pb-8 text-center">
+      <div className="max-w-7xl mx-auto px-6 text-center">
         <ReportTrigger merchantId={merchant.id} merchantName={merchant.business_name} />
       </div>
 
       {similar.length > 0 && (
-        <div className="max-w-7xl mx-auto px-6 pb-16">
+        <div className="max-w-7xl mx-auto px-6 pt-8">
           <SimilarMerchants merchants={similar} />
         </div>
       )}
+
+      <div className={MERCHANT_MOBILE_ACTION_BAR_SPACER} aria-hidden />
 
       <AppFooter />
 
@@ -340,7 +342,7 @@ export default async function MerchantPage({ params }: Props) {
         merchantSlug={merchant.slug}
         merchantId={merchant.id}
         bookingEnabled={isBookingCategory(merchant.category.slug)}
-        bookingCta={getCategoryBookingCta(merchant.category.slug)}
+        bookingCta={getCategoryBookingCtaMobile(merchant.category.slug)}
         whatsapp={merchant.whatsapp}
         phone={merchant.phone}
       />

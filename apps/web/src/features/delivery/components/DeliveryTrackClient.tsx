@@ -171,7 +171,7 @@ export function DeliveryTrackClient({ token }: Props) {
   const lastUpdate = new Date(dataUpdatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <div className={`${PAGE_CONTAINER} py-8 lg:py-12 pb-24`}>
+    <div className={`${PAGE_CONTAINER} py-8 lg:py-12`}>
       {/* En-tête */}
       <div className="mb-6 lg:mb-8">
         <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">

@@ -13,7 +13,7 @@ import {
 } from '@/lib/brandCopy'
 import { CategoryIcon } from '@/lib/icons'
 import { CategoryMerchantsGrid } from '@/features/discovery/components/CategoryMerchantsGrid'
-import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
+import { NAVBAR_TOP_PAD, MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,7 +75,7 @@ export default async function CategoryPage({ params }: Props) {
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 md:py-12 pb-24 md:pb-12">
+      <main className={`max-w-7xl mx-auto px-6 py-8 md:py-12 md:pb-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="flex items-center justify-between mb-6 md:mb-8">
           <p className="text-slate-500 text-sm md:text-base">
             <span className="font-bold text-slate-900">{merchants.meta.total}</span> établissements

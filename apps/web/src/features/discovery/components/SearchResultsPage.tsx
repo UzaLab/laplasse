@@ -24,7 +24,7 @@ import { useGeoCommunesForDefaultCity } from '@/features/discovery/hooks/useGeoC
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { getDefaultCity, getCountryCode } from '@/lib/country'
 import { allCityLabel, popularInCityLabel } from '@/lib/brandCopy'
-import { NAVBAR_TOP_PAD, PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
+import { NAVBAR_TOP_PAD, MOBILE_BOTTOM_NAV_PAD, PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 import { cn } from '@/lib/utils'
 
 type ResultTab = 'all' | 'merchants' | 'products'
@@ -283,7 +283,7 @@ export function SearchResultsPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-7 pb-24 md:pb-10">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 py-7 md:pb-10 ${MOBILE_BOTTOM_NAV_PAD}`}>
 
         {(isLoading || isFetching) && !hasResults && debouncedQuery && (
           <p className="text-sm text-slate-500 font-medium mb-5 animate-pulse">

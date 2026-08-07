@@ -37,6 +37,19 @@ html {
   --page-gutter-x: 1.5rem;
   --backoffice-gutter-x: 1.25rem;
   --mobile-bottom-nav-height: 4rem;
+  /* Espace uniforme entre le dernier contenu et toute barre basse mobile */
+  --mobile-bottom-content-gap: 0.5rem;
+  --mobile-bottom-nav-inset: calc(
+    var(--mobile-bottom-nav-height) + var(--safe-area-bottom) + var(--mobile-bottom-content-gap)
+  );
+  /* Barre contextuelle fiche établissement (h-12 + p-2 + bordure, flottante) */
+  --mobile-merchant-action-bar-height: calc(4rem + 2px);
+  --mobile-merchant-action-bar-offset: max(0.75rem, var(--safe-area-bottom));
+  --mobile-merchant-action-bar-inset: calc(
+    var(--mobile-merchant-action-bar-height)
+    + var(--mobile-merchant-action-bar-offset)
+    + var(--mobile-bottom-content-gap)
+  );
 }
 
 body {
@@ -280,7 +293,18 @@ body {
 }
 
 .mobile-bottom-nav-pad {
-  padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom) + 0.5rem);
+  padding-bottom: var(--mobile-bottom-nav-inset);
+}
+
+.mobile-merchant-action-bar-pad {
+  padding-bottom: var(--mobile-merchant-action-bar-inset);
+}
+
+/* Espace en fin de flux scroll (barre d'actions fiche établissement, lg:hidden) */
+.mobile-merchant-action-bar-spacer {
+  height: var(--mobile-merchant-action-bar-inset);
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 /* Pied de drawer (panier, menu mobile) — safe area + marge de respiration */

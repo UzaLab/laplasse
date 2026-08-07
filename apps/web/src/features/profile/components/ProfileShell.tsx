@@ -13,7 +13,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { getIndependentShops, getShopManageHref, hasMerchantEstablishment } from '@/lib/shopApi'
 import { getCountryCode, getDefaultCity } from '@/lib/country'
 import { exploreCityLabel } from '@/lib/brandCopy'
-import { BACKOFFICE_MAIN_PAD } from '@/lib/mobilePublicChrome'
+import { PROFILE_MAIN_PAD } from '@/lib/mobilePublicChrome'
 
 interface ProfileShellProps {
   children: React.ReactNode
@@ -237,7 +237,7 @@ export function ProfileShell({ children }: ProfileShellProps) {
         </header>
 
         {/* Scrollable content */}
-        <div className={`app-shell-scroll w-full ${BACKOFFICE_MAIN_PAD}`}>
+        <div className={`app-shell-scroll w-full ${PROFILE_MAIN_PAD}`}>
           {children}
         </div>
       </main>

@@ -15,6 +15,7 @@ import {
 import { SearchAutocomplete } from '@/features/discovery/components/SearchAutocomplete'
 import { HOME_MOBILE_GUTTER, HOME_MOBILE_TRACK } from '@/features/discovery/home-mobile-v2/homeMobileLayout'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
+import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { cn } from '@/lib/utils'
 import { useScrollFabVisibility } from '@/hooks/useScrollFabVisibility'
 import {
@@ -617,7 +618,7 @@ export function MarketplacePageClient() {
         )}
       </section>
 
-      <main className={`${PAGE_CONTAINER} py-5 md:py-12 pb-24 lg:pb-12`}>
+      <main className={`${PAGE_CONTAINER} py-5 md:py-12 lg:pb-12 ${MOBILE_BOTTOM_NAV_PAD}`}>
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:sticky lg:top-28">
             <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm">

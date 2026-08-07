@@ -122,8 +122,14 @@ export const MOBILE_COMPACT_HEADER_PAD = 'pt-[calc(4rem+env(safe-area-inset-top,
 /** Header compact + petit espace de respiration. */
 export const MOBILE_COMPACT_HEADER_PAD_LOOSE = 'pt-[calc(4.5rem+env(safe-area-inset-top,0px))]'
 
-/** Espace réservé sous le contenu quand la barre basse est visible (mobile). */
+/** Espace réservé sous le contenu quand la barre basse publique est visible (mobile). */
 export const MOBILE_BOTTOM_NAV_PAD = 'mobile-bottom-nav-pad md:pb-0'
+
+/** Espace sous le contenu quand la barre d'actions contextuelle fiche établissement est visible. */
+export const MERCHANT_MOBILE_ACTION_BAR_PAD = 'mobile-merchant-action-bar-pad lg:pb-0'
+
+/** Spacer en fin de page (dans le flux) — préféré au padding racine pour le scroll. */
+export const MERCHANT_MOBILE_ACTION_BAR_SPACER = 'mobile-merchant-action-bar-spacer lg:hidden'
 
 /** Gouttière horizontale pages publiques (navbar + contenu). */
 export const PAGE_GUTTER_X = 'page-gutter-x'
@@ -142,3 +148,6 @@ export const BACKOFFICE_MAIN_PAD = 'pt-5 backoffice-gutter-x pb-24 lg:pt-8 lg:pb
 
 /** Variante shop (nav basse plus haute). */
 export const BACKOFFICE_MAIN_PAD_SHOP = 'pt-5 backoffice-gutter-x pb-28 lg:pt-8 lg:pb-8'
+
+/** Profil consommateur — barre basse publique visible sur mobile. */
+export const PROFILE_MAIN_PAD = `pt-5 backoffice-gutter-x lg:pt-8 lg:pb-8 ${MOBILE_BOTTOM_NAV_PAD}`

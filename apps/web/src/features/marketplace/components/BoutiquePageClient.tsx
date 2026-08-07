@@ -33,7 +33,7 @@ import { PAGE_CONTAINER } from '@/lib/pageLayout'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { useScrollFabVisibility } from '@/hooks/useScrollFabVisibility'
 import { cn } from '@/lib/utils'
-import { NAVBAR_TOP_PAD } from '@/lib/mobilePublicChrome'
+import { NAVBAR_TOP_PAD, MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 import { MarketplaceFilterListSection } from '@/features/marketplace/components/MarketplaceFilterListSection'
 import { ProductCard } from './ProductCard'
 
@@ -472,7 +472,7 @@ export function BoutiquePageClient({ merchant }: BoutiquePageClientProps) {
         </div>
       </header>
 
-      <main className={`${PAGE_CONTAINER} pt-6 md:pt-10 pb-24 lg:pb-16`}>
+      <main className={`${PAGE_CONTAINER} pt-6 md:pt-10 lg:pb-16 ${MOBILE_BOTTOM_NAV_PAD}`}>
         {establishmentHref && (
         <div className="md:hidden mb-5">
           <Link

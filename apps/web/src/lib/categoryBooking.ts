@@ -20,6 +20,12 @@ export function getCategoryBookingCta(categorySlug: string): string {
   return CATEGORY_BOOKING_CTA[categorySlug] ?? 'Demander une réservation'
 }
 
+/** Libellé court pour la barre d'actions mobile (espace limité). */
+export function getCategoryBookingCtaMobile(categorySlug: string): string {
+  if (categorySlug === 'hotels' || categorySlug === 'residences') return 'Réserver'
+  return getCategoryBookingCta(categorySlug)
+}
+
 export function isBookingCategory(categorySlug: string): boolean {
   return categorySlug !== 'boutiques'
 }
