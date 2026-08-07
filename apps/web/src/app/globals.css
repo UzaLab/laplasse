@@ -38,7 +38,7 @@ html {
   --backoffice-gutter-x: 1.25rem;
   --mobile-bottom-nav-height: 4rem;
   /* Espace uniforme entre le dernier contenu et toute barre basse mobile */
-  --mobile-bottom-content-gap: 0.5rem;
+  --mobile-bottom-content-gap: 0.75rem;
   --mobile-bottom-nav-inset: calc(
     var(--mobile-bottom-nav-height) + var(--safe-area-bottom) + var(--mobile-bottom-content-gap)
   );
@@ -294,6 +294,13 @@ body {
 
 .mobile-bottom-nav-pad {
   padding-bottom: var(--mobile-bottom-nav-inset);
+}
+
+/* Espace en fin de flux scroll (barre basse publique, md:hidden) — @utility pour éviter la purge Tailwind v4 */
+@utility mobile-bottom-nav-spacer {
+  height: var(--mobile-bottom-nav-inset);
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .mobile-merchant-action-bar-pad {

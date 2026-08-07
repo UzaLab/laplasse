@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Navbar } from '@/components/layout/Navbar'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { MOBILE_BOTTOM_NAV_PAD, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
+import { MOBILE_BOTTOM_NAV_SPACER, NAVBAR_TOP_PAD_LOOSE } from '@/lib/mobilePublicChrome'
 import { useAuthReady } from '@/hooks/useAuthReady'
 import { useMarketplaceAddToCart } from '@/hooks/useMarketplaceAddToCart'
 import { api, type ApiMerchantDetail } from '@/lib/api'
@@ -212,7 +212,7 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA]">
         <Navbar />
-        <main className={cn(PAGE_CONTAINER, NAVBAR_TOP_PAD_LOOSE, 'pb-16 text-center')}>
+        <main className={cn(PAGE_CONTAINER, NAVBAR_TOP_PAD_LOOSE, 'text-center')}>
           {isArchivedProduct ? (
             <>
               <p className="text-slate-700 font-semibold mb-2">Ce produit n&apos;est plus disponible.</p>
@@ -225,6 +225,7 @@ export default function ProductDetailPage() {
             Voir les autres produits de cette boutique →
           </Link>
         </main>
+        <div className={MOBILE_BOTTOM_NAV_SPACER} aria-hidden />
         <AppFooter />
       </div>
     )
@@ -321,7 +322,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Section produit principale */}
-      <main className={cn('bg-white', MOBILE_BOTTOM_NAV_PAD, 'lg:pb-16')}>
+      <main className={cn('bg-white', 'lg:pb-16')}>
         <div className={PAGE_CONTAINER}>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
             {/* Galerie */}
@@ -894,13 +895,14 @@ export default function ProductDetailPage() {
         </section>
       )}
 
-      <section className="py-16 bg-slate-50 border-t border-slate-100">
+      <section className="pt-16 md:py-16 bg-slate-50 border-t border-slate-100">
         <div className={`${PAGE_CONTAINER} space-y-12`}>
           <RecentlyViewedProducts excludeProductId={product?.id} />
           <ProductRecommendations productId={product?.id} title="Recommandé pour vous" />
         </div>
       </section>
 
+      <div className={MOBILE_BOTTOM_NAV_SPACER} aria-hidden />
       <AppFooter />
     </div>
   )

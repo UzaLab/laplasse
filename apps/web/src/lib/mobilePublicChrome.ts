@@ -125,6 +125,9 @@ export const MOBILE_COMPACT_HEADER_PAD_LOOSE = 'pt-[calc(4.5rem+env(safe-area-in
 /** Espace réservé sous le contenu quand la barre basse publique est visible (mobile). */
 export const MOBILE_BOTTOM_NAV_PAD = 'mobile-bottom-nav-pad md:pb-0'
 
+/** Spacer en fin de page (dans le flux) — préféré au padding sur un <main> partiel. */
+export const MOBILE_BOTTOM_NAV_SPACER = 'mobile-bottom-nav-spacer md:hidden'
+
 /** Espace sous le contenu quand la barre d'actions contextuelle fiche établissement est visible. */
 export const MERCHANT_MOBILE_ACTION_BAR_PAD = 'mobile-merchant-action-bar-pad lg:pb-0'
 
