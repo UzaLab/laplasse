@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common'
 import { WebPushService } from './web-push.service'
+import { ExpoPushService } from './expo-push.service'
 
 @Module({
-  providers: [WebPushService],
-  exports: [WebPushService],
+  providers: [WebPushService, ExpoPushService],
+  exports: [WebPushService, ExpoPushService],
 })
 export class PushModule {}

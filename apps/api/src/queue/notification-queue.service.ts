@@ -4,6 +4,7 @@ import { Queue, Worker, Job } from 'bullmq'
 import type { PushSubscription } from 'web-push'
 import { PrismaService } from '../prisma/prisma.service'
 import { WebPushService } from '../push/web-push.service'
+import { ExpoPushService } from '../push/expo-push.service'
 
 export interface PushNotificationJob {
   userId: string
@@ -38,6 +39,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly webPush: WebPushService,
+    private readonly expoPush: ExpoPushService,
   ) {}
 
   async onModuleInit() {
@@ -234,7 +236,27 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
     }
 
     const fcmKey = this.config.get<string>('FCM_SERVER_KEY')
-    const fcmTokens = devices.filter(d => !d.push_subscription && d.platform !== 'web_push')
+    const fcmTokens = devices.filter(d => !d.push_subscription && d.platform !== 'web_push' && d.platform !== 'expo')
+
+    const expoTokens = devices.filter(d => d.platform === 'expo')
+    for (const { token, id } of expoTokens) {
+      try {
+        const ok = await this.expoPush.send(token, {
+          title: payload.title,
+          body: payload.body,
+          data: payload.data ?? undefined,
+        })
+        if (ok) {
+          delivered++
+          this.logger.log(`Expo Push [${payload.type}] → ${token.slice(0, 24)}…`)
+        }
+      } catch (err) {
+        this.logger.warn(`Expo Push échec: ${(err as Error).message}`)
+        if ((err as Error).message.includes('DeviceNotRegistered')) {
+          await this.prisma.deviceToken.delete({ where: { id } }).catch(() => {})
+        }
+      }
+    }
 
     if (fcmKey && fcmTokens.length > 0) {
       for (const { token } of fcmTokens) {

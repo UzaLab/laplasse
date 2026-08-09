@@ -23,6 +23,7 @@ import {
   VerifyOtpDto,
   UpdateMeDto,
   ChangePasswordDto,
+  LogoutDto,
 } from './dto/auth.dto'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { Public } from './decorators/public.decorator'
@@ -32,6 +33,7 @@ import {
   getRefreshTokenFromRequest,
   setAuthCookies,
 } from './auth-cookies'
+import { authRefreshBody, authSessionBody } from './auth-client.util'
 
 @Controller('auth')
 @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -45,11 +47,12 @@ export class AuthController {
   @Post('register')
   async register(
     @Body() dto: RegisterDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { user, access_token, refresh_token } = await this.authService.register(dto)
     setAuthCookies(res, this.config, access_token, refresh_token)
-    return { user }
+    return authSessionBody(req, { user, access_token, refresh_token })
   }
 
   @Public()
@@ -57,11 +60,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { user, access_token, refresh_token } = await this.authService.login(dto)
     setAuthCookies(res, this.config, access_token, refresh_token)
-    return { user }
+    return authSessionBody(req, { user, access_token, refresh_token })
   }
 
   @Public()
@@ -78,6 +82,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyOtp(
     @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { user, access_token, refresh_token } = await this.authService.loginWithPhoneOtp(
@@ -85,7 +90,7 @@ export class AuthController {
       dto.code,
     )
     setAuthCookies(res, this.config, access_token, refresh_token)
-    return { user }
+    return authSessionBody(req, { user, access_token, refresh_token })
   }
 
   @Public()
@@ -102,6 +107,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyGuestOtp(
     @Body() dto: VerifyOtpDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { user, access_token, refresh_token } = await this.authService.guestCheckoutWithPhoneOtp(
@@ -109,7 +115,7 @@ export class AuthController {
       dto.code,
     )
     setAuthCookies(res, this.config, access_token, refresh_token)
-    return { user }
+    return authSessionBody(req, { user, access_token, refresh_token })
   }
 
   @Public()
@@ -128,7 +134,7 @@ export class AuthController {
 
     const { access_token, refresh_token } = await this.authService.refreshFromToken(refreshToken)
     setAuthCookies(res, this.config, access_token, refresh_token)
-    return { success: true }
+    return authRefreshBody(req, { access_token, refresh_token })
   }
 
   @UseGuards(JwtAuthGuard)
@@ -156,9 +162,10 @@ export class AuthController {
   async logout(
     @Req() req: Request,
     @CurrentUser() user: { id: string },
+    @Body() dto: LogoutDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = getRefreshTokenFromRequest(req)
+    const refreshToken = getRefreshTokenFromRequest(req) ?? dto.refresh_token ?? null
     const result = await this.authService.logout(refreshToken)
     clearAuthCookies(res, this.config)
     return result

@@ -59,4 +59,20 @@ export class NotificationsController {
   ) {
     return this.svc.unregisterWebPushSubscription(userId, body?.endpoint)
   }
+
+  @Post('push/expo')
+  subscribeExpoPush(
+    @CurrentUser('id') userId: string,
+    @Body() body: { token: string },
+  ) {
+    return this.svc.registerExpoPushToken(userId, body.token)
+  }
+
+  @Delete('push/expo')
+  unsubscribeExpoPush(
+    @CurrentUser('id') userId: string,
+    @Body() body: { token?: string },
+  ) {
+    return this.svc.unregisterExpoPushToken(userId, body?.token)
+  }
 }

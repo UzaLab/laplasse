@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { WebPushService } from '../push/web-push.service'
+import { ExpoPushService } from '../push/expo-push.service'
 
 export type NotificationType =
   | 'review_approved'
@@ -23,6 +24,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webPush: WebPushService,
+    private readonly expoPush: ExpoPushService,
   ) {}
 
   async send(
@@ -143,6 +145,30 @@ export class NotificationsService {
       await this.prisma.deviceToken.deleteMany({
         where: { user_id: userId, platform: 'web_push' },
       })
+    }
+    return { ok: true }
+  }
+
+  async registerExpoPushToken(userId: string, token: string) {
+    if (!this.expoPush.isExpoPushToken(token)) {
+      throw new BadRequestException('Token Expo Push invalide')
+    }
+
+    await this.prisma.deviceToken.upsert({
+      where: { token },
+      update: { user_id: userId, platform: 'expo' },
+      create: { user_id: userId, token, platform: 'expo' },
+    })
+
+    this.logger.log(`Expo Push enregistré → user:${userId}`)
+    return { ok: true }
+  }
+
+  async unregisterExpoPushToken(userId: string, token?: string) {
+    if (token) {
+      await this.prisma.deviceToken.deleteMany({ where: { user_id: userId, token } })
+    } else {
+      await this.prisma.deviceToken.deleteMany({ where: { user_id: userId, platform: 'expo' } })
     }
     return { ok: true }
   }

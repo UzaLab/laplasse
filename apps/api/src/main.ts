@@ -54,6 +54,9 @@ async function bootstrap() {
   const isAllowedOrigin = (origin: string | undefined): boolean => {
     if (!origin) return true
     if (corsOrigins.includes(origin)) return true
+    if (origin.startsWith('exp://')) return true
+    if (/^http:\/\/localhost:\d+$/.test(origin)) return true
+    if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) return true
     try {
       const { hostname } = new URL(origin)
       const host = hostname.toLowerCase()

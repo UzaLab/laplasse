@@ -71,3 +71,9 @@ export class ChangePasswordDto {
   @MinLength(8)
   new_password!: string
 }
+
+export class LogoutDto {
+  @IsOptional()
+  @IsString()
+  refresh_token?: string
+}

@@ -141,11 +141,15 @@ body {
   }
 
   .field-textarea {
-    @apply field-input resize-none;
+    @apply w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none transition-all;
+    @apply focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10;
+    @apply resize-none;
   }
 
   .field-select {
-    @apply field-input bg-white;
+    @apply w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 outline-none transition-all;
+    @apply focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10;
+    @apply bg-white;
   }
 }
 

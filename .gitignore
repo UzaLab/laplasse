@@ -20,6 +20,7 @@ apps/api/dist/
 !.env.example
 !apps/web/.env.example
 !apps/api/.env.example
+!apps/mobile/.env.example
 
 # Uploads
 apps/api/uploads/
