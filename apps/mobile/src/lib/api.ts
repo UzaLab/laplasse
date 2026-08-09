@@ -1,19 +1,17 @@
 import Constants from 'expo-constants'
 import { createApiClient, type ApiClient } from '@laplasse/api-client'
-import { getApiBaseUrl } from '@laplasse/shared-config'
+import { getMobileAppConfig } from '@/src/config/env'
 import { tokenStorage } from '@/src/lib/tokenStorage'
 
-function resolveApiUrl(): string {
-  const fromExtra = Constants.expoConfig?.extra?.apiUrl as string | undefined
-  return getApiBaseUrl(fromExtra ?? process.env.EXPO_PUBLIC_API_URL)
-}
-
 let client: ApiClient | null = null
+let clientBaseUrl: string | null = null
 
 export function getApiClient(): ApiClient {
-  if (!client) {
+  const { apiUrl } = getMobileAppConfig()
+  if (!client || clientBaseUrl !== apiUrl) {
+    clientBaseUrl = apiUrl
     client = createApiClient({
-      baseUrl: resolveApiUrl(),
+      baseUrl: apiUrl,
       getCountryCode: () => tokenStorage.getCountryCode(),
       tokens: {
         getAccessToken: () => tokenStorage.getAccessToken(),
@@ -31,4 +29,15 @@ export function getApiClient(): ApiClient {
 
 export function resetApiClient() {
   client = null
+  clientBaseUrl = null
+}
+
+/** Debug / profil — URL effective (sans secrets). */
+export function getResolvedApiUrl(): string {
+  return getMobileAppConfig().apiUrl
+}
+
+if (__DEV__) {
+  const cfg = getMobileAppConfig()
+  console.info(`[LaPlasse] API ${cfg.apiEnvLabel} → ${cfg.apiUrl}`)
 }

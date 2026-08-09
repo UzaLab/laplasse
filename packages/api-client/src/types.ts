@@ -56,6 +56,8 @@ export interface ApiMerchant {
 
 export interface ApiMerchantDetail extends ApiMerchant {
   email: string | null
+  website?: string | null
+  hours?: BusinessHour[]
   reviews: Array<{
     id: string
     rating: number
@@ -164,11 +166,24 @@ export interface CheckoutInput {
 }
 
 export interface CheckoutResult {
-  orders: Array<{ id: string; total: number; status: OrderStatus }>
+  orders: Array<{
+    orderId: string
+    paymentId: string
+    reference: string
+    amount: number
+    subtotal: number
+    discount_amount?: number
+    delivery_fee?: number
+  }>
   total: number
+  total_discount?: number
+  total_delivery_fee?: number
   currency: string
+  provider?: string
   orderId: string
+  paymentId?: string
   reference: string
+  amount?: number
   instructions: string
 }
 
@@ -176,11 +191,144 @@ export interface Order {
   id: string
   status: OrderStatus
   delivery_type: DeliveryType
-  total: number
+  delivery_address?: string | null
+  delivery_district?: string | null
+  customer_note?: string | null
+  customer_phone?: string | null
   subtotal: number
+  total: number
+  discount_amount?: number | null
+  delivery_fee?: number | null
   currency: string
   created_at: string
-  items?: CartItem[]
+  items?: OrderItem[]
+  merchant?: {
+    business_name: string
+    slug: string
+    logo?: string | null
+    phone?: string | null
+    whatsapp?: string | null
+  } | null
+  shop?: {
+    name: string
+    slug: string
+    logo?: string | null
+    phone?: string | null
+    whatsapp?: string | null
+  } | null
+  payment?: {
+    id?: string
+    status: string
+    reference: string
+    paid_at?: string | null
+  } | null
+  delivery_job?: {
+    id: string
+    status: string
+    tracking_token: string
+    eta_minutes: number | null
+    delivery_code?: string | null
+    courier?: {
+      full_name: string
+      phone: string | null
+      vehicle: string | null
+    } | null
+  } | null
+}
+
+export interface OrderItem {
+  id: string
+  product_id?: string | null
+  product_name: string
+  variant_name?: string | null
+  unit_price: number
+  quantity: number
+  line_total: number
+  image_url?: string | null
+  product?: {
+    id: string
+    slug: string
+    image_url?: string | null
+  } | null
+}
+
+export interface OrderEtaSnapshot {
+  prep_remaining_minutes: number
+  travel_minutes: number
+  eta_minutes: number
+  eta_arrival_at: string | null
+  eta_updated_at: string
+}
+
+export interface DeliveryTrackingData {
+  tracking_token: string
+  status: string
+  eta_minutes: number | null
+  pickup_address: string | null
+  dropoff_address: string | null
+  dropoff_latitude: number | null
+  dropoff_longitude: number | null
+  assigned_at: string | null
+  picked_up_at: string | null
+  delivered_at: string | null
+  updated_at: string
+  courier_latitude: number | null
+  courier_longitude: number | null
+  courier: {
+    full_name: string
+    phone: string | null
+    vehicle: string | null
+    rating_avg?: number
+  } | null
+  order: {
+    id: string
+    status: string
+    delivery_address: string | null
+    shop: { name: string }
+  }
+  delivery_code?: string | null
+}
+
+export interface FavoriteMerchant extends ApiMerchant {
+  avg_rating?: number | null
+}
+
+export interface FavoriteProduct {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  image_url: string | null
+  status: string
+  stock_quantity: number
+  merchant: { id: string; business_name: string; slug: string }
+}
+
+export interface FavoriteToggleResult {
+  is_favorited: boolean
+  merchant_id?: string
+  product_id?: string
+}
+
+export interface OtpSendResponse {
+  sent: boolean
+  expires_in: number
+  dev_code?: string
+}
+
+export interface ConfirmPaymentResult {
+  status: 'SUCCESS' | 'FAILED'
+  orderId?: string
+  orderIds?: string[]
+  message: string
+}
+
+export interface BusinessHour {
+  day: number
+  open_time: string | null
+  close_time: string | null
+  is_closed: boolean
 }
 
 export interface ApiPaginated<T> {

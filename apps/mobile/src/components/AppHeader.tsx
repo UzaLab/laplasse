@@ -1,32 +1,44 @@
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors, fonts } from '@/src/theme'
+import { MobileDrawer } from '@/src/components/MobileDrawer'
+import { colors, fonts, spacing } from '@/src/theme'
 
-export function AppHeader() {
+interface AppHeaderProps {
+  showMenu?: boolean
+}
+
+export function AppHeader({ showMenu = true }: AppHeaderProps) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <View style={[styles.wrap, { paddingTop: insets.top }]}>
-      <View style={styles.row}>
-        <View style={styles.brand}>
-          <View style={styles.logoTile}>
-            <Ionicons name="location" size={18} color={colors.brand500} />
-          </View>
-          <Text style={styles.brandText}>LaPlasse</Text>
-        </View>
+    <>
+      <View style={[styles.wrap, { paddingTop: insets.top }]}>
+        <View style={styles.row}>
+          <Pressable onPress={() => router.push('/(tabs)')} style={styles.brand}>
+            <View style={styles.logoTile}>
+              <Ionicons name="location" size={18} color={colors.brand500} />
+            </View>
+            <Text style={styles.brandText}>LaPlasse</Text>
+          </Pressable>
 
-        <Pressable
-          onPress={() => router.push('/cart')}
-          style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
-          accessibilityLabel="Panier"
-        >
-          <Ionicons name="cart-outline" size={24} color={colors.slate900} />
-        </Pressable>
+          {showMenu ? (
+            <Pressable
+              onPress={() => setDrawerOpen(true)}
+              style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
+              accessibilityLabel="Menu"
+            >
+              <Ionicons name="menu" size={24} color={colors.slate900} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
-    </View>
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </>
   )
 }
 
@@ -41,7 +53,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     height: 56,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.gutter,
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   logoTile: {

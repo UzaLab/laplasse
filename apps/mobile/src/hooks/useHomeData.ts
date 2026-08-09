@@ -22,6 +22,10 @@ export function useHomeData(countryCode: string) {
       const fallbackShops =
         shopsFallback.status === 'fulfilled' ? shopsFallback.value : []
 
+      if (categories.status === 'rejected' && merchants.status === 'rejected') {
+        throw new Error('API indisponible')
+      }
+
       return {
         categories: categories.status === 'fulfilled' ? categories.value : [],
         merchants: merchants.status === 'fulfilled' ? merchants.value : [],

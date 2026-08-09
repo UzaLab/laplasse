@@ -14,10 +14,17 @@ import type {
   Cart,
   CheckoutInput,
   CheckoutResult,
+  ConfirmPaymentResult,
+  DeliveryTrackingData,
+  FavoriteMerchant,
+  FavoriteProduct,
+  FavoriteToggleResult,
   FeaturedProduct,
   MarketplaceProduct,
   MarketplaceSpotlightShop,
   Order,
+  OrderEtaSnapshot,
+  OtpSendResponse,
   ProductSuggestion,
   TrendingSearchItem,
   UnifiedSearchParams,
@@ -154,6 +161,64 @@ export class ApiClient {
     }, true)
   }
 
+  sendOtp(phone: string) {
+    return this.request<OtpSendResponse>('/auth/otp/send', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    })
+  }
+
+  verifyOtp(phone: string, code: string) {
+    return this.request<AuthTokensResponse>('/auth/otp/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
+    })
+  }
+
+  updateProfile(input: { full_name?: string; phone?: string }) {
+    return this.request<AuthUser>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }, true)
+  }
+
+  changePassword(input: { new_password: string; current_password?: string }) {
+    return this.request<{ success: boolean; message: string }>('/auth/me/password', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, true)
+  }
+
+  // ─── Favorites ──────────────────────────────────────────────────────────────
+
+  getFavoriteMerchants() {
+    return this.request<FavoriteMerchant[]>('/favorites', undefined, true)
+  }
+
+  toggleMerchantFavorite(merchantId: string) {
+    return this.request<FavoriteToggleResult>(`/favorites/${merchantId}`, {
+      method: 'POST',
+    }, true)
+  }
+
+  isMerchantFavorited(merchantId: string) {
+    return this.request<{ is_favorited: boolean }>(`/favorites/${merchantId}/check`, undefined, true)
+  }
+
+  getFavoriteProducts() {
+    return this.request<FavoriteProduct[]>('/favorites/products', undefined, true)
+  }
+
+  toggleProductFavorite(productId: string) {
+    return this.request<FavoriteToggleResult>(`/favorites/products/${productId}`, {
+      method: 'POST',
+    }, true)
+  }
+
+  isProductFavorited(productId: string) {
+    return this.request<{ is_favorited: boolean }>(`/favorites/products/${productId}/check`, undefined, true)
+  }
+
   // ─── Discovery ──────────────────────────────────────────────────────────────
 
   getCategories() {
@@ -266,9 +331,27 @@ export class ApiClient {
     }, true)
   }
 
-  getMyOrders(limit = 20, offset = 0) {
-    const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) })
-    return this.request<{ data: Order[]; meta: { total: number } }>(`/orders/mine?${qs}`, undefined, true)
+  getMyOrders() {
+    return this.request<Order[]>('/orders/mine', undefined, true)
+  }
+
+  getOrder(orderId: string) {
+    return this.request<Order>(`/orders/${orderId}`, undefined, true)
+  }
+
+  getOrderEta(orderId: string) {
+    return this.request<OrderEtaSnapshot>(`/orders/${orderId}/eta`, undefined, true)
+  }
+
+  confirmOrderPayment(paymentId: string, simulateResult: 'success' | 'failure' = 'success') {
+    return this.request<ConfirmPaymentResult>('/orders/pay/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ paymentId, simulateResult }),
+    }, true)
+  }
+
+  getDeliveryTrack(token: string) {
+    return this.request<DeliveryTrackingData>(`/delivery/track/${token}`)
   }
 
   registerExpoPushToken(token: string) {

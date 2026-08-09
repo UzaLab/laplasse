@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { getDefaultCity } from '@laplasse/shared-config'
 import { AppHeader } from '@/src/components/AppHeader'
 import { CategoryCarousel } from '@/src/components/CategoryCarousel'
 import { CompactProductCard } from '@/src/components/CompactProductCard'
 import { HorizontalCarousel } from '@/src/components/HorizontalCarousel'
 import { NearbyCard } from '@/src/components/NearbyCard'
+import { NetworkErrorBanner } from '@/src/components/NetworkErrorBanner'
 import { SearchAutocomplete } from '@/src/components/SearchAutocomplete'
 import { SectionHeader } from '@/src/components/SectionHeader'
 import { ShopCard } from '@/src/components/ShopCard'
@@ -12,7 +14,7 @@ import { LoadingState } from '@/src/components/ui'
 import { useHomeData } from '@/src/hooks/useHomeData'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
-import { colors, fonts, spacing } from '@/src/theme'
+import { colors, fonts, layout, spacing } from '@/src/theme'
 
 function greetingName(fullName: string | null | undefined, email: string | undefined): string {
   if (fullName?.trim()) return fullName.trim().split(/\s+/)[0] ?? fullName
@@ -24,11 +26,20 @@ export default function HomeScreen() {
   const router = useRouter()
   const countryCode = useCountryStore(s => s.countryCode)
   const user = useAuthStore(s => s.user)
-  const { data, isLoading } = useHomeData(countryCode)
+  const { data, isLoading, isError, refetch, isFetching } = useHomeData(countryCode)
 
-  if (isLoading || !data) return <LoadingState />
+  if (isLoading) return <LoadingState />
+
+  const isEmpty =
+    !data ||
+    (data.categories.length === 0 &&
+      data.merchants.length === 0 &&
+      data.products.length === 0 &&
+      data.shops.length === 0)
 
   const firstName = greetingName(user?.full_name, user?.email)
+
+  const cityLabel = data?.city ?? getDefaultCity(countryCode)
 
   return (
     <View style={styles.root}>
@@ -38,15 +49,29 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        {(isError || isEmpty) && (
+          <NetworkErrorBanner
+            message={
+              isEmpty
+                ? 'Impossible de charger les données. Vérifiez la connexion à l’API préprod.'
+                : 'Erreur réseau lors du chargement.'
+            }
+            onRetry={() => void refetch()}
+            loading={isFetching}
+          />
+        )}
+
         <View style={styles.hero}>
           <View style={styles.heroBlob} />
           <Text style={styles.greeting}>Bonjour, {firstName}</Text>
           <Text style={styles.subGreeting}>
-            Prêt à découvrir de nouvelles pépites à {data.city} ?
+            Prêt à découvrir de nouvelles pépites à {cityLabel} ?
           </Text>
           <SearchAutocomplete />
         </View>
 
+        {data ? (
+          <>
         {data.categories.length > 0 ? (
           <View style={styles.section}>
             <CategoryCarousel categories={data.categories} />
@@ -106,6 +131,8 @@ export default function HomeScreen() {
             />
           </View>
         ) : null}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   )
@@ -114,7 +141,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  content: { paddingBottom: 32 },
+  content: { paddingBottom: layout.bottomNavInset + 24 },
   hero: {
     paddingHorizontal: spacing.gutter,
     paddingTop: 8,

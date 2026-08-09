@@ -51,10 +51,6 @@ export const useCartStore = create<CartState>((set, get) => ({
   updateQuantity: async (itemId, quantity) => {
     set({ loading: true })
     try {
-      if (quantity <= 0) {
-        await get().clear()
-        return
-      }
       const cart = await getApiClient().updateCartItem(itemId, quantity)
       set({ cart })
     } finally {

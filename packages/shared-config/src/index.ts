@@ -44,3 +44,5 @@ export function formatPrice(amount: number | null | undefined, currency = 'XOF')
   const label = currency === 'XOF' ? 'FCFA' : currency
   return `${amount.toLocaleString('fr-FR')} ${label}`
 }
+
+export * from './apiEnv'

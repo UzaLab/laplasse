@@ -88,6 +88,11 @@ function AuthGate() {
       <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ title: 'Produit' }} />
       <Stack.Screen name="cart" options={{ title: 'Panier' }} />
       <Stack.Screen name="checkout" options={{ title: 'Commande' }} />
+      <Stack.Screen name="payment" options={{ title: 'Paiement' }} />
+      <Stack.Screen name="favoris" options={{ title: 'Favoris', headerShown: false }} />
+      <Stack.Screen name="settings" options={{ title: 'Paramètres', headerShown: false }} />
+      <Stack.Screen name="orders/[id]" options={{ title: 'Commande' }} />
+      <Stack.Screen name="delivery/track/[token]" options={{ title: 'Suivi livraison' }} />
     </Stack>
   )
 }

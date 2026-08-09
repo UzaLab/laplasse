@@ -37,7 +37,14 @@ export const spacing = {
   md: 16,
   lg: 24,
   xl: 32,
-  gutter: 16,
+  gutter: 24,
+}
+
+/** Aligné globals.css — barre basse PWA */
+export const layout = {
+  bottomNavHeight: 64,
+  bottomNavInset: 76,
+  pageGutter: 24,
 }
 
 export const fonts = {

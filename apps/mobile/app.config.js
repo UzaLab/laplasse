@@ -67,7 +67,8 @@ module.exports = ({ config }) => ({
     typedRoutes: true,
   },
   extra: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api',
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
+    appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'preprod',
     eas: {
       projectId: process.env.EAS_PROJECT_ID ?? '95dff08d-bcca-43bb-9b70-0ef8db630b32',
     },

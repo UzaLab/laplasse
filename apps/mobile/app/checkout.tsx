@@ -32,6 +32,13 @@ export default function CheckoutScreen() {
         customer_note: note.trim() || undefined,
       })
       await clear()
+      if (result.paymentId) {
+        router.replace({
+          pathname: '/payment' as never,
+          params: { paymentId: result.paymentId, orderId: result.orderId },
+        })
+        return
+      }
       Alert.alert(
         'Commande confirmée',
         `${result.instructions}\nRéf. ${result.reference}`,
