@@ -17,6 +17,7 @@
     "@laplasse/api-client": "workspace:*",
     "@laplasse/shared-config": "workspace:*",
     "@tanstack/react-query": "^5.101.0",
+    "babel-preset-expo": "~57.0.6",
     "expo": "~57.0.11",
     "expo-constants": "~57.0.9",
     "expo-device": "~57.0.1",
