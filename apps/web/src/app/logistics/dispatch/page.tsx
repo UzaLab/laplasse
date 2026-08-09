@@ -255,7 +255,7 @@ export default function LogisticsDispatchPage() {
           <select
             value={communeFilter}
             onChange={e => setCommuneFilter(e.target.value)}
-            className="border border-slate-200 rounded-full px-4 py-2.5 text-sm bg-white max-w-xs"
+            className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white max-w-xs"
           >
             <option value="">Toutes les communes</option>
             {board.commune_options.map(c => (

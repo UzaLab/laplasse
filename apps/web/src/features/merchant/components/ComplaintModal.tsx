@@ -114,7 +114,7 @@ export function ComplaintModal({ merchantId, merchantName, onClose }: ComplaintM
                   placeholder="Décrivez le problème…"
                   rows={3}
                   maxLength={500}
-                  className="w-full border-2 border-slate-200 focus:border-red-300 rounded-full px-4 py-2.5 text-sm outline-none resize-none"
+                  className="w-full border-2 border-slate-200 focus:border-red-300 rounded-xl px-4 py-2.5 text-sm outline-none resize-none"
                 />
               </div>
 

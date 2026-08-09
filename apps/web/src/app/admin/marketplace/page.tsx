@@ -147,7 +147,7 @@ export default function AdminMarketplacePage() {
                   max={24}
                   value={limitDraft}
                   onChange={e => setLimitDraft(Number(e.target.value))}
-                  className="w-20 px-3 py-2 border border-slate-200 rounded-full text-sm font-bold"
+                  className="w-20 px-3 py-2 border border-slate-200 rounded-xl text-sm font-bold"
                 />
                 <button
                   type="button"
@@ -219,7 +219,7 @@ export default function AdminMarketplacePage() {
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
                 placeholder="Rechercher par nom ou slug…"
-                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm"
+                className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm"
               />
             </div>
             {searching ? (

@@ -137,7 +137,7 @@ export default function LogisticsOrdersPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Commerce, adresse, livreur…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm"
           />
         </div>
 

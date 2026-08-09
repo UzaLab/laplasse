@@ -66,7 +66,7 @@ function InlineEdit({
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') setEditing(false) }}
-        className="px-2 py-1 border border-violet-300 rounded-full text-sm font-bold outline-none focus:ring-2 focus:ring-violet-200 w-full max-w-[200px]"
+        className="px-2 py-1 border border-violet-300 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-violet-200 w-full max-w-[200px]"
       />
       <button type="button" disabled={saving} onClick={() => void save()} className="p-1 rounded text-emerald-600 hover:bg-emerald-50">
         {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -128,14 +128,14 @@ function ProductCategoryEditModal({
             <X size={18} />
           </button>
         </div>
-        <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nom" className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm" />
-        <input required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="Slug" className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm font-mono" />
-        <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="Icône Lucide (ex. Laptop, Shirt)" className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm" />
-        <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm">
+        <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nom" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+        <input required value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="Slug" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono" />
+        <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="Icône Lucide (ex. Laptop, Shirt)" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+        <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm">
           <option value="">— Catégorie racine —</option>
           {parentOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="number" value={form.sort_order} onChange={e => setForm(f => ({ ...f, sort_order: e.target.value }))} placeholder="Ordre" className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm" />
+        <input type="number" value={form.sort_order} onChange={e => setForm(f => ({ ...f, sort_order: e.target.value }))} placeholder="Ordre" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" />
         <div className="flex gap-2 pt-1">
           <button type="button" onClick={onClose} className="flex-1 py-2 rounded-full border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Annuler</button>
           <button type="submit" disabled={saving} className="flex-1 py-2 rounded-full bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-1.5">
@@ -379,7 +379,7 @@ export function ProductCategoriesAdminTab() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Rechercher une catégorie…"
-            className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white outline-none focus:border-violet-400"
+            className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:border-violet-400"
           />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -411,11 +411,11 @@ export function ProductCategoriesAdminTab() {
         <form onSubmit={create} className="bg-violet-50 border border-violet-100 rounded-2xl p-4 space-y-3">
           <p className="text-xs font-bold text-violet-700 uppercase">Nouvelle catégorie</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nom" className="sm:col-span-2 px-3 py-2 border border-slate-200 rounded-full text-sm bg-white" />
-            <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="Icône Lucide" className="px-3 py-2 border border-slate-200 rounded-full text-sm bg-white" />
+            <input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nom" className="sm:col-span-2 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
+            <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="Icône Lucide" className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} className="px-3 py-2 border border-slate-200 rounded-full text-sm bg-white">
+            <select value={form.parent_id} onChange={e => setForm(f => ({ ...f, parent_id: e.target.value }))} className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white">
               <option value="">— Catégorie racine —</option>
               {roots.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>

@@ -162,7 +162,7 @@ function CreateMerchantModal({
               value={form.business_name}
               onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))}
               placeholder="Ex. Chez Mamadou"
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
             />
           </div>
 
@@ -172,7 +172,7 @@ function CreateMerchantModal({
               required
               value={form.category_id}
               onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
             >
               <option value="">— Choisir —</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -187,7 +187,7 @@ function CreateMerchantModal({
                 value={form.owner_email}
                 onChange={e => { setForm(f => ({ ...f, owner_email: e.target.value })); setFoundUser(null); setForm(f => ({ ...f, owner_id: '' })) }}
                 placeholder="Email du propriétaire"
-                className="flex-1 px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+                className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
               />
               <button
                 type="button"
@@ -212,7 +212,7 @@ function CreateMerchantModal({
                 value={form.city}
                 onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
                 placeholder="Abidjan"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
               />
             </div>
             <div>
@@ -220,7 +220,7 @@ function CreateMerchantModal({
               <select
                 value={form.country}
                 onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
               >
                 <option value="CI">Côte d&apos;Ivoire</option>
                 <option value="SN">Sénégal</option>
@@ -239,7 +239,7 @@ function CreateMerchantModal({
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 placeholder="+225 07 xx xx xx"
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
               />
             </div>
             <div>
@@ -249,7 +249,7 @@ function CreateMerchantModal({
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="contact@..."
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
               />
             </div>
           </div>
@@ -261,7 +261,7 @@ function CreateMerchantModal({
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               rows={3}
               placeholder="Description courte…"
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm resize-none"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none"
             />
           </div>
 
@@ -395,7 +395,7 @@ function AdminMerchantsContent() {
             value={q}
             onChange={e => handleQChange(e.target.value)}
             placeholder="Rechercher par nom, slug, email propriétaire…"
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
           />
         </div>
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 shrink-0">

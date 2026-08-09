@@ -126,7 +126,7 @@ function ResetPasswordModal({ email, onClose, onSave }: { email: string; onClose
           placeholder="Nouveau mot de passe"
           value={pw}
           onChange={e => setPw(e.target.value)}
-          className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm mb-4"
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm mb-4"
         />
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-full border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">

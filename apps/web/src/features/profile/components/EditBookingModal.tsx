@@ -259,7 +259,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   min={new Date().toISOString().slice(0, 10)}
                   value={date}
                   onChange={e => setDate(e.target.value)}
-                  className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                 />
 
                 {isRoom && (
@@ -269,7 +269,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                     min={date || new Date().toISOString().slice(0, 10)}
                     value={form.check_out_date}
                     onChange={e => setForm(f => ({ ...f, check_out_date: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                   />
                 )}
 
@@ -310,7 +310,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   placeholder="Votre nom *"
                   value={form.guest_name}
                   onChange={e => setForm(f => ({ ...f, guest_name: e.target.value }))}
-                  className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                 />
                 <input
                   type="tel"
@@ -318,7 +318,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   placeholder="Téléphone *"
                   value={form.guest_phone}
                   onChange={e => setForm(f => ({ ...f, guest_phone: e.target.value }))}
-                  className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                 />
 
                 {(bookingType === 'TABLE' || isRoom) && (
@@ -330,7 +330,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                       max={20}
                       value={form.party_size}
                       onChange={e => setForm(f => ({ ...f, party_size: e.target.value }))}
-                      className="w-full border-2 border-slate-200 rounded-full pl-9 pr-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                      className="w-full border-2 border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-amber-400"
                     />
                   </div>
                 )}
@@ -340,7 +340,7 @@ export function EditBookingModal({ booking, open, onClose, onSuccess }: Props) {
                   rows={2}
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none resize-none focus:border-amber-400"
+                  className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none resize-none focus:border-amber-400"
                 />
 
                 {error && <p className="text-sm text-red-600 font-medium">{error}</p>}

@@ -731,7 +731,7 @@ export function ShopPromotionsPanel() {
                 placeholder={formMode === 'code' ? 'Ex. Offre BIENVENUE15' : 'Ex. Soldes été -20%'}
                 value={form.title}
                 onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
             <div className="sm:col-span-2">
@@ -740,7 +740,7 @@ export function ShopPromotionsPanel() {
                 rows={2}
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400 resize-none"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400 resize-none"
               />
             </div>
 
@@ -754,7 +754,7 @@ export function ShopPromotionsPanel() {
                     value={form.code}
                     readOnly={isEditing && (promos.find(p => p.id === editingId)?.uses_count ?? 0) > 0}
                     onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400 font-mono uppercase disabled:bg-slate-50 disabled:text-slate-500"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400 font-mono uppercase disabled:bg-slate-50 disabled:text-slate-500"
                   />
                   {isEditing && (promos.find(p => p.id === editingId)?.uses_count ?? 0) > 0 && (
                     <p className="text-[10px] text-slate-400 mt-1">Code verrouillé après la première utilisation.</p>
@@ -768,7 +768,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Optionnel — par commande"
                     value={form.min_order_amount}
                     onChange={e => setForm(f => ({ ...f, min_order_amount: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
                 <div>
@@ -779,7 +779,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Illimité"
                     value={form.max_uses}
                     onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
                 <div>
@@ -790,7 +790,7 @@ export function ShopPromotionsPanel() {
                     placeholder="Illimité — 1 commande = 1 utilisation"
                     value={form.max_uses_per_user}
                     onChange={e => setForm(f => ({ ...f, max_uses_per_user: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-violet-400"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-violet-400"
                   />
                 </div>
               </>
@@ -801,7 +801,7 @@ export function ShopPromotionsPanel() {
               <select
                 value={form.type}
                 onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               >
                 <option value="PERCENTAGE">Pourcentage</option>
                 <option value="FIXED">Montant fixe</option>
@@ -816,7 +816,7 @@ export function ShopPromotionsPanel() {
                 min={0}
                 value={form.value}
                 onChange={e => setForm(f => ({ ...f, value: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
                 disabled={form.type === 'FREE_DELIVERY'}
               />
             </div>
@@ -828,7 +828,7 @@ export function ShopPromotionsPanel() {
                 min={isEditing ? undefined : minStart}
                 value={form.starts_at}
                 onChange={e => setForm(f => ({ ...f, starts_at: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
             <div>
@@ -839,12 +839,12 @@ export function ShopPromotionsPanel() {
                 min={form.starts_at || minStart}
                 value={form.ends_at}
                 onChange={e => setForm(f => ({ ...f, ends_at: e.target.value }))}
-                className="w-full border-2 border-slate-200 rounded-full px-4 py-2.5 text-sm outline-none focus:border-amber-400"
+                className="w-full border-2 border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-amber-400"
               />
             </div>
           </div>
 
-          <div className="rounded-full border border-slate-100 bg-slate-50/80 p-4 space-y-4">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4 space-y-4">
             <div>
               <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <MapPin size={16} className="text-slate-400" />

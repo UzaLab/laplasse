@@ -156,7 +156,7 @@ function VerifyPhoneContent() {
                     value={code}
                     onChange={e => setCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
-                    className="w-full text-center text-3xl font-mono font-extrabold tracking-[0.5em] border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-4 outline-none transition-all"
+                    className="w-full text-center text-3xl font-mono font-extrabold tracking-[0.5em] border-2 border-slate-200 focus:border-brand-400 rounded-xl px-4 py-4 outline-none transition-all"
                     autoFocus
                   />
 

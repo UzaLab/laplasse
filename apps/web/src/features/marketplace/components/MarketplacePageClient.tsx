@@ -201,7 +201,7 @@ function MarketplaceFiltersPanel({
             value={search}
             onChange={e => onSearchChange(e.target.value)}
             placeholder={t('marketplace.searchPlaceholder')}
-            className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
       )}
@@ -214,7 +214,7 @@ function MarketplaceFiltersPanel({
           <select
             value={sort}
             onChange={e => onSortChange(e.target.value as SortOption)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-full px-3 py-2.5 text-sm font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900 outline-none cursor-pointer focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10"
           >
             {SORT_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>

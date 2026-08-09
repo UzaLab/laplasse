@@ -252,7 +252,7 @@ export function MerchantSignupWizard() {
           ))}
         </div>
 
-        <div className="bg-white rounded-[28px] border border-slate-100 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
           {step === 0 && showStructureStep && (
             <div className="space-y-6">
               <div>
@@ -325,7 +325,7 @@ export function MerchantSignupWizard() {
                       value={orgName}
                       onChange={e => setOrgName(e.target.value)}
                       placeholder="Ex : Groupe Foody, Salon Beauty Group…"
-                      className="w-full border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-3 outline-none text-sm"
+                      className="w-full border-2 border-slate-200 focus:border-brand-400 rounded-xl px-4 py-3 outline-none text-sm"
                     />
                   </div>
                   <div>
@@ -353,7 +353,7 @@ export function MerchantSignupWizard() {
               <button
                 type="button"
                 onClick={() => { setError(''); setStep(1) }}
-                className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-slate-900 text-white font-bold py-3.5 rounded-full hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
               >
                 Continuer <ArrowRight size={16} />
               </button>
@@ -374,7 +374,7 @@ export function MerchantSignupWizard() {
                   value={form.business_name}
                   onChange={e => set('business_name', e.target.value)}
                   placeholder="Ex : Villa Maasai, Noom Rooftop…"
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -419,7 +419,7 @@ export function MerchantSignupWizard() {
                     {moduleHints.map(hint => (
                       <li
                         key={hint}
-                        className="text-[11px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-full"
+                        className="text-[11px] font-semibold bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded-lg"
                       >
                         {hint}
                       </li>
@@ -446,7 +446,7 @@ export function MerchantSignupWizard() {
                   <button
                     type="button"
                     onClick={() => setStep(0)}
-                    className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-2xl font-bold text-slate-700"
+                    className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-full font-bold text-slate-700"
                   >
                     <ArrowLeft size={16} /> Retour
                   </button>
@@ -461,7 +461,7 @@ export function MerchantSignupWizard() {
                     setError('')
                     setStep(2)
                   }}
-                  className="flex-1 bg-slate-900 text-white font-bold py-3.5 rounded-2xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-slate-900 text-white font-bold py-3.5 rounded-full hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
                 >
                   Continuer <ArrowRight size={16} />
                 </button>
@@ -544,7 +544,7 @@ export function MerchantSignupWizard() {
                     value={form.district}
                     onChange={e => set('district', e.target.value)}
                     placeholder="Quartier ou commune"
-                    className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
+                    className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 outline-none transition-all text-sm"
                   />
                 )}
               </div>
@@ -558,7 +558,7 @@ export function MerchantSignupWizard() {
                   value={form.address}
                   onChange={e => set('address', e.target.value)}
                   placeholder="Rue, immeuble, repère…"
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -566,7 +566,7 @@ export function MerchantSignupWizard() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-2xl font-bold text-slate-700 hover:border-slate-400 transition-colors"
+                  className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-full font-bold text-slate-700 hover:border-slate-400 transition-colors"
                 >
                   <ArrowLeft size={16} /> Retour
                 </button>
@@ -580,7 +580,7 @@ export function MerchantSignupWizard() {
                     setError('')
                     setStep(3)
                   }}
-                  className="flex-1 bg-slate-900 text-white font-bold py-3.5 rounded-2xl hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-slate-900 text-white font-bold py-3.5 rounded-full hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
                 >
                   Continuer <ArrowRight size={16} />
                 </button>
@@ -602,7 +602,7 @@ export function MerchantSignupWizard() {
                   value={form.phone}
                   onChange={e => set('phone', e.target.value)}
                   placeholder={phonePlaceholder}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
@@ -615,11 +615,11 @@ export function MerchantSignupWizard() {
                   value={form.whatsapp}
                   onChange={e => set('whatsapp', e.target.value)}
                   placeholder={phonePlaceholder}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 outline-none transition-all text-sm"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 outline-none transition-all text-sm"
                 />
               </div>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-full p-5 space-y-2">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-2">
                 <h4 className="text-sm font-bold text-slate-700 mb-3">Récapitulatif</h4>
                 {showStructureStep && (
                   <div className="flex justify-between text-sm gap-4">
@@ -654,13 +654,13 @@ export function MerchantSignupWizard() {
               </div>
 
               {error && (
-                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-full">
+                <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-xl">
                   {error}
                 </div>
               )}
 
               {!isAuthenticated && (
-                <div className="px-4 py-3 bg-brand-50 border border-brand-200 text-brand-800 text-sm font-medium rounded-full">
+                <div className="px-4 py-3 bg-brand-50 border border-brand-200 text-brand-800 text-sm font-medium rounded-xl">
                   Vous devez être connecté.{' '}
                   <Link href="/login?redirect=/merchant/signup" className="font-bold underline">
                     Se connecter
@@ -672,7 +672,7 @@ export function MerchantSignupWizard() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-2xl font-bold text-slate-700 hover:border-slate-400 transition-colors"
+                  className="flex items-center gap-2 px-5 py-3.5 border-2 border-slate-200 rounded-full font-bold text-slate-700 hover:border-slate-400 transition-colors"
                 >
                   <ArrowLeft size={16} /> Retour
                 </button>

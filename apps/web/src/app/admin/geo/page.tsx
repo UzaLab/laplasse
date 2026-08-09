@@ -96,13 +96,13 @@ function CoordsForm({ lat, lng, onSave, saving }: {
           Latitude
           <input value={latStr} onChange={e => setLatStr(e.target.value)}
             placeholder="5.3599517"
-            className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2 text-sm font-mono" />
+            className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono" />
         </label>
         <label className="text-xs font-bold text-slate-500 uppercase">
           Longitude
           <input value={lngStr} onChange={e => setLngStr(e.target.value)}
             placeholder="-4.0082563"
-            className="mt-1 w-full border border-slate-200 rounded-full px-3 py-2 text-sm font-mono" />
+            className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono" />
         </label>
       </div>
       <GeoOsmMap lat={preview.lat} lng={preview.lng} radiusMeters={0}
@@ -359,7 +359,7 @@ function ReferentielTab({ initialCountry }: { initialCountry: string }) {
               <form onSubmit={createCity} className="flex gap-2">
                 <input required value={cityForm.name} onChange={e => setCityForm({ name: e.target.value })}
                   placeholder="Nouvelle ville…"
-                  className="flex-1 border border-slate-200 rounded-full px-3 py-2 text-sm" />
+                  className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm" />
                 <button type="submit" disabled={addingCity}
                   className="px-3 py-2 bg-slate-900 text-white rounded-full text-sm font-bold disabled:opacity-50">
                   {addingCity ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -427,7 +427,7 @@ function ReferentielTab({ initialCountry }: { initialCountry: string }) {
                   <form onSubmit={createCommune} className="flex gap-2">
                     <input required value={communeForm.name} onChange={e => setCommuneForm({ name: e.target.value })}
                       placeholder="Nouvelle commune…"
-                      className="flex-1 border border-slate-200 rounded-full px-3 py-2 text-sm" />
+                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm" />
                     <button type="submit" disabled={addingCommune}
                       className="px-3 py-2 bg-slate-900 text-white rounded-full text-sm font-bold disabled:opacity-50">
                       {addingCommune ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}

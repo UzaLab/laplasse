@@ -360,7 +360,7 @@ export default function CartPage() {
                           value={promoCode}
                           onChange={e => setPromoCode(e.target.value.toUpperCase())}
                           placeholder="Entrez votre code"
-                          className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-full px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                          className="flex-1 min-w-0 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/10 transition-all"
                         />
                         <button
                           type="button"

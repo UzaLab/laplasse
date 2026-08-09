@@ -247,7 +247,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
             </div>
           )}
           {needsProofOtp && (
-            <div className="rounded-full border border-amber-100 bg-amber-50 p-4 space-y-2">
+            <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 space-y-2">
               <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                 Code client requis
               </p>
@@ -272,7 +272,7 @@ export function CourierJobCard({ job, mode, onAccept, onReject, onAdvance, onPro
                 aria-invalid={!!otpError}
               />
               {otpError && (
-                <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-3 py-2">
+                <p className="text-sm font-semibold text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
                   {otpError}
                 </p>
               )}

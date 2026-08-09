@@ -234,7 +234,7 @@ function LoginForm() {
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder="vous@exemple.ci"
                 required
-                className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 text-slate-900 outline-none transition-all text-sm"
+                className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-slate-900 outline-none transition-all text-sm"
               />
             </div>
 
@@ -248,7 +248,7 @@ function LoginForm() {
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••"
                   required
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 text-slate-900 outline-none transition-all text-sm pr-12"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-slate-900 outline-none transition-all text-sm pr-12"
                 />
                 <button
                   type="button"
@@ -292,12 +292,12 @@ function LoginForm() {
                   onChange={e => setPhone(e.target.value)}
                   placeholder={phonePlaceholder}
                   disabled={otpSent}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-3 text-slate-900 outline-none transition-all text-sm disabled:bg-slate-50"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-slate-900 outline-none transition-all text-sm disabled:bg-slate-50"
                 />
               </div>
 
               {devCode && (
-                <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-full text-sm text-amber-800">
+                <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
                   <span className="font-bold">Mode dev :</span> code = <span className="font-mono font-bold">{devCode}</span>
                 </div>
               )}
@@ -312,7 +312,7 @@ function LoginForm() {
                     value={otpCode}
                     onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="000000"
-                    className="w-full text-center text-2xl font-mono font-extrabold tracking-[0.4em] border-2 border-slate-200 focus:border-brand-400 rounded-full px-4 py-3 outline-none mb-4"
+                    className="w-full text-center text-2xl font-mono font-extrabold tracking-[0.4em] border-2 border-slate-200 focus:border-brand-400 rounded-xl px-4 py-3 outline-none mb-4"
                   />
                   <button
                     type="submit"

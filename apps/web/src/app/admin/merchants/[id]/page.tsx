@@ -261,7 +261,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
               required
               value={form.business_name}
               onChange={e => setForm(f => ({ ...f, business_name: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
             />
           ))}
 
@@ -269,7 +269,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
             <select
               value={form.category_id}
               onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
             >
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -280,26 +280,26 @@ function InfoTab({ merchant, categories, onUpdated }: {
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               rows={3}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm resize-none"
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none"
             />
           ))}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Téléphone', (
               <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('WhatsApp', (
               <input value={form.whatsapp} onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                placeholder="+225 07 xx xx xx" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Email', (
               <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Site web', (
               <input type="url" value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                placeholder="https://…" className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                placeholder="https://…" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
           </div>
 
@@ -307,13 +307,13 @@ function InfoTab({ merchant, categories, onUpdated }: {
             {field('Préparation (min)', (
               <input type="number" min={0} max={120} value={form.food_prep_minutes}
                 onChange={e => setForm(f => ({ ...f, food_prep_minutes: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Trust Score', (
               <div className="flex gap-2">
                 <input type="number" min={0} max={100} value={form.trust_score}
                   onChange={e => setForm(f => ({ ...f, trust_score: Number(e.target.value) }))}
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
                 <button type="button" disabled={recalculating} onClick={recalcTrustScore}
                   className="px-3 py-2 rounded-full border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-200 transition-colors disabled:opacity-50"
                   title="Recalculer">
@@ -329,19 +329,19 @@ function InfoTab({ merchant, categories, onUpdated }: {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Ville', (
               <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Quartier / District', (
               <input value={form.district} onChange={e => setForm(f => ({ ...f, district: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Adresse', (
               <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
             ))}
             {field('Pays', (
               <select value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm bg-white">
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
                 <option value="CI">Côte d&apos;Ivoire</option>
                 <option value="SN">Sénégal</option>
                 <option value="BF">Burkina Faso</option>
@@ -387,7 +387,7 @@ function InfoTab({ merchant, categories, onUpdated }: {
               value={ownerEmail}
               onChange={e => { setOwnerEmail(e.target.value); setFoundOwner(null) }}
               placeholder="Email du nouveau propriétaire"
-              className="flex-1 px-3 py-2.5 border border-slate-200 rounded-full text-sm"
+              className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl text-sm"
             />
             <button
               type="button"
@@ -513,12 +513,12 @@ function SubscriptionTab({ merchant, onUpdated }: { merchant: MerchantDetail; on
           <div className="sm:col-span-2">
             <label className="text-xs font-bold text-slate-400 uppercase block mb-1.5">Date d&apos;expiration (laisser vide si illimité)</label>
             <input type="date" value={form.expires_at} onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
-              className="w-full px-3 py-2.5 border border-slate-200 rounded-full text-sm" />
+              className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm" />
           </div>
         </div>
 
         {sub && (
-          <div className="bg-slate-50 rounded-full px-4 py-3 text-xs text-slate-500">
+          <div className="bg-slate-50 rounded-xl px-4 py-3 text-xs text-slate-500">
             Actif depuis le {new Date(sub.started_at).toLocaleDateString('fr-FR')}
             {sub.expires_at && ` · expire le ${new Date(sub.expires_at).toLocaleDateString('fr-FR')}`}
           </div>

@@ -339,13 +339,13 @@ export function ShopCollectionsPanel({ embedded = false }: { embedded?: boolean 
           placeholder="Nom * (ex. Nouveautés)"
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-full px-4 py-2 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-400"
         />
         <input
           placeholder="Description (optionnel)"
           value={form.description}
           onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-          className="w-full border-2 border-slate-200 rounded-full px-4 py-2 text-sm outline-none focus:border-brand-400"
+          className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-brand-400"
         />
         <button
           type="submit"

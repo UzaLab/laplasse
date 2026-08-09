@@ -127,7 +127,7 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Résumez votre expérience"
                   maxLength={100}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-2.5 text-sm outline-none transition-all"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
                 />
               </div>
 
@@ -142,13 +142,13 @@ export function ReviewModal({ merchantId, merchantName, onClose }: ReviewModalPr
                   placeholder="Décrivez votre expérience : ambiance, service, rapport qualité/prix…"
                   rows={3}
                   maxLength={1000}
-                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-full px-4 py-2.5 text-sm outline-none transition-all resize-none"
+                  className="w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-2.5 text-sm outline-none transition-all resize-none"
                 />
                 <p className="text-xs text-slate-400 mt-1 text-right">{content.length}/1000</p>
               </div>
 
               {!isAuthenticated && (
-                <div className="px-4 py-3 bg-brand-50 border border-brand-200 rounded-full text-sm text-brand-800 font-medium">
+                <div className="px-4 py-3 bg-brand-50 border border-brand-200 rounded-xl text-sm text-brand-800 font-medium">
                   Vous devez être{' '}
                   <a href="/login" className="font-bold underline">connecté</a>
                   {' '}pour laisser un avis.

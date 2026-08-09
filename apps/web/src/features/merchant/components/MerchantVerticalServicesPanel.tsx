@@ -249,7 +249,7 @@ export function MerchantVerticalServicesPanel() {
                     placeholder="Nb chambres"
                     value={form.capacity}
                     onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))}
-                    className="w-36 border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
+                    className="w-36 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
                   />
                 ) : (
                   <input
@@ -259,7 +259,7 @@ export function MerchantVerticalServicesPanel() {
                     placeholder="Durée (min)"
                     value={form.duration_min}
                     onChange={e => setForm(f => ({ ...f, duration_min: e.target.value }))}
-                    className="w-36 border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
+                    className="w-36 border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
                   />
                 )}
                 <input
@@ -268,7 +268,7 @@ export function MerchantVerticalServicesPanel() {
                   placeholder="Prix (F CFA)"
                   value={form.price}
                   onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  className="flex-1 min-w-[140px] border-2 border-slate-200 rounded-full px-3 py-2 text-sm"
+                  className="flex-1 min-w-[140px] border-2 border-slate-200 rounded-xl px-3 py-2 text-sm"
                 />
                 <button
                   type="button"

@@ -100,7 +100,7 @@ export function ShopCourierStaffPanel({ merchantId }: ShopCourierStaffPanelProps
           value={email}
           onChange={e => setEmail(e.target.value)}
           placeholder="Email du compte livreur"
-          className="w-full border border-slate-200 rounded-full px-4 py-2.5 text-sm"
+          className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
         />
         <button
           type="submit"

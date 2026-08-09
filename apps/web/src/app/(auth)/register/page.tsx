@@ -18,7 +18,7 @@ import {
 } from '@/lib/authIntent'
 
 const INPUT_CLASS =
-  'w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-2xl px-4 py-3 text-slate-900 outline-none transition-all text-sm'
+  'w-full border-2 border-slate-200 focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 rounded-xl px-4 py-3 text-slate-900 outline-none transition-all text-sm'
 
 function RegisterContent() {
   const router = useRouter()

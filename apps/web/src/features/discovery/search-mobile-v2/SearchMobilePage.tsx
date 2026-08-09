@@ -141,7 +141,7 @@ export function SearchMobilePage({
           <div
             className={cn(
               'flex-1 min-w-0',
-              '[&_form>div]:rounded-full [&_form>div]:h-12 [&_form>div]:px-4',
+              '[&_form>div]:rounded-xl [&_form>div]:h-12 [&_form>div]:px-4',
               '[&_form>div]:bg-white/95 [&_form>div]:backdrop-blur-xl [&_form>div]:border-slate-200/80',
               '[&_form>div]:shadow-sm [&_form>div]:focus-within:border-brand-400',
               '[&_form>div]:focus-within:ring-2 [&_form>div]:focus-within:ring-brand-500/15',

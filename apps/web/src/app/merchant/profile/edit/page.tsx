@@ -412,7 +412,7 @@ export default function EditMerchantProfilePage() {
               />
             </div>
 
-            <label className="flex items-start gap-3 p-4 rounded-full border border-slate-200 bg-slate-50 cursor-pointer">
+            <label className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.has_precise_location}

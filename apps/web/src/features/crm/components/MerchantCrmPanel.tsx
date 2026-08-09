@@ -423,7 +423,7 @@ export function MerchantCrmPanel({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Nom, email, téléphone…"
-                className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
+                className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
               />
             </div>
 
@@ -449,7 +449,7 @@ export function MerchantCrmPanel({
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Nom, email, téléphone…"
-                  className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
+                  className="w-full h-10 pl-9 pr-3 text-sm font-medium text-slate-700 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 bg-slate-50"
                 />
               </div>
             </div>

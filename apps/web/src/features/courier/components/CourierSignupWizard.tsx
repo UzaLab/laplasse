@@ -248,7 +248,7 @@ export function CourierSignupWizard() {
                   value={plateNumber}
                   onChange={e => setPlateNumber(e.target.value)}
                   placeholder="AB-123-CD"
-                  className="w-full px-4 py-3 rounded-full border border-slate-200 font-semibold outline-none focus:border-emerald-400"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 font-semibold outline-none focus:border-emerald-400"
                 />
               </div>
             </div>
@@ -269,12 +269,12 @@ export function CourierSignupWizard() {
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
                     placeholder={phonePlaceholder}
-                    className="w-full pl-11 pr-4 py-3 rounded-full border border-slate-200 font-semibold outline-none focus:border-emerald-400"
+                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 font-semibold outline-none focus:border-emerald-400"
                   />
                 </div>
               </div>
 
-              <div className="p-4 rounded-full bg-slate-50 border border-slate-100 flex gap-3">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex gap-3">
                 <ShieldCheck size={20} className="text-emerald-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-slate-600 leading-relaxed">
                   Votre dossier sera vérifié par notre équipe avant activation. Les pièces d&apos;identité pourront être demandées à l&apos;étape suivante.
@@ -296,7 +296,7 @@ export function CourierSignupWizard() {
                   { icon: Bike, label: 'Véhicule', value: VEHICLE_OPTIONS.find(v => v.value === vehicle)?.label ?? vehicle },
                   { icon: Phone, label: 'Téléphone', value: phone },
                 ].map(({ icon: Icon, label, value }) => (
-                  <li key={label} className="flex items-center gap-3 p-4 rounded-full bg-slate-50 border border-slate-100">
+                  <li key={label} className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100">
                     <Icon size={18} className="text-emerald-600 shrink-0" />
                     <div>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{label}</p>
@@ -307,7 +307,7 @@ export function CourierSignupWizard() {
               </ul>
 
               {error && (
-                <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-full px-4 py-3">{error}</p>
+                <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">{error}</p>
               )}
             </div>
           )}

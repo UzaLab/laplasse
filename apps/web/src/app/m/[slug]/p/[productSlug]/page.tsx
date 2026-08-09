@@ -295,28 +295,34 @@ export default function ProductDetailPage() {
       {/* Fil d'Ariane */}
       <div className={cn(NAVBAR_TOP_PAD_LOOSE, 'pb-4 bg-white')}>
         <div className={PAGE_CONTAINER}>
-          <nav className="flex items-center gap-2 text-sm font-medium text-slate-500 flex-wrap">
-            <Link href="/" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
+          <nav className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-slate-500 flex-nowrap min-w-0">
+            <Link href="/" className="shrink-0 hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
               Accueil
             </Link>
-            <ChevronRight size={16} className="text-slate-300 shrink-0" />
-            <Link href="/marketplace" className="hover:text-slate-900 transition-colors" style={{ textDecoration: 'none' }}>
+            <ChevronRight size={14} className="text-slate-300 shrink-0" />
+            <Link
+              href="/marketplace"
+              className="shrink-0 hover:text-slate-900 transition-colors hidden sm:inline"
+              style={{ textDecoration: 'none' }}
+            >
               Marketplace
             </Link>
-            <ChevronRight size={16} className="text-slate-300 shrink-0" />
-            {slug && (
-              <>
-                <Link
-                  href={`/m/${slug}/boutique`}
-                  className="hover:text-slate-900 transition-colors"
-                  style={{ textDecoration: 'none' }}
-                >
-                  {merchant?.business_name ?? merchantDetail?.business_name ?? categoryName}
-                </Link>
-                <ChevronRight size={16} className="text-slate-300 shrink-0" />
-              </>
-            )}
-            <span className="text-slate-900 font-bold truncate">{product.name}</span>
+            <ChevronRight size={14} className="text-slate-300 shrink-0 hidden sm:inline" />
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2 overflow-hidden">
+              {slug && (
+                <>
+                  <Link
+                    href={`/m/${slug}/boutique`}
+                    className="min-w-0 truncate hover:text-slate-900 transition-colors"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {merchant?.business_name ?? merchantDetail?.business_name ?? categoryName}
+                  </Link>
+                  <ChevronRight size={14} className="text-slate-300 shrink-0" />
+                </>
+              )}
+              <span className="min-w-0 truncate text-slate-900 font-bold">{product.name}</span>
+            </div>
           </nav>
         </div>
       </div>

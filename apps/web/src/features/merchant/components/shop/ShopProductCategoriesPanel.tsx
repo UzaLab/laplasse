@@ -169,7 +169,7 @@ export function ShopProductCategoriesPanel() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Rechercher une catégorie ou sous-catégorie…"
-            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-full text-sm outline-none focus:border-amber-400"
+            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-sm outline-none focus:border-amber-400"
           />
         </div>
 

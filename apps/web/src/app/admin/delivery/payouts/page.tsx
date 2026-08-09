@@ -149,14 +149,14 @@ export default function AdminDeliveryPayoutsPage() {
                 required
                 value={form.period_start}
                 onChange={e => setForm(f => ({ ...f, period_start: e.target.value }))}
-                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
               />
               <input
                 type="date"
                 required
                 value={form.period_end}
                 onChange={e => setForm(f => ({ ...f, period_end: e.target.value }))}
-                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -167,14 +167,14 @@ export default function AdminDeliveryPayoutsPage() {
                 value={form.amount}
                 onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                 placeholder="Montant (FCFA)"
-                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
               />
               <input
                 type="text"
                 value={form.reference}
                 onChange={e => setForm(f => ({ ...f, reference: e.target.value }))}
                 placeholder="Référence virement (optionnel)"
-                className="px-3 py-2 border border-slate-200 rounded-full text-sm"
+                className="px-3 py-2 border border-slate-200 rounded-xl text-sm"
               />
             </div>
             <input
@@ -182,7 +182,7 @@ export default function AdminDeliveryPayoutsPage() {
               value={form.note}
               onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
               placeholder="Note interne (optionnel)"
-              className="w-full px-3 py-2 border border-slate-200 rounded-full text-sm"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm"
             />
             <button
               type="submit"
