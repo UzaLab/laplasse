@@ -188,6 +188,69 @@ export interface ApiPaginated<T> {
   meta: { total: number; limit: number; offset: number }
 }
 
+export interface FeaturedProduct {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  image_url?: string | null
+  original_price?: number
+  promo_price?: number | null
+  merchant: { business_name: string; slug: string }
+  is_sponsored?: boolean
+  has_variants?: boolean
+}
+
+export interface MarketplaceSpotlightShop {
+  id: string
+  business_name: string
+  slug: string
+  logo: string | null
+  is_sponsored?: boolean
+}
+
+export interface MerchantSuggestion {
+  id: string
+  business_name: string
+  slug: string
+  category_name: string
+  district: string | null
+  verification_status: string
+  _highlight: string | null
+}
+
+export interface ProductSuggestion {
+  id: string
+  name: string
+  slug: string
+  price: number
+  currency: string
+  category_name: string | null
+  merchant: { business_name: string; slug: string }
+  _highlight: string | null
+}
+
+export interface TrendingSearchItem {
+  query: string
+  count: number
+}
+
+export interface AutocompleteUnifiedResult {
+  merchants: MerchantSuggestion[]
+  products: ProductSuggestion[]
+}
+
+export interface UnifiedSearchParams {
+  q: string
+  type?: 'all' | 'merchants' | 'products'
+  limit?: number
+  offset?: number
+  city?: string
+  category?: string
+  sort?: string
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,

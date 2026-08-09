@@ -1,6 +1,6 @@
-import * as SecureStore from 'expo-secure-store'
 import { create } from 'zustand'
 import { DEFAULT_COUNTRY } from '@laplasse/shared-config'
+import { secureStorage } from '@/src/lib/secureStorage'
 import { tokenStorage } from '@/src/lib/tokenStorage'
 
 const COUNTRY_KEY = 'laplasse_country'
@@ -17,7 +17,7 @@ export const useCountryStore = create<CountryState>((set) => ({
   hydrated: false,
 
   hydrate: async () => {
-    const stored = await SecureStore.getItemAsync(COUNTRY_KEY)
+    const stored = await secureStorage.getItem(COUNTRY_KEY)
     const code = stored?.toUpperCase() || DEFAULT_COUNTRY
     tokenStorage.setCountryCode(code)
     set({ countryCode: code, hydrated: true })
@@ -25,7 +25,7 @@ export const useCountryStore = create<CountryState>((set) => ({
 
   setCountry: async (code) => {
     const normalized = code.toUpperCase()
-    await SecureStore.setItemAsync(COUNTRY_KEY, normalized)
+    await secureStorage.setItem(COUNTRY_KEY, normalized)
     tokenStorage.setCountryCode(normalized)
     set({ countryCode: normalized })
   },

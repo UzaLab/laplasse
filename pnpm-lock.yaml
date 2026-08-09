@@ -198,6 +198,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@expo-google-fonts/outfit':
+        specifier: ^0.4.3
+        version: 0.4.3
       '@expo/metro-runtime':
         specifier: ^57.0.8
         version: 57.0.8(@expo/log-box@57.0.2)(expo@57.0.11)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.16)(react@19.2.3))(react@19.2.3)
@@ -1017,6 +1020,9 @@ packages:
 
   '@expo-google-fonts/material-symbols@0.4.42':
     resolution: {integrity: sha512-KZmHZRcthJ3KFZZlpzHjopA9guZgWR9fb3uVZlTR0BNlvG2pw1bnYBCpkze2PB0vRllwGhAM7lWXsfmcWCbXYg==}
+
+  '@expo-google-fonts/outfit@0.4.3':
+    resolution: {integrity: sha512-2uQmDVJencWLllxds6SG92E+SjxyZfvg7eZKZ5XLHggmm5AuUyQK7lzMAFOUzT6kheq2kJ7BAiubMdjKT32fJg==}
 
   '@expo/cli@57.0.13':
     resolution: {integrity: sha512-8gjLMyx+s0dLeDHlcfjM9D9x5yrCU5C6516rmC7q/Wiyuj1fxgr/cbDSmjdpQKkjlvvfvNwtRyMk2zhvhPohiw==}
@@ -8375,6 +8381,8 @@ snapshots:
     optional: true
 
   '@expo-google-fonts/material-symbols@0.4.42': {}
+
+  '@expo-google-fonts/outfit@0.4.3': {}
 
   '@expo/cli@57.0.13(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.8)(expo-constants@57.0.9)(expo-font@57.0.1)(expo-router@57.0.11)(expo@57.0.11)(react-dom@19.2.3(react@19.2.3))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.16)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)':
     dependencies:

@@ -88,5 +88,13 @@ eas build --profile preview --platform all
 - [ ] Plan EAS payant : oui / non (requis pour `search_documentation`)
 - [x] URL staging API : `https://api.laplasse.tech/api`
 - [x] Slug Expo : `laplasse`
+- [x] App consommateur : Phase 0 terminée, Phase 1 en cours — voir [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)
 
 Après chaque start/stop du serveur Expo, **reconnecter le MCP** (toggle off/on) pour activer les outils locaux (screenshots, logs, sitemap).
+
+## 8. Documentation associée
+
+| Document | Contenu |
+|----------|---------|
+| [MOBILE_APP_STACK_RECOMMANDATIONS.md](./MOBILE_APP_STACK_RECOMMANDATIONS.md) | Choix stack, phases, personas |
+| [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md) | Parité PWA, avancement, journal, roadmap |

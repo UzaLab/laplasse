@@ -8,13 +8,19 @@ import type {
   ApiMerchant,
   ApiMerchantDetail,
   ApiUnifiedSearchResult,
+  AutocompleteUnifiedResult,
   AuthTokensResponse,
   AuthUser,
   Cart,
   CheckoutInput,
   CheckoutResult,
+  FeaturedProduct,
   MarketplaceProduct,
+  MarketplaceSpotlightShop,
   Order,
+  ProductSuggestion,
+  TrendingSearchItem,
+  UnifiedSearchParams,
 } from './types'
 import { ApiError } from './types'
 
@@ -187,8 +193,46 @@ export class ApiClient {
   }
 
   unifiedSearch(q: string, limit = 12) {
-    const qs = new URLSearchParams({ q, limit: String(limit), type: 'all' })
+    return this.unifiedSearchAdvanced({ q, limit, type: 'all' })
+  }
+
+  unifiedSearchAdvanced(params: UnifiedSearchParams) {
+    const qs = new URLSearchParams({
+      q: params.q,
+      type: params.type ?? 'all',
+      limit: String(params.limit ?? 12),
+      offset: String(params.offset ?? 0),
+    })
+    if (params.city) qs.set('city', params.city)
+    if (params.category) qs.set('category', params.category)
+    if (params.sort) qs.set('sort', params.sort)
     return this.request<ApiUnifiedSearchResult>(`/search/unified?${qs}`)
+  }
+
+  getTrendingSearches(limit = 6) {
+    return this.request<TrendingSearchItem[]>(`/search/trending?limit=${limit}`)
+  }
+
+  autocompleteUnified(q: string, limit = 8) {
+    const qs = new URLSearchParams({ q, limit: String(limit) })
+    return this.request<AutocompleteUnifiedResult>(`/search/autocomplete/unified?${qs}`)
+  }
+
+  autocompleteProducts(q: string, limit = 8) {
+    const qs = new URLSearchParams({ q, limit: String(limit) })
+    return this.request<{ products: ProductSuggestion[] }>(`/search/autocomplete/products?${qs}`)
+  }
+
+  getMarketplaceFeatured() {
+    return this.request<FeaturedProduct[]>('/marketplace/featured')
+  }
+
+  getMarketplaceSpotlight() {
+    return this.request<MarketplaceSpotlightShop[]>('/marketplace/spotlight')
+  }
+
+  getMarketplaceShops(limit = 12) {
+    return this.request<MarketplaceSpotlightShop[]>(`/marketplace/merchants?limit=${limit}`)
   }
 
   // ─── Cart & orders ──────────────────────────────────────────────────────────

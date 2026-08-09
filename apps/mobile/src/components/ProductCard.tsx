@@ -2,7 +2,7 @@ import { Image, StyleSheet, Text, View } from 'react-native'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MarketplaceProduct } from '@laplasse/api-client'
 import { Card } from '@/src/components/ui'
-import { colors } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 
 export function ProductCard({
   product,
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   image: { width: 72, height: 72, borderRadius: 12 },
   imageFallback: { backgroundColor: colors.border },
   content: { flex: 1 },
-  name: { fontSize: 15, fontWeight: '600', color: colors.text },
-  price: { fontSize: 14, color: colors.primary, marginTop: 4, fontWeight: '700' },
-  merchant: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
+  name: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
+  price: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700, marginTop: 4 },
+  merchant: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 4 },
 })

@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store'
 import { create } from 'zustand'
 import type { AuthUser } from '@laplasse/api-client'
 import { getApiClient } from '@/src/lib/api'
+import { secureStorage } from '@/src/lib/secureStorage'
 import { tokenStorage } from '@/src/lib/tokenStorage'
 
 const ACCESS_KEY = 'laplasse_access'
@@ -34,8 +34,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   hydrate: async () => {
     try {
       const [accessToken, refreshToken] = await Promise.all([
-        SecureStore.getItemAsync(ACCESS_KEY),
-        SecureStore.getItemAsync(REFRESH_KEY),
+        secureStorage.getItem(ACCESS_KEY),
+        secureStorage.getItem(REFRESH_KEY),
       ])
       if (!accessToken || !refreshToken) {
         set({ hydrated: true, isAuthenticated: false })
@@ -53,8 +53,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setTokens: async (accessToken, refreshToken) => {
     await Promise.all([
-      SecureStore.setItemAsync(ACCESS_KEY, accessToken),
-      SecureStore.setItemAsync(REFRESH_KEY, refreshToken),
+      secureStorage.setItem(ACCESS_KEY, accessToken),
+      secureStorage.setItem(REFRESH_KEY, refreshToken),
     ])
     tokenStorage.setTokens(accessToken, refreshToken)
     set({ accessToken, refreshToken, isAuthenticated: true })
@@ -62,8 +62,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearTokens: async () => {
     await Promise.all([
-      SecureStore.deleteItemAsync(ACCESS_KEY),
-      SecureStore.deleteItemAsync(REFRESH_KEY),
+      secureStorage.deleteItem(ACCESS_KEY),
+      secureStorage.deleteItem(REFRESH_KEY),
     ])
     tokenStorage.clearTokens()
     set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })

@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from 'react-native'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { Card } from '@/src/components/ui'
-import { colors } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 
 export function MerchantCard({
   merchant,
@@ -39,13 +39,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12 },
   logo: { width: 56, height: 56, borderRadius: 12 },
   logoFallback: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.brand600,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  logoText: { color: '#fff', fontFamily: fonts.extrabold, fontSize: 22 },
   content: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '600', color: colors.text },
-  meta: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  distance: { fontSize: 12, color: colors.primary, marginTop: 4, fontWeight: '600' },
+  name: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  meta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, marginTop: 4 },
+  distance: { fontFamily: fonts.semibold, fontSize: 12, color: colors.brand700, marginTop: 4 },
 })

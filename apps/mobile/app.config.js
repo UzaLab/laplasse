@@ -16,7 +16,7 @@ module.exports = ({ config }) => ({
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#fffbeb',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -50,15 +50,16 @@ module.exports = ({ config }) => ({
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
+        imageWidth: 200,
         resizeMode: 'contain',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FAFAFA',
       },
     ],
     [
       'expo-notifications',
       {
         icon: './assets/images/icon.png',
-        color: '#0f766e',
+        color: '#f59e0b',
       },
     ],
   ],

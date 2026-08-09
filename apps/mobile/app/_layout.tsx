@@ -1,5 +1,12 @@
+import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  Outfit_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/outfit'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -8,6 +15,7 @@ import 'react-native-reanimated'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { tokenStorage } from '@/src/lib/tokenStorage'
+import { colors } from '@/src/theme'
 
 export { ErrorBoundary } from 'expo-router'
 
@@ -17,7 +25,11 @@ const queryClient = new QueryClient()
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    Outfit_800ExtraBold,
   })
 
   useEffect(() => {
@@ -42,7 +54,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate />
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
     </QueryClientProvider>
   )
 }
@@ -62,7 +74,13 @@ function AuthGate() {
   }, [hydrated, isAuthenticated, segments, router])
 
   return (
-    <Stack>
+    <Stack
+      screenOptions={{
+        headerTintColor: colors.brand700,
+        headerTitleStyle: { fontFamily: 'Outfit_700Bold' },
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/login" options={{ title: 'Connexion', presentation: 'modal' }} />
       <Stack.Screen name="(auth)/register" options={{ title: 'Inscription', presentation: 'modal' }} />

@@ -336,14 +336,52 @@ packages:
 
 ## 11. Prochaines actions concrètes
 
-- [ ] Valider périmètre P0 (consommateur uniquement vs livreur inclus).
-- [ ] Créer `apps/mobile` + `packages/api-client`.
-- [ ] PR API : login mobile (`access_token` / `refresh_token` dans le JSON) + CORS.
-- [ ] PR API : enregistrement push Expo (`DeviceToken.platform = 'expo'`).
-- [ ] Maquettes : reprendre `HomeMobileV2Page` + `NearbyCard` comme référence visuelle.
-- [ ] Configurer **Expo MCP** dans Cursor + compte EAS.
-- [ ] Premier build EAS (Android internal) pour test sur appareils CI/SN.
+> **État au 9 août 2026** — détail et parité écran par écran : [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)
+
+### Décisions produit
+
+- [x] **Périmètre P0 = app consommateur uniquement** (pas livreur ni marchand dans v1)
+- [ ] **App livreur** : Phase 2 — app séparée ou switch rôle (à trancher)
+- [ ] **Marchand** : web responsive ; option future module « Pro » dans l'app consommateur
+
+### Phase 0 — Fondations
+
+- [x] Créer `apps/mobile` + `packages/api-client` + `packages/shared-config`
+- [x] PR API : tokens mobile JSON (`auth-client.util.ts`) + push Expo
+- [x] Maquettes : `HomeMobileV2Page` + `NearbyCard` (carrousels, amber/Outfit)
+- [x] Configurer Expo MCP + compte EAS (`@uza.lab/laplasse`)
+- [x] Premier build EAS Android preview (APK test CI/SN)
+- [ ] Login OTP téléphone (parité web)
+
+### Phase 1 — MVP consommateur (en cours)
+
+- [x] Home + catégories + carrousels marketplace
+- [x] Autocomplete Meilisearch (trending + unified)
+- [x] Onglet Marketplace
+- [x] Panier + checkout basique
+- [ ] Recherche carte + rayon (`SearchMobilePage`)
+- [ ] Fiche établissement enrichie (avis, contact, horaires)
+- [ ] Détail commande + suivi livraison
+- [ ] Favoris
+- [ ] Hub restauration / menus
+- [ ] Paiement checkout (Mobile Money)
+
+### Phase 2 — Livreur (planifié)
+
+- [ ] Créer `apps/courier` ou module rôle livreur
+- [ ] Missions, GPS, push offres
 
 ---
 
-*Document rédigé à partir de l’analyse du dépôt `laplasse` (apps/web, apps/api, PWA, auth JWT, notifications).*
+## 12. Suivi de l'évolution
+
+Le document **[MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)** est la source de vérité pour :
+
+- Matrice parité PWA ↔ app native (consommateur)
+- Avancement par phase vs ce plan
+- Journal des jalons et roadmap immédiate
+- Setup dev/build : [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md)
+
+---
+
+*Document rédigé à partir de l'analyse du dépôt `laplasse` (apps/web, apps/api, PWA, auth JWT, notifications). Dernière révision plan : 9 août 2026.*
