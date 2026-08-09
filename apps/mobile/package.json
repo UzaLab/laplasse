@@ -19,13 +19,13 @@
     "@tanstack/react-query": "^5.101.0",
     "expo": "~57.0.11",
     "expo-constants": "~57.0.9",
-    "expo-device": "~8.0.10",
+    "expo-device": "~57.0.1",
     "expo-font": "~57.0.1",
     "expo-linking": "~57.0.5",
-    "expo-location": "~19.0.8",
-    "expo-notifications": "~0.32.16",
+    "expo-location": "~57.0.8",
+    "expo-notifications": "~57.0.9",
     "expo-router": "~57.0.11",
-    "expo-secure-store": "~15.0.8",
+    "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.2",
@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "expo-mcp": "^0.1.6",
+    "expo-mcp": "^0.2.4",
     "typescript": "~6.0.3"
   }
 }
