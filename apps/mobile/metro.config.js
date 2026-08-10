@@ -19,9 +19,7 @@ config.resolver.nodeModulesPaths = [
 /** Proxy same-origin /laplasse-api → API préprod (contourne CORS en preview web). */
 const API_PROXY_PREFIX = '/laplasse-api'
 const API_PROXY_TARGET =
-  process.env.EXPO_PUBLIC_API_PROXY_TARGET ??
-  process.env.EXPO_PUBLIC_API_URL?.replace(/\/api\/?$/, '') ??
-  'https://api-preprod.laplasse.tech'
+  process.env.EXPO_PUBLIC_API_PROXY_TARGET ?? 'https://api-preprod.laplasse.tech'
 
 function proxyApiRequest(req, res) {
   const incoming = req.url ?? ''

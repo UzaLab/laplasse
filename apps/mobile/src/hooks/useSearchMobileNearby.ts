@@ -1,6 +1,7 @@
 import type { ApiMerchant } from '@laplasse/api-client'
 import * as Location from 'expo-location'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Platform } from 'react-native'
 import { getApiClient } from '@/src/lib/api'
 
 export type GeoStatus = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'
@@ -32,9 +33,18 @@ export function useSearchMobileNearby(
 
   useEffect(() => {
     fallbackRef.current = fallbackMerchants
-  }, [fallbackMerchants])
+    if (!userLocation) {
+      setMerchants(prev =>
+        sameMerchantList(prev, fallbackMerchants) ? prev : fallbackMerchants,
+      )
+    }
+  }, [fallbackMerchants, userLocation])
 
   const requestGeolocation = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      setGeoStatus('unsupported')
+      return
+    }
     setGeoStatus('loading')
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()

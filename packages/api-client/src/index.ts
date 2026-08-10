@@ -7,6 +7,7 @@ import type {
   ApiCategory,
   ApiMerchant,
   ApiMerchantDetail,
+  ApiPaginated,
   ApiUnifiedSearchResult,
   AutocompleteUnifiedResult,
   AuthTokensResponse,
@@ -20,6 +21,8 @@ import type {
   FavoriteProduct,
   FavoriteToggleResult,
   FeaturedProduct,
+  MenuSearchHit,
+  MerchantMenuData,
   MarketplaceProduct,
   MarketplaceSpotlightShop,
   Order,
@@ -242,6 +245,38 @@ export class ApiClient {
     return this.request<ApiMerchant[]>(`/merchants/featured?${qs}`)
   }
 
+  listMerchants(params: {
+    city?: string
+    country?: string
+    category?: string
+    vertical?: 'food'
+    limit?: number
+    offset?: number
+    sort?: 'trust_score' | 'created_at' | 'business_name'
+  }) {
+    const qs = new URLSearchParams()
+    if (params.city) qs.set('city', params.city)
+    if (params.country) qs.set('country', params.country)
+    if (params.category) qs.set('category', params.category)
+    if (params.vertical) qs.set('vertical', params.vertical)
+    if (params.limit != null) qs.set('limit', String(params.limit))
+    if (params.offset != null) qs.set('offset', String(params.offset))
+    if (params.sort) qs.set('sort', params.sort)
+    const query = qs.toString()
+    return this.request<ApiPaginated<ApiMerchant>>(`/merchants${query ? `?${query}` : ''}`)
+  }
+
+  getMerchantMenu(slug: string) {
+    return this.request<MerchantMenuData>(`/merchants/${slug}/menu`)
+  }
+
+  searchMenus(q: string, limit = 12) {
+    const qs = new URLSearchParams({ q, limit: String(limit) })
+    return this.request<{ data: MenuSearchHit[]; meta: { total: number; query: string } }>(
+      `/search/menus?${qs}`,
+    )
+  }
+
   getMerchant(slug: string) {
     return this.request<ApiMerchantDetail>(`/merchants/${slug}`)
   }
@@ -310,6 +345,13 @@ export class ApiClient {
     return this.request<Cart>('/cart/items', {
       method: 'POST',
       body: JSON.stringify({ productId, quantity, ...(variantId ? { variantId } : {}) }),
+    }, true)
+  }
+
+  addMenuItemToCart(menuItemId: string, quantity: number, optionIds: string[] = []) {
+    return this.request<Cart>('/cart/menu-items', {
+      method: 'POST',
+      body: JSON.stringify({ menuItemId, quantity, optionIds }),
     }, true)
   }
 

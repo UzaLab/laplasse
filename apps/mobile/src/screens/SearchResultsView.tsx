@@ -1,29 +1,58 @@
 import { useQuery } from '@tanstack/react-query'
+import { getDefaultCity } from '@laplasse/shared-config'
+import type { ApiMerchant } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  FlatList,
+  ActivityIndicator,
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { AppHeader } from '@/src/components/AppHeader'
-import { CompactProductCard } from '@/src/components/CompactProductCard'
-import { NearbyCard } from '@/src/components/NearbyCard'
-import { SearchAutocomplete } from '@/src/components/SearchAutocomplete'
+import { Ionicons } from '@expo/vector-icons'
+import { HomeTopBar } from '@/src/components/HomeTopBar'
+import { MobileDrawer } from '@/src/components/MobileDrawer'
+import {
+  SearchResultsFiltersSheet,
+  type SearchResultsFilters,
+} from '@/src/components/SearchResultsFiltersSheet'
+import { SearchResultsMerchantCard } from '@/src/components/SearchResultsMerchantCard'
+import { SearchResultsProductCard } from '@/src/components/SearchResultsProductCard'
 import { EmptyState, LoadingState } from '@/src/components/ui'
+import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
 import { getApiClient } from '@/src/lib/api'
-import { colors, fonts, layout, spacing } from '@/src/theme'
+import { isFoodCategorySlug } from '@/src/lib/merchantVertical'
+import { useAuthStore } from '@/src/stores/authStore'
+import { useCountryStore } from '@/src/stores/countryStore'
+import { colors, fonts, homeLayout, layout } from '@/src/theme'
 
-type Tab = 'all' | 'merchants' | 'products'
+type Tab = 'merchants' | 'products'
+
+function greetingName(fullName: string | null | undefined, email: string | undefined): string {
+  if (fullName?.trim()) return fullName.trim().split(/\s+/)[0] ?? fullName
+  if (email) return email.split('@')[0] ?? 'vous'
+  return 'vous'
+}
+
+function merchantHref(merchant: ApiMerchant): `/m/${string}` | `/restauration/${string}` {
+  if (isFoodCategorySlug(merchant.category.slug)) return `/restauration/${merchant.slug}`
+  return `/m/${merchant.slug}`
+}
+
+function applyCategoryFilter(merchants: ApiMerchant[], categories: string[]) {
+  if (categories.length === 0) return merchants
+  return merchants.filter(m => categories.includes(m.category.slug))
+}
 
 export default function SearchResultsView({
   initialQuery,
   initialCategory,
-  filtersOpen = false,
+  filtersOpen: initialFiltersOpen = false,
   onClear,
 }: {
   initialQuery: string
@@ -33,154 +62,381 @@ export default function SearchResultsView({
 }) {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const countryCode = useCountryStore(s => s.countryCode)
+  const city = getDefaultCity(countryCode)
+  const user = useAuthStore(s => s.user)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+
   const [query, setQuery] = useState(initialQuery)
-  const [submitted, setSubmitted] = useState(initialQuery)
-  const [tab, setTab] = useState<Tab>('all')
+  const [tab, setTab] = useState<Tab>('merchants')
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(initialFiltersOpen)
+  const [filters, setFilters] = useState<SearchResultsFilters>(() => ({
+    categories: initialCategory ? initialCategory.split(',').filter(Boolean) : [],
+    sort: 'trust_score',
+  }))
+
+  const debouncedQuery = useDebouncedValue(query, 350)
+  const pageSize = 12
 
   const searchQuery = useQuery({
-    queryKey: ['search', submitted, tab, initialCategory],
+    queryKey: [
+      'search',
+      debouncedQuery,
+      city,
+      filters.sort,
+      filters.categories.length === 1 ? filters.categories[0] : null,
+    ],
     queryFn: () =>
       getApiClient().unifiedSearchAdvanced({
-        q: submitted,
-        type: tab === 'all' ? 'all' : tab,
-        limit: 20,
-        category: initialCategory || undefined,
+        q: debouncedQuery,
+        type: 'all',
+        limit: pageSize,
+        offset: 0,
+        city,
+        category: filters.categories.length === 1 ? filters.categories[0] : undefined,
+        sort: filters.sort,
       }),
-    enabled: submitted.length >= 2,
+    enabled: debouncedQuery.length >= 2,
   })
+
+  const trendingQuery = useQuery({
+    queryKey: ['search-trending', city, countryCode],
+    queryFn: () => getApiClient().getFeaturedMerchants(city, 6, countryCode),
+    enabled:
+      debouncedQuery.length >= 2
+      && searchQuery.isSuccess
+      && (searchQuery.data?.merchants.data.length ?? 0) === 0,
+    staleTime: 60_000,
+  })
+
+  const merchants = useMemo(
+    () => applyCategoryFilter(searchQuery.data?.merchants.data ?? [], filters.categories),
+    [searchQuery.data?.merchants.data, filters.categories],
+  )
+  const products = useMemo(() => {
+    const list = searchQuery.data?.products.data ?? []
+    if (filters.categories.length === 0) return list
+    return list.filter(p => {
+      const slug = (p as { category?: { slug?: string } }).category?.slug
+      return slug != null && filters.categories.includes(slug)
+    })
+  }, [searchQuery.data?.products.data, filters.categories])
+
+  const merchantTotal = filters.categories.length > 1 ? merchants.length : (searchQuery.data?.merchants.meta.total ?? 0)
+  const productTotal = searchQuery.data?.products.meta.total ?? 0
+  const activeTotal = tab === 'merchants' ? merchantTotal : productTotal
+  const hasFilters = filters.categories.length > 0 || filters.sort !== 'trust_score'
+  const listBottomPad = layout.bottomNavHeight + insets.bottom + 16
+  const productColWidth = (Dimensions.get('window').width - homeLayout.gutter * 2 - 12) / 2
 
   const goToMap = () => {
     onClear()
     router.replace('/(tabs)/search')
   }
 
-  const merchants = searchQuery.data?.merchants.data ?? []
-  const products = searchQuery.data?.products.data ?? []
+  const scrollTopPad = insets.top + homeLayout.topBarHeight + 8
+
+  if (debouncedQuery.length < 2 && !initialFiltersOpen) {
+    return (
+      <View style={styles.root}>
+        <HomeTopBar
+          onOpenMenu={() => setDrawerOpen(true)}
+          isAuthenticated={isAuthenticated}
+          avatarLabel={greetingName(user?.full_name, user?.email)}
+        />
+        <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+        <View style={{ paddingTop: scrollTopPad, flex: 1 }}>
+          <EmptyState title="Recherchez un établissement ou un produit" />
+        </View>
+      </View>
+    )
+  }
 
   return (
     <View style={styles.root}>
-      <View style={{ paddingTop: insets.top }}>
-        <AppHeader showMenu={false} />
-      </View>
-      <View style={styles.searchWrap}>
-        <SearchAutocomplete
-          initialQuery={query}
-          autoFocus={filtersOpen || !initialQuery}
-          onSubmit={q => {
-            setQuery(q)
-            setSubmitted(q)
-          }}
-        />
-        <Pressable onPress={goToMap} hitSlop={8}>
+      <HomeTopBar
+        onOpenMenu={() => setDrawerOpen(true)}
+        isAuthenticated={isAuthenticated}
+        avatarLabel={greetingName(user?.full_name, user?.email)}
+      />
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingTop: scrollTopPad, paddingBottom: listBottomPad }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.searchField}>
+          <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Établissements, produits, services…"
+            placeholderTextColor={colors.textLight}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoFocus={initialFiltersOpen || !!initialQuery}
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        <Pressable onPress={goToMap} hitSlop={8} style={styles.backLinkWrap}>
           <Text style={styles.backLink}>← Carte</Text>
         </Pressable>
-      </View>
 
-      {filtersOpen && submitted.length < 2 ? (
-        <View style={styles.filtersHint}>
-          <Text style={styles.filtersHintTitle}>Recherche avancée</Text>
-          <Text style={styles.filtersHintText}>
-            Saisissez au moins 2 caractères pour explorer établissements et produits.
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.tabs}>
-        {(['all', 'merchants', 'products'] as Tab[]).map(t => (
-          <Pressable
-            key={t}
-            onPress={() => setTab(t)}
-            style={[styles.tab, tab === t && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'all' ? 'Tout' : t === 'merchants' ? 'Établissements' : 'Produits'}
+        {initialFiltersOpen && debouncedQuery.length < 2 ? (
+          <View style={styles.filtersHint}>
+            <Text style={styles.filtersHintTitle}>Recherche avancée</Text>
+            <Text style={styles.filtersHintText}>
+              Saisissez au moins 2 caractères pour explorer établissements et produits.
             </Text>
-          </Pressable>
-        ))}
-      </View>
+          </View>
+        ) : null}
 
-      {submitted.length < 2 ? (
-        filtersOpen ? null : <EmptyState title="Recherchez un établissement ou un produit" />
-      ) : searchQuery.isLoading ? (
-        <LoadingState />
-      ) : tab === 'products' ? (
-        <FlatList
-          data={products}
-          keyExtractor={p => p.id}
-          numColumns={2}
-          columnWrapperStyle={styles.productRow}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState title="Aucun produit" />}
-          renderItem={({ item }) => (
-            <CompactProductCard
-              product={{ ...item, merchant: item.merchant }}
-              onPress={() => router.push(`/m/${item.merchant.slug}/p/${item.slug}`)}
-            />
-          )}
-        />
-      ) : tab === 'merchants' ? (
-        <FlatList
-          data={merchants}
-          keyExtractor={m => m.id}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<EmptyState title="Aucun établissement" />}
-          renderItem={({ item }) => (
-            <View style={styles.merchantItem}>
-              <NearbyCard merchant={item} onPress={() => router.push(`/m/${item.slug}`)} />
+        <View style={styles.tabs}>
+          <Pressable onPress={() => setTab('merchants')} style={styles.tabBtn}>
+            <Text style={[styles.tabText, tab === 'merchants' && styles.tabTextActive]}>
+              Établissements
+            </Text>
+            <View style={[styles.tabBadge, tab === 'merchants' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, tab === 'merchants' && styles.tabBadgeTextActive]}>
+                {merchantTotal}
+              </Text>
             </View>
-          )}
-        />
-      ) : merchants.length === 0 && products.length === 0 ? (
-        <EmptyState title="Aucun résultat" subtitle={`Pour « ${submitted} »`} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.list}>
-          {merchants.map(m => (
-            <View key={m.id} style={styles.merchantItem}>
-              <NearbyCard merchant={m} onPress={() => router.push(`/m/${m.slug}`)} />
+            {tab === 'merchants' ? <View style={styles.tabIndicator} /> : null}
+          </Pressable>
+          <Pressable onPress={() => setTab('products')} style={styles.tabBtn}>
+            <Text style={[styles.tabText, tab === 'products' && styles.tabTextActive]}>
+              Produits
+            </Text>
+            <View style={[styles.tabBadge, tab === 'products' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, tab === 'products' && styles.tabBadgeTextActive]}>
+                {productTotal}
+              </Text>
             </View>
-          ))}
-          {products.map(p => (
-            <CompactProductCard
-              key={p.id}
-              product={{ ...p, merchant: p.merchant }}
-              onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
-            />
-          ))}
-        </ScrollView>
-      )}
+            {tab === 'products' ? <View style={styles.tabIndicator} /> : null}
+          </Pressable>
+        </View>
+
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText} numberOfLines={1}>
+            {searchQuery.isFetching && merchants.length === 0 && products.length === 0
+              ? 'Recherche en cours…'
+              : `${activeTotal} résultat${activeTotal > 1 ? 's' : ''} pour « ${debouncedQuery} »`}
+          </Text>
+          <Pressable onPress={() => setFiltersOpen(true)} style={styles.filterBtn}>
+            <Ionicons name="options-outline" size={16} color={hasFilters ? colors.brand700 : colors.textMuted} />
+            <Text style={[styles.filterBtnText, hasFilters && styles.filterBtnTextActive]}>Filtres</Text>
+            {hasFilters ? <View style={styles.filterDot} /> : null}
+          </Pressable>
+        </View>
+
+        {searchQuery.isLoading ? (
+          <LoadingState />
+        ) : searchQuery.isError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>
+              Le moteur de recherche est momentanément indisponible.
+            </Text>
+          </View>
+        ) : tab === 'merchants' ? (
+          <>
+            {merchants.length === 0 ? (
+              <EmptyState title="Aucun établissement" subtitle={`Pour « ${debouncedQuery} »`} />
+            ) : (
+              <View style={styles.merchantList}>
+                {merchants.map(m => (
+                  <SearchResultsMerchantCard
+                    key={m.id}
+                    merchant={m}
+                    onPress={() => router.push(merchantHref(m) as never)}
+                  />
+                ))}
+              </View>
+            )}
+
+            {debouncedQuery && products.length > 0 ? (
+              <View style={styles.crossSell}>
+                <View style={styles.crossSellHeader}>
+                  <View style={styles.crossSellTitles}>
+                    <Text style={styles.crossSellTitle}>Populaires en produits</Text>
+                    <Text style={styles.crossSellSub}>Articles liés à « {debouncedQuery} »</Text>
+                  </View>
+                  <Pressable onPress={() => setTab('products')}>
+                    <Text style={styles.crossSellLink}>Tout voir →</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.productRow}>
+                  {products.slice(0, 2).map(p => (
+                    <SearchResultsProductCard
+                      key={p.id}
+                      product={p}
+                      width={productColWidth}
+                      onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {merchants.length === 0 && (trendingQuery.data?.length ?? 0) > 0 ? (
+              <View style={styles.crossSell}>
+                <Text style={styles.crossSellTitle}>Populaires à {city}</Text>
+                <View style={styles.merchantList}>
+                  {trendingQuery.data!.map(m => (
+                    <SearchResultsMerchantCard
+                      key={m.id}
+                      merchant={m}
+                      onPress={() => router.push(merchantHref(m) as never)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
+        ) : products.length === 0 ? (
+          <EmptyState title="Aucun produit" subtitle={`Pour « ${debouncedQuery} »`} />
+        ) : (
+          <View style={styles.productGrid}>
+            {Array.from({ length: Math.ceil(products.length / 2) }, (_, rowIndex) => {
+              const row = products.slice(rowIndex * 2, rowIndex * 2 + 2)
+              return (
+                <View key={row.map(p => p.id).join('-')} style={styles.productRow}>
+                  {row.map(p => (
+                    <SearchResultsProductCard
+                      key={p.id}
+                      product={p}
+                      width={productColWidth}
+                      onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
+                    />
+                  ))}
+                  {row.length === 1 ? <View style={{ width: productColWidth }} /> : null}
+                </View>
+              )
+            })}
+            {searchQuery.isFetching ? (
+              <ActivityIndicator color={colors.brand600} style={{ marginTop: 16 }} />
+            ) : null}
+          </View>
+        )}
+      </ScrollView>
+
+      <SearchResultsFiltersSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        filters={filters}
+        onChange={next => {
+          setFilters(next)
+        }}
+      />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  searchWrap: { paddingHorizontal: spacing.gutter, paddingBottom: 4 },
+  scroll: { paddingHorizontal: homeLayout.gutter },
+  searchField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    paddingHorizontal: 12,
+    minHeight: 52,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    color: colors.text,
+    paddingVertical: 12,
+  },
+  backLinkWrap: { marginTop: 8, marginBottom: 4 },
   backLink: {
     fontFamily: fonts.semibold,
     fontSize: 13,
     color: colors.brand700,
-    marginTop: 8,
-    marginBottom: 4,
   },
   tabs: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: spacing.gutter,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderStrong,
+    marginTop: 12,
     marginBottom: 12,
   },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 10,
+    gap: 6,
+    position: 'relative',
   },
-  tabActive: { backgroundColor: colors.brand50, borderColor: colors.brand200 },
-  tabText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textMuted },
-  tabTextActive: { color: colors.brand800 },
+  tabText: {
+    fontFamily: fonts.bold,
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  tabTextActive: { color: colors.brand700 },
+  tabBadge: {
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceContainer,
+  },
+  tabBadgeActive: { backgroundColor: colors.brand100 },
+  tabBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: 11,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  tabBadgeTextActive: { color: colors.brand800 },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '15%',
+    right: '15%',
+    height: 2,
+    backgroundColor: colors.brand600,
+    borderRadius: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  metaText: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  filterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  filterBtnText: {
+    fontFamily: fonts.bold,
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  filterBtnTextActive: { color: colors.brand700 },
+  filterDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.brand500,
+  },
   filtersHint: {
-    marginHorizontal: spacing.gutter,
     marginBottom: 12,
     padding: 16,
     borderRadius: 16,
@@ -200,7 +456,49 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     lineHeight: 20,
   },
-  list: { paddingHorizontal: spacing.gutter, paddingBottom: layout.bottomNavHeight + 16 },
-  merchantItem: { marginBottom: 12 },
+  merchantList: { gap: 16 },
+  productGrid: { gap: 12 },
   productRow: { gap: 12, marginBottom: 12 },
+  crossSell: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderStrong,
+    gap: 16,
+  },
+  crossSellHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  crossSellTitles: { flex: 1 },
+  crossSellTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  crossSellSub: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  crossSellLink: {
+    fontFamily: fonts.bold,
+    fontSize: 13,
+    color: colors.brand700,
+  },
+  errorBanner: {
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand200,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.brand800,
+  },
 })

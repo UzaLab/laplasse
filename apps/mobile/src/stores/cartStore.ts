@@ -8,6 +8,7 @@ interface CartState {
   loading: boolean
   loadCart: () => Promise<void>
   addItem: (productId: string, quantity?: number, variantId?: string) => Promise<{ error?: string }>
+  addMenuItem: (menuItemId: string, quantity?: number, optionIds?: string[]) => Promise<{ error?: string }>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   clear: () => Promise<void>
 }
@@ -39,6 +40,22 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ loading: true })
     try {
       const cart = await getApiClient().addCartItem(productId, quantity, variantId)
+      set({ cart })
+      return {}
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Ajout impossible' }
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  addMenuItem: async (menuItemId, quantity = 1, optionIds = []) => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      return { error: 'Connectez-vous pour commander au restaurant' }
+    }
+    set({ loading: true })
+    try {
+      const cart = await getApiClient().addMenuItemToCart(menuItemId, quantity, optionIds)
       set({ cart })
       return {}
     } catch (err) {

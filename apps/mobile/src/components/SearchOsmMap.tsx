@@ -1,6 +1,6 @@
 import type { ApiMerchant } from '@laplasse/api-client'
 import type { ComponentType } from 'react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
 import RNWebView from 'react-native-webview'
 import type { WebViewMessageEvent } from 'react-native-webview/lib/WebViewTypes'
@@ -32,7 +32,9 @@ export function SearchOsmMap({
 }: SearchOsmMapProps) {
   const webRef = useRef<{ injectJavaScript: (script: string) => void } | null>(null)
   const readyRef = useRef(false)
+  const lastPayloadRef = useRef('')
   const html = useMemo(() => buildSearchMapHtml(), [])
+  const webSource = useMemo(() => ({ html }), [html])
 
   const mappable = useMemo(
     () =>
@@ -57,30 +59,37 @@ export function SearchOsmMap({
     [center, userLocation, radiusKm, selectedId, mappable],
   )
 
+  const pushPayload = useCallback((next: SearchMapPayload) => {
+    const serialized = JSON.stringify(next)
+    if (lastPayloadRef.current === serialized) return
+    lastPayloadRef.current = serialized
+    webRef.current?.injectJavaScript(buildMapUpdateScript(next))
+  }, [])
+
   useEffect(() => {
     if (!readyRef.current) return
-    webRef.current?.injectJavaScript(buildMapUpdateScript(payload))
-  }, [payload])
+    pushPayload(payload)
+  }, [payload, pushPayload])
 
-  function onMessage(event: WebViewMessageEvent) {
+  const onMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data) as { type: string; id?: string }
       if (data.type === 'ready') {
         readyRef.current = true
-        webRef.current?.injectJavaScript(buildMapUpdateScript(payload))
+        pushPayload(payload)
       }
       if (data.type === 'select' && data.id) onSelect(data.id)
     } catch {
       /* ignore */
     }
-  }
+  }, [onSelect, payload, pushPayload])
 
   return (
     <View style={styles.host} pointerEvents="box-none">
       <WebView
         ref={webRef}
         originWhitelist={['*']}
-        source={{ html }}
+        source={webSource}
         style={styles.webview}
         onMessage={onMessage}
         scrollEnabled={false}

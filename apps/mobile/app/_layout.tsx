@@ -23,7 +23,15 @@ export { ErrorBoundary } from 'expo-router'
 
 SplashScreen.preventAutoHideAsync()
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
+})
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -98,6 +106,8 @@ function AuthGate() {
       <Stack.Screen name="checkout" options={{ title: 'Commande' }} />
       <Stack.Screen name="payment" options={{ title: 'Paiement' }} />
       <Stack.Screen name="favoris" options={{ title: 'Favoris', headerShown: false }} />
+      <Stack.Screen name="restauration/index" options={{ headerShown: false }} />
+      <Stack.Screen name="restauration/[slug]" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: 'Paramètres', headerShown: false }} />
       <Stack.Screen name="orders/[id]" options={{ title: 'Commande' }} />
       <Stack.Screen name="delivery/track/[token]" options={{ title: 'Suivi livraison' }} />

@@ -43,7 +43,13 @@ export function SearchDiscoverView({ initialCategory = '' }: { initialCategory?:
       ])
       return { categories, featured }
     },
+    staleTime: 60_000,
   })
+
+  const fallbackMerchants = useMemo(
+    () => bootstrapQuery.data?.featured ?? EMPTY_MERCHANTS,
+    [bootstrapQuery.data?.featured],
+  )
 
   const {
     radiusKm,
@@ -58,7 +64,7 @@ export function SearchDiscoverView({ initialCategory = '' }: { initialCategory?:
   } = useSearchMobileNearby(
     city,
     countryCode,
-    bootstrapQuery.data?.featured ?? EMPTY_MERCHANTS,
+    fallbackMerchants,
   )
 
   useEffect(() => {
@@ -75,6 +81,11 @@ export function SearchDiscoverView({ initialCategory = '' }: { initialCategory?:
     return nearbyMerchants.filter(m => m.category.slug === selectedCategory)
   }, [nearbyMerchants, selectedCategory])
 
+  const filteredKey = useMemo(
+    () => filtered.map(m => m.id).join(','),
+    [filtered],
+  )
+
   useEffect(() => {
     if (filtered.length === 0) {
       setSelectedId(null)
@@ -84,7 +95,7 @@ export function SearchDiscoverView({ initialCategory = '' }: { initialCategory?:
       if (prev && filtered.some(m => m.id === prev)) return prev
       return filtered[0]!.id
     })
-  }, [filtered])
+  }, [filteredKey])
 
   const scrollToMerchant = useCallback((merchantId: string) => {
     const index = filtered.findIndex(m => m.id === merchantId)

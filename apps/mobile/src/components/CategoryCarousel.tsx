@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router'
 import { HorizontalCarousel } from '@/src/components/HorizontalCarousel'
 import { getCategoryCircleStyle } from '@/src/lib/categoryStyles'
 import { getCategoryIcon } from '@/src/lib/categoryIcons'
+import { isFoodCategorySlug } from '@/src/lib/merchantVertical'
 import { colors, fonts } from '@/src/theme'
 
 export function CategoryCarousel({
@@ -32,9 +33,16 @@ export function CategoryCarousel({
             }
           : getCategoryCircleStyle(cat.slug)
         const icon = getCategoryIcon(cat.slug, cat.icon)
+        const onPress = () => {
+          if (isFoodCategorySlug(cat.slug)) {
+            router.push({ pathname: '/restauration', params: { cat: cat.slug } } as never)
+            return
+          }
+          router.push({ pathname: '/(tabs)/search', params: { category: cat.slug } })
+        }
         return (
           <Pressable
-            onPress={() => router.push({ pathname: '/(tabs)/search', params: { category: cat.slug } })}
+            onPress={onPress}
             style={styles.item}
           >
             <View

@@ -52,6 +52,80 @@ export interface ApiMerchant {
   avg_rating?: number | null
   distance_km?: number
   has_marketplace?: boolean
+  food_prep_minutes?: number
+  food_min_order_amount?: number | null
+  food_is_paused?: boolean
+  food_pause_until?: string | null
+  food_accepts_cash?: boolean
+  food_cash_max_amount?: number | null
+  food_opening_hours?: Record<string, { open: string; close: string } | null> | null
+  is_sponsored?: boolean
+  has_active_promo?: boolean
+  tags?: string[]
+  featured_vertical?: {
+    kind: string
+    badge: string
+    name: string
+    price: string | null
+    image: string
+    tab: string
+    meta: string | null
+  }
+}
+
+export interface ApiPaginated<T> {
+  data: T[]
+  meta: { total: number; limit: number; offset: number }
+}
+
+export interface MenuSearchHit {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  currency: string
+  prep_minutes: number | null
+  image_url: string | null
+  section_name: string | null
+  merchant: { business_name: string; slug: string }
+}
+
+export interface MenuItemRow {
+  id: string
+  section_id: string | null
+  name: string
+  description: string | null
+  price: number
+  currency: string
+  image_url: string | null
+  is_available: boolean
+  prep_minutes: number | null
+  modifier_groups: Array<{
+    id: string
+    name: string
+    min_select: number
+    max_select: number
+    options: Array<{ id: string; name: string; price_delta: number }>
+  }>
+}
+
+export interface MerchantMenuData {
+  merchant: {
+    id: string
+    name: string
+    slug: string
+    food_prep_minutes?: number
+    food_min_order_amount?: number | null
+    food_is_paused?: boolean
+    food_pause_until?: string | null
+    food_accepts_cash?: boolean
+    food_cash_max_amount?: number | null
+    food_opening_hours?: Record<string, { open: string; close: string } | null> | null
+    food_accepts_preorders?: boolean
+    food_status?: 'open' | 'paused' | 'closed'
+  }
+  sections: Array<{ id: string; name: string; sort_order: number; items: MenuItemRow[] }>
+  uncategorized: MenuItemRow[]
 }
 
 export interface ApiMerchantDetail extends ApiMerchant {

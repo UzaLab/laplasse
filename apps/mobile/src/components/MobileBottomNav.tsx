@@ -28,6 +28,7 @@ function resolveActiveRoute(segments: string[]): NavKey | null {
     }
   }
   if (segments[0] === 'm') return 'marketplace'
+  if (segments[0] === 'restauration') return 'search'
   if (segments[0] === 'favoris') return 'profile'
   return null
 }
