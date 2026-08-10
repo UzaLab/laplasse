@@ -432,6 +432,137 @@ export interface MarketplaceSpotlightShop {
   is_sponsored?: boolean
 }
 
+export type ProductCondition = 'NEW' | 'USED_GOOD' | 'USED_FAIR' | 'REFURBISHED'
+export type ProductOrigin = 'LOCAL_CI' | 'IMPORTED' | 'HANDMADE'
+
+export interface MarketplaceCatalogProduct extends FeaturedProduct {
+  created_at?: string
+  category?: { id: string; name: string; slug: string } | null
+  condition?: ProductCondition
+  origin?: ProductOrigin
+  merchant: { business_name: string; slug: string; logo?: string | null }
+  can_quick_add?: boolean
+  default_variant_id?: string | null
+}
+
+export interface MarketplaceCatalogPage {
+  data: MarketplaceCatalogProduct[]
+  meta: { total: number; limit: number; offset: number; hasMore: boolean }
+}
+
+export interface ProductCategoryNode {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  sort_order: number
+  children: ProductCategoryNode[]
+}
+
+export interface MarketplaceBoutique {
+  id: string
+  business_name: string
+  slug: string
+  logo: string | null
+}
+
+export interface ShopProductCategory {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  parent_id?: string | null
+  sort_order?: number
+}
+
+export interface ShopCollectionPublic {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  product_count: number
+}
+
+export interface ShopTrustScore {
+  score: number | null
+  total_orders: number
+  fulfilled_orders: number
+  cancelled_orders: number
+  label: string
+  badge: 'trusted' | 'good' | 'new' | null
+}
+
+export interface ApiShopPublic {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  logo?: string | null
+  cover_image?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  city?: string | null
+  district?: string | null
+  merchant_id?: string | null
+  merchant?: { slug: string; is_active?: boolean } | null
+}
+
+export interface MerchantServiceConfig {
+  id: string
+  slug?: string
+  name: string
+  description?: string | null
+  duration_min: number
+  price: number | null
+  nightly_rate?: number | null
+  weekend_nightly_rate?: number | null
+  min_stay_nights?: number | null
+  capacity?: number | null
+  max_guests?: number | null
+  surface_sqm?: number | null
+  service_kind?: string
+  image_urls?: string[]
+  amenities?: string[]
+  highlights?: string[]
+  bedrooms?: number | null
+  bathrooms?: number | null
+  is_active?: boolean
+}
+
+export interface BookingSettingsConfig {
+  max_capacity?: number
+  require_payment?: boolean
+  deposit_percent?: number
+  cancellation_policy?: string | null
+  no_show_policy?: string | null
+}
+
+export interface BookingConfig {
+  enabled: boolean
+  booking_type: string | null
+  label: string
+  cta: string
+  category_slug: string
+  services: MerchantServiceConfig[]
+  room_services?: MerchantServiceConfig[]
+  room_types?: string[]
+  booking_settings?: BookingSettingsConfig
+}
+
+export interface RoomCalendarDay {
+  date: string
+  available: boolean
+  remaining?: number
+  nightly_rate: number | null
+}
+
+export interface RoomCalendarData {
+  from: string
+  to: string
+  room_service: { id: string; name: string; nightly_rate: number; capacity: number }
+  days: RoomCalendarDay[]
+}
+
 export interface MerchantSuggestion {
   id: string
   business_name: string

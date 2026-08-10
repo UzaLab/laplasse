@@ -31,6 +31,11 @@ interface SearchAutocompleteProps {
   onSubmit?: (q: string) => void
   /** Style barre recherche home ou carte */
   appearance?: 'default' | 'home' | 'map'
+  /** Mode contrôlé */
+  value?: string
+  onValueChange?: (v: string) => void
+  /** Suggestions produits uniquement (marketplace) */
+  productsOnly?: boolean
 }
 
 export function SearchAutocomplete({
@@ -39,9 +44,14 @@ export function SearchAutocomplete({
   autoFocus = false,
   onSubmit,
   appearance = 'default',
+  value,
+  onValueChange,
+  productsOnly = false,
 }: SearchAutocompleteProps) {
   const router = useRouter()
-  const [query, setQuery] = useState(initialQuery)
+  const [internalQuery, setInternalQuery] = useState(initialQuery)
+  const query = value ?? internalQuery
+  const setQuery = onValueChange ?? setInternalQuery
   const [focused, setFocused] = useState(false)
   const debounced = useDebouncedValue(query.trim(), 180)
   const open = focused && (debounced.length >= 1 || query.length === 0)
@@ -49,13 +59,19 @@ export function SearchAutocomplete({
   const trendingQuery = useQuery({
     queryKey: ['trending'],
     queryFn: () => getApiClient().getTrendingSearches(6),
-    enabled: open && debounced.length < 2,
+    enabled: open && debounced.length < 2 && !productsOnly,
     staleTime: 60_000,
   })
 
   const suggestQuery = useQuery({
-    queryKey: ['autocomplete', debounced],
-    queryFn: () => getApiClient().autocompleteUnified(debounced, 8),
+    queryKey: ['autocomplete', debounced, productsOnly],
+    queryFn: () =>
+      productsOnly
+        ? getApiClient().autocompleteProducts(debounced, 8).then(r => ({
+            merchants: [],
+            products: r.products,
+          }))
+        : getApiClient().autocompleteUnified(debounced, 8),
     enabled: open && debounced.length >= 2,
   })
 
@@ -113,7 +129,7 @@ export function SearchAutocomplete({
       {open ? (
         <View style={styles.panel}>
           <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-            {debounced.length < 2 ? (
+            {debounced.length < 2 && !productsOnly ? (
               <>
                 <Text style={styles.sectionLabel}>Tendances</Text>
                 {trendingQuery.isLoading ? (
@@ -133,7 +149,7 @@ export function SearchAutocomplete({
               </>
             ) : (
               <>
-                {(suggestQuery.data?.merchants ?? []).length > 0 ? (
+                {(suggestQuery.data?.merchants ?? []).length > 0 && !productsOnly ? (
                   <>
                     <Text style={styles.sectionLabel}>Établissements</Text>
                     {suggestQuery.data!.merchants.map(m => (

@@ -21,10 +21,21 @@ import type {
   FavoriteProduct,
   FavoriteToggleResult,
   FeaturedProduct,
+  ApiShopPublic,
+  BookingConfig,
+  MarketplaceBoutique,
+  MarketplaceCatalogPage,
+  MarketplaceCatalogProduct,
+  MerchantServiceConfig,
+  RoomCalendarData,
   MenuSearchHit,
   MerchantMenuData,
   MarketplaceProduct,
   MarketplaceSpotlightShop,
+  ProductCategoryNode,
+  ShopCollectionPublic,
+  ShopProductCategory,
+  ShopTrustScore,
   Order,
   OrderEtaSnapshot,
   OtpSendResponse,
@@ -333,6 +344,96 @@ export class ApiClient {
 
   getMarketplaceShops(limit = 12) {
     return this.request<MarketplaceSpotlightShop[]>(`/marketplace/merchants?limit=${limit}`)
+  }
+
+  getMarketplaceProducts(params?: {
+    q?: string
+    merchant?: string
+    category?: string
+    condition?: string
+    origin?: string
+    sort?: 'price_asc' | 'price_desc'
+    limit?: number
+    offset?: number
+  }) {
+    const qs = new URLSearchParams()
+    if (params?.q) qs.set('q', params.q)
+    if (params?.merchant) qs.set('merchant', params.merchant)
+    if (params?.category) qs.set('category', params.category)
+    if (params?.condition) qs.set('condition', params.condition)
+    if (params?.origin) qs.set('origin', params.origin)
+    if (params?.sort) qs.set('sort', params.sort)
+    if (params?.limit != null) qs.set('limit', String(params.limit))
+    if (params?.offset != null) qs.set('offset', String(params.offset))
+    const query = qs.toString()
+    return this.request<MarketplaceCatalogProduct[]>(`/marketplace/products${query ? `?${query}` : ''}`)
+  }
+
+  getMarketplaceProductsPage(params: {
+    q?: string
+    merchant?: string
+    category?: string
+    condition?: string
+    origin?: string
+    sort?: 'price_asc' | 'price_desc'
+    limit?: number
+    offset?: number
+  }) {
+    const qs = new URLSearchParams()
+    if (params.q) qs.set('q', params.q)
+    if (params.merchant) qs.set('merchant', params.merchant)
+    if (params.category) qs.set('category', params.category)
+    if (params.condition) qs.set('condition', params.condition)
+    if (params.origin) qs.set('origin', params.origin)
+    if (params.sort) qs.set('sort', params.sort)
+    if (params.limit != null) qs.set('limit', String(params.limit))
+    if (params.offset != null) qs.set('offset', String(params.offset))
+    qs.set('paged', '1')
+    const query = qs.toString()
+    return this.request<MarketplaceCatalogPage>(`/marketplace/products?${query}`)
+  }
+
+  getMarketplaceProductCategories(country?: string) {
+    const qs = country ? `?country=${encodeURIComponent(country)}` : ''
+    return this.request<ProductCategoryNode[]>(`/marketplace/product-categories${qs}`)
+  }
+
+  getShopProducts(slug: string, params?: { category?: string; q?: string; collection?: string }) {
+    const qs = new URLSearchParams()
+    if (params?.category) qs.set('category', params.category)
+    if (params?.q) qs.set('q', params.q)
+    if (params?.collection) qs.set('collection', params.collection)
+    const query = qs.toString()
+    return this.request<MarketplaceProduct[]>(`/shops/${slug}/products${query ? `?${query}` : ''}`)
+  }
+
+  getShopProductCategories(slug: string) {
+    return this.request<ShopProductCategory[]>(`/shops/${slug}/product-categories`)
+  }
+
+  getShopCollections(slug: string) {
+    return this.request<ShopCollectionPublic[]>(`/shops/${slug}/collections`)
+  }
+
+  getShopTrustScore(slug: string) {
+    return this.request<ShopTrustScore>(`/shops/${slug}/trust`)
+  }
+
+  getMerchantSimilar(slug: string, limit = 4) {
+    return this.request<ApiMerchant[]>(`/merchants/${slug}/similar?limit=${limit}`)
+  }
+
+  getShop(slug: string) {
+    return this.request<ApiShopPublic>(`/shops/${slug}`)
+  }
+
+  getMerchantBookingConfig(merchantId: string) {
+    return this.request<BookingConfig>(`/bookings/merchant/${merchantId}/config`)
+  }
+
+  getMerchantRoomCalendar(merchantId: string, serviceId: string, from: string, to: string) {
+    const qs = new URLSearchParams({ serviceId, from, to })
+    return this.request<RoomCalendarData>(`/bookings/merchant/${merchantId}/room-calendar?${qs}`)
   }
 
   // ─── Cart & orders ──────────────────────────────────────────────────────────

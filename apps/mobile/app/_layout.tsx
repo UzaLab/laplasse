@@ -101,6 +101,7 @@ function AuthGate() {
       <Stack.Screen name="(auth)/login" options={{ title: 'Connexion', presentation: 'modal' }} />
       <Stack.Screen name="(auth)/register" options={{ title: 'Inscription', presentation: 'modal' }} />
       <Stack.Screen name="m/[slug]/index" options={{ headerShown: false }} />
+      <Stack.Screen name="m/[slug]/boutique" options={{ headerShown: false }} />
       <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ headerShown: false }} />
       <Stack.Screen name="checkout" options={{ title: 'Commande' }} />
