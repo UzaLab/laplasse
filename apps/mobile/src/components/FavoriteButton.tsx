@@ -9,9 +9,13 @@ import { colors } from '@/src/theme'
 export function FavoriteButton({
   merchantId,
   size = 22,
+  color,
+  favoritedColor = '#ef4444',
 }: {
   merchantId: string
   size?: number
+  color?: string
+  favoritedColor?: string
 }) {
   const router = useRouter()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
@@ -51,7 +55,7 @@ export function FavoriteButton({
       <Ionicons
         name={favorited ? 'heart' : 'heart-outline'}
         size={size}
-        color={favorited ? '#ef4444' : colors.slate900}
+        color={favorited ? favoritedColor : (color ?? colors.slate900)}
       />
     </Pressable>
   )

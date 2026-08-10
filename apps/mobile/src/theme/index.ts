@@ -54,6 +54,10 @@ export const layout = {
   bottomNavHeight: 56,
   bottomNavInset: 64,
   pageGutter: 16,
+  /** Espace au-dessus de la bottom nav — aligné PWA (--mobile-bottom-content-gap: 0.75rem) */
+  fabBottomGap: 12,
+  /** Gouttière horizontale FAB — aligné PWA (px-6) */
+  fabHorizontalGutter: 24,
 }
 
 export const homeLayout = {

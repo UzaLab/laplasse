@@ -28,7 +28,13 @@ export function HomeTopBar({
           <Ionicons name="search-outline" size={22} color={colors.textMuted} />
         </Pressable>
 
-        <Text style={styles.brand}>LaPlasse</Text>
+        <Pressable
+          onPress={() => router.push('/(tabs)')}
+          style={({ pressed }) => [styles.brandWrap, pressed && styles.pressed]}
+          accessibilityLabel="Accueil LaPlasse"
+        >
+          <Text style={styles.brand}>LaPlasse</Text>
+        </Pressable>
 
         <View style={styles.right}>
           <Pressable
@@ -97,6 +103,7 @@ const styles = StyleSheet.create({
     color: colors.brand800,
   },
   pressed: { opacity: 0.75 },
+  brandWrap: { paddingHorizontal: 4, paddingVertical: 2 },
   brand: {
     fontFamily: fonts.extrabold,
     fontSize: 20,

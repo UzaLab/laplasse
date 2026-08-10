@@ -129,8 +129,7 @@ export function RestaurationDetailView({ slug }: { slug: string }) {
             ) : (
               <View style={[styles.heroImage, styles.heroFallback]} />
             )}
-            <View style={styles.heroOverlayTop} />
-            <View style={styles.heroOverlayBottom} />
+            <View style={styles.heroOverlay} />
             <View style={styles.heroContent}>
               <View style={styles.heroBadges}>
                 <View
@@ -230,20 +229,12 @@ const styles = StyleSheet.create({
   },
   headerBrandSpacer: { width: 80 },
   headerActions: { flexDirection: 'row', gap: 8 },
-  hero: { height: 320, position: 'relative', backgroundColor: colors.brand100 },
-  heroImage: { width: '100%', height: '100%' },
+  hero: { height: 320, position: 'relative', backgroundColor: colors.brand100, overflow: 'hidden' },
+  heroImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   heroFallback: { backgroundColor: colors.brand100 },
-  heroOverlayTop: {
+  heroOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  heroOverlayBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '65%',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   heroContent: {
     position: 'absolute',

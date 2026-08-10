@@ -14,7 +14,7 @@ import {
 } from '@/src/lib/orderUtils'
 import { openWhatsApp } from '@/src/lib/whatsapp'
 import { useAuthStore } from '@/src/stores/authStore'
-import { colors, fonts, spacing } from '@/src/theme'
+import { colors, fonts, radii, spacing } from '@/src/theme'
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radii.button,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

@@ -1,0 +1,12 @@
+# Copier ce contenu dans C:\Users\<VOTRE_USER>\.wslconfig (Windows)
+# Puis exécuter dans PowerShell : wsl --shutdown
+# Relancer WSL avant le prochain build.
+
+[wsl2]
+memory=8GB
+processors=4
+swap=8GB
+localhostForwarding=true
+
+# Si WSL redémarre encore pendant le build, augmenter memory/swap
+# ou utiliser : pnpm mobile:build:preview:lite

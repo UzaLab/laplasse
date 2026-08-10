@@ -22,6 +22,7 @@ import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { LoadingState } from '@/src/components/ui'
 import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
 import { getApiClient } from '@/src/lib/api'
+import { resolveBoutique } from '@/src/lib/boutiqueResolve'
 import { computePriceCeiling, flattenProductCategories } from '@/src/lib/marketplace'
 import { openWhatsApp } from '@/src/lib/whatsapp'
 import { colors, fonts, homeLayout, layout } from '@/src/theme'
@@ -122,47 +123,70 @@ export function BoutiqueView({ slug }: { slug: string }) {
     scrollY.current = newY
   }, [showFab, hideFab])
 
-  // Try merchant first, then shop fallback
+  // Resolve merchant or shop by slug
   const resolveQuery = useQuery({
     queryKey: ['boutique-resolve', slug],
-    queryFn: async (): Promise<BoutiqueDisplayData> => {
-      const api = getApiClient()
-      try {
-        const m = await api.getMerchant(slug)
-        return merchantToDisplay(m as ApiMerchantDetail)
-      } catch {
-        const s = await api.getShop(slug)
-        return shopToDisplay(s)
-      }
+    queryFn: async () => {
+      const resolved = await resolveBoutique(slug)
+      if (!resolved) throw new Error('not found')
+      return resolved
     },
   })
 
+  const shopSlug = resolveQuery.data?.shopSlug ?? slug
+  const merchantSlug = resolveQuery.data?.merchant?.slug
+
   const categoriesQuery = useQuery({
-    queryKey: ['shop-categories', slug],
-    queryFn: () => getApiClient().getShopProductCategories(slug),
+    queryKey: ['shop-categories', shopSlug],
+    queryFn: () => getApiClient().getShopProductCategories(shopSlug),
+    enabled: !!resolveQuery.data,
   })
 
   const collectionsQuery = useQuery({
-    queryKey: ['shop-collections', slug],
-    queryFn: () => getApiClient().getShopCollections(slug),
+    queryKey: ['shop-collections', shopSlug],
+    queryFn: () => getApiClient().getShopCollections(shopSlug),
+    enabled: !!resolveQuery.data,
   })
 
   const trustQuery = useQuery({
-    queryKey: ['shop-trust', slug],
-    queryFn: () => getApiClient().getShopTrustScore(slug),
+    queryKey: ['shop-trust', shopSlug],
+    queryFn: () => getApiClient().getShopTrustScore(shopSlug),
+    enabled: !!resolveQuery.data,
   })
 
   const productsQuery = useQuery({
-    queryKey: ['shop-products', slug, debouncedSearch, selectedCategory, selectedCollection],
-    queryFn: () =>
-      getApiClient().getShopProducts(slug, {
-        q: debouncedSearch || undefined,
-        category: selectedCategory || undefined,
-        collection: selectedCollection || undefined,
-      }),
+    queryKey: ['shop-products', shopSlug, merchantSlug, debouncedSearch, selectedCategory, selectedCollection],
+    queryFn: async () => {
+      const api = getApiClient()
+      try {
+        const products = await api.getShopProducts(shopSlug, {
+          q: debouncedSearch || undefined,
+          category: selectedCategory || undefined,
+          collection: selectedCollection || undefined,
+        })
+        if (products.length > 0 || !merchantSlug) return products
+      } catch {
+        // Fall back to merchant products endpoint
+      }
+      if (merchantSlug) {
+        const res = await api.getMerchantProducts(merchantSlug, 100, 0)
+        let list = res.data
+        if (debouncedSearch) {
+          const q = debouncedSearch.toLowerCase()
+          list = list.filter(p => p.name.toLowerCase().includes(q))
+        }
+        return list
+      }
+      return []
+    },
+    enabled: !!resolveQuery.data,
   })
 
-  const merchant = resolveQuery.data
+  const merchant: BoutiqueDisplayData | undefined = resolveQuery.data
+    ? resolveQuery.data.merchant
+      ? merchantToDisplay(resolveQuery.data.merchant)
+      : shopToDisplay(resolveQuery.data.shop!)
+    : undefined
   const products: MarketplaceProduct[] = productsQuery.data ?? []
   const collections = collectionsQuery.data ?? []
 
@@ -393,7 +417,7 @@ export function BoutiqueView({ slug }: { slug: string }) {
                 <View key={product.id} style={styles.gridCell}>
                   <MarketplaceProductGridCard
                     product={product as unknown as MarketplaceCatalogProduct}
-                    onPress={() => router.push(`/m/${merchant.slug}/p/${product.slug}`)}
+                    onPress={() => router.push(`/m/${merchantSlug ?? merchant.slug}/p/${product.slug}`)}
                   />
                 </View>
               ))}

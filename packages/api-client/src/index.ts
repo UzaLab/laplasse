@@ -43,7 +43,7 @@ import type {
   TrendingSearchItem,
   UnifiedSearchParams,
 } from './types'
-import { ApiError } from './types'
+import { ApiError, normalizeAuthTokens } from './types'
 
 export interface TokenStorage {
   getAccessToken: () => string | null | Promise<string | null>
@@ -69,6 +69,10 @@ export class ApiClient {
 
   private url(path: string): string {
     return `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}`
+  }
+
+  private mobileAuthPath(path: string): string {
+    return path.includes('?') ? `${path}&client=mobile` : `${path}?client=mobile`
   }
 
   private async buildHeaders(auth = false, extra?: Record<string, string>): Promise<Record<string, string>> {
@@ -128,13 +132,13 @@ export class ApiClient {
       if (!refreshToken) return false
       try {
         const headers = await this.buildHeaders(false)
-        const res = await fetch(this.url('/auth/refresh'), {
+        const res = await fetch(this.url(this.mobileAuthPath('/auth/refresh')), {
           method: 'POST',
           headers,
           body: JSON.stringify({ refresh_token: refreshToken }),
         })
         if (!res.ok) return false
-        const data = await res.json() as { accessToken?: string; refreshToken?: string }
+        const data = normalizeAuthTokens(await res.json() as AuthTokensResponse)
         if (!data.accessToken || !data.refreshToken) return false
         await this.options.tokens!.setTokens(data.accessToken, data.refreshToken)
         return true
@@ -151,17 +155,17 @@ export class ApiClient {
   // ─── Auth ───────────────────────────────────────────────────────────────────
 
   login(email: string, password: string) {
-    return this.request<AuthTokensResponse>('/auth/login', {
+    return this.request<AuthTokensResponse>(this.mobileAuthPath('/auth/login'), {
       method: 'POST',
       body: JSON.stringify({ email, password }),
-    })
+    }).then(normalizeAuthTokens)
   }
 
   register(input: { email: string; password: string; full_name: string; phone: string }) {
-    return this.request<AuthTokensResponse>('/auth/register', {
+    return this.request<AuthTokensResponse>(this.mobileAuthPath('/auth/register'), {
       method: 'POST',
       body: JSON.stringify(input),
-    })
+    }).then(normalizeAuthTokens)
   }
 
   getMe() {
@@ -183,10 +187,10 @@ export class ApiClient {
   }
 
   verifyOtp(phone: string, code: string) {
-    return this.request<AuthTokensResponse>('/auth/otp/verify', {
+    return this.request<AuthTokensResponse>(this.mobileAuthPath('/auth/otp/verify'), {
       method: 'POST',
       body: JSON.stringify({ phone, code }),
-    })
+    }).then(normalizeAuthTokens)
   }
 
   updateProfile(input: { full_name?: string; phone?: string }) {
@@ -434,6 +438,13 @@ export class ApiClient {
   getMerchantRoomCalendar(merchantId: string, serviceId: string, from: string, to: string) {
     const qs = new URLSearchParams({ serviceId, from, to })
     return this.request<RoomCalendarData>(`/bookings/merchant/${merchantId}/room-calendar?${qs}`)
+  }
+
+  createMerchantBooking(merchantId: string, body: Record<string, unknown>) {
+    return this.request<{ id: string }>(`/bookings/merchant/${merchantId}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
   }
 
   // ─── Cart & orders ──────────────────────────────────────────────────────────

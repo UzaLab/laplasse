@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import {
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import type {
@@ -13,6 +22,7 @@ import {
   PRODUCT_CONDITION_LABELS,
   PRODUCT_ORIGIN_LABELS,
 } from '@/src/lib/marketplace'
+import { ScrollArea } from '@/src/components/ScrollArea'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
 export type MarketplaceSort = 'newest' | 'price_asc' | 'price_desc'
@@ -99,6 +109,7 @@ export function MarketplaceFiltersSheet({
   const flatCategories = flattenProductCategories(categories)
   const [categoryQuery, setCategoryQuery] = useState('')
   const [merchantQuery, setMerchantQuery] = useState('')
+  const sheetHeight = Dimensions.get('window').height * 0.85
 
   const filteredCategories = categoryQuery.trim()
     ? flatCategories.filter(c => c.name.toLowerCase().includes(categoryQuery.trim().toLowerCase()))
@@ -121,7 +132,7 @@ export function MarketplaceFiltersSheet({
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.sheet, { height: sheetHeight, paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Filtres</Text>
           <Pressable onPress={onClose} hitSlop={8}>
@@ -129,7 +140,13 @@ export function MarketplaceFiltersSheet({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          style={styles.scrollBody}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+        >
           {showSort ? (
             <>
               <Text style={styles.sectionLabel}>Tri</Text>
@@ -160,22 +177,26 @@ export function MarketplaceFiltersSheet({
                 placeholderTextColor={colors.textLight}
                 style={styles.searchInput}
               />
-              <View style={styles.listBox}>
+              <ScrollArea>
                 <RadioRow
                   label="Toutes les catégories"
                   selected={!filters.selectedCategory}
                   onPress={() => onChange({ ...filters, selectedCategory: '' })}
                 />
-                {filteredCategories.map(cat => (
-                  <RadioRow
-                    key={cat.slug}
-                    label={cat.name}
-                    selected={filters.selectedCategory === cat.slug}
-                    onPress={() => onChange({ ...filters, selectedCategory: cat.slug })}
-                    indent={cat.depth * 12}
-                  />
-                ))}
-              </View>
+                {filteredCategories.length === 0 ? (
+                  <Text style={styles.emptyList}>Aucun résultat</Text>
+                ) : (
+                  filteredCategories.map(cat => (
+                    <RadioRow
+                      key={cat.slug}
+                      label={cat.name}
+                      selected={filters.selectedCategory === cat.slug}
+                      onPress={() => onChange({ ...filters, selectedCategory: cat.slug })}
+                      indent={cat.depth * 12}
+                    />
+                  ))
+                )}
+              </ScrollArea>
             </>
           ) : null}
 
@@ -189,16 +210,20 @@ export function MarketplaceFiltersSheet({
                 placeholderTextColor={colors.textLight}
                 style={styles.searchInput}
               />
-              <View style={styles.listBox}>
-                {filteredMerchants.map(m => (
-                  <CheckRow
-                    key={m.id}
-                    label={m.business_name}
-                    checked={filters.selectedMerchants.includes(m.slug)}
-                    onPress={() => toggleMerchant(m.slug)}
-                  />
-                ))}
-              </View>
+              <ScrollArea>
+                {filteredMerchants.length === 0 ? (
+                  <Text style={styles.emptyList}>Aucun résultat</Text>
+                ) : (
+                  filteredMerchants.map(m => (
+                    <CheckRow
+                      key={m.id}
+                      label={m.business_name}
+                      checked={filters.selectedMerchants.includes(m.slug)}
+                      onPress={() => toggleMerchant(m.slug)}
+                    />
+                  ))
+                )}
+              </ScrollArea>
             </>
           ) : null}
 
@@ -282,10 +307,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    maxHeight: '85%',
     backgroundColor: colors.surface,
     borderTopLeftRadius: homeLayout.radiusXl,
     borderTopRightRadius: homeLayout.radiusXl,
+    flexDirection: 'column',
+  },
+  scrollBody: {
+    flex: 1,
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -383,13 +412,12 @@ const styles = StyleSheet.create({
   sliderChipActive: { backgroundColor: colors.brand50, borderColor: colors.brand500 },
   sliderChipText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.textMuted },
   sliderChipTextActive: { color: colors.brand700 },
-  listBox: {
-    maxHeight: 200,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+  emptyList: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    paddingVertical: 12,
     paddingHorizontal: 8,
   },
   footer: {

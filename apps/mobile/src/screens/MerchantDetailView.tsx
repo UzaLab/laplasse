@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
-import { HotelChambresTab } from '@/src/components/HotelChambresTab'
+import { HotelMerchantView } from '@/src/screens/HotelMerchantView'
+import { ShopMerchantView } from '@/src/screens/ShopMerchantView'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
 import { PrestationsTab } from '@/src/components/PrestationsTab'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
@@ -23,7 +24,8 @@ import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { RestaurationMenuPanel } from '@/src/components/RestaurationMenuPanel'
 import { LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
-import { isFoodCategorySlug } from '@/src/lib/merchantVertical'
+import { loadBoutiqueProducts, resolveBoutique } from '@/src/lib/boutiqueResolve'
+import { getMerchantVertical, isFoodCategorySlug } from '@/src/lib/merchantVertical'
 import {
   getDefaultProfileTab,
   getProfileTabs,
@@ -79,13 +81,13 @@ export function MerchantDetailView({
   const insets = useSafeAreaInsets()
   const [scrolled, setScrolled] = useState(false)
 
-  const merchantQuery = useQuery({
-    queryKey: ['merchant', slug],
-    queryFn: () => getApiClient().getMerchant(slug),
+  const resolveQuery = useQuery({
+    queryKey: ['boutique-resolve', slug],
+    queryFn: () => resolveBoutique(slug),
   })
 
-  const merchant = merchantQuery.data as ApiMerchantDetail | undefined
-  const hasMarketplace = !!merchant?.has_marketplace
+  const merchant = resolveQuery.data?.merchant
+  const hasMarketplace = !!merchant?.has_marketplace || !!resolveQuery.data?.shop
 
   const tabs = useMemo(
     () => (merchant ? getProfileTabs(merchant.category.slug, { hasMarketplace }) : []),
@@ -125,7 +127,7 @@ export function MerchantDetailView({
     enabled: !!merchant,
   })
 
-  if (merchantQuery.isLoading) {
+  if (resolveQuery.isLoading) {
     return (
       <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
         <LoadingState />
@@ -133,7 +135,7 @@ export function MerchantDetailView({
     )
   }
 
-  if (!merchant) {
+  if (!resolveQuery.data) {
     return (
       <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
         <View style={styles.notFound}>
@@ -146,12 +148,24 @@ export function MerchantDetailView({
     )
   }
 
+  if (!merchant) {
+    return <ShopMerchantView slug={slug} initialTab={initialTab} />
+  }
+
   if (isFoodCategorySlug(merchant.category.slug)) {
     return (
       <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
         <LoadingState />
       </PublicScreenShell>
     )
+  }
+
+  if (getMerchantVertical(merchant.category.slug) === 'hotel') {
+    return <HotelMerchantView slug={slug} initialTab={initialTab} />
+  }
+
+  if (getMerchantVertical(merchant.category.slug) === 'retail' || hasMarketplace) {
+    return <ShopMerchantView slug={slug} initialTab={initialTab} />
   }
 
   const contactPhone = merchant.whatsapp ?? merchant.phone
@@ -249,15 +263,6 @@ export function MerchantDetailView({
 
             {activeTab === 'menu' ? (
               <RestaurationMenuPanel merchantSlug={merchant.slug} />
-            ) : null}
-
-            {activeTab === 'chambres' ? (
-              <HotelChambresTab
-                merchantId={merchant.id}
-                merchantSlug={merchant.slug}
-                merchantName={merchant.business_name}
-                categorySlug={merchant.category.slug}
-              />
             ) : null}
 
             {activeTab === 'prestations' ? (

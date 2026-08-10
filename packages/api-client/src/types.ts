@@ -25,6 +25,31 @@ export interface AuthTokensResponse {
   user: AuthUser
   accessToken?: string
   refreshToken?: string
+  /** Legacy / fallback when X-Client header is ignored */
+  access_token?: string
+  refresh_token?: string
+}
+
+export function normalizeAuthTokens(data: AuthTokensResponse): {
+  user: AuthUser
+  accessToken?: string
+  refreshToken?: string
+} {
+  const raw = data as AuthTokensResponse & Record<string, unknown>
+  const accessToken =
+    data.accessToken ??
+    data.access_token ??
+    (typeof raw.token === 'string' ? raw.token : undefined)
+  const refreshToken =
+    data.refreshToken ??
+    data.refresh_token ??
+    (typeof raw.refreshToken === 'string' ? raw.refreshToken : undefined)
+
+  return {
+    user: data.user,
+    accessToken,
+    refreshToken,
+  }
 }
 
 export interface ApiMerchantLocation {

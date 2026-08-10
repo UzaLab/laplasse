@@ -270,7 +270,13 @@ export function MarketplaceView() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: topPad }]}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: topPad,
+            paddingBottom: layout.fabBottomGap + 56,
+          },
+        ]}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -358,7 +364,11 @@ export function MarketplaceView() {
       <Animated.View
         style={[
           styles.filtersFabWrap,
-          { bottom: layout.bottomNavInset + 12, opacity: fabOpacity, transform: [{ translateY: fabOpacity.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] },
+          {
+            bottom: layout.fabBottomGap,
+            opacity: fabOpacity,
+            transform: [{ translateY: fabOpacity.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+          },
         ]}
         pointerEvents={fabVisible.current ? 'auto' : 'none'}
       >
@@ -452,7 +462,6 @@ const styles = StyleSheet.create({
   },
   cartBadgeText: { color: '#fff', fontSize: 9, fontFamily: fonts.bold },
   content: {
-    paddingBottom: layout.bottomNavInset + 80,
     gap: 16,
   },
   searchWrap: {
@@ -503,8 +512,8 @@ const styles = StyleSheet.create({
   resetBtnText: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },
   filtersFabWrap: {
     position: 'absolute',
-    left: 24,
-    right: 24,
+    left: layout.fabHorizontalGutter,
+    right: layout.fabHorizontalGutter,
   },
   filtersFab: {
     flexDirection: 'row',
