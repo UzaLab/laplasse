@@ -12,8 +12,9 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
-import { AppHeader } from '@/src/components/AppHeader'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
+import { PublicScreenShell } from '@/src/components/PublicScreenShell'
+import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { ProductFavoriteButton } from '@/src/components/ProductFavoriteButton'
 import { EmptyState, LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
@@ -44,25 +45,32 @@ export default function FavorisScreen() {
 
   const filteredProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
 
-  if (!hydrated) return <LoadingState />
+  if (!hydrated) {
+    return (
+      <PublicScreenShell activeRoute="profile">
+        <PublicTopBar showCart />
+        <LoadingState />
+      </PublicScreenShell>
+    )
+  }
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.root}>
-        <AppHeader />
+      <PublicScreenShell activeRoute="profile">
+        <PublicTopBar showCart />
         <View style={styles.center}>
           <EmptyState title="Connectez-vous" subtitle="Retrouvez vos établissements et produits favoris." />
           <PrimaryButton label="Se connecter" onPress={() => router.push('/(auth)/login')} />
         </View>
-      </View>
+      </PublicScreenShell>
     )
   }
 
   const loading = tab === 'merchants' ? merchantsQuery.isLoading : productsQuery.isLoading
 
   return (
-    <View style={styles.root}>
-      <AppHeader />
+    <PublicScreenShell activeRoute="profile">
+      <PublicTopBar showCart />
       <View style={styles.header}>
         <Text style={styles.title}>Mes favoris</Text>
         <View style={styles.tabs}>
@@ -152,12 +160,11 @@ export default function FavorisScreen() {
           )}
         />
       )}
-    </View>
+    </PublicScreenShell>
   )
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, padding: spacing.gutter, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.gutter, paddingBottom: 12 },
   title: { fontFamily: fonts.extrabold, fontSize: 24, color: colors.text, marginBottom: 12 },
@@ -173,7 +180,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.slate900, borderColor: colors.slate900 },
   tabText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.text },
   tabTextActive: { color: '#fff' },
-  list: { padding: spacing.gutter, paddingBottom: layout.bottomNavInset + 24, gap: 12 },
+  list: { padding: spacing.gutter, paddingBottom: layout.bottomNavHeight + 16, gap: 12 },
   merchantCard: {
     backgroundColor: colors.surface,
     borderRadius: 16,

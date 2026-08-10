@@ -7,7 +7,13 @@ import { getCategoryCircleStyle } from '@/src/lib/categoryStyles'
 import { getCategoryIcon } from '@/src/lib/categoryIcons'
 import { colors, fonts } from '@/src/theme'
 
-export function CategoryCarousel({ categories }: { categories: ApiCategory[] }) {
+export function CategoryCarousel({
+  categories,
+  variant = 'default',
+}: {
+  categories: ApiCategory[]
+  variant?: 'default' | 'home'
+}) {
   const router = useRouter()
 
   if (categories.length === 0) return null
@@ -17,7 +23,14 @@ export function CategoryCarousel({ categories }: { categories: ApiCategory[] }) 
       data={categories}
       keyExtractor={c => c.id}
       renderItem={cat => {
-        const style = getCategoryCircleStyle(cat.slug)
+        const style = variant === 'home'
+          ? {
+              circleBg: colors.surfaceContainer,
+              circleBorder: colors.surfaceContainer,
+              iconColor: colors.brand600,
+              labelColor: colors.textMuted,
+            }
+          : getCategoryCircleStyle(cat.slug)
         const icon = getCategoryIcon(cat.slug, cat.icon)
         return (
           <Pressable
@@ -28,6 +41,7 @@ export function CategoryCarousel({ categories }: { categories: ApiCategory[] }) 
               style={[
                 styles.circle,
                 { backgroundColor: style.circleBg, borderColor: style.circleBorder },
+                variant === 'home' && styles.circleHome,
               ]}
             >
               <Ionicons name={icon} size={26} color={style.iconColor} />
@@ -56,10 +70,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  circleHome: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 1,
+  },
   label: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
+    fontFamily: fonts.semibold,
+    fontSize: 12,
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 16,
   },
 })

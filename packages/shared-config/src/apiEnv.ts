@@ -1,6 +1,9 @@
 import { getApiBaseUrl } from './index'
 
-/** URLs API par environnement — alignées Coolify (preprod / prod). */
+/** Préfixe proxy Metro (web dev) — évite CORS localhost → api-preprod. */
+export const WEB_DEV_API_PROXY_PATH = '/laplasse-api'
+
+/** URL API par environnement — alignées Coolify (preprod / prod). */
 export const API_URL_BY_ENV = {
   local: 'http://localhost:3001/api',
   preprod: 'https://api-preprod.laplasse.tech/api',
@@ -28,7 +31,13 @@ export function resolveApiEnvironment(raw?: string): ApiEnvironment {
 export function resolveMobileApiUrl(options?: {
   explicitUrl?: string
   appEnv?: string
+  /** Origin navigateur (web dev) → proxy Metro same-origin */
+  webDevOrigin?: string
 }): string {
+  if (options?.webDevOrigin) {
+    return getApiBaseUrl(`${options.webDevOrigin}${WEB_DEV_API_PROXY_PATH}`)
+  }
+
   const explicit = options?.explicitUrl?.trim()
   if (explicit) return getApiBaseUrl(explicit)
 

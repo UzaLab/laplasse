@@ -4,14 +4,17 @@ import { SearchDiscoverView } from '@/src/components/SearchDiscoverView'
 import SearchResultsView from '@/src/screens/SearchResultsView'
 
 export default function SearchScreen() {
-  const params = useLocalSearchParams<{ q?: string; category?: string }>()
+  const params = useLocalSearchParams<{ q?: string; category?: string; filters?: string }>()
   const [submitted, setSubmitted] = useState(params.q ?? '')
 
   useEffect(() => {
     if (params.q) setSubmitted(params.q)
   }, [params.q])
 
-  if (!submitted || submitted.length < 2) {
+  const showResults =
+    params.filters === '1' || (submitted.length >= 2)
+
+  if (!showResults) {
     return <SearchDiscoverView initialCategory={params.category} />
   }
 
@@ -19,6 +22,7 @@ export default function SearchScreen() {
     <SearchResultsView
       initialQuery={submitted}
       initialCategory={params.category}
+      filtersOpen={params.filters === '1'}
       onClear={() => setSubmitted('')}
     />
   )

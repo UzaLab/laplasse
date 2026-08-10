@@ -26,13 +26,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontFamily: fonts.bold,
-    fontSize: 18,
-    color: colors.text,
+    fontFamily: fonts.semibold,
+    fontSize: 24,
+    lineHeight: 32,
+    color: colors.onBackground,
   },
   link: {
-    fontFamily: fonts.semibold,
+    fontFamily: fonts.medium,
     fontSize: 14,
-    color: colors.brand600,
+    color: colors.primary,
   },
 })

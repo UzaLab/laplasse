@@ -1,16 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter, useSegments } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
 import { useCartItemCount } from '@/src/hooks/useCartItemCount'
+import { tabRouteHref } from '@/src/lib/routes'
 import { colors, fonts, layout } from '@/src/theme'
 
-type TabBarProps = {
-  state: { index: number; routes: { name: string; key: string }[] }
-  navigation: { navigate: (name: string) => void }
-}
-
-type NavKey = 'index' | 'marketplace' | 'search' | 'profile'
+export type NavKey = 'index' | 'marketplace' | 'search' | 'profile'
 
 const NAV_ITEMS: {
   route: NavKey
@@ -24,7 +20,54 @@ const NAV_ITEMS: {
   { route: 'profile', label: 'Profil', icon: 'person-outline', iconActive: 'person' },
 ]
 
+function resolveActiveRoute(segments: string[]): NavKey | null {
+  if (segments[0] === '(tabs)') {
+    const tab = segments[1]
+    if (tab === 'index' || tab === 'marketplace' || tab === 'search' || tab === 'profile') {
+      return tab
+    }
+  }
+  if (segments[0] === 'm') return 'marketplace'
+  if (segments[0] === 'favoris') return 'profile'
+  return null
+}
+
+type TabBarProps = {
+  state: { index: number; routes: { name: string; key: string }[] }
+  navigation: { navigate: (name: string) => void }
+}
+
 export function MobileBottomNav({ state, navigation }: TabBarProps) {
+  const activeRoute = state.routes[state.index]?.name as NavKey | undefined
+
+  return (
+    <MobileBottomNavInner
+      activeRoute={activeRoute ?? null}
+      onNavigate={name => navigation.navigate(name)}
+    />
+  )
+}
+
+export function MobileBottomNavBar({ activeRoute }: { activeRoute?: NavKey | null }) {
+  const router = useRouter()
+  const segments = useSegments()
+  const resolved = activeRoute ?? resolveActiveRoute(segments as string[])
+
+  return (
+    <MobileBottomNavInner
+      activeRoute={resolved}
+      onNavigate={name => router.replace(tabRouteHref(name) as never)}
+    />
+  )
+}
+
+function MobileBottomNavInner({
+  activeRoute,
+  onNavigate,
+}: {
+  activeRoute: NavKey | null
+  onNavigate: (route: NavKey) => void
+}) {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const itemCount = useCartItemCount()
@@ -33,23 +76,18 @@ export function MobileBottomNav({ state, navigation }: TabBarProps) {
     <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
       <View style={styles.inner}>
         {NAV_ITEMS.map(item => {
-          const routeIndex = state.routes.findIndex(r => r.name === item.route)
-          const focused = state.index === routeIndex
+          const focused = activeRoute === item.route
           const color = focused ? colors.slate900 : colors.textLight
 
           return (
             <Pressable
               key={item.route}
-              onPress={() => navigation.navigate(item.route)}
+              onPress={() => onNavigate(item.route)}
               style={styles.tab}
               accessibilityRole="button"
               accessibilityState={{ selected: focused }}
             >
-              <Ionicons
-                name={focused ? item.iconActive : item.icon}
-                size={20}
-                color={color}
-              />
+              <Ionicons name={focused ? item.iconActive : item.icon} size={20} color={color} />
               <Text style={[styles.label, focused && styles.labelActive]}>{item.label}</Text>
             </Pressable>
           )

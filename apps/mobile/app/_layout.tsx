@@ -11,7 +11,9 @@ import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
+import { Platform } from 'react-native'
 import 'react-native-reanimated'
+import { resetApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { tokenStorage } from '@/src/lib/tokenStorage'
@@ -49,6 +51,12 @@ export default function RootLayout() {
     void useCountryStore.getState().hydrate()
   }, [])
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      resetApiClient()
+    }
+  }, [])
+
   if (!loaded && !error) return null
 
   return (
@@ -84,9 +92,9 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/login" options={{ title: 'Connexion', presentation: 'modal' }} />
       <Stack.Screen name="(auth)/register" options={{ title: 'Inscription', presentation: 'modal' }} />
-      <Stack.Screen name="m/[slug]/index" options={{ title: 'Boutique' }} />
-      <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ title: 'Produit' }} />
-      <Stack.Screen name="cart" options={{ title: 'Panier' }} />
+      <Stack.Screen name="m/[slug]/index" options={{ headerShown: false }} />
+      <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ headerShown: false }} />
+      <Stack.Screen name="cart" options={{ headerShown: false }} />
       <Stack.Screen name="checkout" options={{ title: 'Commande' }} />
       <Stack.Screen name="payment" options={{ title: 'Paiement' }} />
       <Stack.Screen name="favoris" options={{ title: 'Favoris', headerShown: false }} />

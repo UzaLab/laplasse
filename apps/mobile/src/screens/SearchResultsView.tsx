@@ -23,10 +23,12 @@ type Tab = 'all' | 'merchants' | 'products'
 export default function SearchResultsView({
   initialQuery,
   initialCategory,
+  filtersOpen = false,
   onClear,
 }: {
   initialQuery: string
   initialCategory?: string
+  filtersOpen?: boolean
   onClear: () => void
 }) {
   const router = useRouter()
@@ -47,6 +49,11 @@ export default function SearchResultsView({
     enabled: submitted.length >= 2,
   })
 
+  const goToMap = () => {
+    onClear()
+    router.replace('/(tabs)/search')
+  }
+
   const merchants = searchQuery.data?.merchants.data ?? []
   const products = searchQuery.data?.products.data ?? []
 
@@ -58,16 +65,25 @@ export default function SearchResultsView({
       <View style={styles.searchWrap}>
         <SearchAutocomplete
           initialQuery={query}
-          autoFocus
+          autoFocus={filtersOpen || !initialQuery}
           onSubmit={q => {
             setQuery(q)
             setSubmitted(q)
           }}
         />
-        <Pressable onPress={onClear} hitSlop={8}>
+        <Pressable onPress={goToMap} hitSlop={8}>
           <Text style={styles.backLink}>← Carte</Text>
         </Pressable>
       </View>
+
+      {filtersOpen && submitted.length < 2 ? (
+        <View style={styles.filtersHint}>
+          <Text style={styles.filtersHintTitle}>Recherche avancée</Text>
+          <Text style={styles.filtersHintText}>
+            Saisissez au moins 2 caractères pour explorer établissements et produits.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.tabs}>
         {(['all', 'merchants', 'products'] as Tab[]).map(t => (
@@ -83,7 +99,9 @@ export default function SearchResultsView({
         ))}
       </View>
 
-      {searchQuery.isLoading ? (
+      {submitted.length < 2 ? (
+        filtersOpen ? null : <EmptyState title="Recherchez un établissement ou un produit" />
+      ) : searchQuery.isLoading ? (
         <LoadingState />
       ) : tab === 'products' ? (
         <FlatList
@@ -161,7 +179,28 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.brand50, borderColor: colors.brand200 },
   tabText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textMuted },
   tabTextActive: { color: colors.brand800 },
-  list: { paddingHorizontal: spacing.gutter, paddingBottom: layout.bottomNavInset + 16 },
+  filtersHint: {
+    marginHorizontal: spacing.gutter,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  filtersHintTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 15,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  filtersHintText: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  list: { paddingHorizontal: spacing.gutter, paddingBottom: layout.bottomNavHeight + 16 },
   merchantItem: { marginBottom: 12 },
   productRow: { gap: 12, marginBottom: 12 },
 })

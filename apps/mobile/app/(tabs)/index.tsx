@@ -1,20 +1,24 @@
 import { useRouter } from 'expo-router'
+import { useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getDefaultCity } from '@laplasse/shared-config'
-import { AppHeader } from '@/src/components/AppHeader'
+import type { FeaturedProduct } from '@laplasse/api-client'
 import { CategoryCarousel } from '@/src/components/CategoryCarousel'
-import { CompactProductCard } from '@/src/components/CompactProductCard'
+import { HomeGreeting } from '@/src/components/HomeGreeting'
+import { HomeProductGridCard } from '@/src/components/HomeProductGridCard'
+import { HomeTopBar } from '@/src/components/HomeTopBar'
 import { HorizontalCarousel } from '@/src/components/HorizontalCarousel'
+import { MobileDrawer } from '@/src/components/MobileDrawer'
 import { NearbyCard } from '@/src/components/NearbyCard'
 import { NetworkErrorBanner } from '@/src/components/NetworkErrorBanner'
 import { SearchAutocomplete } from '@/src/components/SearchAutocomplete'
 import { SectionHeader } from '@/src/components/SectionHeader'
-import { ShopCard } from '@/src/components/ShopCard'
 import { LoadingState } from '@/src/components/ui'
 import { useHomeData } from '@/src/hooks/useHomeData'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
-import { colors, fonts, layout, spacing } from '@/src/theme'
+import { colors, fonts, homeLayout, layout } from '@/src/theme'
 
 function greetingName(fullName: string | null | undefined, email: string | undefined): string {
   if (fullName?.trim()) return fullName.trim().split(/\s+/)[0] ?? fullName
@@ -24,11 +28,27 @@ function greetingName(fullName: string | null | undefined, email: string | undef
 
 export default function HomeScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const countryCode = useCountryStore(s => s.countryCode)
   const user = useAuthStore(s => s.user)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const { data, isLoading, isError, refetch, isFetching } = useHomeData(countryCode)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  if (isLoading) return <LoadingState />
+  const scrollTopPad = insets.top + homeLayout.topBarHeight + 8
+
+  if (isLoading) {
+    return (
+      <View style={styles.root}>
+        <HomeTopBar
+          onOpenMenu={() => setDrawerOpen(true)}
+          isAuthenticated={isAuthenticated}
+          avatarLabel={greetingName(user?.full_name, user?.email)}
+        />
+        <LoadingState />
+      </View>
+    )
+  }
 
   const isEmpty =
     !data ||
@@ -38,15 +58,33 @@ export default function HomeScreen() {
       data.shops.length === 0)
 
   const firstName = greetingName(user?.full_name, user?.email)
-
   const cityLabel = data?.city ?? getDefaultCity(countryCode)
+
+  const productPairs: FeaturedProduct[][] = []
+  if (data?.products) {
+    for (let i = 0; i < data.products.length; i += 2) {
+      productPairs.push(data.products.slice(i, i + 2))
+    }
+  }
 
   return (
     <View style={styles.root}>
-      <AppHeader />
+      <HomeTopBar
+        onOpenMenu={() => setDrawerOpen(true)}
+        isAuthenticated={isAuthenticated}
+        avatarLabel={firstName}
+      />
+      <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: scrollTopPad,
+            paddingBottom: layout.bottomNavHeight + insets.bottom + 4,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {(isError || isEmpty) && (
@@ -62,75 +100,62 @@ export default function HomeScreen() {
         )}
 
         <View style={styles.hero}>
-          <View style={styles.heroBlob} />
-          <Text style={styles.greeting}>Bonjour, {firstName}</Text>
-          <Text style={styles.subGreeting}>
-            Prêt à découvrir de nouvelles pépites à {cityLabel} ?
-          </Text>
-          <SearchAutocomplete />
+          <HomeGreeting firstName={firstName} cityLabel={cityLabel} />
+          <View style={styles.searchWrap}>
+            <SearchAutocomplete
+              appearance="home"
+              placeholder="Rechercher un établissement ou un produit"
+            />
+          </View>
         </View>
 
         {data ? (
           <>
-        {data.categories.length > 0 ? (
-          <View style={styles.section}>
-            <CategoryCarousel categories={data.categories} />
-          </View>
-        ) : null}
+            {data.categories.length > 0 ? (
+              <View style={styles.section}>
+                <CategoryCarousel categories={data.categories} variant="home" />
+              </View>
+            ) : null}
 
-        <View style={styles.section}>
-          <View style={styles.sectionPad}>
-            <SectionHeader title="Établissements à la une" href="/(tabs)/search" />
-          </View>
-          {data.merchants.length > 0 ? (
-            <HorizontalCarousel
-              data={data.merchants}
-              keyExtractor={m => m.id}
-              itemWidth={280}
-              renderItem={m => (
-                <NearbyCard merchant={m} onPress={() => router.push(`/m/${m.slug}`)} />
-              )}
-            />
-          ) : (
-            <Text style={styles.empty}>Aucun établissement disponible pour le moment.</Text>
-          )}
-        </View>
-
-        {data.products.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionPad}>
-              <SectionHeader title="Nouveautés Marketplace" href="/(tabs)/marketplace" />
-            </View>
-            <HorizontalCarousel
-              data={data.products}
-              keyExtractor={p => p.id}
-              itemWidth={168}
-              renderItem={p => (
-                <CompactProductCard
-                  product={p}
-                  width={168}
-                  onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
+            <View style={styles.section}>
+              <SectionHeader title="Établissements à la une" href="/(tabs)/search" />
+              {data.merchants.length > 0 ? (
+                <HorizontalCarousel
+                  data={data.merchants}
+                  keyExtractor={m => m.id}
+                  itemWidth={280}
+                  contentContainerStyle={styles.carouselBleed}
+                  renderItem={m => (
+                    <NearbyCard merchant={m} onPress={() => router.push(`/m/${m.slug}`)} />
+                  )}
                 />
+              ) : (
+                <Text style={styles.empty}>Aucun établissement disponible pour le moment.</Text>
               )}
-            />
-          </View>
-        ) : null}
-
-        {data.shops.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionPad}>
-              <SectionHeader title="Boutiques à découvrir" href="/(tabs)/marketplace" />
             </View>
-            <HorizontalCarousel
-              data={data.shops}
-              keyExtractor={s => s.id}
-              itemWidth={88}
-              renderItem={s => (
-                <ShopCard shop={s} onPress={() => router.push(`/m/${s.slug}`)} />
-              )}
-            />
-          </View>
-        ) : null}
+
+            {data.products.length > 0 ? (
+              <View style={styles.section}>
+                <SectionHeader title="Nouveautés Marketplace" href="/(tabs)/marketplace" />
+                <View style={styles.productGrid}>
+                  {productPairs.map((pair, rowIndex) => (
+                    <View key={rowIndex} style={styles.productRow}>
+                      {pair.map(p => (
+                        <View key={p.id} style={styles.productCell}>
+                          <HomeProductGridCard
+                            product={p}
+                            onPress={() =>
+                              router.push(`/m/${p.merchant.slug}/p/${p.slug}`)
+                            }
+                          />
+                        </View>
+                      ))}
+                      {pair.length === 1 ? <View style={styles.productCell} /> : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
           </>
         ) : null}
       </ScrollView>
@@ -141,43 +166,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  content: { paddingBottom: layout.bottomNavInset + 24 },
-  hero: {
-    paddingHorizontal: spacing.gutter,
-    paddingTop: 8,
-    paddingBottom: 24,
-    position: 'relative',
+  content: { paddingHorizontal: homeLayout.gutter },
+  hero: { marginBottom: homeLayout.stackLg },
+  searchWrap: { marginTop: homeLayout.stackMd },
+  section: { marginBottom: homeLayout.stackLg },
+  carouselBleed: {
+    paddingHorizontal: homeLayout.gutter,
+    marginHorizontal: -homeLayout.gutter,
   },
-  heroBlob: {
-    position: 'absolute',
-    top: -24,
-    right: -32,
-    width: 192,
-    height: 192,
-    borderRadius: 96,
-    backgroundColor: colors.brand100,
-    opacity: 0.6,
-  },
-  greeting: {
-    fontFamily: fonts.extrabold,
-    fontSize: 24,
-    color: colors.text,
-    marginBottom: 4,
-  },
-  subGreeting: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textMuted,
-    marginBottom: 16,
-  },
-  section: { marginBottom: 28 },
-  sectionPad: { paddingHorizontal: spacing.gutter },
+  productGrid: { gap: homeLayout.stackMd },
+  productRow: { flexDirection: 'row', gap: homeLayout.stackMd },
+  productCell: { flex: 1 },
   empty: {
     fontFamily: fonts.regular,
     fontSize: 14,
     color: colors.textLight,
     textAlign: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: spacing.gutter,
+    paddingVertical: 24,
   },
 })

@@ -8,8 +8,18 @@ export const colors = {
   brand700: '#b45309',
   brand800: '#92400e',
 
-  primary: '#f59e0b',
-  primaryDark: '#d97706',
+  primary: '#d97706',
+  primaryContainer: '#f59e0b',
+  onPrimaryContainer: '#ffffff',
+  onBackground: '#0f172a',
+  onSurfaceVariant: '#64748b',
+  outlineVariant: '#e2e8f0',
+  surfaceContainer: '#f1f5f9',
+  surfaceContainerLow: '#f8fafc',
+  surfaceBright: '#ffffff',
+  tertiary: '#64748b',
+
+  primaryDark: '#b45309',
   background: '#FAFAFA',
   surface: '#ffffff',
   text: '#0f172a',
@@ -40,11 +50,20 @@ export const spacing = {
   gutter: 24,
 }
 
-/** Aligné globals.css — barre basse PWA */
 export const layout = {
-  bottomNavHeight: 64,
-  bottomNavInset: 76,
-  pageGutter: 24,
+  bottomNavHeight: 56,
+  bottomNavInset: 64,
+  pageGutter: 16,
+}
+
+export const homeLayout = {
+  gutter: 16,
+  topBarHeight: 52,
+  stackSm: 8,
+  stackMd: 12,
+  stackLg: 24,
+  radiusLg: 16,
+  radiusXl: 24,
 }
 
 export const fonts = {

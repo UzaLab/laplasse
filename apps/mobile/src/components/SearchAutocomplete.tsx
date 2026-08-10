@@ -29,6 +29,8 @@ interface SearchAutocompleteProps {
   initialQuery?: string
   autoFocus?: boolean
   onSubmit?: (q: string) => void
+  /** Style barre recherche home ou carte */
+  appearance?: 'default' | 'home' | 'map'
 }
 
 export function SearchAutocomplete({
@@ -36,6 +38,7 @@ export function SearchAutocomplete({
   initialQuery = '',
   autoFocus = false,
   onSubmit,
+  appearance = 'default',
 }: SearchAutocompleteProps) {
   const router = useRouter()
   const [query, setQuery] = useState(initialQuery)
@@ -74,8 +77,24 @@ export function SearchAutocomplete({
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.inputRow, focused && styles.inputRowFocused]}>
-        <Ionicons name="search" size={20} color={colors.textMuted} />
+      <View
+        style={[
+          styles.inputRow,
+          appearance === 'home' && styles.inputRowHome,
+          appearance === 'map' && styles.inputRowMap,
+          focused &&
+            (appearance === 'home'
+              ? styles.inputRowHomeFocused
+              : appearance === 'map'
+                ? styles.inputRowMapFocused
+                : styles.inputRowFocused),
+        ]}
+      >
+        <Ionicons
+          name="search"
+          size={20}
+          color={appearance === 'default' ? colors.textMuted : colors.textMuted}
+        />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -194,6 +213,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 2,
+  },
+  inputRowHome: {
+    backgroundColor: colors.surfaceBright,
+    borderColor: colors.outlineVariant,
+    borderRadius: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  inputRowHomeFocused: {
+    borderColor: colors.brand500,
+    shadowColor: colors.brand500,
+    shadowOpacity: 0.12,
+  },
+  inputRowMap: {
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    borderColor: 'rgba(226, 232, 240, 0.8)',
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputRowMapFocused: {
+    borderColor: colors.brand500,
   },
   input: {
     flex: 1,

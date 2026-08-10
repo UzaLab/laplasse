@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
 import { ProductCard } from '@/src/components/ProductCard'
+import { PublicScreenShell } from '@/src/components/PublicScreenShell'
+import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
 import { openWhatsApp } from '@/src/lib/whatsapp'
@@ -24,6 +27,7 @@ function formatHours(hours: Array<{ day: number; open_time: string | null; close
 export default function MerchantScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
 
   const merchantQuery = useQuery({
     queryKey: ['merchant', slug],
@@ -37,14 +41,24 @@ export default function MerchantScreen() {
     enabled: !!slug,
   })
 
-  if (merchantQuery.isLoading) return <LoadingState />
+  if (merchantQuery.isLoading) {
+    return (
+      <PublicScreenShell activeRoute="marketplace">
+        <PublicTopBar />
+        <LoadingState />
+      </PublicScreenShell>
+    )
+  }
 
   const merchant = merchantQuery.data
   if (!merchant) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFound}>Boutique introuvable</Text>
-      </View>
+      <PublicScreenShell activeRoute="marketplace">
+        <PublicTopBar />
+        <View style={styles.center}>
+          <Text style={styles.notFound}>Boutique introuvable</Text>
+        </View>
+      </PublicScreenShell>
     )
   }
 
@@ -53,8 +67,13 @@ export default function MerchantScreen() {
   const hoursLines = merchant.hours?.length ? formatHours(merchant.hours) : []
 
   return (
-    <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+    <PublicScreenShell activeRoute="marketplace">
+      <PublicTopBar />
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: layout.bottomNavHeight + insets.bottom + 72,
+        }}
+      >
         <View style={styles.hero}>
           {merchant.cover_image ? (
             <Image source={{ uri: merchant.cover_image }} style={styles.cover} />
@@ -139,7 +158,7 @@ export default function MerchantScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { bottom: layout.bottomNavHeight + insets.bottom }]}>
         {contactPhone ? (
           <Pressable
             style={styles.whatsappBtn}
@@ -163,13 +182,11 @@ export default function MerchantScreen() {
           <PrimaryButton label="Panier" onPress={() => router.push('/cart')} />
         </View>
       </View>
-    </View>
+    </PublicScreenShell>
   )
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: layout.bottomNavInset + 80 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFound: { fontFamily: fonts.medium, fontSize: 16, color: colors.textMuted },
   hero: { position: 'relative', height: 200 },
@@ -213,7 +230,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     padding: 12,
-    paddingBottom: layout.bottomNavInset > 64 ? layout.bottomNavInset - 48 : 12,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
