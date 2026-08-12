@@ -42,6 +42,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ])
       if (!accessToken || !refreshToken) {
         set({ hydrated: true, isAuthenticated: false })
+        void useCartStore.getState().loadCart()
         return
       }
       set({ accessToken, refreshToken, isAuthenticated: true })
@@ -137,6 +138,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // ignore
     }
     await get().clearTokens()
-    useCartStore.setState({ cart: null })
+    useCartStore.getState().reset()
+    void useCartStore.getState().loadCart()
   },
 }))

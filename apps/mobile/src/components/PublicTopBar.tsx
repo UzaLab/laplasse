@@ -55,8 +55,6 @@ export function PublicTopBar({
 const styles = StyleSheet.create({
   wrap: {
     backgroundColor: 'rgba(250, 250, 250, 0.92)',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
     zIndex: 20,
   },
   row: {

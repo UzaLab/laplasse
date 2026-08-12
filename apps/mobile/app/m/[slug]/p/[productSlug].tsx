@@ -21,6 +21,11 @@ import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { LoadingState } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
+import {
+  getBoutiquePath,
+  resolveBoutique,
+  resolveProductBoutiqueSlug,
+} from '@/src/lib/boutiqueResolve'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { useCountryStore } from '@/src/stores/countryStore'
@@ -56,9 +61,9 @@ export default function ProductScreen() {
     enabled: !!slug && !!productSlug,
   })
 
-  const merchantQuery = useQuery({
-    queryKey: ['merchant-mini', slug],
-    queryFn: () => getApiClient().getMerchant(String(slug)),
+  const boutiqueResolveQuery = useQuery({
+    queryKey: ['boutique-resolve', slug],
+    queryFn: () => resolveBoutique(String(slug)),
     enabled: !!slug,
   })
 
@@ -115,15 +120,18 @@ export default function ProductScreen() {
 
   const stock = stockLabel(product, activeVariant)
   const outOfStock = stock === 'Rupture de stock'
-  const merchant = merchantQuery.data
-  const merchantName = product.merchant?.business_name ?? merchant?.business_name ?? 'Boutique'
-  const merchantSlug = product.merchant?.slug ?? String(slug)
+  const merchant = boutiqueResolveQuery.data?.merchant
+  const shopSlug = resolveProductBoutiqueSlug(product, String(slug), boutiqueResolveQuery.data)
+  const boutiquePath = getBoutiquePath(shopSlug)
+  const merchantName =
+    product.merchant?.business_name
+    ?? product.shop?.name
+    ?? merchant?.business_name
+    ?? boutiqueResolveQuery.data?.displayName
+    ?? 'Boutique'
+  const productRouteSlug = shopSlug
 
   async function onAddToCart(buyNow = false) {
-    if (!isAuthenticated) {
-      router.push('/(auth)/login')
-      return
-    }
     if (outOfStock) {
       Alert.alert('Stock', 'Ce produit n’est plus disponible.')
       return
@@ -198,7 +206,7 @@ export default function ProductScreen() {
 
         <View style={styles.body}>
           <Pressable
-            onPress={() => router.push(`/m/${merchantSlug}`)}
+            onPress={() => router.push(boutiquePath)}
             style={styles.merchantRow}
           >
             {merchant?.logo ? (
@@ -348,7 +356,7 @@ export default function ProductScreen() {
           <View style={styles.relatedSection}>
             <View style={styles.relatedHeader}>
               <Text style={styles.relatedTitle}>Dans la même boutique</Text>
-              <Pressable onPress={() => router.push(`/m/${merchantSlug}`)}>
+              <Pressable onPress={() => router.push(boutiquePath)}>
                 <Text style={styles.relatedLink}>Voir la boutique →</Text>
               </Pressable>
             </View>
@@ -370,10 +378,10 @@ export default function ProductScreen() {
                       image_url: p.image_url ?? null,
                       merchant: {
                         business_name: merchantName,
-                        slug: merchantSlug,
+                        slug: productRouteSlug,
                       },
                     }}
-                    onPress={() => router.push(`/m/${merchantSlug}/p/${p.slug}`)}
+                    onPress={() => router.push(`/m/${productRouteSlug}/p/${p.slug}`)}
                   />
                 </View>
               ))}

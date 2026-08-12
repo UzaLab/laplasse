@@ -1,5 +1,6 @@
 import type { ApiMerchantDetail, ApiShopPublic, MarketplaceProduct } from '@laplasse/api-client'
 import { getApiClient } from '@/src/lib/api'
+import { getMerchantVertical } from '@/src/lib/merchantVertical'
 
 export interface BoutiqueResolved {
   merchant: ApiMerchantDetail | null
@@ -45,9 +46,33 @@ export async function resolveBoutique(slug: string): Promise<BoutiqueResolved | 
   if (!merchant && !shop) return null
 
   const shopSlug = shop?.slug ?? merchant!.slug
-  const displayName = merchant?.business_name ?? shop!.name
+  const displayName = merchant?.business_name ?? shop?.name ?? slug
 
   return { merchant, shop, shopSlug, displayName }
+}
+
+export function getBoutiquePath(shopSlug: string): `/m/${string}/boutique` {
+  return `/m/${shopSlug}/boutique`
+}
+
+/** Standalone shop ou boutique liée à un établissement → accès direct catalogue. */
+export function shouldOpenBoutiqueDirect(resolved: BoutiqueResolved): boolean {
+  const { merchant, shop } = resolved
+  if (!merchant && shop) return true
+  if (!merchant) return false
+
+  const vertical = getMerchantVertical(merchant.category.slug)
+  if (vertical === 'appointment' || vertical === 'hotel' || vertical === 'food') return false
+  if (vertical === 'retail') return true
+  return !!(shop || merchant.has_marketplace)
+}
+
+export function resolveProductBoutiqueSlug(
+  product: MarketplaceProduct,
+  routeSlug: string,
+  resolved?: BoutiqueResolved | null,
+): string {
+  return product.shop?.slug ?? resolved?.shopSlug ?? product.merchant?.slug ?? routeSlug
 }
 
 export async function loadBoutiqueProducts(

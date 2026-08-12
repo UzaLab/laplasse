@@ -104,8 +104,9 @@ function AuthGate() {
       <Stack.Screen name="m/[slug]/boutique" options={{ headerShown: false }} />
       <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ headerShown: false }} />
-      <Stack.Screen name="checkout" options={{ title: 'Commande' }} />
-      <Stack.Screen name="payment" options={{ title: 'Paiement' }} />
+      <Stack.Screen name="checkout" options={{ headerShown: false }} />
+      <Stack.Screen name="payment" options={{ headerShown: false }} />
+      <Stack.Screen name="checkout/confirmation" options={{ headerShown: false }} />
       <Stack.Screen name="favoris" options={{ title: 'Favoris', headerShown: false }} />
       <Stack.Screen name="restauration/index" options={{ headerShown: false }} />
       <Stack.Screen name="restauration/[slug]" options={{ headerShown: false }} />

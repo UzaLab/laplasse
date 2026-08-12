@@ -136,15 +136,23 @@ fi
 
 mkdir -p "$OUTPUT_DIR"
 
-# EAS local + Gradle use /tmp by default (tmpfs ~8 Go on WSL) — redirect to disk
-# Must live OUTSIDE the monorepo (EAS copies the project tree into TMPDIR)
+# EAS local + Gradle use /tmp by default (tmpfs ~8 Go on WSL) — redirect to disk.
+# Ne pas fixer EAS_LOCAL_BUILD_WORKINGDIR : eas CLI y dépose project.tar.gz avant le
+# plugin local, qui exige ensuite un dossier vide → conflit garanti.
 BUILD_CACHE_DIR="${BUILD_CACHE_DIR:-$HOME/.cache/laplasse-eas-build}"
 mkdir -p "$BUILD_CACHE_DIR"
-export EAS_LOCAL_BUILD_WORKINGDIR="$BUILD_CACHE_DIR/working"
 export TMPDIR="$BUILD_CACHE_DIR/tmp"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$BUILD_CACHE_DIR/gradle}"
 mkdir -p "$TMPDIR" "$GRADLE_USER_HOME"
 info "Build cache: $BUILD_CACHE_DIR (disque, hors projet)"
+
+# Ancien répertoire working (script précédent) — libérer l'espace si présent.
+LEGACY_WORKING="$BUILD_CACHE_DIR/working"
+if [[ -d "$LEGACY_WORKING" ]]; then
+  info "Suppression de l'ancien cache working ($LEGACY_WORKING)…"
+  rm -rf "$LEGACY_WORKING" 2>/dev/null || info "  (ignoré si fichiers root — sudo rm -rf \"$LEGACY_WORKING\")"
+fi
+unset EAS_LOCAL_BUILD_WORKINGDIR
 
 # ── Low-resource mode (recommended on WSL) ───────────────────────────────────
 # Usage: BUILD_LOW_RESOURCE=1 pnpm mobile:build:preview

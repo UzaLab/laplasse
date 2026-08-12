@@ -1,29 +1,31 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
   Image,
   Linking,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import type { ApiMerchantDetail, ApiShopPublic, MarketplaceCatalogProduct, MarketplaceProduct } from '@laplasse/api-client'
+import {
+  MarketplaceFiltersSheet,
+  type MarketplaceFilterState,
+} from '@/src/components/MarketplaceFiltersSheet'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { LoadingState } from '@/src/components/ui'
 import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
 import { getApiClient } from '@/src/lib/api'
 import { resolveBoutique } from '@/src/lib/boutiqueResolve'
-import { computePriceCeiling, flattenProductCategories } from '@/src/lib/marketplace'
+import { buildProductCategoryTree, computeMaxProductPrice, deriveCategoriesFromProducts } from '@/src/lib/marketplace'
 import { openWhatsApp } from '@/src/lib/whatsapp'
 import { colors, fonts, homeLayout, layout } from '@/src/theme'
 
@@ -35,7 +37,6 @@ interface BoutiqueDisplayData {
   phone?: string | null
   whatsapp?: string | null
   location?: { city?: string | null; district?: string | null } | null
-  establishment_slug?: string | null
 }
 
 function merchantToDisplay(m: ApiMerchantDetail): BoutiqueDisplayData {
@@ -47,7 +48,6 @@ function merchantToDisplay(m: ApiMerchantDetail): BoutiqueDisplayData {
     phone: m.phone,
     whatsapp: m.whatsapp,
     location: m.location,
-    establishment_slug: m.slug,
   }
 }
 
@@ -60,10 +60,6 @@ function shopToDisplay(s: ApiShopPublic): BoutiqueDisplayData {
     phone: s.phone,
     whatsapp: s.whatsapp,
     location: s.city ? { city: s.city, district: s.district } : null,
-    establishment_slug:
-      s.merchant_id && s.merchant?.is_active !== false && s.merchant?.slug
-        ? s.merchant.slug
-        : null,
   }
 }
 
@@ -72,8 +68,8 @@ type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc'
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'recommended', label: 'Recommandés' },
   { value: 'newest', label: 'Nouveautés' },
-  { value: 'price_asc', label: 'Prix ↑' },
-  { value: 'price_desc', label: 'Prix ↓' },
+  { value: 'price_asc', label: 'Prix croissant' },
+  { value: 'price_desc', label: 'Prix décroissant' },
 ]
 
 function sortProducts(products: MarketplaceProduct[], sort: SortOption): MarketplaceProduct[] {
@@ -91,11 +87,17 @@ export function BoutiqueView({ slug }: { slug: string }) {
   const insets = useSafeAreaInsets()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search.trim(), 300)
-  const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedCollection, setSelectedCollection] = useState('')
   const [sort, setSort] = useState<SortOption>('recommended')
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [priceFilter, setPriceFilter] = useState(100_000)
+  const [filters, setFilters] = useState<MarketplaceFilterState>(() => ({
+    sort: 'newest',
+    selectedCategory: '',
+    selectedCondition: '',
+    selectedOrigin: '',
+    selectedMerchants: [],
+    priceFilter: 100_000,
+  }))
 
   // Scroll-direction FAB visibility
   const scrollY = useRef(0)
@@ -154,14 +156,33 @@ export function BoutiqueView({ slug }: { slug: string }) {
     enabled: !!resolveQuery.data,
   })
 
+  const catalogQuery = useQuery({
+    queryKey: ['shop-catalog', shopSlug, merchantSlug],
+    queryFn: async () => {
+      const api = getApiClient()
+      try {
+        const list = await api.getShopProducts(shopSlug, {})
+        if (list.length > 0 || !merchantSlug) return list
+      } catch {
+        // Fall back to merchant products endpoint
+      }
+      if (merchantSlug) {
+        const res = await api.getMerchantProducts(merchantSlug, 100, 0)
+        return res.data
+      }
+      return []
+    },
+    enabled: !!resolveQuery.data,
+  })
+
   const productsQuery = useQuery({
-    queryKey: ['shop-products', shopSlug, merchantSlug, debouncedSearch, selectedCategory, selectedCollection],
+    queryKey: ['shop-products', shopSlug, merchantSlug, debouncedSearch, filters.selectedCategory, selectedCollection],
     queryFn: async () => {
       const api = getApiClient()
       try {
         const products = await api.getShopProducts(shopSlug, {
           q: debouncedSearch || undefined,
-          category: selectedCategory || undefined,
+          category: filters.selectedCategory || undefined,
           collection: selectedCollection || undefined,
         })
         if (products.length > 0 || !merchantSlug) return products
@@ -188,41 +209,47 @@ export function BoutiqueView({ slug }: { slug: string }) {
       : shopToDisplay(resolveQuery.data.shop!)
     : undefined
   const products: MarketplaceProduct[] = productsQuery.data ?? []
+  const catalogProducts: MarketplaceProduct[] = catalogQuery.data ?? []
   const collections = collectionsQuery.data ?? []
 
   const priceCeiling = useMemo(
-    () => computePriceCeiling(products.map(p => p.price)),
-    [products],
+    () => computeMaxProductPrice(catalogProducts.map(p => p.price)),
+    [catalogProducts],
   )
+
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, priceFilter: priceCeiling }))
+  }, [priceCeiling])
 
   const filtered = useMemo<MarketplaceProduct[]>(() => {
-    const list = products.filter(p => p.price <= priceFilter)
+    const list = products.filter(p => p.price <= filters.priceFilter)
     return sortProducts(list, sort)
-  }, [products, priceFilter, sort])
+  }, [products, filters.priceFilter, sort])
 
-  const flatCategories = flattenProductCategories(
-    (categoriesQuery.data ?? []).map(c => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      icon: c.icon,
-      sort_order: c.sort_order ?? 0,
-      children: [],
-    })),
-  )
+  const categoryTree = useMemo(() => {
+    const apiCategories = categoriesQuery.data ?? []
+    const source =
+      apiCategories.length > 0
+        ? apiCategories
+        : deriveCategoriesFromProducts(catalogProducts)
+    return buildProductCategoryTree(source)
+  }, [categoriesQuery.data, catalogProducts])
 
   const activeFilterCount = [
     search.trim(),
-    selectedCategory,
+    filters.selectedCategory,
     selectedCollection,
-    priceFilter < priceCeiling ? 'price' : '',
+    filters.priceFilter < priceCeiling ? 'price' : '',
   ].filter(Boolean).length
 
   const resetFilters = () => {
     setSearch('')
-    setSelectedCategory('')
     setSelectedCollection('')
-    setPriceFilter(priceCeiling)
+    setFilters(prev => ({
+      ...prev,
+      selectedCategory: '',
+      priceFilter: priceCeiling,
+    }))
   }
 
   if (resolveQuery.isLoading) {
@@ -257,7 +284,7 @@ export function BoutiqueView({ slug }: { slug: string }) {
     <PublicScreenShell activeRoute="marketplace">
       <View style={styles.root}>
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: layout.bottomNavInset + 80 }]}
+          contentContainerStyle={[styles.content, { paddingBottom: layout.bottomNavInset + 24 }]}
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
@@ -290,100 +317,39 @@ export function BoutiqueView({ slug }: { slug: string }) {
                   <Ionicons name="storefront" size={12} color="#fff" />
                   <Text style={styles.officialBadgeText}>Boutique Officielle</Text>
                 </View>
-                <Text style={styles.shopName}>{merchant.name}</Text>
-                {locationLabel ? (
-                  <Text style={styles.location}>
-                    {'  '}{locationLabel}
-                  </Text>
-                ) : null}
-                {trust && trust.badge && trust.badge !== 'new' ? (
-                  <View style={[
-                    styles.trustBadge,
-                    trust.badge === 'trusted' ? styles.trustBadgeTrusted : styles.trustBadgeGood,
-                  ]}>
-                    <Ionicons
-                      name={trust.badge === 'trusted' ? 'checkmark-circle' : 'shield-outline'}
-                      size={12}
-                      color={trust.badge === 'trusted' ? colors.emerald700 : colors.brand700}
-                    />
-                    <Text style={[
-                      styles.trustText,
-                      trust.badge === 'trusted' ? styles.trustTextTrusted : styles.trustTextGood,
+                <View style={styles.nameRow}>
+                  {trust && trust.badge && trust.badge !== 'new' ? (
+                    <View style={[
+                      styles.trustIconOnly,
+                      trust.badge === 'trusted' ? styles.trustIconTrusted : styles.trustIconGood,
                     ]}>
-                      {trust.label}
-                    </Text>
+                      <Ionicons
+                        name={trust.badge === 'trusted' ? 'checkmark-circle' : 'shield-outline'}
+                        size={18}
+                        color={trust.badge === 'trusted' ? colors.emerald700 : colors.brand700}
+                      />
+                    </View>
+                  ) : null}
+                  <Text style={styles.shopName}>{merchant.name}</Text>
+                </View>
+                {locationLabel ? (
+                  <View style={styles.locationRow}>
+                    <Ionicons name="location" size={14} color={colors.brand500} />
+                    <Text style={styles.location}>{locationLabel}</Text>
                   </View>
                 ) : null}
               </View>
             </View>
           </View>
 
-          {/* ─── Back to establishment ─── */}
-          {merchant.establishment_slug ? (
-            <Pressable
-              onPress={() => router.push(`/m/${merchant.establishment_slug}`)}
-              style={styles.establishmentLink}
-            >
-              <Ionicons name="arrow-back" size={16} color={colors.textMuted} />
-              <Text style={styles.establishmentLinkText}>Voir l&apos;établissement</Text>
-            </Pressable>
-          ) : null}
-
-          {/* ─── Search ─── */}
-          <View style={styles.searchWrap}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Nom du produit…"
-              placeholderTextColor={colors.textLight}
-              style={styles.searchInput}
-            />
-            {search ? (
-              <Pressable onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textLight} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          {/* ─── Collection chips ─── */}
-          {collections.length > 0 ? (
+          {/* ─── Sort strip (PWA mobile) ─── */}
+          <View style={styles.sortCard}>
+            <Text style={styles.sortCardLabel}>Trier par :</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.collectionsTrack}
+              contentContainerStyle={styles.sortChips}
             >
-              <Pressable
-                onPress={() => setSelectedCollection('')}
-                style={[styles.chip, !selectedCollection && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, !selectedCollection && styles.chipTextActive]}>
-                  Toutes
-                </Text>
-              </Pressable>
-              {collections.map(col => {
-                const active = selectedCollection === col.slug
-                return (
-                  <Pressable
-                    key={col.id}
-                    onPress={() => setSelectedCollection(active ? '' : col.slug)}
-                    style={[styles.chip, active && styles.chipBrand]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextBrand]}>
-                      {col.name}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          ) : null}
-
-          {/* ─── Sort strip (like PWA) ─── */}
-          <View style={styles.sortStrip}>
-            <Text style={styles.sortLabel}>
-              <Text style={styles.sortCount}>{filtered.length}</Text> produit{filtered.length > 1 ? 's' : ''}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortChips}>
               {SORT_OPTIONS.map(opt => (
                 <Pressable
                   key={opt.value}
@@ -417,6 +383,7 @@ export function BoutiqueView({ slug }: { slug: string }) {
                 <View key={product.id} style={styles.gridCell}>
                   <MarketplaceProductGridCard
                     product={product as unknown as MarketplaceCatalogProduct}
+                    showMerchantName={false}
                     onPress={() => router.push(`/m/${merchantSlug ?? merchant.slug}/p/${product.slug}`)}
                   />
                 </View>
@@ -446,136 +413,49 @@ export function BoutiqueView({ slug }: { slug: string }) {
           </View>
         </ScrollView>
 
-        {/* ─── Scroll-aware Filter FAB ─── */}
-        <Animated.View
-          style={[
-            styles.fabWrap,
-            {
-              bottom: layout.bottomNavInset + 12,
-              opacity: fabOpacity,
-              transform: [{ translateY: fabOpacity.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
-            },
-          ]}
-          pointerEvents={fabVisible.current ? 'auto' : 'none'}
-        >
-          <Pressable onPress={() => setFiltersOpen(true)} style={styles.fab}>
-            <Ionicons name="options-outline" size={18} color="#fff" />
-            <Text style={styles.fabText}>Filtres</Text>
-            {activeFilterCount > 0 ? (
-              <View style={styles.fabBadge}>
-                <Text style={styles.fabBadgeText}>{activeFilterCount}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        </Animated.View>
-
-        {/* ─── Filter modal ─── */}
-        <Modal
-          visible={filtersOpen}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setFiltersOpen(false)}
-        >
-          <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)} />
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 8 }]}>
-            {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                <Ionicons name="options-outline" size={18} color={colors.brand500} />
-                {'  '}Filtres
-              </Text>
-              <Pressable onPress={() => setFiltersOpen(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-
-            {/* Scrollable body */}
-            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
-
-              {/* Sort */}
-              <Text style={styles.sectionLabel}>Trier par</Text>
-              <View style={styles.listBox}>
-                {SORT_OPTIONS.map(opt => (
-                  <Pressable
-                    key={opt.value}
-                    onPress={() => setSort(opt.value)}
-                    style={styles.radioRow}
-                  >
-                    <View style={[styles.radio, sort === opt.value && styles.radioSelected]} />
-                    <Text style={styles.radioLabel}>{opt.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* Categories */}
-              {flatCategories.length > 0 ? (
-                <>
-                  <Text style={styles.sectionLabel}>Catégories</Text>
-                  <ScrollView
-                    style={styles.categoryScroll}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                  >
-                    <Pressable onPress={() => setSelectedCategory('')} style={styles.radioRow}>
-                      <View style={[styles.radio, !selectedCategory && styles.radioSelected]} />
-                      <Text style={styles.radioLabel}>Toutes</Text>
-                    </Pressable>
-                    {flatCategories.map(cat => (
-                      <Pressable
-                        key={cat.slug}
-                        onPress={() => setSelectedCategory(cat.slug)}
-                        style={[styles.radioRow, { paddingLeft: cat.depth * 12 }]}
-                      >
-                        <View style={[styles.radio, selectedCategory === cat.slug && styles.radioSelected]} />
-                        <Text style={styles.radioLabel}>{cat.name}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </>
-              ) : null}
-
-              {/* Price */}
-              <Text style={styles.sectionLabel}>Prix maximum</Text>
-              <Text style={styles.priceLabel}>
-                Jusqu&apos;à {Math.min(priceFilter, priceCeiling).toLocaleString('fr-FR')} F
-              </Text>
-              <View style={styles.sliderRow}>
-                {[0.25, 0.5, 0.75, 1].map(ratio => {
-                  const v = Math.round(priceCeiling * ratio)
-                  const active = Math.abs(priceFilter - v) < 100
-                  return (
-                    <Pressable
-                      key={ratio}
-                      onPress={() => setPriceFilter(v)}
-                      style={[styles.sliderChip, active && styles.sliderChipActive]}
-                    >
-                      <Text style={[styles.sliderChipText, active && styles.sliderChipTextActive]}>
-                        {Math.round(ratio * 100)}%
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </View>
-            </ScrollView>
-
-            {/* Footer */}
-            <View style={styles.modalFooter}>
+        {!filtersOpen ? (
+          <Animated.View
+            style={[
+              styles.fabWrap,
+              {
+                bottom: layout.fabBottomGap,
+                opacity: fabOpacity,
+                transform: [{ translateY: fabOpacity.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+              },
+            ]}
+            pointerEvents={fabVisible.current ? 'auto' : 'none'}
+          >
+            <Pressable onPress={() => setFiltersOpen(true)} style={styles.fab}>
+              <Ionicons name="options-outline" size={18} color="#fff" />
+              <Text style={styles.fabText}>Filtres</Text>
               {activeFilterCount > 0 ? (
-                <Pressable onPress={resetFilters} style={styles.resetCircle}>
-                  <Ionicons name="refresh-outline" size={18} color={colors.textMuted} />
-                </Pressable>
+                <View style={styles.fabBadge}>
+                  <Text style={styles.fabBadgeText}>{activeFilterCount}</Text>
+                </View>
               ) : null}
-              <Pressable
-                onPress={() => setFiltersOpen(false)}
-                style={styles.applyBtn}
-              >
-                <Text style={styles.applyBtnText}>
-                  Voir {filtered.length} produit{filtered.length > 1 ? 's' : ''}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
+            </Pressable>
+          </Animated.View>
+        ) : null}
+
+        <MarketplaceFiltersSheet
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          filters={filters}
+          onChange={setFilters}
+          categories={categoryTree}
+          merchants={[]}
+          priceCeiling={priceCeiling}
+          showSort={false}
+          showMarketplaceExtras={false}
+          productSearch={search}
+          onProductSearchChange={setSearch}
+          collections={collections}
+          selectedCollection={selectedCollection}
+          onCollectionChange={setSelectedCollection}
+          onReset={resetFilters}
+          resultCount={filtered.length}
+          categoriesLoading={categoriesQuery.isLoading || catalogQuery.isLoading}
+        />
       </View>
     </PublicScreenShell>
   )
@@ -589,10 +469,10 @@ const styles = StyleSheet.create({
   backLink: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },
 
   // Hero
-  hero: { height: 280, position: 'relative', backgroundColor: colors.slate900 },
+  hero: { minHeight: 260, height: 280, position: 'relative', backgroundColor: colors.slate900 },
   cover: { width: '100%', height: '100%' },
   coverFallback: { backgroundColor: colors.slate900 },
-  heroOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.55)' },
+  heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 23, 42, 0.55)' },
   backBtn: {
     position: 'absolute',
     left: 16,
@@ -623,62 +503,38 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold, fontSize: 10, color: '#fff',
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  shopName: { fontFamily: fonts.extrabold, fontSize: 22, color: '#fff' },
-  location: { fontFamily: fonts.medium, fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  trustBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8,
-    alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
+  shopName: { fontFamily: fonts.extrabold, fontSize: 22, color: '#fff', flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  trustIconOnly: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
   },
-  trustBadgeTrusted: { backgroundColor: colors.emerald50, borderWidth: 1, borderColor: '#a7f3d0' },
-  trustBadgeGood: { backgroundColor: colors.brand50, borderWidth: 1, borderColor: colors.brand200 },
-  trustText: { fontFamily: fonts.bold, fontSize: 11 },
-  trustTextTrusted: { color: colors.emerald700 },
-  trustTextGood: { color: colors.brand700 },
+  trustIconTrusted: { backgroundColor: colors.emerald50, borderWidth: 1, borderColor: '#a7f3d0' },
+  trustIconGood: { backgroundColor: colors.brand50, borderWidth: 1, borderColor: colors.brand200 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  location: { fontFamily: fonts.medium, fontSize: 13, color: 'rgba(255,255,255,0.85)', flex: 1 },
 
-  // Establishment link
-  establishmentLink: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 12,
+  // Sort card (PWA)
+  sortCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: homeLayout.radiusLg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  establishmentLinkText: { fontFamily: fonts.bold, fontSize: 14, color: colors.textMuted },
-
-  // Search
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: 16, marginBottom: 12,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong,
-    borderRadius: homeLayout.radiusLg, paddingHorizontal: 14, paddingVertical: 12,
-  },
-  searchInput: { flex: 1, fontFamily: fonts.medium, fontSize: 15, color: colors.text, padding: 0 },
-
-  // Collections
-  collectionsTrack: { paddingHorizontal: 16, gap: 8, marginBottom: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface,
-  },
-  chipActive: { backgroundColor: colors.slate900, borderColor: colors.slate900 },
-  chipBrand: { backgroundColor: colors.brand500, borderColor: colors.brand500 },
-  chipText: { fontFamily: fonts.bold, fontSize: 13, color: colors.textMuted },
-  chipTextActive: { color: '#fff' },
-  chipTextBrand: { color: '#fff' },
-
-  // Sort strip
-  sortStrip: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: colors.surface, borderTopWidth: 1, borderBottomWidth: 1,
-    borderColor: colors.border, gap: 12, marginBottom: 12,
-  },
-  sortLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textMuted, flexShrink: 0 },
-  sortCount: { fontFamily: fonts.bold, color: colors.text },
-  sortChips: { gap: 6 },
+  sortCardLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.textMuted, flexShrink: 0 },
+  sortChips: { gap: 6, paddingRight: 8 },
   sortChip: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-    borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.background,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+    borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surfaceContainerLow,
   },
   sortChipActive: { backgroundColor: colors.brand50, borderColor: colors.brand500 },
-  sortChipText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.textMuted },
+  sortChipText: { fontFamily: fonts.bold, fontSize: 12, color: colors.textMuted },
   sortChipTextActive: { color: colors.brand700 },
 
   // Grid
@@ -694,7 +550,7 @@ const styles = StyleSheet.create({
 
   // Contact
   contactBlock: {
-    margin: 16, marginTop: 24, padding: 20,
+    marginHorizontal: 16, marginTop: 20, marginBottom: 8, padding: 20,
     borderRadius: homeLayout.radiusXl,
     backgroundColor: colors.brand50, borderWidth: 1, borderColor: colors.brand100,
     alignItems: 'center', gap: 8,
@@ -708,7 +564,7 @@ const styles = StyleSheet.create({
   contactBtnText: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },
 
   // FAB
-  fabWrap: { position: 'absolute', left: 24, right: 24 },
+  fabWrap: { position: 'absolute', left: layout.fabHorizontalGutter, right: layout.fabHorizontalGutter },
   fab: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: colors.slate900, paddingVertical: 14, borderRadius: 999,
@@ -721,59 +577,4 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
   fabBadgeText: { fontFamily: fonts.bold, fontSize: 11, color: '#fff' },
-
-  // Modal
-  modalBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 23, 42, 0.5)' },
-  modalSheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    maxHeight: '85%', backgroundColor: colors.surface,
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-  },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  modalTitle: { fontFamily: fonts.extrabold, fontSize: 18, color: colors.text },
-  closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: colors.surfaceContainerLow, alignItems: 'center', justifyContent: 'center',
-  },
-  modalBody: { padding: 20, gap: 12 },
-  sectionLabel: {
-    fontFamily: fonts.bold, fontSize: 11, color: colors.textMuted,
-    textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 8,
-  },
-  listBox: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8,
-  },
-  categoryScroll: { maxHeight: 200, backgroundColor: colors.surfaceContainerLow, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
-  radioRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 8 },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.borderStrong },
-  radioSelected: { borderColor: colors.brand500, backgroundColor: colors.brand500 },
-  radioLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
-  priceLabel: { fontFamily: fonts.bold, fontSize: 14, color: colors.text },
-  sliderRow: { flexDirection: 'row', gap: 8 },
-  sliderChip: {
-    flex: 1, paddingVertical: 10, borderRadius: 12,
-    borderWidth: 1, borderColor: colors.borderStrong,
-    alignItems: 'center', backgroundColor: colors.background,
-  },
-  sliderChipActive: { backgroundColor: colors.brand50, borderColor: colors.brand500 },
-  sliderChipText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.textMuted },
-  sliderChipTextActive: { color: colors.brand700 },
-  modalFooter: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderTopWidth: 1, borderTopColor: colors.border, padding: 16,
-  },
-  resetCircle: {
-    width: 48, height: 48, borderRadius: 24,
-    borderWidth: 1, borderColor: colors.borderStrong,
-    backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
-  },
-  applyBtn: {
-    flex: 1, backgroundColor: colors.slate900, borderRadius: 999,
-    paddingVertical: 14, alignItems: 'center',
-  },
-  applyBtnText: { fontFamily: fonts.extrabold, fontSize: 14, color: '#fff' },
 })

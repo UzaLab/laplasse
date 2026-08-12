@@ -1,9 +1,7 @@
 import { Alert, ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MarketplaceCatalogProduct } from '@laplasse/api-client'
-import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -18,8 +16,6 @@ export function MarketplaceProductGridCard({
   showMerchantName?: boolean
   showAddButton?: boolean
 }) {
-  const router = useRouter()
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const addItem = useCartStore(s => s.addItem)
   const loading = useCartStore(s => s.loading)
   const displayPrice = product.promo_price ?? product.price
@@ -30,13 +26,16 @@ export function MarketplaceProductGridCard({
       onPress()
       return
     }
-    if (!isAuthenticated) {
-      router.push('/(auth)/login')
+    const result = await addItem(product.id, 1, product.default_variant_id ?? undefined)
+    if (result.error) {
+      Alert.alert('Panier', result.error)
       return
     }
-    const result = await addItem(product.id, 1, product.default_variant_id ?? undefined)
-    if (result.error) Alert.alert('Panier', result.error)
+    Alert.alert('Panier', 'Article ajouté')
   }
+
+  const merchantLabel =
+    product.merchant?.business_name ?? product.shop?.name ?? null
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
@@ -47,8 +46,8 @@ export function MarketplaceProductGridCard({
       )}
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
-        {showMerchantName ? (
-          <Text style={styles.shop} numberOfLines={1}>{product.merchant.business_name}</Text>
+        {showMerchantName && merchantLabel ? (
+          <Text style={styles.shop} numberOfLines={1}>{merchantLabel}</Text>
         ) : null}
         <View style={styles.footer}>
           <Text style={styles.price}>{formatPrice(displayPrice, product.currency)}</Text>

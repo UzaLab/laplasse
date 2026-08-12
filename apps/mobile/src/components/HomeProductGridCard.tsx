@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { FeaturedProduct } from '@laplasse/api-client'
-import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -14,19 +13,17 @@ export function HomeProductGridCard({
   product: FeaturedProduct
   onPress: () => void
 }) {
-  const router = useRouter()
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const addItem = useCartStore(s => s.addItem)
   const displayPrice = product.promo_price ?? product.price
 
   async function onAdd(e?: { stopPropagation?: () => void }) {
     e?.stopPropagation?.()
-    if (!isAuthenticated) {
-      router.push('/(auth)/login')
+    const result = await addItem(product.id, 1)
+    if (result.error) {
+      Alert.alert('Panier', result.error)
       return
     }
-    const result = await addItem(product.id, 1)
-    if (result.error) Alert.alert('Panier', result.error)
+    Alert.alert('Panier', 'Article ajouté')
   }
 
   return (

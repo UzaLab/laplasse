@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  ActivityIndicator,
   Dimensions,
   Modal,
   Pressable,
@@ -16,12 +17,14 @@ import type {
   ProductCategoryNode,
   ProductCondition,
   ProductOrigin,
+  ShopCollectionPublic,
 } from '@laplasse/api-client'
 import {
   flattenProductCategories,
   PRODUCT_CONDITION_LABELS,
   PRODUCT_ORIGIN_LABELS,
 } from '@/src/lib/marketplace'
+import { PriceRangeSlider } from '@/src/components/PriceRangeSlider'
 import { ScrollArea } from '@/src/components/ScrollArea'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -91,8 +94,15 @@ export function MarketplaceFiltersSheet({
   merchants,
   priceCeiling,
   showSort = true,
+  showMarketplaceExtras = true,
+  productSearch,
+  onProductSearchChange,
+  collections = [],
+  selectedCollection = '',
+  onCollectionChange,
   onReset,
   resultCount,
+  categoriesLoading = false,
 }: {
   open: boolean
   onClose: () => void
@@ -102,8 +112,16 @@ export function MarketplaceFiltersSheet({
   merchants: MarketplaceBoutique[]
   priceCeiling: number
   showSort?: boolean
+  /** Masque état, origine et boutiques (écran boutique). */
+  showMarketplaceExtras?: boolean
+  productSearch?: string
+  onProductSearchChange?: (value: string) => void
+  collections?: ShopCollectionPublic[]
+  selectedCollection?: string
+  onCollectionChange?: (slug: string) => void
   onReset: () => void
   resultCount: number
+  categoriesLoading?: boolean
 }) {
   const insets = useSafeAreaInsets()
   const flatCategories = flattenProductCategories(categories)
@@ -147,6 +165,19 @@ export function MarketplaceFiltersSheet({
           nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
         >
+          {onProductSearchChange ? (
+            <>
+              <Text style={styles.sectionLabel}>Recherche</Text>
+              <TextInput
+                value={productSearch ?? ''}
+                onChangeText={onProductSearchChange}
+                placeholder="Nom du produit…"
+                placeholderTextColor={colors.textLight}
+                style={styles.searchInput}
+              />
+            </>
+          ) : null}
+
           {showSort ? (
             <>
               <Text style={styles.sectionLabel}>Tri</Text>
@@ -167,40 +198,69 @@ export function MarketplaceFiltersSheet({
             </>
           ) : null}
 
-          {flatCategories.length > 0 ? (
+          {!showMarketplaceExtras || flatCategories.length > 0 || categoriesLoading ? (
             <>
               <Text style={styles.sectionLabel}>Catégories</Text>
-              <TextInput
-                value={categoryQuery}
-                onChangeText={setCategoryQuery}
-                placeholder="Rechercher une catégorie…"
-                placeholderTextColor={colors.textLight}
-                style={styles.searchInput}
-              />
+              {categoriesLoading ? (
+                <ActivityIndicator color={colors.brand500} style={styles.sectionLoader} />
+              ) : flatCategories.length === 0 ? (
+                <Text style={styles.emptyList}>Aucune catégorie disponible</Text>
+              ) : (
+                <>
+                  <TextInput
+                    value={categoryQuery}
+                    onChangeText={setCategoryQuery}
+                    placeholder="Rechercher une catégorie…"
+                    placeholderTextColor={colors.textLight}
+                    style={styles.searchInput}
+                  />
+                  <ScrollArea>
+                    <RadioRow
+                      label="Toutes les catégories"
+                      selected={!filters.selectedCategory}
+                      onPress={() => onChange({ ...filters, selectedCategory: '' })}
+                    />
+                    {filteredCategories.length === 0 ? (
+                      <Text style={styles.emptyList}>Aucun résultat</Text>
+                    ) : (
+                      filteredCategories.map(cat => (
+                        <RadioRow
+                          key={cat.slug}
+                          label={cat.name}
+                          selected={filters.selectedCategory === cat.slug}
+                          onPress={() => onChange({ ...filters, selectedCategory: cat.slug })}
+                          indent={cat.depth * 12}
+                        />
+                      ))
+                    )}
+                  </ScrollArea>
+                </>
+              )}
+            </>
+          ) : null}
+
+          {collections.length > 0 && onCollectionChange ? (
+            <>
+              <Text style={styles.sectionLabel}>Collections</Text>
               <ScrollArea>
                 <RadioRow
-                  label="Toutes les catégories"
-                  selected={!filters.selectedCategory}
-                  onPress={() => onChange({ ...filters, selectedCategory: '' })}
+                  label="Toutes"
+                  selected={!selectedCollection}
+                  onPress={() => onCollectionChange('')}
                 />
-                {filteredCategories.length === 0 ? (
-                  <Text style={styles.emptyList}>Aucun résultat</Text>
-                ) : (
-                  filteredCategories.map(cat => (
-                    <RadioRow
-                      key={cat.slug}
-                      label={cat.name}
-                      selected={filters.selectedCategory === cat.slug}
-                      onPress={() => onChange({ ...filters, selectedCategory: cat.slug })}
-                      indent={cat.depth * 12}
-                    />
-                  ))
-                )}
+                {collections.map(col => (
+                  <RadioRow
+                    key={col.id}
+                    label={col.name}
+                    selected={selectedCollection === col.slug}
+                    onPress={() => onCollectionChange(col.slug)}
+                  />
+                ))}
               </ScrollArea>
             </>
           ) : null}
 
-          {merchants.length > 0 ? (
+          {showMarketplaceExtras && merchants.length > 0 ? (
             <>
               <Text style={styles.sectionLabel}>Boutiques</Text>
               <TextInput
@@ -227,6 +287,8 @@ export function MarketplaceFiltersSheet({
             </>
           ) : null}
 
+          {showMarketplaceExtras ? (
+            <>
           <Text style={styles.sectionLabel}>État du produit</Text>
           <RadioRow
             label="Tous les états"
@@ -256,30 +318,15 @@ export function MarketplaceFiltersSheet({
               onPress={() => onChange({ ...filters, selectedOrigin: key })}
             />
           ))}
+            </>
+          ) : null}
 
-          <Text style={styles.sectionLabel}>Prix maximum</Text>
-          <Text style={styles.priceValue}>
-            {filters.priceFilter >= priceCeiling
-              ? 'Tout'
-              : `Jusqu'à ${filters.priceFilter.toLocaleString('fr-FR')} F`}
-          </Text>
-          <View style={styles.sliderRow}>
-            {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
-              const value = Math.round(priceCeiling * ratio)
-              const active = filters.priceFilter === value || (ratio === 1 && filters.priceFilter >= priceCeiling)
-              return (
-                <Pressable
-                  key={ratio}
-                  onPress={() => onChange({ ...filters, priceFilter: ratio === 1 ? priceCeiling : value })}
-                  style={[styles.sliderChip, active && styles.sliderChipActive]}
-                >
-                  <Text style={[styles.sliderChipText, active && styles.sliderChipTextActive]}>
-                    {ratio === 0 ? '0' : ratio === 1 ? 'Max' : `${Math.round(ratio * 100)}%`}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </View>
+          <Text style={styles.sectionLabel}>Fourchette de prix</Text>
+          <PriceRangeSlider
+            value={Math.min(filters.priceFilter, priceCeiling)}
+            onValueChange={next => onChange({ ...filters, priceFilter: next })}
+            maximumValue={priceCeiling}
+          />
         </ScrollView>
 
         <View style={styles.footer}>
@@ -399,19 +446,7 @@ const styles = StyleSheet.create({
   },
   checkSelected: { borderColor: colors.brand500, backgroundColor: colors.brand500 },
   radioLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, flex: 1 },
-  priceValue: { fontFamily: fonts.bold, fontSize: 14, color: colors.text, marginBottom: 8 },
-  sliderRow: { flexDirection: 'row', gap: 8 },
-  sliderChip: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-  },
-  sliderChipActive: { backgroundColor: colors.brand50, borderColor: colors.brand500 },
-  sliderChipText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.textMuted },
-  sliderChipTextActive: { color: colors.brand700 },
+  sectionLoader: { paddingVertical: 12 },
   emptyList: {
     fontFamily: fonts.medium,
     fontSize: 14,

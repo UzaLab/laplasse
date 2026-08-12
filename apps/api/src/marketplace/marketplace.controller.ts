@@ -17,6 +17,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { Public } from '../auth/decorators/public.decorator'
 import { CurrentUser } from '../auth/decorators/current-user.decorator'
 import { setAuthCookies } from '../auth/auth-cookies'
+import { authSessionBody } from '../auth/auth-client.util'
+import type { Request } from 'express'
 import { MarketplaceService } from './marketplace.service'
 import { ProductCategoriesService } from './product-categories.service'
 import {
@@ -395,11 +397,17 @@ export class MarketplaceController {
   @Post('orders/checkout/guest')
   async guestCheckout(
     @Body() dto: GuestCheckoutDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.svc.guestCheckout(dto)
     setAuthCookies(res, this.config, result.access_token, result.refresh_token)
-    return { checkout: result.checkout, user: result.user }
+    const auth = authSessionBody(req, {
+      user: result.user,
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+    })
+    return { checkout: result.checkout, ...auth }
   }
 
   @UseGuards(JwtAuthGuard)

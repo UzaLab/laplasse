@@ -13,16 +13,27 @@ import type {
   AuthTokensResponse,
   AuthUser,
   Cart,
+  CartPromoApplication,
   CheckoutInput,
   CheckoutResult,
   ConfirmPaymentResult,
+  CreateUserAddressInput,
+  DeliveryQuoteItem,
+  GeoCity,
+  GeoCommune,
+  GuestCartItemInput,
+  GuestCheckoutInput,
+  UserAddress,
   DeliveryTrackingData,
   FavoriteMerchant,
   FavoriteProduct,
   FavoriteToggleResult,
   FeaturedProduct,
   ApiShopPublic,
+  BookingAvailability,
   BookingConfig,
+  BookingSlot,
+  CreateBookingResult,
   MarketplaceBoutique,
   MarketplaceCatalogPage,
   MarketplaceCatalogProduct,
@@ -435,13 +446,26 @@ export class ApiClient {
     return this.request<BookingConfig>(`/bookings/merchant/${merchantId}/config`)
   }
 
+  getMerchantBookingAvailability(
+    merchantId: string,
+    date: string,
+    opts?: { serviceId?: string; staffId?: string },
+  ) {
+    const qs = new URLSearchParams({ date })
+    if (opts?.serviceId) qs.set('serviceId', opts.serviceId)
+    if (opts?.staffId) qs.set('staffId', opts.staffId)
+    return this.request<BookingAvailability>(
+      `/bookings/merchant/${merchantId}/availability?${qs}`,
+    )
+  }
+
   getMerchantRoomCalendar(merchantId: string, serviceId: string, from: string, to: string) {
     const qs = new URLSearchParams({ serviceId, from, to })
     return this.request<RoomCalendarData>(`/bookings/merchant/${merchantId}/room-calendar?${qs}`)
   }
 
   createMerchantBooking(merchantId: string, body: Record<string, unknown>) {
-    return this.request<{ id: string }>(`/bookings/merchant/${merchantId}`, {
+    return this.request<CreateBookingResult>(`/bookings/merchant/${merchantId}`, {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -478,8 +502,90 @@ export class ApiClient {
     return this.request<void>('/cart', { method: 'DELETE' }, true)
   }
 
+  previewGuestCart(items: GuestCartItemInput[]) {
+    return this.request<Cart>('/cart/guest/preview', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    })
+  }
+
+  applyCartPromo(code: string, shopId?: string) {
+    return this.request<{ applications: CartPromoApplication[]; total_discount: number }>(
+      '/cart/promo/apply',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code, ...(shopId ? { shop_id: shopId } : {}) }),
+      },
+      true,
+    )
+  }
+
   checkout(input: CheckoutInput) {
     return this.request<CheckoutResult>('/orders/checkout', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, true)
+  }
+
+  guestCheckout(input: GuestCheckoutInput) {
+    return this.request<{
+      checkout: CheckoutResult
+      user?: AuthUser
+      accessToken?: string
+      refreshToken?: string
+      access_token?: string
+      refresh_token?: string
+    }>(this.mobileAuthPath('/orders/checkout/guest'), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }).then(data => {
+      const tokens = normalizeAuthTokens(data as AuthTokensResponse)
+      return {
+        checkout: data.checkout,
+        user: data.user,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      }
+    })
+  }
+
+  fetchDeliveryQuote(input: {
+    shop_ids?: string[]
+    merchant_ids?: string[]
+    city_id: string
+    commune_id: string
+    subtotals?: Record<string, number>
+    order_flow?: 'food' | 'marketplace'
+    country?: string
+  }) {
+    const country = input.country ?? this.options.getCountryCode()
+    return this.request<{ quotes: DeliveryQuoteItem[]; total_delivery_fee: number }>(
+      '/checkout/delivery-quote',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...input, country }),
+      },
+    )
+  }
+
+  getGeoCities(country?: string) {
+    const c = country ?? this.options.getCountryCode()
+    return this.request<GeoCity[]>(`/geo/cities?country=${encodeURIComponent(c)}`)
+  }
+
+  getGeoCommunes(citySlug: string, country?: string) {
+    const c = country ?? this.options.getCountryCode()
+    return this.request<{ city: GeoCity; communes: GeoCommune[] }>(
+      `/geo/cities/${encodeURIComponent(citySlug)}/communes?country=${encodeURIComponent(c)}`,
+    )
+  }
+
+  getMyAddresses() {
+    return this.request<UserAddress[]>('/addresses', undefined, true)
+  }
+
+  createUserAddress(input: CreateUserAddressInput) {
+    return this.request<UserAddress>('/addresses', {
       method: 'POST',
       body: JSON.stringify(input),
     }, true)
@@ -501,6 +607,13 @@ export class ApiClient {
     return this.request<ConfirmPaymentResult>('/orders/pay/confirm', {
       method: 'POST',
       body: JSON.stringify({ paymentId, simulateResult }),
+    }, true)
+  }
+
+  confirmBatchOrderPayments(paymentIds: string[], simulateResult: 'success' | 'failure' = 'success') {
+    return this.request<ConfirmPaymentResult>('/orders/pay/confirm-batch', {
+      method: 'POST',
+      body: JSON.stringify({ paymentIds, simulateResult }),
     }, true)
   }
 

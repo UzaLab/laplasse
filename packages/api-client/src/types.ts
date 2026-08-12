@@ -240,10 +240,18 @@ export interface CartItem {
   unit_price: number
   line_total: number
   variant_id?: string | null
-  variant?: ProductVariant | null
+  variant?: { id: string; name: string } | null
   product: MarketplaceProduct & {
     merchant: { id: string; business_name: string; slug: string }
   }
+}
+
+export interface CartMerchantGroup {
+  id: string
+  business_name: string
+  slug: string
+  subtotal: number
+  item_count: number
 }
 
 export interface Cart {
@@ -253,15 +261,121 @@ export interface Cart {
   currency: string
   item_count: number
   merchant: { id: string; business_name: string; slug: string } | null
+  merchants?: CartMerchantGroup[]
+  merchant_count?: number
+  kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   delivery_options?: { allow_pickup: boolean; allow_delivery: boolean }
+}
+
+export interface AppliedPromotionInput {
+  shop_id: string
+  promotion_id: string
+  code: string
+}
+
+export interface ShopCheckoutDeliveryInput {
+  shop_id: string
+  delivery_type: DeliveryType
+  delivery_city_id?: string
+  delivery_commune_id?: string
+  delivery_district?: string
+  delivery_address_detail?: string
+  delivery_address?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
 }
 
 export interface CheckoutInput {
   delivery_type?: DeliveryType
   delivery_address?: string
+  delivery_city_id?: string
+  delivery_commune_id?: string
   delivery_district?: string
+  delivery_address_detail?: string
+  delivery_latitude?: number
+  delivery_longitude?: number
   customer_note?: string
   customer_phone: string
+  applied_promotions?: AppliedPromotionInput[]
+  shop_deliveries?: ShopCheckoutDeliveryInput[]
+  food_promo_code?: string
+  preorder_for?: string
+}
+
+export interface GuestCartItemInput {
+  productId: string
+  quantity: number
+  variantId?: string
+}
+
+export interface GuestCheckoutInput extends CheckoutInput {
+  guest_first_name: string
+  guest_last_name: string
+  create_account?: boolean
+  email?: string
+  password?: string
+  cart_items: GuestCartItemInput[]
+}
+
+export interface CartPromoApplication {
+  valid: boolean
+  code: string
+  shop_id: string
+  promotion_id?: string
+  discount: number
+  message?: string
+  free_delivery?: boolean
+}
+
+export interface GeoCity {
+  id: string
+  name: string
+  slug: string
+  is_default?: boolean
+}
+
+export interface GeoCommune {
+  id: string
+  name: string
+  slug: string
+  city_id: string
+}
+
+export interface DeliveryQuoteItem {
+  shop_id: string
+  merchant_id?: string
+  shop_name: string
+  available: boolean
+  fee: number
+  zone_name?: string
+  eta_min?: number
+  eta_max?: number
+  message?: string
+}
+
+export interface UserAddress {
+  id: string
+  label: string | null
+  city_id: string
+  commune_id: string
+  district: string
+  address_detail: string | null
+  latitude: number | null
+  longitude: number | null
+  is_default: boolean
+  city: { id: string; name: string; slug: string; country: string }
+  commune: { id: string; name: string; slug: string }
+}
+
+export interface CreateUserAddressInput {
+  label?: string
+  city_id: string
+  commune_id: string
+  district: string
+  address_detail?: string
+  latitude?: number | null
+  longitude?: number | null
+  is_default?: boolean
 }
 
 export interface CheckoutResult {
@@ -586,6 +700,24 @@ export interface RoomCalendarData {
   to: string
   room_service: { id: string; name: string; nightly_rate: number; capacity: number }
   days: RoomCalendarDay[]
+}
+
+export interface BookingSlot {
+  time: string
+  available: boolean
+  remaining?: number
+}
+
+export interface BookingAvailability {
+  slots: BookingSlot[]
+  closed?: boolean
+  reason?: string
+}
+
+export interface CreateBookingResult {
+  id: string
+  payment_required?: boolean
+  payment?: { id: string }
 }
 
 export interface MerchantSuggestion {

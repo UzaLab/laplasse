@@ -45,8 +45,6 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
 const styles = StyleSheet.create({
   wrap: {
     backgroundColor: 'rgba(255,255,255,0.92)',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
   },
   row: {
     flexDirection: 'row',

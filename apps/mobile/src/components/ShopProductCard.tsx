@@ -1,9 +1,7 @@
 import { Alert, ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MarketplaceProduct } from '@laplasse/api-client'
-import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -16,8 +14,6 @@ export function ShopProductCard({
   onPress: () => void
   showBestSeller?: boolean
 }) {
-  const router = useRouter()
-  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const addItem = useCartStore(s => s.addItem)
   const loading = useCartStore(s => s.loading)
   const displayPrice =
@@ -31,13 +27,13 @@ export function ShopProductCard({
       onPress()
       return
     }
-    if (!isAuthenticated) {
-      router.push('/(auth)/login')
-      return
-    }
     const variantId = product.variants?.[0]?.id
     const result = await addItem(product.id, 1, variantId)
-    if (result.error) Alert.alert('Panier', result.error)
+    if (result.error) {
+      Alert.alert('Panier', result.error)
+      return
+    }
+    Alert.alert('Panier', 'Article ajouté')
   }
 
   return (

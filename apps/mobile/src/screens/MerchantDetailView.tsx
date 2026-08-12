@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
 import { HotelMerchantView } from '@/src/screens/HotelMerchantView'
-import { ShopMerchantView } from '@/src/screens/ShopMerchantView'
+import { ServiceMerchantView } from '@/src/screens/ServiceMerchantView'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
 import { PrestationsTab } from '@/src/components/PrestationsTab'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
@@ -24,7 +24,7 @@ import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { RestaurationMenuPanel } from '@/src/components/RestaurationMenuPanel'
 import { LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
-import { loadBoutiqueProducts, resolveBoutique } from '@/src/lib/boutiqueResolve'
+import { loadBoutiqueProducts, resolveBoutique, getBoutiquePath, shouldOpenBoutiqueDirect } from '@/src/lib/boutiqueResolve'
 import { getMerchantVertical, isFoodCategorySlug } from '@/src/lib/merchantVertical'
 import {
   getDefaultProfileTab,
@@ -103,6 +103,13 @@ export function MerchantDetailView({
   )
 
   useEffect(() => {
+    if (!resolveQuery.data) return
+    if (shouldOpenBoutiqueDirect(resolveQuery.data)) {
+      router.replace(getBoutiquePath(resolveQuery.data.shopSlug))
+    }
+  }, [resolveQuery.data, router])
+
+  useEffect(() => {
     if (!merchant) return
     if (isFoodCategorySlug(merchant.category.slug)) {
       router.replace(`/restauration/${merchant.slug}`)
@@ -148,8 +155,25 @@ export function MerchantDetailView({
     )
   }
 
+  if (resolveQuery.data && shouldOpenBoutiqueDirect(resolveQuery.data)) {
+    return (
+      <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
+        <LoadingState />
+      </PublicScreenShell>
+    )
+  }
+
   if (!merchant) {
-    return <ShopMerchantView slug={slug} initialTab={initialTab} />
+    return (
+      <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
+        <View style={styles.notFound}>
+          <Text style={styles.notFoundText}>Établissement introuvable</Text>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.backLink}>Retour</Text>
+          </Pressable>
+        </View>
+      </PublicScreenShell>
+    )
   }
 
   if (isFoodCategorySlug(merchant.category.slug)) {
@@ -164,8 +188,8 @@ export function MerchantDetailView({
     return <HotelMerchantView slug={slug} initialTab={initialTab} />
   }
 
-  if (getMerchantVertical(merchant.category.slug) === 'retail' || hasMarketplace) {
-    return <ShopMerchantView slug={slug} initialTab={initialTab} />
+  if (getMerchantVertical(merchant.category.slug) === 'appointment') {
+    return <ServiceMerchantView slug={slug} initialTab={initialTab} />
   }
 
   const contactPhone = merchant.whatsapp ?? merchant.phone
