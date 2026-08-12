@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,6 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import DateTimePicker from '@react-native-community/datetimepicker'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { BookingSettingsConfig, MerchantServiceConfig } from '@laplasse/api-client'
@@ -22,96 +20,8 @@ import {
   computeBookingPaymentPreview,
 } from '@/src/lib/bookingPaymentDisplay'
 import { useAuthStore } from '@/src/stores/authStore'
+import { InlineDateCalendar } from '@/src/components/InlineDateCalendar'
 import { colors, fonts, homeLayout } from '@/src/theme'
-
-function dateToStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function formatDisplayDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`)
-  return d.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-function BookingDateField({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (dateStr: string) => void
-}) {
-  const [showPicker, setShowPicker] = useState(false)
-  const [draft, setDraft] = useState(() =>
-    value ? new Date(`${value}T12:00:00`) : new Date(),
-  )
-
-  const openPicker = () => {
-    setDraft(value ? new Date(`${value}T12:00:00`) : new Date())
-    setShowPicker(true)
-  }
-
-  const confirmDate = (selected: Date) => {
-    onChange(dateToStr(selected))
-    setShowPicker(false)
-  }
-
-  return (
-    <>
-      <Pressable onPress={openPicker} style={styles.datePickerBtn}>
-        <Ionicons name="calendar-outline" size={20} color={colors.brand600} />
-        <Text style={[styles.datePickerText, !value && styles.datePickerPlaceholder]}>
-          {value ? formatDisplayDate(value) : 'Choisir une date'}
-        </Text>
-        <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
-      </Pressable>
-
-      {Platform.OS === 'android' && showPicker ? (
-        <DateTimePicker
-          value={draft}
-          mode="date"
-          minimumDate={new Date()}
-          onChange={(event, selected) => {
-            setShowPicker(false)
-            if (event.type !== 'dismissed' && selected) {
-              onChange(dateToStr(selected))
-            }
-          }}
-        />
-      ) : null}
-
-      {Platform.OS === 'ios' && showPicker ? (
-        <Modal transparent animationType="slide" visible onRequestClose={() => setShowPicker(false)}>
-          <View style={styles.pickerOverlay}>
-            <Pressable style={styles.pickerBackdrop} onPress={() => setShowPicker(false)} />
-            <View style={styles.pickerSheet}>
-              <View style={styles.pickerToolbar}>
-                <Pressable onPress={() => setShowPicker(false)} hitSlop={8}>
-                  <Text style={styles.pickerCancel}>Annuler</Text>
-                </Pressable>
-                <Pressable onPress={() => confirmDate(draft)} hitSlop={8}>
-                  <Text style={styles.pickerConfirm}>OK</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={draft}
-                mode="date"
-                minimumDate={new Date()}
-                display="spinner"
-                locale="fr-FR"
-                onChange={(_, selected) => selected && setDraft(selected)}
-              />
-            </View>
-          </View>
-        </Modal>
-      ) : null}
-    </>
-  )
-}
 
 function serviceIcon(categorySlug: string, name: string): keyof typeof Ionicons.glyphMap {
   if (categorySlug === 'pharmacies') return 'medkit-outline'
@@ -484,7 +394,7 @@ export function ServicePrestationsTab({
             ) : null}
 
             <Text style={styles.fieldLabel}>Date *</Text>
-            <BookingDateField
+            <InlineDateCalendar
               value={date}
               onChange={nextDate => {
                 setDate(nextDate)
@@ -779,47 +689,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: homeLayout.radiusLg,
   },
-  datePickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 2,
-    borderColor: colors.borderStrong,
-    borderRadius: homeLayout.radiusLg,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    backgroundColor: colors.background,
-  },
-  datePickerText: {
-    flex: 1,
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: colors.text,
-    textTransform: 'capitalize',
-  },
-  datePickerPlaceholder: { color: colors.textLight },
-  pickerOverlay: { flex: 1, justifyContent: 'flex-end' },
-  pickerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  pickerSheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 24,
-  },
-  pickerToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  pickerCancel: { fontFamily: fonts.medium, fontSize: 16, color: colors.textMuted },
-  pickerConfirm: { fontFamily: fonts.bold, fontSize: 16, color: colors.brand700 },
   input: {
     borderWidth: 2,
     borderColor: colors.borderStrong,

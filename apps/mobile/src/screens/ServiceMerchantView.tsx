@@ -3,6 +3,7 @@ import type { ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
+  Animated,
   Image,
   Linking,
   Pressable,
@@ -19,6 +20,7 @@ import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { ServiceBottomActionBar } from '@/src/components/ServiceBottomActionBar'
 import { ServicePrestationsTab } from '@/src/components/ServicePrestationsTab'
 import { LoadingState } from '@/src/components/ui'
+import { useScrollRevealBar } from '@/src/hooks/useScrollRevealBar'
 import { getApiClient } from '@/src/lib/api'
 import { isValidProfileTab, type ProfileTabId } from '@/src/lib/merchantProfileTabs'
 import { colors, fonts, layout } from '@/src/theme'
@@ -59,6 +61,7 @@ export function ServiceMerchantView({
   const bookingAnchorRef = useRef<View>(null)
   const bookingY = useRef(0)
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | null>(null)
+  const { onScroll, animatedStyle, interactive } = useScrollRevealBar()
 
   const merchantQuery = useQuery({
     queryKey: ['merchant', slug],
@@ -145,6 +148,8 @@ export function ServiceMerchantView({
         <ScrollView
           ref={scrollRef}
           stickyHeaderIndices={[1]}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={{ paddingBottom: layout.bottomNavInset + 100 }}
         >
           <View style={styles.hero}>
@@ -291,14 +296,19 @@ export function ServiceMerchantView({
           </View>
         </ScrollView>
 
-        <ServiceBottomActionBar
-          prestationsLabel={prestationsLabel}
-          bookingCta={bookingCta}
-          whatsapp={merchant.whatsapp}
-          phone={merchant.phone}
-          onPrestations={scrollToTop}
-          onReserver={() => scrollToBooking()}
-        />
+        <Animated.View
+          style={[styles.actionBarWrap, animatedStyle]}
+          pointerEvents={interactive ? 'auto' : 'none'}
+        >
+          <ServiceBottomActionBar
+            prestationsLabel={prestationsLabel}
+            bookingCta={bookingCta}
+            whatsapp={merchant.whatsapp}
+            phone={merchant.phone}
+            onPrestations={scrollToTop}
+            onReserver={() => scrollToBooking()}
+          />
+        </Animated.View>
       </View>
     </PublicScreenShell>
   )
@@ -306,6 +316,12 @@ export function ServiceMerchantView({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  actionBarWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   notFoundText: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text },
   backLink: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },

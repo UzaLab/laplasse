@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { openWhatsApp } from '@/src/lib/whatsapp'
-import { colors, fonts, homeLayout } from '@/src/theme'
+import { colors, fonts, homeLayout, radii } from '@/src/theme'
 
 interface Props {
   prestationsLabel?: string
@@ -36,32 +36,29 @@ export function ServiceBottomActionBar({
           }
           accessibilityLabel="WhatsApp"
         >
-          <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+          <Ionicons name="logo-whatsapp" size={22} color="#fff" />
         </Pressable>
       ) : null}
 
-      <Pressable onPress={onPrestations} style={styles.secondaryBtn}>
-        <Ionicons name="list-outline" size={20} color={colors.text} />
-        <Text style={styles.secondaryText}>{prestationsLabel}</Text>
-      </Pressable>
-
-      <Pressable onPress={onReserver} style={styles.primaryBtn}>
-        <Ionicons name="calendar-outline" size={18} color="#fff" />
-        <Text style={styles.primaryText}>{bookingCta}</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable onPress={onPrestations} style={styles.secondaryBtn}>
+          <Ionicons name="list-outline" size={18} color={colors.text} />
+          <Text style={styles.secondaryText}>{prestationsLabel}</Text>
+        </Pressable>
+        <Pressable onPress={onReserver} style={styles.primaryBtn}>
+          <Ionicons name="calendar-outline" size={18} color="#fff" />
+          <Text style={styles.primaryText}>{bookingCta}</Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 12,
     backgroundColor: 'rgba(255,255,255,0.98)',
@@ -82,35 +79,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#22c55e',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
+  actions: { flex: 1, flexDirection: 'row', gap: 8 },
   secondaryBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    minWidth: 64,
-    paddingHorizontal: 4,
+    gap: 6,
+    height: 48,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
   },
-  secondaryText: {
-    fontFamily: fonts.semibold,
-    fontSize: 10,
-    color: colors.text,
-  },
+  secondaryText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
   primaryBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    height: 48,
+    borderRadius: radii.button,
     backgroundColor: colors.slate900,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: homeLayout.radiusLg,
-    maxWidth: 220,
-    marginLeft: 'auto',
   },
-  primaryText: {
-    fontFamily: fonts.bold,
-    fontSize: 14,
-    color: '#fff',
-  },
+  primaryText: { fontFamily: fonts.bold, fontSize: 13, color: '#fff' },
 })
