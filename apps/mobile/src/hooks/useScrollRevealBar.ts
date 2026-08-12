@@ -1,5 +1,12 @@
 import { useCallback, useRef, useState } from 'react'
-import { Animated, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
+import {
+  Animated,
+  Platform,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native'
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web'
 
 /** Masque la barre au scroll vers le bas ; réaffiche en haut, en bas de page ou au scroll vers le haut. */
 export function useScrollRevealBar() {
@@ -14,7 +21,7 @@ export function useScrollRevealBar() {
     setInteractive(true)
     Animated.spring(opacity, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
       tension: 120,
       friction: 8,
     }).start()
@@ -26,7 +33,7 @@ export function useScrollRevealBar() {
     setInteractive(false)
     Animated.spring(opacity, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
       tension: 120,
       friction: 8,
     }).start()

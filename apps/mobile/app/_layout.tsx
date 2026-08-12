@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import 'react-native-reanimated'
+import { ToastHost } from '@/src/components/ToastHost'
 import { resetApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
@@ -70,6 +71,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate />
+      <ToastHost />
       <StatusBar style="dark" />
     </QueryClientProvider>
   )
@@ -106,7 +108,10 @@ function AuthGate() {
       <Stack.Screen name="cart" options={{ headerShown: false }} />
       <Stack.Screen name="checkout" options={{ headerShown: false }} />
       <Stack.Screen name="payment" options={{ headerShown: false }} />
+      <Stack.Screen name="bookings/pay" options={{ headerShown: false }} />
+      <Stack.Screen name="bookings/confirmation" options={{ headerShown: false }} />
       <Stack.Screen name="checkout/confirmation" options={{ headerShown: false }} />
+      <Stack.Screen name="profile" options={{ headerShown: false }} />
       <Stack.Screen name="favoris" options={{ title: 'Favoris', headerShown: false }} />
       <Stack.Screen name="restauration/index" options={{ headerShown: false }} />
       <Stack.Screen name="restauration/[slug]" options={{ headerShown: false }} />

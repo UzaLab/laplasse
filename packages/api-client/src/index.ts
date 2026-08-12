@@ -32,9 +32,17 @@ import type {
   ApiShopPublic,
   BookingAvailability,
   BookingConfig,
+  BookingPaymentSession,
   BookingSlot,
   CreateBookingResult,
+  LoyaltyAccount,
   MarketplaceBoutique,
+  MyBooking,
+  MyBookingsPage,
+  MyReview,
+  NotificationItem,
+  NotificationsPage,
+  ReferralStats,
   MarketplaceCatalogPage,
   MarketplaceCatalogProduct,
   MerchantServiceConfig,
@@ -468,7 +476,26 @@ export class ApiClient {
     return this.request<CreateBookingResult>(`/bookings/merchant/${merchantId}`, {
       method: 'POST',
       body: JSON.stringify(body),
-    })
+    }, true)
+  }
+
+  getBookingPayment(bookingId: string) {
+    return this.request<BookingPaymentSession>(`/payments/bookings/${bookingId}`, undefined, true)
+  }
+
+  confirmBookingPayment(
+    bookingId: string,
+    paymentId: string,
+    simulateResult: 'success' | 'failure' = 'success',
+  ) {
+    return this.request<{ status: string; message?: string }>(
+      `/payments/bookings/${bookingId}/confirm`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ paymentId, simulateResult }),
+      },
+      true,
+    )
   }
 
   // ─── Cart & orders ──────────────────────────────────────────────────────────
@@ -625,6 +652,63 @@ export class ApiClient {
     return this.request<{ ok: boolean }>('/notifications/push/expo', {
       method: 'POST',
       body: JSON.stringify({ token }),
+    }, true)
+  }
+
+  getMyBookings(params: { tab?: 'upcoming' | 'history'; page?: number; limit?: number } = {}) {
+    const qs = new URLSearchParams()
+    if (params.tab) qs.set('tab', params.tab)
+    qs.set('page', String(params.page ?? 1))
+    qs.set('limit', String(params.limit ?? 10))
+    return this.request<MyBookingsPage | MyBooking[]>(`/bookings/mine?${qs}`, undefined, true)
+  }
+
+  cancelMyBooking(bookingId: string) {
+    return this.request<{ ok: boolean }>(`/bookings/mine/${bookingId}/cancel`, {
+      method: 'PATCH',
+    }, true)
+  }
+
+  getLoyaltyAccount() {
+    return this.request<LoyaltyAccount>('/loyalty/my', undefined, true)
+  }
+
+  getReferralStats() {
+    return this.request<ReferralStats>('/referral/stats', undefined, true)
+  }
+
+  getMyReviews() {
+    return this.request<MyReview[]>('/reviews/mine', undefined, true)
+  }
+
+  getNotifications(params: { page?: number; limit?: number; unreadOnly?: boolean } = {}) {
+    const qs = new URLSearchParams()
+    qs.set('page', String(params.page ?? 1))
+    qs.set('limit', String(params.limit ?? 20))
+    if (params.unreadOnly) qs.set('unread_only', 'true')
+    return this.request<NotificationsPage>(`/notifications?${qs}`, undefined, true)
+  }
+
+  getUnreadNotificationCount() {
+    return this.request<{ count: number }>('/notifications/unread-count', undefined, true)
+  }
+
+  markNotificationRead(id: string) {
+    return this.request<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }, true)
+  }
+
+  markAllNotificationsRead() {
+    return this.request<{ ok: boolean }>('/notifications/read-all', { method: 'PATCH' }, true)
+  }
+
+  deleteUserAddress(id: string) {
+    return this.request<{ ok: boolean }>(`/addresses/${id}`, { method: 'DELETE' }, true)
+  }
+
+  updateUserAddress(id: string, input: Partial<CreateUserAddressInput>) {
+    return this.request<UserAddress>(`/addresses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
     }, true)
   }
 }

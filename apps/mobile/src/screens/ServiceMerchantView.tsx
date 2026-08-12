@@ -175,7 +175,11 @@ export function ServiceMerchantView({
             </View>
 
             <View style={styles.heroInfo}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badges}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.badges}
+              >
                 <View style={styles.badgeCategory}>
                   <Text style={styles.badgeCategoryText}>{merchant.category.name}</Text>
                 </View>
@@ -188,16 +192,15 @@ export function ServiceMerchantView({
                   <Ionicons name="time-outline" size={12} color="#fff" />
                   <Text style={styles.badgeOpenText}>{isOpen ? 'Ouvert' : 'Fermé'}</Text>
                 </View>
+                {merchant.avg_rating != null && merchant.review_count > 0 ? (
+                  <View style={styles.badgeRating}>
+                    <Ionicons name="star" size={12} color={colors.brand500} />
+                    <Text style={styles.badgeRatingText}>
+                      {merchant.avg_rating} ({merchant.review_count} avis)
+                    </Text>
+                  </View>
+                ) : null}
               </ScrollView>
-
-              {merchant.avg_rating != null && merchant.review_count > 0 ? (
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={14} color="#fff" />
-                  <Text style={styles.ratingText}>
-                    {merchant.avg_rating} ({merchant.review_count} avis)
-                  </Text>
-                </View>
-              ) : null}
 
               <Text style={styles.heroName}>{merchant.business_name}</Text>
               {locationLabel ? (
@@ -209,20 +212,24 @@ export function ServiceMerchantView({
             </View>
           </View>
 
-          <View style={styles.tabsBar}>
-            {SERVICE_TABS.map(tab => {
-              const active = activeTab === tab.id
-              const label = tab.id === 'prestations' ? prestationsLabel : tab.label
-              return (
-                <Pressable
-                  key={tab.id}
-                  onPress={() => setActiveTab(tab.id)}
-                  style={[styles.tab, active && styles.tabActive]}
-                >
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-                </Pressable>
-              )
-            })}
+          <View style={styles.tabsBar} collapsable={false}>
+            <View style={styles.tabsRow}>
+              {SERVICE_TABS.map(tab => {
+                const active = activeTab === tab.id
+                const label = tab.id === 'prestations' ? prestationsLabel : tab.label
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setActiveTab(tab.id)}
+                    style={[styles.tab, active && styles.tabActive]}
+                  >
+                    <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
           </View>
 
           <View style={styles.content}>
@@ -297,8 +304,11 @@ export function ServiceMerchantView({
         </ScrollView>
 
         <Animated.View
-          style={[styles.actionBarWrap, animatedStyle]}
-          pointerEvents={interactive ? 'auto' : 'none'}
+          style={[
+            styles.actionBarWrap,
+            animatedStyle,
+            { pointerEvents: interactive ? 'auto' : 'none' },
+          ]}
         >
           <ServiceBottomActionBar
             prestationsLabel={prestationsLabel}
@@ -360,7 +370,13 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
   },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 8,
+  },
   badgeCategory: {
     backgroundColor: colors.brand500,
     paddingHorizontal: 10,
@@ -393,8 +409,16 @@ const styles = StyleSheet.create({
   badgeOpenYes: { backgroundColor: '#22c55e' },
   badgeOpenNo: { backgroundColor: '#ef4444' },
   badgeOpenText: { fontFamily: fonts.semibold, fontSize: 11, color: '#fff' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  ratingText: { fontFamily: fonts.medium, fontSize: 13, color: '#fff' },
+  badgeRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  badgeRatingText: { fontFamily: fonts.semibold, fontSize: 11, color: '#fff' },
   heroName: {
     fontFamily: fonts.extrabold,
     fontSize: 28,
@@ -409,15 +433,23 @@ const styles = StyleSheet.create({
   },
 
   tabsBar: {
-    flexDirection: 'row',
+    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  tabsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    alignItems: 'stretch',
+  },
   tab: {
     flex: 1,
+    flexBasis: 0,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },

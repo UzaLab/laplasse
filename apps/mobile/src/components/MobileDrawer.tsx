@@ -1,8 +1,18 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import {
+  Animated,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SUPPORTED_COUNTRIES } from '@laplasse/shared-config'
+import { CountrySelect } from '@/src/components/CountrySelect'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { colors, fonts, spacing } from '@/src/theme'
@@ -11,9 +21,11 @@ const DRAWER_LINKS = [
   { href: '/(tabs)' as const, label: 'Découvrir', icon: 'compass-outline' as const },
   { href: '/(tabs)/marketplace' as const, label: 'Marketplace', icon: 'storefront-outline' as const },
   { href: '/(tabs)/search' as const, label: 'Recherche', icon: 'search-outline' as const },
-  { href: '/(tabs)/profile' as const, label: 'Profil', icon: 'person-outline' as const },
+  { href: '/profile' as const, label: 'Mon espace', icon: 'person-outline' as const },
   { href: '/favoris' as const, label: 'Favoris', icon: 'heart-outline' as const },
 ]
+
+const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.85, 320)
 
 export function MobileDrawer({
   open,
@@ -29,11 +41,29 @@ export function MobileDrawer({
   const logout = useAuthStore(s => s.logout)
   const countryCode = useCountryStore(s => s.countryCode)
   const setCountry = useCountryStore(s => s.setCountry)
+  const slideX = useRef(new Animated.Value(DRAWER_WIDTH)).current
+
+  useEffect(() => {
+    Animated.timing(slideX, {
+      toValue: open ? 0 : DRAWER_WIDTH,
+      duration: 260,
+      useNativeDriver: true,
+    }).start()
+  }, [open, slideX])
 
   return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={[styles.panel, { paddingTop: insets.top }]}>
+    <Modal visible={open} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer le menu" />
+        <Animated.View
+          style={[
+            styles.panel,
+            {
+              paddingTop: insets.top,
+              transform: [{ translateX: slideX }],
+            },
+          ]}
+        >
         <View style={styles.header}>
           <View style={styles.brandRow}>
             <View style={styles.logoTile}>
@@ -63,21 +93,10 @@ export function MobileDrawer({
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Pays</Text>
-          {SUPPORTED_COUNTRIES.map(c => (
-            <Pressable
-              key={c.code}
-              style={styles.linkRow}
-              onPress={() => void setCountry(c.code)}
-            >
-              <Ionicons
-                name={c.code === countryCode ? 'checkmark-circle' : 'ellipse-outline'}
-                size={20}
-                color={c.code === countryCode ? colors.brand600 : colors.textMuted}
-              />
-              <Text style={styles.linkText}>{c.label}</Text>
-            </Pressable>
-          ))}
+          <CountrySelect
+            value={countryCode}
+            onChange={code => void setCountry(code)}
+          />
 
           <View style={styles.divider} />
 
@@ -88,11 +107,31 @@ export function MobileDrawer({
                 style={styles.linkRow}
                 onPress={() => {
                   onClose()
-                  router.push('/(tabs)/orders')
+                  router.push('/profile/orders' as never)
                 }}
               >
                 <Ionicons name="receipt-outline" size={20} color={colors.textMuted} />
                 <Text style={styles.linkText}>Mes commandes</Text>
+              </Pressable>
+              <Pressable
+                style={styles.linkRow}
+                onPress={() => {
+                  onClose()
+                  router.push('/profile/bookings' as never)
+                }}
+              >
+                <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
+                <Text style={styles.linkText}>Mes réservations</Text>
+              </Pressable>
+              <Pressable
+                style={styles.linkRow}
+                onPress={() => {
+                  onClose()
+                  router.push('/profile/settings' as never)
+                }}
+              >
+                <Ionicons name="settings-outline" size={20} color={colors.textMuted} />
+                <Text style={styles.linkText}>Paramètres</Text>
               </Pressable>
               <Pressable
                 style={styles.linkRow}
@@ -118,14 +157,16 @@ export function MobileDrawer({
             </Pressable>
           )}
         </ScrollView>
+        </Animated.View>
       </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
+  modalRoot: { flex: 1 },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,23,42,0.5)',
   },
   panel: {
@@ -133,13 +174,13 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     bottom: 0,
-    width: '85%',
-    maxWidth: 320,
+    width: DRAWER_WIDTH,
     backgroundColor: colors.surface,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   header: {
     flexDirection: 'row',
@@ -169,14 +210,6 @@ const styles = StyleSheet.create({
   },
   linkText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 16 },
-  sectionTitle: {
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 4,
-  },
   userName: {
     fontFamily: fonts.semibold,
     fontSize: 14,

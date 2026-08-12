@@ -7,9 +7,9 @@ export const MOBILE_CLIENT_HEADER = 'X-Client'
 export const MOBILE_CLIENT_VALUE = 'mobile'
 
 export const SUPPORTED_COUNTRIES = [
-  { code: 'CI', label: "Côte d'Ivoire" },
-  { code: 'BF', label: 'Burkina Faso' },
-  { code: 'SN', label: 'Sénégal' },
+  { code: 'CI', label: "Côte d'Ivoire", flag: '🇨🇮' },
+  { code: 'BF', label: 'Burkina Faso', flag: '🇧🇫' },
+  { code: 'SN', label: 'Sénégal', flag: '🇸🇳' },
 ] as const
 
 const CITY_BY_COUNTRY: Record<string, string> = {
@@ -24,6 +24,10 @@ export function getDefaultCity(country = DEFAULT_COUNTRY): string {
 
 export function getCountryLabel(code: string): string {
   return SUPPORTED_COUNTRIES.find(c => c.code === code.toUpperCase())?.label ?? code
+}
+
+export function getCountryFlag(code: string): string {
+  return SUPPORTED_COUNTRIES.find(c => c.code === code.toUpperCase())?.flag ?? '🌍'
 }
 
 export function countryRequestHeaders(countryCode: string): Record<string, string> {

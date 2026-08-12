@@ -43,11 +43,11 @@ export function ServiceBottomActionBar({
       <View style={styles.actions}>
         <Pressable onPress={onPrestations} style={styles.secondaryBtn}>
           <Ionicons name="list-outline" size={18} color={colors.text} />
-          <Text style={styles.secondaryText}>{prestationsLabel}</Text>
+          <Text style={styles.secondaryText} numberOfLines={1}>{prestationsLabel}</Text>
         </Pressable>
         <Pressable onPress={onReserver} style={styles.primaryBtn}>
           <Ionicons name="calendar-outline" size={18} color="#fff" />
-          <Text style={styles.primaryText}>{bookingCta}</Text>
+          <Text style={styles.primaryText} numberOfLines={1}>{bookingCta}</Text>
         </Pressable>
       </View>
     </View>
@@ -58,6 +58,7 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
     gap: 8,
     paddingHorizontal: 12,
     paddingTop: 12,
@@ -85,9 +86,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  actions: { flex: 1, flexDirection: 'row', gap: 8 },
+  actions: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   secondaryBtn: {
     flex: 1,
+    flexBasis: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -101,6 +103,7 @@ const styles = StyleSheet.create({
   secondaryText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
   primaryBtn: {
     flex: 1,
+    flexBasis: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

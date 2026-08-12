@@ -18,8 +18,9 @@ import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { ProductFavoriteButton } from '@/src/components/ProductFavoriteButton'
 import { EmptyState, LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
+import { profileTheme } from '@/src/lib/profileTheme'
 import { useAuthStore } from '@/src/stores/authStore'
-import { colors, fonts, layout, spacing } from '@/src/theme'
+import { fonts, layout, spacing } from '@/src/theme'
 
 type Tab = 'merchants' | 'products'
 
@@ -119,7 +120,7 @@ export default function FavorisScreen() {
                 <Text style={styles.cardMeta}>{item.category.name}</Text>
                 {item.location ? (
                   <View style={styles.locationRow}>
-                    <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+                    <Ionicons name="location-outline" size={14} color={profileTheme.textMuted} />
                     <Text style={styles.cardMeta}>
                       {[item.location.district, item.location.city].filter(Boolean).join(', ')}
                     </Text>
@@ -167,39 +168,44 @@ export default function FavorisScreen() {
 const styles = StyleSheet.create({
   center: { flex: 1, padding: spacing.gutter, justifyContent: 'center' },
   header: { paddingHorizontal: spacing.gutter, paddingBottom: 12 },
-  title: { fontFamily: fonts.extrabold, fontSize: 24, color: colors.text, marginBottom: 12 },
+  title: {
+    fontFamily: fonts.extrabold,
+    fontSize: 24,
+    color: profileTheme.text,
+    marginBottom: 12,
+  },
   tabs: { flexDirection: 'row', gap: 8 },
   tab: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: colors.surface,
+    backgroundColor: profileTheme.surface,
     borderWidth: 1,
-    borderColor: colors.borderStrong,
+    borderColor: profileTheme.border,
   },
-  tabActive: { backgroundColor: colors.slate900, borderColor: colors.slate900 },
-  tabText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.text },
+  tabActive: { backgroundColor: profileTheme.navActiveBg, borderColor: profileTheme.navActiveBg },
+  tabText: { fontFamily: fonts.semibold, fontSize: 13, color: profileTheme.textMuted },
   tabTextActive: { color: '#fff' },
   list: { padding: spacing.gutter, paddingBottom: layout.bottomNavHeight + 16, gap: 12 },
   merchantCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    backgroundColor: profileTheme.surface,
+    borderRadius: profileTheme.cardRadiusSm,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: profileTheme.border,
   },
   cover: { width: '100%', height: 120 },
-  coverFallback: { backgroundColor: colors.border },
+  coverFallback: { backgroundColor: profileTheme.borderLight },
   cardBody: { padding: 12 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { flex: 1, fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  cardMeta: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, marginTop: 4 },
+  cardTitle: { flex: 1, fontFamily: fonts.bold, fontSize: 16, color: profileTheme.text },
+  cardMeta: { fontFamily: fonts.regular, fontSize: 13, color: profileTheme.textMuted, marginTop: 4 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   productRow: { gap: 12 },
   productCard: { flex: 1, maxWidth: '48%' },
   productImageWrap: { position: 'relative' },
   productImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
   productHeart: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 999 },
-  productName: { fontFamily: fonts.medium, fontSize: 14, color: colors.text, marginTop: 8 },
-  productPrice: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700, marginTop: 4 },
+  productName: { fontFamily: fonts.medium, fontSize: 14, color: profileTheme.text, marginTop: 8 },
+  productPrice: { fontFamily: fonts.bold, fontSize: 14, color: profileTheme.accent, marginTop: 4 },
 })

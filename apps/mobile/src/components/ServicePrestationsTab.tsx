@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -19,8 +19,9 @@ import {
   bookingPaymentFootnote,
   computeBookingPaymentPreview,
 } from '@/src/lib/bookingPaymentDisplay'
+import { notify } from '@/src/lib/notify'
 import { useAuthStore } from '@/src/stores/authStore'
-import { InlineDateCalendar } from '@/src/components/InlineDateCalendar'
+import { InlineDateCalendar } from './InlineDateCalendar'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
 function serviceIcon(categorySlug: string, name: string): keyof typeof Ionicons.glyphMap {
@@ -151,6 +152,7 @@ export function ServicePrestationsTab({
   onPreselectedConsumed?: () => void
   onScrollToBooking?: (serviceId: string) => void
 }) {
+  const router = useRouter()
   const user = useAuthStore(s => s.user)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const isPharmacy = categorySlug === 'pharmacies'
@@ -168,6 +170,7 @@ export function ServicePrestationsTab({
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [formError, setFormError] = useState('')
 
   const configQuery = useQuery({
     queryKey: ['booking-config', merchantId],
@@ -202,6 +205,7 @@ export function ServicePrestationsTab({
     if (user) {
       setGuestName(v => v || user.full_name || '')
       setGuestEmail(v => v || user.email || '')
+      setGuestPhone(v => v || user.phone || '')
     }
   }, [user])
 
@@ -227,27 +231,37 @@ export function ServicePrestationsTab({
   }, [onScrollToBooking])
 
   const handleSubmit = async () => {
+    setFormError('')
+
     if (!selectedService) {
-      Alert.alert('Réservation', `Choisissez une ${itemLabel}.`)
+      const msg = `Choisissez une ${itemLabel}.`
+      setFormError(msg)
+      notify.warning('Réservation', msg)
       return
     }
     if (!date) {
-      Alert.alert('Réservation', 'Choisissez une date.')
+      const msg = 'Choisissez une date.'
+      setFormError(msg)
+      notify.warning('Réservation', msg)
       return
     }
     if (!selectedSlot) {
-      Alert.alert('Réservation', 'Choisissez un créneau disponible.')
+      const msg = 'Choisissez un créneau disponible.'
+      setFormError(msg)
+      notify.warning('Réservation', msg)
       return
     }
     if (!guestName.trim() || !guestPhone.trim()) {
-      Alert.alert('Informations requises', 'Veuillez renseigner votre nom et téléphone.')
+      const msg = 'Veuillez renseigner votre nom et téléphone.'
+      setFormError(msg)
+      notify.warning('Informations requises', msg)
       return
     }
     if (paymentPreview?.requirePayment && !isAuthenticated) {
-      Alert.alert(
-        'Connexion requise',
-        'Connectez-vous pour finaliser le paiement de votre réservation.',
-      )
+      const msg = 'Connectez-vous pour finaliser le paiement de votre réservation.'
+      setFormError(msg)
+      notify.warning('Connexion requise', msg)
+      router.push('/(auth)/login')
       return
     }
 
@@ -263,18 +277,23 @@ export function ServicePrestationsTab({
         booking_type: bookingType,
         notes: notes.trim() || undefined,
       })
-      setSuccess(true)
-      if (result.payment_required) {
-        Alert.alert(
-          'Paiement requis',
-          'Votre demande a été enregistrée. Finalisez le paiement depuis votre espace client.',
-        )
+
+      if (result.payment_required && result.payment?.id) {
+        notify.info('Paiement requis', 'Finalisez votre acompte pour confirmer la réservation.')
+        router.push({
+          pathname: '/bookings/pay',
+          params: { bookingId: result.id },
+        } as never)
+        return
       }
+
+      setSuccess(true)
+      notify.success('Demande envoyée', `${merchantName} confirmera votre rendez-vous sous peu.`)
     } catch (e) {
-      Alert.alert(
-        'Réservation',
-        e instanceof Error ? e.message : 'Impossible d\'envoyer la demande de réservation.',
-      )
+      const msg =
+        e instanceof Error ? e.message : 'Impossible d\'envoyer la demande de réservation.'
+      setFormError(msg)
+      notify.error('Réservation', msg)
     } finally {
       setSubmitting(false)
     }
@@ -467,6 +486,13 @@ export function ServicePrestationsTab({
               numberOfLines={2}
               style={[styles.input, styles.textarea]}
             />
+
+            {formError ? (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={18} color={colors.danger} />
+                <Text style={styles.errorText}>{formError}</Text>
+              </View>
+            ) : null}
 
             <Pressable
               onPress={() => void handleSubmit()}
@@ -729,6 +755,23 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderRadius: homeLayout.radiusLg,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    padding: 12,
+  },
+  errorText: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: '#991b1b',
+    lineHeight: 18,
   },
   successBox: {
     alignItems: 'center',

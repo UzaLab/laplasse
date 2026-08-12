@@ -714,10 +714,31 @@ export interface BookingAvailability {
   reason?: string
 }
 
+export interface BookingPaymentInfo {
+  id: string
+  reference: string
+  amount: number
+  currency: string
+  provider: string
+  instructions: string
+}
+
+export interface BookingPaymentSession {
+  payment_required: boolean
+  booking_id: string
+  merchant_name?: string
+  payment?: BookingPaymentInfo
+}
+
 export interface CreateBookingResult {
   id: string
   payment_required?: boolean
   payment?: { id: string }
+  pricing?: {
+    base_amount: number
+    deposit_percent: number
+    due_now: number
+  } | null
 }
 
 export interface MerchantSuggestion {
@@ -759,6 +780,92 @@ export interface UnifiedSearchParams {
   city?: string
   category?: string
   sort?: string
+}
+
+export type BookingType =
+  | 'TABLE'
+  | 'APPOINTMENT'
+  | 'ROOM'
+  | 'CONSULTATION'
+  | 'VENUE'
+
+export interface MyBooking {
+  id: string
+  booking_type: BookingType
+  booked_at: string
+  check_out_at?: string | null
+  party_size: number
+  status: string
+  guest_name: string
+  guest_phone: string
+  guest_email?: string | null
+  notes?: string | null
+  room_type?: string | null
+  service?: {
+    id: string
+    name: string
+    price?: number | null
+    duration_min?: number | null
+  } | null
+  merchant: {
+    id: string
+    business_name: string
+    slug: string
+    cover_image?: string | null
+  }
+  created_at?: string
+}
+
+export interface MyBookingsPage {
+  items: MyBooking[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface LoyaltyAccount {
+  account: { points: number; tier: string; total_earned?: number }
+  transactions: { id: string; points: number; reason: string; created_at: string }[]
+  tiers: { key: string; label: string; min: number; active: boolean }[]
+  pointsToNext: number | null
+}
+
+export interface ReferralStats {
+  code: string
+  uses_count: number
+  total_points_earned: number
+  referrals: { id: string; invited_user: { full_name: string | null; created_at: string } }[]
+}
+
+export interface MyReview {
+  id: string
+  rating: number
+  title: string | null
+  content: string | null
+  status: 'APPROVED' | 'PENDING' | 'REJECTED'
+  created_at: string
+  merchant: { id: string; business_name: string; slug: string }
+}
+
+export interface NotificationItem {
+  id: string
+  type: string
+  title: string
+  body: string
+  read: boolean
+  created_at: string
+  data?: Record<string, unknown> | null
+}
+
+export interface NotificationsPage {
+  items: NotificationItem[]
+  total: number
+  totalAll: number
+  page: number
+  pageSize: number
+  totalPages: number
+  unreadCount: number
 }
 
 export class ApiError extends Error {

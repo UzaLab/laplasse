@@ -38,7 +38,11 @@ export function HomeTopBar({
 
         <View style={styles.right}>
           <Pressable
-            onPress={() => router.push('/(tabs)/profile')}
+            onPress={() =>
+              router.push(
+                (isAuthenticated ? '/profile/notifications' : '/(tabs)/profile') as never,
+              )
+            }
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
             accessibilityLabel="Notifications"
           >
