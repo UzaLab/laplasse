@@ -51,12 +51,15 @@ export function CheckoutDeliveryScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const hydrated = useAuthStore(s => s.hydrated)
   const user = useAuthStore(s => s.user)
   const setTokens = useAuthStore(s => s.setTokens)
   const setUser = useAuthStore(s => s.setUser)
   const cart = useCartStore(s => s.cart)
+  const guestHydrated = useCartStore(s => s.guestHydrated)
   const loadCart = useCartStore(s => s.loadCart)
 
+  const [bootstrapped, setBootstrapped] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [deliveryType, setDeliveryType] = useState<DeliveryMode>('PICKUP')
@@ -98,6 +101,7 @@ export function CheckoutDeliveryScreen() {
     () => cart?.merchants?.map(m => m.id) ?? (cart?.merchant ? [cart.merchant.id] : []),
     [cart],
   )
+  const cartShopIdsKey = cartShopIds.join(',')
   const isFoodFlow = getCartKind(cart) === 'food'
   const checkoutFlow = isFoodFlow ? 'food' : 'marketplace'
   const cartBackRoute = isFoodFlow ? '/commande' : '/cart'
@@ -168,71 +172,92 @@ export function CheckoutDeliveryScreen() {
   }, [cities, updateShopDelivery])
 
   useEffect(() => {
+    if (!hydrated) return
+
+    let cancelled = false
+
     void (async () => {
       setLoading(true)
-      await loadCart()
-      const draft = await getCheckoutDraft()
-      if (draft) {
-        setDeliveryType(draft.deliveryType)
-        setCustomerPhone(draft.customerPhone ?? user?.phone ?? '')
-        setCustomerNote(draft.customerNote ?? '')
-        setDeliveryCityId(draft.deliveryCityId ?? '')
-        setDeliveryCommuneId(draft.deliveryCommuneId ?? '')
-        setDeliveryDistrict(draft.deliveryDistrict ?? '')
-        setDeliveryAddressDetail(draft.deliveryAddressDetail ?? '')
-        setSelectedAddressId(draft.selectedAddressId ?? null)
-        if (draft.foodPreorderFor) setFoodPreorderFor(draft.foodPreorderFor)
-      }
       try {
-        const cityList = await getApiClient().getGeoCities()
-        setCities(cityList)
-        const defaultCity = cityList.find(c => c.is_default) ?? cityList[0]
-        if (!draft?.deliveryCityId && defaultCity) setDeliveryCityId(defaultCity.id)
-      } catch {
-        // geo optional
-      }
-      if (isAuthenticated) {
+        const existing = useCartStore.getState().cart
+        if (!existing?.items.length) {
+          await loadCart()
+        }
+        if (cancelled) return
+
+        const draft = await getCheckoutDraft()
+        if (cancelled) return
+
+        if (draft) {
+          setDeliveryType(draft.deliveryType)
+          setCustomerPhone(draft.customerPhone ?? user?.phone ?? '')
+          setCustomerNote(draft.customerNote ?? '')
+          setDeliveryCityId(draft.deliveryCityId ?? '')
+          setDeliveryCommuneId(draft.deliveryCommuneId ?? '')
+          setDeliveryDistrict(draft.deliveryDistrict ?? '')
+          setDeliveryAddressDetail(draft.deliveryAddressDetail ?? '')
+          setSelectedAddressId(draft.selectedAddressId ?? null)
+          if (draft.foodPreorderFor) setFoodPreorderFor(draft.foodPreorderFor)
+        }
+
         try {
-          const addresses = await getApiClient().getMyAddresses()
-          setSavedAddresses(addresses)
-          const defaultAddr = addresses.find(a => a.is_default) ?? addresses[0]
-          if (defaultAddr && !draft?.selectedAddressId) applySavedAddress(defaultAddr)
+          const cityList = await getApiClient().getGeoCities()
+          if (cancelled) return
+          setCities(cityList)
+          const defaultCity = cityList.find(c => c.is_default) ?? cityList[0]
+          if (!draft?.deliveryCityId && defaultCity) setDeliveryCityId(defaultCity.id)
         } catch {
-          // ignore
+          // geo optional
+        }
+
+        if (isAuthenticated) {
+          try {
+            const addresses = await getApiClient().getMyAddresses()
+            if (cancelled) return
+            setSavedAddresses(addresses)
+            const defaultAddr = addresses.find(a => a.is_default) ?? addresses[0]
+            if (defaultAddr && !draft?.selectedAddressId) {
+              setSelectedAddressId(defaultAddr.id)
+              setDeliveryCityId(defaultAddr.city_id)
+              setDeliveryCommuneId(defaultAddr.commune_id)
+              setDeliveryDistrict(defaultAddr.district)
+              setDeliveryAddressDetail(defaultAddr.address_detail ?? '')
+              void loadCommunesForCity(defaultAddr.city.slug)
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setBootstrapped(true)
         }
       }
-      if (!isFoodFlow) {
-        setAppliedPromos(await getCartPromos(cartShopIds))
-      } else {
-        setAppliedPromos([])
-      }
-      setLoading(false)
     })()
-  }, [applySavedAddress, cartShopIds, isAuthenticated, isFoodFlow, loadCart, user?.phone])
+
+    return () => {
+      cancelled = true
+    }
+  }, [hydrated, isAuthenticated, loadCart, loadCommunesForCity, user?.phone])
 
   useEffect(() => {
-    if (!cart || isFoodFlow) {
+    if (!bootstrapped) return
+    if (isFoodFlow || !cartShopIdsKey) {
       if (isFoodFlow) setAppliedPromos([])
       return
     }
     void getCartPromos(cartShopIds).then(setAppliedPromos)
-  }, [cart, cartShopIds, isFoodFlow])
+  }, [bootstrapped, cartShopIdsKey, isFoodFlow, cartShopIds])
 
   useFocusEffect(
     useCallback(() => {
-      if (!isAuthenticated) return
-      void loadCart()
+      if (!isAuthenticated || !bootstrapped) return
       void getApiClient()
         .getMyAddresses()
-        .then(addresses => {
-          setSavedAddresses(addresses)
-          const defaultAddr = addresses.find(a => a.is_default) ?? addresses[0]
-          if (defaultAddr && !selectedAddressId) applySavedAddress(defaultAddr)
-        })
+        .then(setSavedAddresses)
         .catch(() => {})
-      if (user?.phone) setCustomerPhone(user.phone)
-      if (!isFoodFlow) void getCartPromos(cartShopIds).then(setAppliedPromos)
-    }, [applySavedAddress, cartShopIds, isAuthenticated, isFoodFlow, loadCart, selectedAddressId, user?.phone]),
+    }, [bootstrapped, isAuthenticated]),
   )
 
   useEffect(() => {
@@ -267,7 +292,7 @@ export function CheckoutDeliveryScreen() {
   }, [foodScheduling, foodPreorderFor])
 
   useEffect(() => {
-    if (!cart?.items.length) return
+    if (!bootstrapped || !cart?.items.length) return
     const kind = getCartKind(cart)
     if (kind === 'mixed') {
       Alert.alert('Panier incompatible', 'Videz votre panier avant de continuer.')
@@ -275,7 +300,7 @@ export function CheckoutDeliveryScreen() {
       return
     }
     if (isFoodFlow && !isAuthenticated) router.replace('/(auth)/login')
-  }, [cart, isFoodFlow, isAuthenticated, router])
+  }, [bootstrapped, cart, isFoodFlow, isAuthenticated, router])
 
   useEffect(() => {
     if (isFoodFlow && allowDelivery) {
@@ -340,11 +365,12 @@ export function CheckoutDeliveryScreen() {
     } finally {
       setQuoteLoading(false)
     }
-  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, cartShopIds, isFoodFlow, useSplitDelivery, shopDeliveries])
+  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, cartShopIdsKey, isFoodFlow, useSplitDelivery, shopDeliveries, cartShopIds])
 
   useEffect(() => {
+    if (!bootstrapped) return
     void loadDeliveryQuote()
-  }, [loadDeliveryQuote])
+  }, [bootstrapped, loadDeliveryQuote])
 
   const formattedDeliveryAddress = useMemo(() => {
     if (deliveryType !== 'DELIVERY') return undefined
@@ -592,7 +618,7 @@ export function CheckoutDeliveryScreen() {
     }
   }
 
-  if (loading) {
+  if (!hydrated || !guestHydrated || loading || !bootstrapped) {
     return (
       <CheckoutWizardShell step={2} flow={checkoutFlow}>
         <View style={styles.loader}>
@@ -708,7 +734,7 @@ export function CheckoutDeliveryScreen() {
                       >
                         <Text style={styles.addressLabel}>{addr.label ?? 'Adresse'}</Text>
                         <Text style={styles.addressText}>
-                          {[addr.district, addr.commune.name, addr.city.name].filter(Boolean).join(', ')}
+                          {[addr.district, addr.commune?.name, addr.city?.name].filter(Boolean).join(', ')}
                         </Text>
                       </Pressable>
                     ))}
