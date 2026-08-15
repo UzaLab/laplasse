@@ -11,6 +11,7 @@ ENV PNPM_CHILD_CONCURRENCY=1 \
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json ./apps/web/
+COPY packages/shared-config/package.json ./packages/shared-config/
 RUN echo "node-linker=hoisted" > .npmrc
 RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --filter web
@@ -24,6 +25,7 @@ ENV NODE_OPTIONS="--max-old-space-size=896" \
     CI=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web ./apps/web
+COPY packages/shared-config ./packages/shared-config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 WORKDIR /app/apps/web

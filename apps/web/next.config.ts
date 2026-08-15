@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  transpilePackages: ["@laplasse/shared-config"],
   // Évite les builds Docker bloqués sur le VPS (pages lentes / API indisponible)
   staticPageGenerationTimeout: 45,
   async headers() {

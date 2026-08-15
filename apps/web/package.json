@@ -11,6 +11,7 @@
     "sync:brand": "node ../../scripts/sync-brand-assets.mjs"
   },
   "dependencies": {
+    "@laplasse/shared-config": "workspace:*",
     "@sentry/nextjs": "^10.56.0",
     "@tanstack/react-query": "^5.101.0",
     "@tiptap/pm": "^3.27.0",
