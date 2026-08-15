@@ -12,6 +12,7 @@ import { useT } from '@/providers/LocaleProvider'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { CountrySwitcher } from './CountrySwitcher'
 import { MOBILE_DRAWER_NAV_ITEMS } from './navConfig'
+import { BrandLogo } from '@/components/BrandLogo'
 import { PAGE_GUTTER_X } from '@/lib/mobilePublicChrome'
 import {
   getIndependentShops,
@@ -103,10 +104,7 @@ export function MobileNav({
             className="flex items-center gap-2"
             style={{ textDecoration: 'none' }}
           >
-            <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
-              <MapPin size={18} />
-            </div>
-            <span className="text-lg font-extrabold text-slate-900">LaPlasse</span>
+            <BrandLogo variant="full" className="h-8" />
           </Link>
           <button
             type="button"

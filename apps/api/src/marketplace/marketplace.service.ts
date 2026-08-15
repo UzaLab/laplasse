@@ -3926,7 +3926,7 @@ export class MarketplaceService {
         limit: limit ?? 100,
         offset,
       })
-      if (meili) {
+      if (meili?.data.length) {
         const data = await this.enrichMeiliCatalogProducts(meili.data)
         if (!paginate) return data
         return {
@@ -3982,7 +3982,14 @@ export class MarketplaceService {
         ? { price: { lte: query.maxPrice } }
         : {}),
       ...(query?.q
-        ? { name: { contains: query.q, mode: 'insensitive' as const } }
+        ? {
+            OR: [
+              { name: { contains: query.q, mode: 'insensitive' as const } },
+              { description: { contains: query.q, mode: 'insensitive' as const } },
+              { category: { name: { contains: query.q, mode: 'insensitive' as const } } },
+              { shop: { name: { contains: query.q, mode: 'insensitive' as const } } },
+            ],
+          }
         : {}),
       shop: {
         is_active: true,

@@ -46,8 +46,10 @@ import type {
   MarketplaceCatalogPage,
   MarketplaceCatalogProduct,
   MerchantServiceConfig,
+  PublicRoomPayload,
   RoomCalendarData,
   MenuSearchHit,
+  MenuSuggestion,
   MerchantMenuData,
   MarketplaceProduct,
   MarketplaceSpotlightShop,
@@ -57,6 +59,8 @@ import type {
   ShopTrustScore,
   Order,
   OrderEtaSnapshot,
+  ReorderResult,
+  CourierReview,
   OrderReturnReason,
   OrderReturnRequest,
   DeliveryDispute,
@@ -350,14 +354,23 @@ export class ApiClient {
     return this.request<TrendingSearchItem[]>(`/search/trending?limit=${limit}`)
   }
 
-  autocompleteUnified(q: string, limit = 8) {
+  autocompleteUnified(q: string, limit = 3) {
     const qs = new URLSearchParams({ q, limit: String(limit) })
     return this.request<AutocompleteUnifiedResult>(`/search/autocomplete/unified?${qs}`)
   }
 
-  autocompleteProducts(q: string, limit = 8) {
+  autocompleteProducts(q: string, limit = 3) {
     const qs = new URLSearchParams({ q, limit: String(limit) })
-    return this.request<{ products: ProductSuggestion[] }>(`/search/autocomplete/products?${qs}`)
+    return this.request<ProductSuggestion[] | { products: ProductSuggestion[] }>(
+      `/search/autocomplete/products?${qs}`,
+    ).then(result =>
+      Array.isArray(result) ? { products: result } : result,
+    )
+  }
+
+  autocompleteMenus(q: string, limit = 3) {
+    const qs = new URLSearchParams({ q, limit: String(limit) })
+    return this.request<MenuSuggestion[]>(`/search/autocomplete/menus?${qs}`)
   }
 
   getMarketplaceFeatured() {
@@ -455,6 +468,12 @@ export class ApiClient {
 
   getMerchantBookingConfig(merchantId: string) {
     return this.request<BookingConfig>(`/bookings/merchant/${merchantId}/config`)
+  }
+
+  getPublicRoom(merchantSlug: string, roomSlug: string) {
+    return this.request<PublicRoomPayload>(
+      `/bookings/merchant-by-slug/${encodeURIComponent(merchantSlug)}/rooms/${encodeURIComponent(roomSlug)}`,
+    )
   }
 
   getMerchantBookingAvailability(
@@ -631,6 +650,17 @@ export class ApiClient {
 
   getOrderEta(orderId: string) {
     return this.request<OrderEtaSnapshot>(`/orders/${orderId}/eta`, undefined, true)
+  }
+
+  reorderFromOrder(orderId: string) {
+    return this.request<ReorderResult>(`/orders/${orderId}/reorder`, { method: 'POST' }, true)
+  }
+
+  createCourierReview(orderId: string, input: { rating: number; comment?: string }) {
+    return this.request<CourierReview>(`/orders/${orderId}/courier-review`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, true)
   }
 
   createOrderReturn(

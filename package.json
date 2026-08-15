@@ -26,7 +26,8 @@
     "test:e2e:ads": "pnpm --filter api test:e2e:ads",
     "test:e2e:guest-cart": "pnpm --filter api test:e2e:guest-cart",
     "load-test": "node scripts/load-test.mjs",
-    "backup": "bash scripts/backup.sh"
+    "backup": "bash scripts/backup.sh",
+    "sync:brand": "node scripts/sync-brand-assets.mjs"
   },
   "engines": {
     "node": ">=20.0.0",

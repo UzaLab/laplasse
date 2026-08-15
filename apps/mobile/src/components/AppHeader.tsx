@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MobileDrawer } from '@/src/components/MobileDrawer'
-import { colors, fonts, spacing } from '@/src/theme'
+import { BrandLogo } from '@/src/components/BrandLogo'
+import { colors, spacing } from '@/src/theme'
 
 interface AppHeaderProps {
   showMenu?: boolean
@@ -20,10 +21,7 @@ export function AppHeader({ showMenu = true }: AppHeaderProps) {
       <View style={[styles.wrap, { paddingTop: insets.top }]}>
         <View style={styles.row}>
           <Pressable onPress={() => router.push('/(tabs)')} style={styles.brand}>
-            <View style={styles.logoTile}>
-              <Ionicons name="location" size={18} color={colors.brand500} />
-            </View>
-            <Text style={styles.brandText}>LaPlasse</Text>
+            <BrandLogo variant="full" style={styles.brandLogo} />
           </Pressable>
 
           {showMenu ? (
@@ -53,21 +51,8 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: spacing.gutter,
   },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoTile: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.slate900,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandText: {
-    fontFamily: fonts.extrabold,
-    fontSize: 18,
-    color: colors.slate900,
-    letterSpacing: -0.3,
-  },
+  brand: { flexDirection: 'row', alignItems: 'center' },
+  brandLogo: { height: 28, width: 120 },
   menuBtn: { padding: 6, borderRadius: 8 },
   pressed: { opacity: 0.7 },
 })

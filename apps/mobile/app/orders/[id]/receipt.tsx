@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { formatPrice } from '@laplasse/shared-config'
 import { EmptyState, LoadingState, PrimaryButton, SecondaryButton } from '@/src/components/ui'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { getApiClient } from '@/src/lib/api'
 import { buildOrderReceiptText } from '@/src/lib/orderReceipt'
 import { formatOrderRef, getSellerName } from '@/src/lib/orderUtils'
@@ -60,7 +61,7 @@ export default function OrderReceiptScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.brand}>LaPlasse</Text>
+        <BrandLogo variant="mark" markStyle={styles.brandLogo} />
         <Text style={styles.title}>Reçu de commande</Text>
         <Text style={styles.ref}>{formatOrderRef(order.id)}</Text>
       </View>
@@ -154,13 +155,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderStrong,
     paddingBottom: 16,
   },
-  brand: {
-    fontFamily: fonts.bold,
-    fontSize: 11,
-    letterSpacing: 2,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-  },
+  brandLogo: { width: 40, height: 40, marginBottom: 8 },
   title: { fontFamily: fonts.extrabold, fontSize: 24, color: colors.text, marginTop: 4 },
   ref: { fontFamily: fonts.medium, fontSize: 14, color: colors.textMuted, marginTop: 4 },
   metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },

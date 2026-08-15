@@ -5,7 +5,8 @@ import { SearchParamsWrapper } from '@/components/SearchParamsWrapper'
 import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff, Loader2, MapPin, Smartphone, Bike, Truck, Building2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Smartphone, Bike, Truck, Building2 } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
 import { invalidateAuthSession } from '@/lib/authSession'
 import { BRAND_AUTH_SUBTITLE } from '@/lib/brandCopy'
@@ -168,11 +169,8 @@ function LoginForm() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2" style={{ textDecoration: 'none' }}>
-            <div className="w-10 h-10 bg-slate-900 text-brand-500 rounded-xl flex items-center justify-center">
-              <MapPin size={20} />
-            </div>
-            <span className="text-2xl font-extrabold text-slate-900 tracking-tight">LaPlasse</span>
+          <Link href="/" className="inline-flex items-center justify-center" style={{ textDecoration: 'none' }}>
+            <BrandLogo variant="full" className="h-10 w-auto" />
           </Link>
           <p className="text-slate-500 mt-2 text-sm">{BRAND_AUTH_SUBTITLE}</p>
         </div>

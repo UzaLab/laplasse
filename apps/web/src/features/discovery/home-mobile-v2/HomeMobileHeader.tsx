@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { MapPin, Menu } from 'lucide-react'
+import { Menu } from 'lucide-react'
+
+import { BrandLogo } from '@/components/BrandLogo'
 
 import { MobileNav } from '@/components/layout/MobileNav'
 import { useCartStore, useCartItemCount } from '@/stores/cartStore'
@@ -40,11 +42,8 @@ export function HomeMobileHeader({ topOffsetClass = 'top-0' }: HomeMobileHeaderP
         )}
       >
         <div className={cn('flex items-center justify-between h-16', HOME_MOBILE_GUTTER)}>
-          <Link href="/" className="flex items-center gap-2 min-w-0" style={{ textDecoration: 'none' }}>
-            <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center shrink-0">
-              <MapPin size={18} />
-            </div>
-            <span className="text-lg font-extrabold tracking-tight text-slate-900 truncate">LaPlasse</span>
+          <Link href="/" className="flex items-center min-w-0" style={{ textDecoration: 'none' }}>
+            <BrandLogo variant="full" className="h-8 w-auto" />
           </Link>
 
           <button

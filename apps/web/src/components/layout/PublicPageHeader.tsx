@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { ChevronLeft, MapPin } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { PUBLIC_CONTENT, PUBLIC_NARROW } from '@/lib/pageLayout'
 
 type Width = 'narrow' | 'content'
@@ -32,10 +33,7 @@ export function PublicPageHeader({
             </Link>
           ) : null}
           <Link href="/" className="flex items-center gap-2 shrink-0" style={{ textDecoration: 'none' }}>
-            <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
-              <MapPin size={16} />
-            </div>
-            <span className="text-lg font-extrabold text-slate-900">LaPlasse</span>
+            <BrandLogo variant="full" className="h-8" />
           </Link>
         </div>
         {title ? (

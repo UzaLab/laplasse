@@ -9,7 +9,6 @@ import {
   Bike,
   Share2,
   MapPin,
-  UtensilsCrossed,
 } from 'lucide-react'
 import type { ApiMerchantDetail } from '@/lib/api'
 import { FoodMenuOrderPanel } from '@/features/merchant/components/profile/FoodMenuOrderPanel'
@@ -26,6 +25,7 @@ import {
 } from '@/lib/foodHub'
 import { FavoriteButton } from '@/features/discovery/components/FavoriteButton'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/BrandLogo'
 import { MOBILE_BOTTOM_NAV_PAD } from '@/lib/mobilePublicChrome'
 
 interface Props {
@@ -74,14 +74,11 @@ export function RestaurationDetailPage({ merchant }: Props) {
         {/* Logo LaPlasse affiché uniquement quand scrollé */}
         <div
           className={cn(
-            'absolute left-1/2 -translate-x-1/2 flex items-center gap-2 transition-all duration-300',
+            'absolute left-1/2 -translate-x-1/2 flex items-center transition-all duration-300',
             scrolled ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none',
           )}
         >
-          <div className="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center shrink-0">
-            <UtensilsCrossed size={15} className="text-amber-400" />
-          </div>
-          <span className="text-base font-extrabold tracking-tight text-slate-900">LaPlasse</span>
+          <BrandLogo variant="mark" markClassName="h-8 w-8" />
         </div>
 
         <div className="flex gap-2">

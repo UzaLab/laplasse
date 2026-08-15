@@ -209,6 +209,10 @@ export interface ApiUnifiedSearchResult {
     data: ApiProductSearchHit[]
     meta: { total: number; query: string; limit: number; offset: number }
   }
+  menus: {
+    data: MenuSearchHit[]
+    meta: { total: number; query: string; limit: number; offset: number }
+  }
   meta: { query: string; type: string }
 }
 
@@ -484,21 +488,32 @@ export interface Order {
       phone: string | null
       vehicle: string | null
     } | null
+    courier_profile?: {
+      rating_avg: number
+      user: { full_name?: string | null }
+    } | null
   } | null
   order_source?: 'MARKETPLACE' | 'FOOD' | string
   return_request?: OrderReturnRequest | null
   delivery_dispute?: DeliveryDispute | null
+  courier_review?: {
+    id: string
+    rating: number
+    comment?: string | null
+  } | null
 }
 
 export interface OrderItem {
   id: string
   product_id?: string | null
+  menu_item_id?: string | null
   product_name: string
   variant_name?: string | null
   unit_price: number
   quantity: number
   line_total: number
   image_url?: string | null
+  modifiers?: unknown
   product?: {
     id: string
     slug: string
@@ -542,6 +557,19 @@ export interface OrderEtaSnapshot {
   eta_minutes: number
   eta_arrival_at: string | null
   eta_updated_at: string
+}
+
+export interface ReorderResult {
+  cart: Cart
+  added_count: number
+  added: string[]
+  skipped: Array<{ name: string; reason: string }>
+}
+
+export interface CourierReview {
+  id: string
+  rating: number
+  comment?: string | null
 }
 
 export interface DeliveryTrackingData {
@@ -726,6 +754,8 @@ export interface MerchantServiceConfig {
   price: number | null
   nightly_rate?: number | null
   weekend_nightly_rate?: number | null
+  peak_nightly_rate?: number | null
+  peak_months?: unknown
   min_stay_nights?: number | null
   capacity?: number | null
   max_guests?: number | null
@@ -736,7 +766,27 @@ export interface MerchantServiceConfig {
   highlights?: string[]
   bedrooms?: number | null
   bathrooms?: number | null
+  beds?: number | null
+  property_type?: string | null
+  unit_type?: string | null
   is_active?: boolean
+}
+
+export interface PublicRoomPayload {
+  merchant: {
+    id: string
+    business_name: string
+    slug: string
+    cover_image?: string | null
+    location?: {
+      address?: string | null
+      district?: string | null
+      city?: string | null
+    } | null
+  }
+  room: MerchantServiceConfig
+  booking_settings?: BookingSettingsConfig | null
+  booking_enabled?: boolean
 }
 
 export interface BookingSettingsConfig {
@@ -817,6 +867,7 @@ export interface MerchantSuggestion {
   business_name: string
   slug: string
   category_name: string
+  category_slug?: string
   district: string | null
   verification_status: string
   _highlight: string | null
@@ -838,14 +889,27 @@ export interface TrendingSearchItem {
   count: number
 }
 
+export interface MenuSuggestion {
+  id: string
+  name: string
+  price: number
+  currency: string
+  prep_minutes: number | null
+  image_url: string | null
+  section_name: string | null
+  merchant: { business_name: string; slug: string }
+  _highlight: string | null
+}
+
 export interface AutocompleteUnifiedResult {
   merchants: MerchantSuggestion[]
   products: ProductSuggestion[]
+  menus: MenuSuggestion[]
 }
 
 export interface UnifiedSearchParams {
   q: string
-  type?: 'all' | 'merchants' | 'products'
+  type?: 'all' | 'merchants' | 'products' | 'menus'
   limit?: number
   offset?: number
   city?: string

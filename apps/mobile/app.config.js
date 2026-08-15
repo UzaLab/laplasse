@@ -16,7 +16,7 @@ module.exports = ({ config }) => ({
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: '#fffbeb',
+      backgroundColor: '#FAFAFA',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -74,7 +74,7 @@ module.exports = ({ config }) => ({
       'expo-notifications',
       {
         icon: './assets/images/icon.png',
-        color: '#f59e0b',
+        color: '#0f182b',
       },
     ],
   ],

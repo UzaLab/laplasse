@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CountrySelect } from '@/src/components/CountrySelect'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { colors, fonts, spacing } from '@/src/theme'
@@ -66,10 +67,7 @@ export function MobileDrawer({
         >
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <View style={styles.logoTile}>
-              <Ionicons name="location" size={18} color={colors.brand500} />
-            </View>
-            <Text style={styles.brand}>LaPlasse</Text>
+            <BrandLogo variant="full" style={styles.brandLogo} />
           </View>
           <Pressable onPress={onClose} hitSlop={12}>
             <Ionicons name="close" size={24} color={colors.slate900} />
@@ -192,15 +190,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoTile: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.slate900,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brand: { fontFamily: fonts.extrabold, fontSize: 18, color: colors.slate900 },
+  brandLogo: { height: 28, width: 120 },
   body: { padding: spacing.gutter, paddingBottom: 40 },
   linkRow: {
     flexDirection: 'row',

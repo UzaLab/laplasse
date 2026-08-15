@@ -33,7 +33,7 @@ export const PROFILE_MAIN_NAV: ProfileNavItem[] = [
 export function resolveProfileNavId(pathname: string): ProfileNavId {
   if (pathname === '/profile' || pathname === '/profile/') return 'overview'
   if (pathname.startsWith('/profile/bookings')) return 'bookings'
-  if (pathname.startsWith('/profile/orders')) return 'orders'
+  if (pathname.startsWith('/profile/orders') || pathname.startsWith('/orders/')) return 'orders'
   if (pathname === '/favoris') return 'favorites'
   if (pathname.startsWith('/profile/reviews')) return 'reviews'
   if (pathname.startsWith('/profile/loyalty')) return 'loyalty'

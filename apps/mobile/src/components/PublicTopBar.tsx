@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { useCartItemCount } from '@/src/hooks/useCartItemCount'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -27,7 +28,7 @@ export function PublicTopBar({
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </Pressable>
 
-        <Text style={styles.brand}>LaPlasse</Text>
+        <BrandLogo variant="full" style={styles.brandLogo} />
 
         <View style={styles.right}>
           {showCart ? (
@@ -73,12 +74,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pressed: { opacity: 0.75 },
-  brand: {
-    fontFamily: fonts.extrabold,
-    fontSize: 20,
-    letterSpacing: -0.4,
-    color: colors.brand600,
-  },
+  brandLogo: { height: 28, width: 110 },
   badge: {
     position: 'absolute',
     top: 2,

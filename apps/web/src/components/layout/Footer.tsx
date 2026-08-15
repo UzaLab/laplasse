@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { BookOpen, Globe, Share2, LinkIcon, Heart } from 'lucide-react'
+import { Globe, Share2, LinkIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BrandLogo } from '@/components/BrandLogo'
 import { BRAND_FOOTER_TAGLINE } from '@/lib/brandCopy'
 
 interface FooterProps {
@@ -23,10 +24,7 @@ export function Footer({ mobileHidden = false }: FooterProps) {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
-                <BookOpen size={18} />
-              </div>
-              <span className="text-xl font-extrabold tracking-tight text-slate-900">LaPlasse</span>
+              <BrandLogo variant="full" className="h-9" />
             </div>
             <p className="text-sm text-slate-500 mb-6">
               {BRAND_FOOTER_TAGLINE}

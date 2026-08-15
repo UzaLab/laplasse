@@ -77,7 +77,7 @@ export class SearchController {
   ) {
     return this.searchService.autocompleteProducts(
       q ?? '',
-      limit ? Number(limit) : 8,
+      limit ? Number(limit) : 3,
       country ?? req.countryCode ?? DEFAULT_COUNTRY,
     )
   }
@@ -91,7 +91,7 @@ export class SearchController {
   ) {
     return this.searchService.autocompleteMenus(
       q ?? '',
-      limit ? Number(limit) : 8,
+      limit ? Number(limit) : 3,
       country ?? req.countryCode ?? DEFAULT_COUNTRY,
     )
   }
@@ -130,9 +130,10 @@ export class SearchController {
     @Query('offset') offset?: string,
     @Query('merchantOffset') merchantOffset?: string,
     @Query('productOffset') productOffset?: string,
+    @Query('menuOffset') menuOffset?: string,
   ) {
     const resolvedType =
-      type === 'merchants' || type === 'products' ? type : 'all'
+      type === 'merchants' || type === 'products' || type === 'menus' ? type : 'all'
 
     const result = await this.searchService.unifiedSearch({
       q,
@@ -147,11 +148,12 @@ export class SearchController {
       offset: offset ? Number(offset) : 0,
       merchantOffset: merchantOffset ? Number(merchantOffset) : undefined,
       productOffset: productOffset ? Number(productOffset) : undefined,
+      menuOffset: menuOffset ? Number(menuOffset) : undefined,
     })
 
     if (q?.trim()) {
       const total =
-        result.merchants.meta.total + result.products.meta.total
+        result.merchants.meta.total + result.products.meta.total + result.menus.meta.total
       this.searchService.logSearch(q, city, total).catch(() => {})
     }
 

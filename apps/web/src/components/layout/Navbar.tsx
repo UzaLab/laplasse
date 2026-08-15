@@ -1,13 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Search, User, Menu, LogOut, LayoutDashboard, UserCircle2, Heart, ShoppingBag } from 'lucide-react'
+import { Search, User, Menu, LogOut, LayoutDashboard, UserCircle2, Heart, ShoppingBag } from 'lucide-react'
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useCartStore, useCartItemCount } from '@/stores/cartStore'
 import { MobileNav } from './MobileNav'
+import { BrandLogo } from '@/components/BrandLogo'
 import { CountrySwitcher } from './CountrySwitcher'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { GLOBAL_NAV_ITEMS } from './navConfig'
@@ -63,10 +64,7 @@ export function Navbar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
-          <div className="w-8 h-8 bg-slate-900 text-brand-500 rounded-lg flex items-center justify-center">
-            <MapPin size={18} />
-          </div>
-          <span className="text-xl font-extrabold tracking-tight text-slate-900">LaPlasse</span>
+          <BrandLogo variant="full" className="h-9" />
         </Link>
 
         {/* Links desktop */}

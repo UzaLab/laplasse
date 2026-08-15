@@ -7,7 +7,8 @@
     "build": "next build",
     "build:docker": "next build --webpack",
     "start": "next start",
-    "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs"
+    "generate:pwa-icons": "node scripts/generate-pwa-icons.mjs",
+    "sync:brand": "node ../../scripts/sync-brand-assets.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.56.0",

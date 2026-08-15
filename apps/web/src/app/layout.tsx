@@ -41,7 +41,7 @@ const outfit = Outfit({
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://laplasse.ci'
 
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#0f182b',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',

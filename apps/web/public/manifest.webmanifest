@@ -9,7 +9,7 @@
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "portrait-primary",
   "background_color": "#FAFAFA",
-  "theme_color": "#0f172a",
+  "theme_color": "#0f182b",
   "lang": "fr",
   "dir": "ltr",
   "categories": ["shopping", "food", "lifestyle", "business"],

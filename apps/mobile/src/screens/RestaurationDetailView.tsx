@@ -17,6 +17,7 @@ import { FavoriteButton } from '@/src/components/FavoriteButton'
 import { RestaurationCartBar } from '@/src/components/RestaurationCartBar'
 import { AppImage } from '@/src/components/ui/AppImage'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { RestaurationMenuPanel } from '@/src/components/RestaurationMenuPanel'
 import { TableBookingPanel } from '@/src/components/TableBookingPanel'
 import { LoadingState } from '@/src/components/ui'
@@ -105,7 +106,7 @@ export function RestaurationDetailView({ slug }: { slug: string }) {
           </Pressable>
 
           {scrolled ? (
-            <Text style={styles.headerBrand}>LaPlasse</Text>
+            <BrandLogo variant="mark" markStyle={styles.headerBrandLogo} />
           ) : (
             <View style={styles.headerBrandSpacer} />
           )}
@@ -237,11 +238,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerBtnScrolled: { backgroundColor: colors.surfaceContainer },
-  headerBrand: {
-    fontFamily: fonts.extrabold,
-    fontSize: 16,
-    color: colors.text,
-  },
+  headerBrandLogo: { width: 32, height: 32 },
   headerBrandSpacer: { width: 80 },
   headerActions: { flexDirection: 'row', gap: 8 },
   hero: { height: 320, position: 'relative', backgroundColor: colors.brand100, overflow: 'hidden' },

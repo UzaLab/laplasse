@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowRight, MapPin } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import {
   buildCountrySwitchUrl,
   COUNTRY_HUB_ENTRIES,
@@ -52,13 +53,8 @@ export function CountryHubModal() {
 
         <div className="relative px-6 sm:px-8 pt-8 pb-7">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-11 h-11 rounded-2xl bg-slate-900 text-brand-400 flex items-center justify-center shadow-lg shadow-slate-900/10">
-              <MapPin size={20} aria-hidden />
-            </div>
+            <BrandLogo variant="full" className="h-10 w-auto" />
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-600">
-                LaPlasse
-              </p>
               <p className="text-sm font-semibold text-slate-500">
                 Marketplace locale premium
               </p>

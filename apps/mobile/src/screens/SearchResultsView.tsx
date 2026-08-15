@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getDefaultCity } from '@laplasse/shared-config'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
@@ -23,8 +23,10 @@ import {
   SearchResultsFiltersSheet,
   type SearchResultsFilters,
 } from '@/src/components/SearchResultsFiltersSheet'
+import { SearchResultsMenuCard } from '@/src/components/SearchResultsMenuCard'
 import { SearchResultsMerchantCard } from '@/src/components/SearchResultsMerchantCard'
 import { SearchResultsProductCard } from '@/src/components/SearchResultsProductCard'
+import { SearchResultsShopCard } from '@/src/components/SearchResultsShopCard'
 import { EmptyState, LoadingState } from '@/src/components/ui'
 import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
 import { getApiClient } from '@/src/lib/api'
@@ -33,7 +35,7 @@ import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { colors, fonts, homeLayout, layout } from '@/src/theme'
 
-type Tab = 'merchants' | 'products'
+type Tab = 'merchants' | 'products' | 'menus' | 'shops'
 
 function greetingName(fullName: string | null | undefined, email: string | undefined): string {
   if (fullName?.trim()) return fullName.trim().split(/\s+/)[0] ?? fullName
@@ -42,8 +44,14 @@ function greetingName(fullName: string | null | undefined, email: string | undef
 }
 
 function merchantHref(merchant: ApiMerchant): `/m/${string}` | `/restauration/${string}` {
-  if (isFoodCategorySlug(merchant.category.slug)) return `/restauration/${merchant.slug}`
+  const slug = merchant.category?.slug ?? ''
+  if (isFoodCategorySlug(slug)) return `/restauration/${merchant.slug}`
   return `/m/${merchant.slug}`
+}
+
+function pickDefaultTab(totals: Record<Tab, number>): Tab {
+  const priority: Tab[] = ['products', 'merchants', 'menus', 'shops']
+  return priority.find(tab => totals[tab] > 0) ?? 'merchants'
 }
 
 function applyCategoryFilter(merchants: ApiMerchant[], categories: string[]) {
@@ -71,6 +79,7 @@ export default function SearchResultsView({
 
   const [query, setQuery] = useState(initialQuery)
   const [tab, setTab] = useState<Tab>('merchants')
+  const autoTabQueryRef = useRef<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(initialFiltersOpen)
   const [filters, setFilters] = useState<SearchResultsFilters>(() => ({
@@ -107,7 +116,8 @@ export default function SearchResultsView({
       const next = lastPageParam + pageSize
       const merchantsHasMore = next < lastPage.merchants.meta.total
       const productsHasMore = next < lastPage.products.meta.total
-      return merchantsHasMore || productsHasMore ? next : undefined
+      const menusHasMore = next < (lastPage.menus?.meta.total ?? 0)
+      return merchantsHasMore || productsHasMore || menusHasMore ? next : undefined
     },
     enabled: debouncedQuery.length >= 2,
   })
@@ -129,9 +139,28 @@ export default function SearchResultsView({
     })
   }, [searchPages, filters.categories])
 
+  const menus = useMemo(
+    () => searchPages.flatMap(page => page.menus?.data ?? []),
+    [searchPages],
+  )
+
+  const shops = useMemo(() => {
+    const map = new Map<string, { name: string; slug: string }>()
+    for (const product of products) {
+      const slug = product.merchant.slug
+      if (!slug || map.has(slug)) continue
+      map.set(slug, { name: product.merchant.business_name, slug })
+    }
+    return Array.from(map.values())
+  }, [products])
+
   const canLoadMore = tab === 'merchants'
     ? merchants.length < (searchData?.merchants.meta.total ?? 0)
-    : products.length < (searchData?.products.meta.total ?? 0)
+    : tab === 'products'
+      ? products.length < (searchData?.products.meta.total ?? 0)
+      : tab === 'menus'
+        ? menus.length < (searchData?.menus?.meta.total ?? 0)
+        : false
 
   const trendingQuery = useQuery({
     queryKey: ['search-trending', city, countryCode],
@@ -147,6 +176,35 @@ export default function SearchResultsView({
     ? merchants.length
     : (searchData?.merchants.meta.total ?? 0)
   const productTotal = searchData?.products.meta.total ?? 0
+  const menuTotal = searchData?.menus?.meta.total ?? 0
+  const shopTotal = shops.length
+  const globalTotal = merchantTotal + productTotal + menuTotal + shopTotal
+
+  useEffect(() => {
+    setQuery(initialQuery)
+  }, [initialQuery])
+
+  useEffect(() => {
+    if (searchQuery.isLoading || !searchData || debouncedQuery.length < 2) return
+    if (autoTabQueryRef.current === debouncedQuery) return
+
+    const nextTab = pickDefaultTab({
+      merchants: merchantTotal,
+      products: productTotal,
+      menus: menuTotal,
+      shops: shopTotal,
+    })
+    setTab(nextTab)
+    autoTabQueryRef.current = debouncedQuery
+  }, [
+    debouncedQuery,
+    searchQuery.isLoading,
+    searchData,
+    merchantTotal,
+    productTotal,
+    menuTotal,
+    shopTotal,
+  ])
 
   const loadMore = () => {
     if (searchQuery.hasNextPage && !searchQuery.isFetchingNextPage) {
@@ -172,15 +230,16 @@ export default function SearchResultsView({
       })
     }
   }
-  const activeTotal = tab === 'merchants' ? merchantTotal : productTotal
+  const activeTotal = tab === 'merchants'
+    ? merchantTotal
+    : tab === 'products'
+      ? productTotal
+      : tab === 'menus'
+        ? menuTotal
+        : shopTotal
   const hasFilters = filters.categories.length > 0 || filters.sort !== 'trust_score'
   const listBottomPad = layout.bottomNavHeight + insets.bottom + 16
   const productColWidth = (Dimensions.get('window').width - homeLayout.gutter * 2 - 12) / 2
-
-  const goToMap = () => {
-    onClear()
-    router.replace('/(tabs)/search')
-  }
 
   const scrollTopPad = insets.top + homeLayout.topBarHeight + 8
 
@@ -194,7 +253,7 @@ export default function SearchResultsView({
         />
         <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
         <View style={{ paddingTop: scrollTopPad, flex: 1 }}>
-          <EmptyState title="Recherchez un établissement ou un produit" />
+          <EmptyState title="Recherchez sur LaPlasse" subtitle="Établissements, plats, boutiques, produits…" />
         </View>
       </View>
     )
@@ -220,7 +279,7 @@ export default function SearchResultsView({
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Établissements, produits, services…"
+            placeholder="Établissements, plats, boutiques, produits…"
             placeholderTextColor={colors.textLight}
             style={styles.searchInput}
             returnKeyType="search"
@@ -233,20 +292,21 @@ export default function SearchResultsView({
           ) : null}
         </View>
 
-        <Pressable onPress={goToMap} hitSlop={8} style={styles.backLinkWrap}>
-          <Text style={styles.backLink}>← Carte</Text>
-        </Pressable>
-
         {initialFiltersOpen && debouncedQuery.length < 2 ? (
           <View style={styles.filtersHint}>
             <Text style={styles.filtersHintTitle}>Recherche avancée</Text>
             <Text style={styles.filtersHintText}>
-              Saisissez au moins 2 caractères pour explorer établissements et produits.
+              Saisissez au moins 2 caractères pour explorer établissements, plats, boutiques et produits.
             </Text>
           </View>
         ) : null}
 
-        <View style={styles.tabs}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScroll}
+          contentContainerStyle={styles.tabs}
+        >
           <Pressable onPress={() => setTab('merchants')} style={styles.tabBtn}>
             <Text style={[styles.tabText, tab === 'merchants' && styles.tabTextActive]}>
               Établissements
@@ -257,6 +317,28 @@ export default function SearchResultsView({
               </Text>
             </View>
             {tab === 'merchants' ? <View style={styles.tabIndicator} /> : null}
+          </Pressable>
+          <Pressable onPress={() => setTab('menus')} style={styles.tabBtn}>
+            <Text style={[styles.tabText, tab === 'menus' && styles.tabTextActive]}>
+              Plats
+            </Text>
+            <View style={[styles.tabBadge, tab === 'menus' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, tab === 'menus' && styles.tabBadgeTextActive]}>
+                {menuTotal}
+              </Text>
+            </View>
+            {tab === 'menus' ? <View style={styles.tabIndicator} /> : null}
+          </Pressable>
+          <Pressable onPress={() => setTab('shops')} style={styles.tabBtn}>
+            <Text style={[styles.tabText, tab === 'shops' && styles.tabTextActive]}>
+              Boutiques
+            </Text>
+            <View style={[styles.tabBadge, tab === 'shops' && styles.tabBadgeActive]}>
+              <Text style={[styles.tabBadgeText, tab === 'shops' && styles.tabBadgeTextActive]}>
+                {shopTotal}
+              </Text>
+            </View>
+            {tab === 'shops' ? <View style={styles.tabIndicator} /> : null}
           </Pressable>
           <Pressable onPress={() => setTab('products')} style={styles.tabBtn}>
             <Text style={[styles.tabText, tab === 'products' && styles.tabTextActive]}>
@@ -269,13 +351,15 @@ export default function SearchResultsView({
             </View>
             {tab === 'products' ? <View style={styles.tabIndicator} /> : null}
           </Pressable>
-        </View>
+        </ScrollView>
 
         <View style={styles.metaRow}>
           <Text style={styles.metaText} numberOfLines={1}>
-            {searchQuery.isFetching && merchants.length === 0 && products.length === 0
+            {searchQuery.isFetching && merchants.length === 0 && products.length === 0 && menus.length === 0
               ? 'Recherche en cours…'
-              : `${activeTotal} résultat${activeTotal > 1 ? 's' : ''} pour « ${debouncedQuery} »`}
+              : globalTotal !== activeTotal
+                ? `${globalTotal} résultat${globalTotal > 1 ? 's' : ''} au total · ${activeTotal} dans cet onglet`
+                : `${activeTotal} résultat${activeTotal > 1 ? 's' : ''} pour « ${debouncedQuery} »`}
           </Text>
           <Pressable onPress={() => setFiltersOpen(true)} style={styles.filterBtn}>
             <Ionicons name="options-outline" size={16} color={hasFilters ? colors.brand700 : colors.textMuted} />
@@ -295,7 +379,16 @@ export default function SearchResultsView({
         ) : tab === 'merchants' ? (
           <>
             {merchants.length === 0 ? (
-              <EmptyState title="Aucun établissement" subtitle={`Pour « ${debouncedQuery} »`} />
+              <>
+                <EmptyState title="Aucun établissement" subtitle={`Pour « ${debouncedQuery} »`} />
+                {productTotal > 0 ? (
+                  <Pressable onPress={() => setTab('products')} style={styles.emptyCta}>
+                    <Text style={styles.emptyCtaText}>
+                      Voir {productTotal} produit{productTotal > 1 ? 's' : ''} →
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : (
               <View style={styles.merchantList}>
                 {merchants.map(m => (
@@ -360,6 +453,48 @@ export default function SearchResultsView({
               </View>
             ) : null}
           </>
+        ) : tab === 'menus' ? (
+          <>
+            {menus.length === 0 ? (
+              <EmptyState title="Aucun plat" subtitle={`Pour « ${debouncedQuery} »`} />
+            ) : (
+              <View style={styles.merchantList}>
+                {menus.map(item => (
+                  <SearchResultsMenuCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => router.push(`/restauration/${item.merchant.slug}`)}
+                  />
+                ))}
+              </View>
+            )}
+            {canLoadMore ? (
+              <Pressable
+                onPress={loadMore}
+                style={({ pressed }) => [styles.loadMoreBtn, pressed && { opacity: 0.85 }]}
+              >
+                {searchQuery.isFetchingNextPage ? (
+                  <ActivityIndicator color={colors.brand600} />
+                ) : (
+                  <Text style={styles.loadMoreText}>Voir plus de plats</Text>
+                )}
+              </Pressable>
+            ) : null}
+          </>
+        ) : tab === 'shops' ? (
+          shops.length === 0 ? (
+            <EmptyState title="Aucune boutique" subtitle={`Pour « ${debouncedQuery} »`} />
+          ) : (
+            <View style={styles.merchantList}>
+              {shops.map(shop => (
+                <SearchResultsShopCard
+                  key={shop.slug}
+                  name={shop.name}
+                  onPress={() => router.push(`/m/${shop.slug}/boutique`)}
+                />
+              ))}
+            </View>
+          )
         ) : products.length === 0 ? (
           <EmptyState title="Aucun produit" subtitle={`Pour « ${debouncedQuery} »`} />
         ) : (
@@ -432,25 +567,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     paddingVertical: 12,
   },
-  backLinkWrap: { marginTop: 8, marginBottom: 4 },
-  backLink: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
-    color: colors.brand700,
+  tabsScroll: {
+    marginTop: 12,
+    marginBottom: 12,
+    marginHorizontal: -homeLayout.gutter,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderStrong,
   },
   tabs: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-    marginTop: 12,
-    marginBottom: 12,
+    paddingHorizontal: homeLayout.gutter,
+    gap: 4,
   },
   tabBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingBottom: 10,
+    paddingHorizontal: 10,
     gap: 6,
     position: 'relative',
   },
@@ -478,8 +612,8 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: '15%',
-    right: '15%',
+    left: 8,
+    right: 8,
     height: 2,
     backgroundColor: colors.brand600,
     borderRadius: 1,
@@ -588,6 +722,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   loadMoreText: {
+    fontFamily: fonts.bold,
+    fontSize: 14,
+    color: colors.brand700,
+  },
+  emptyCta: {
+    marginTop: 12,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyCtaText: {
     fontFamily: fonts.bold,
     fontSize: 14,
     color: colors.brand700,

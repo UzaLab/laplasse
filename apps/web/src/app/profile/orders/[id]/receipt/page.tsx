@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useRequireAuth } from '@/hooks/useRequireAuth'
 import { fetchOrder, formatPrice } from '@/lib/marketplaceApi'
 import { formatOrderRef } from '@/features/profile/components/orders/orderUtils'
@@ -36,7 +37,7 @@ export default function OrderReceiptPage() {
     <div className="min-h-screen bg-white text-slate-900 p-8 max-w-2xl mx-auto print:p-4">
       <div className="flex justify-between items-start mb-8 border-b border-slate-200 pb-6">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">LaPlasse</p>
+          <BrandLogo variant="mark" markClassName="h-10 w-10 mb-2" />
           <h1 className="text-2xl font-extrabold">Reçu de commande</h1>
           <p className="text-sm text-slate-500 mt-1">{formatOrderRef(order.id)}</p>
         </div>

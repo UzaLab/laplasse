@@ -29,10 +29,11 @@ export interface ProductSearchFilters {
 }
 
 export interface UnifiedSearchFilters extends SearchFilters {
-  type?: 'all' | 'merchants' | 'products'
+  type?: 'all' | 'merchants' | 'products' | 'menus'
   country?: string
   merchantOffset?: number
   productOffset?: number
+  menuOffset?: number
 }
 
 type MeiliDocument = Record<string, unknown>
@@ -137,6 +138,10 @@ export class SearchService implements OnModuleInit {
         rankingRules: [
           'words', 'typo', 'proximity', 'attribute', 'sort', 'exactness',
         ],
+        typoTolerance: {
+          enabled: true,
+          minWordSizeForTypos: { oneTypo: 3, twoTypos: 7 },
+        },
       })
       this.logger.log(`Meilisearch index "${this.PRODUCTS_INDEX}" configured`)
     } catch (error) {
@@ -278,13 +283,18 @@ export class SearchService implements OnModuleInit {
       }
 
       const sorted = this.sortSearchHitsWithBoost(hits, searchBoostIds).slice(0, limit)
+
+      if (sorted.length === 0 && q.trim()) {
+        return this.fallbackSearch(filters)
+      }
+
       const injectedCount = offset === 0
         ? sorted.filter(h => searchBoostIds.has(String(h.id)) && !result.hits.some(r => String(r.id) === String(h.id))).length
         : 0
 
       const enriched = await attachCardPreviewsToMerchants(
         this.prisma,
-        sorted as Array<{ id: string } & Record<string, unknown>>,
+        sorted.map(h => this.normalizeMerchantHit(h)),
       )
 
       return {
@@ -357,6 +367,44 @@ export class SearchService implements OnModuleInit {
     location: { select: { city: true, district: true, country: true } },
     _count: { select: { reviews: { where: { status: 'APPROVED' as const } } } },
   } as const
+
+  private normalizeMerchantHit(h: MeiliDocument) {
+    const nested = h['category'] as { id?: string; name?: string; slug?: string; icon?: string | null } | undefined
+    return {
+      id: h['id'] as string,
+      business_name: h['business_name'] as string,
+      slug: h['slug'] as string,
+      description: (h['description'] as string | null) ?? null,
+      cover_image: (h['cover_image'] as string | null) ?? null,
+      logo: (h['logo'] as string | null) ?? null,
+      whatsapp: (h['whatsapp'] as string | null) ?? null,
+      verification_status: h['verification_status'] as string,
+      trust_score: (h['trust_score'] as number) ?? 0,
+      is_sponsored: Boolean(h['is_sponsored']),
+      category: nested?.slug
+        ? {
+            id: nested.id ?? '',
+            name: nested.name ?? '',
+            slug: nested.slug,
+            icon: nested.icon ?? null,
+          }
+        : {
+            id: (h['category_id'] as string) ?? '',
+            name: (h['category_name'] as string) ?? '',
+            slug: (h['category_slug'] as string) ?? '',
+            icon: (h['category_icon'] as string | null) ?? null,
+          },
+      location:
+        h['city'] || h['district'] || h['country']
+          ? {
+              city: (h['city'] as string | null) ?? null,
+              district: (h['district'] as string | null) ?? null,
+              country: (h['country'] as string | null) ?? null,
+            }
+          : null,
+      review_count: (h['review_count'] as number) ?? 0,
+    }
+  }
 
   private formatMerchantAsSearchHit(
     m: {
@@ -542,7 +590,7 @@ export class SearchService implements OnModuleInit {
         showRankingScore: false,
       }) as { hits: MeiliDocument[] }
 
-      return result.hits.map(h => ({
+      const hits = result.hits.map(h => ({
         id: h['id'] as string,
         business_name: h['business_name'] as string,
         slug: h['slug'] as string,
@@ -552,6 +600,12 @@ export class SearchService implements OnModuleInit {
         verification_status: h['verification_status'] as string,
         _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['business_name'],
       }))
+
+      if (hits.length === 0) {
+        return this.autocompleteMerchantsFallback(q, limit, country)
+      }
+
+      return hits
     } catch (error) {
       if (this.isMeiliRequired()) this.failMeiliRequired(error)
       return this.autocompleteMerchantsFallback(q, limit, country)
@@ -604,7 +658,7 @@ export class SearchService implements OnModuleInit {
         showRankingScore: false,
       }) as { hits: MeiliDocument[] }
 
-      return result.hits.map(h => ({
+      const hits = result.hits.map(h => ({
         id: h['id'] as string,
         name: h['name'] as string,
         slug: h['slug'] as string,
@@ -617,6 +671,12 @@ export class SearchService implements OnModuleInit {
         },
         _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['name'],
       }))
+
+      if (hits.length === 0) {
+        return this.autocompleteProductsFallback(q, limit, country)
+      }
+
+      return hits
     } catch (error) {
       if (this.isMeiliRequired()) this.failMeiliRequired(error)
       return this.autocompleteProductsFallback(q, limit, country)
@@ -638,6 +698,8 @@ export class SearchService implements OnModuleInit {
             OR: [
               { name: { contains: q, mode: 'insensitive' } },
               { description: { contains: q, mode: 'insensitive' } },
+              { category: { name: { contains: q, mode: 'insensitive' } } },
+              { shop: { name: { contains: q, mode: 'insensitive' } } },
             ],
           },
         ],
@@ -675,16 +737,16 @@ export class SearchService implements OnModuleInit {
     }))
   }
 
-  async autocompleteUnified(q: string, limit = 6, country?: string) {
-    const merchantLimit = Math.ceil(limit / 2)
-    const productLimit = Math.floor(limit / 2)
+  async autocompleteUnified(q: string, _limit = 12, country?: string) {
+    const perBucket = 3
 
-    const [merchants, products] = await Promise.all([
-      this.autocomplete(q, merchantLimit, country),
-      this.autocompleteProducts(q, productLimit, country),
+    const [merchants, products, menus] = await Promise.all([
+      this.autocomplete(q, perBucket, country),
+      this.autocompleteProducts(q, perBucket, country),
+      this.autocompleteMenus(q, perBucket, country),
     ])
 
-    return { merchants, products }
+    return { merchants, products, menus }
   }
 
   // ─── Trending searches ─────────────────────────────────────────────────────
@@ -836,18 +898,23 @@ export class SearchService implements OnModuleInit {
       offset = 0,
       merchantOffset,
       productOffset,
+      menuOffset,
       ...rest
     } = filters
     const pageSize = limit
 
     const resolvedMerchantOffset =
-      type === 'products'
+      type === 'products' || type === 'menus'
         ? 0
         : merchantOffset ?? (type === 'merchants' ? offset : 0)
     const resolvedProductOffset =
-      type === 'merchants'
+      type === 'merchants' || type === 'menus'
         ? 0
         : productOffset ?? (type === 'products' ? offset : 0)
+    const resolvedMenuOffset =
+      type === 'merchants' || type === 'products'
+        ? 0
+        : menuOffset ?? (type === 'menus' ? offset : 0)
 
     const emptyProducts = {
       data: [] as Awaited<ReturnType<SearchService['searchProducts']>>['data'],
@@ -860,8 +927,19 @@ export class SearchService implements OnModuleInit {
       },
     }
 
-    const [merchants, products] = await Promise.all([
-      type !== 'products'
+    const emptyMenus = {
+      data: [] as Awaited<ReturnType<SearchService['searchMenus']>>['data'],
+      meta: {
+        total: 0,
+        query: rest.q ?? '',
+        limit: pageSize,
+        offset: 0,
+        processing_time_ms: 0,
+      },
+    }
+
+    const [merchants, products, menus] = await Promise.all([
+      type !== 'products' && type !== 'menus'
         ? this.search({
             ...rest,
             country,
@@ -869,13 +947,25 @@ export class SearchService implements OnModuleInit {
             offset: resolvedMerchantOffset,
           })
         : Promise.resolve(null),
-      type !== 'merchants'
+      type !== 'merchants' && type !== 'menus'
         ? this.searchProducts({
             q: rest.q,
             country,
             limit: pageSize,
             offset: resolvedProductOffset,
           })
+        : Promise.resolve(null),
+      type !== 'merchants' && type !== 'products'
+        ? this.searchMenus(rest.q ?? '', pageSize, country).then(result => ({
+            data: result.data,
+            meta: {
+              total: result.meta.total,
+              query: result.meta.query,
+              limit: pageSize,
+              offset: resolvedMenuOffset,
+              processing_time_ms: result.meta.processing_time_ms,
+            },
+          }))
         : Promise.resolve(null),
     ])
 
@@ -891,12 +981,14 @@ export class SearchService implements OnModuleInit {
         },
       },
       products: products ?? emptyProducts,
+      menus: menus ?? emptyMenus,
       meta: {
         query: rest.q ?? '',
         type,
         processing_time_ms:
           (merchants?.meta.processing_time_ms ?? 0) +
-          (products?.meta.processing_time_ms ?? 0),
+          (products?.meta.processing_time_ms ?? 0) +
+          (menus?.meta.processing_time_ms ?? 0),
       },
     }
   }
@@ -948,6 +1040,10 @@ export class SearchService implements OnModuleInit {
         processingTimeMs: number
       }
 
+      if ((result.estimatedTotalHits ?? result.hits.length) === 0 && q.trim()) {
+        return this.fallbackProductSearch(filters)
+      }
+
       return {
         data: result.hits.map(h => this.formatProductHit(h)),
         meta: {
@@ -987,6 +1083,8 @@ export class SearchService implements OnModuleInit {
           OR: [
             { name: { contains: q, mode: 'insensitive' } },
             { description: { contains: q, mode: 'insensitive' } },
+            { category: { name: { contains: q, mode: 'insensitive' } } },
+            { shop: { name: { contains: q, mode: 'insensitive' } } },
           ],
         }),
       },
@@ -1217,7 +1315,7 @@ export class SearchService implements OnModuleInit {
         showRankingScore: false,
       }) as { hits: MeiliDocument[] }
 
-      return result.hits.map(h => ({
+      const hits = result.hits.map(h => ({
         id: h['id'] as string,
         name: h['name'] as string,
         price: h['price'] as number,
@@ -1231,6 +1329,12 @@ export class SearchService implements OnModuleInit {
         },
         _highlight: (h['_formatted'] as Record<string, string> | undefined)?.['name'],
       }))
+
+      if (hits.length === 0) {
+        return this.autocompleteMenusFallback(q, limit, country)
+      }
+
+      return hits
     } catch (error) {
       if (this.isMeiliRequired()) this.failMeiliRequired(error)
       return this.autocompleteMenusFallback(q, limit, country)
@@ -1255,6 +1359,14 @@ export class SearchService implements OnModuleInit {
           'section_name', 'price', 'currency', 'prep_minutes', 'image_url',
         ],
       }) as { hits: MeiliDocument[]; estimatedTotalHits: number; processingTimeMs: number }
+
+      if ((result.estimatedTotalHits ?? result.hits.length) === 0) {
+        const fallback = await this.autocompleteMenusFallback(q, limit, country)
+        return {
+          data: fallback,
+          meta: { total: fallback.length, query: q.trim(), limit, processing_time_ms: 0 },
+        }
+      }
 
       return {
         data: result.hits.map(h => ({

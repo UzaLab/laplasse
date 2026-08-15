@@ -1,28 +1,35 @@
 import { useLocalSearchParams } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { SearchDiscoverView } from '@/src/components/SearchDiscoverView'
 import SearchResultsView from '@/src/screens/SearchResultsView'
 
+function paramString(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0]?.trim() ?? ''
+  return value?.trim() ?? ''
+}
+
 export default function SearchScreen() {
-  const params = useLocalSearchParams<{ q?: string; category?: string; filters?: string }>()
-  const [submitted, setSubmitted] = useState(params.q ?? '')
+  const params = useLocalSearchParams<{ q?: string | string[]; category?: string | string[]; filters?: string | string[] }>()
+  const queryFromParams = useMemo(() => paramString(params.q), [params.q])
+  const categoryFromParams = useMemo(() => paramString(params.category), [params.category])
+  const filtersOpen = paramString(params.filters) === '1'
+  const [submitted, setSubmitted] = useState(queryFromParams)
 
   useEffect(() => {
-    if (params.q) setSubmitted(params.q)
-  }, [params.q])
+    if (queryFromParams) setSubmitted(queryFromParams)
+  }, [queryFromParams])
 
-  const showResults =
-    params.filters === '1' || (submitted.length >= 2)
+  const showResults = filtersOpen || submitted.length >= 2
 
   if (!showResults) {
-    return <SearchDiscoverView initialCategory={params.category} />
+    return <SearchDiscoverView initialCategory={categoryFromParams} />
   }
 
   return (
     <SearchResultsView
       initialQuery={submitted}
-      initialCategory={params.category}
-      filtersOpen={params.filters === '1'}
+      initialCategory={categoryFromParams}
+      filtersOpen={filtersOpen}
       onClear={() => setSubmitted('')}
     />
   )

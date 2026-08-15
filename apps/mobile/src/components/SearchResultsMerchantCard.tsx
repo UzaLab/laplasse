@@ -16,7 +16,9 @@ export function SearchResultsMerchantCard({
 }) {
   const rating = merchantSearchRating(merchant)
   const location = merchantLocationLine(merchant)
-  const icon = getCategoryIcon(merchant.category.slug, merchant.category.icon)
+  const categorySlug = merchant.category?.slug ?? ''
+  const categoryIcon = merchant.category?.icon ?? null
+  const icon = getCategoryIcon(categorySlug, categoryIcon)
 
   return (
     <Pressable
@@ -35,7 +37,7 @@ export function SearchResultsMerchantCard({
           <FavoriteButton merchantId={merchant.id} size={18} />
         </View>
         <View style={styles.badges}>
-          {merchant.category.name ? (
+          {merchant.category?.name ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText} numberOfLines={1}>{merchant.category.name}</Text>
             </View>

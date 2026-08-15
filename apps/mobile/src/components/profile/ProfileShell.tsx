@@ -22,6 +22,7 @@ import { profileTheme } from '@/src/lib/profileTheme'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
 import { MobileBottomNavBar } from '@/src/components/MobileBottomNav'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { layout } from '@/src/theme'
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 300)
@@ -84,12 +85,7 @@ function ProfileNavDrawer({
         >
           <View style={styles.drawerHeader}>
             <View style={styles.logoRow}>
-              <View style={styles.logoMark}>
-                <Text style={styles.logoMarkText}>LP</Text>
-              </View>
-              <Text style={styles.logoText}>
-                La<Text style={styles.logoAccent}>Plasse</Text>
-              </Text>
+              <BrandLogo variant="full" style={styles.logoFull} />
             </View>
             <Pressable onPress={onClose} hitSlop={12}>
               <Ionicons name="close" size={22} color={profileTheme.textLight} />
@@ -305,25 +301,7 @@ const styles = StyleSheet.create({
     borderBottomColor: profileTheme.borderLight,
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: profileTheme.navActiveBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoMarkText: {
-    fontFamily: profileTheme.fonts.extrabold,
-    fontSize: 13,
-    color: profileTheme.navIconActive,
-  },
-  logoText: {
-    fontFamily: profileTheme.fonts.extrabold,
-    fontSize: 17,
-    color: profileTheme.text,
-  },
-  logoAccent: { color: profileTheme.navIconActive },
+  logoFull: { height: 28, width: 120 },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',

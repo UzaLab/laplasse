@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo, useState, type RefObject } from 'react'
+import { useRouter } from 'expo-router'
+import { getRoomPublicPath } from '@/src/lib/roomListing'
+import { useCallback, useState, type RefObject } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -14,56 +16,23 @@ import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MerchantServiceConfig } from '@laplasse/api-client'
+import { RoomStayCalendar } from '@/src/components/RoomStayCalendar'
 import { getApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { colors, fonts, radii } from '@/src/theme'
 
-const MONTH_NAMES = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-]
-const DAY_ABBR = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa']
-
-function todayStr() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function nightsBetween(a: string, b: string): number {
-  return Math.round(
-    (new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 86400000,
-  )
-}
-
-function formatShortDate(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00`)
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-}
-
-function monthRange(year: number, month: number) {
-  const to = new Date(year, month + 1, 0)
-  return {
-    from: `${year}-${String(month + 1).padStart(2, '0')}-01`,
-    to: `${year}-${String(month + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`,
-    daysInMonth: to.getDate(),
-    startWeekday: new Date(year, month, 1).getDay(),
-  }
-}
-
-interface DayCell {
-  date: string
-  available: boolean
-  nightly_rate: number | null
-}
-
 function RoomCard({
   room,
   selected,
+  merchantSlug,
   onSelect,
+  onOpenDetails,
 }: {
   room: MerchantServiceConfig
   selected: boolean
+  merchantSlug: string
   onSelect: () => void
+  onOpenDetails: () => void
 }) {
   const rate = room.nightly_rate ?? room.price
   const image = room.image_urls?.[0]
@@ -103,10 +72,10 @@ function RoomCard({
           )}
         </View>
         <View style={styles.roomCardActions}>
-          <View style={styles.roomDetailsLink}>
+          <Pressable onPress={onOpenDetails} style={styles.roomDetailsLink} hitSlop={8}>
             <Ionicons name="open-outline" size={14} color={colors.brand600} />
             <Text style={styles.roomDetailsText}>Détails</Text>
-          </View>
+          </Pressable>
           {selected ? (
             <Text style={styles.roomSelectedLabel}>SÉLECTIONNÉE</Text>
           ) : null}
@@ -138,10 +107,10 @@ export function HotelChambresTab({
   onDatesChange?: (checkIn: string | null, checkOut: string | null) => void
 }) {
   const user = useAuthStore(s => s.user)
+  const router = useRouter()
   const isResidence = categorySlug === 'residences'
 
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
-  const [viewDate, setViewDate] = useState(() => new Date())
   const [checkIn, setCheckIn] = useState<string | null>(externalCheckIn ?? null)
   const [checkOut, setCheckOut] = useState<string | null>(externalCheckOut ?? null)
   const [rangeError, setRangeError] = useState('')
@@ -152,13 +121,6 @@ export function HotelChambresTab({
   const [guestPhone, setGuestPhone] = useState('')
   const [partySize, setPartySize] = useState('2')
   const [notes, setNotes] = useState('')
-
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-  const { from, to, daysInMonth, startWeekday } = useMemo(
-    () => monthRange(year, month),
-    [year, month],
-  )
 
   const configQuery = useQuery({
     queryKey: ['booking-config', merchantId],
@@ -171,65 +133,12 @@ export function HotelChambresTab({
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) ?? rooms[0] ?? null
 
-  const calendarQuery = useQuery({
-    queryKey: ['room-calendar', merchantId, selectedRoom?.id, from, to],
-    queryFn: () =>
-      selectedRoom
-        ? getApiClient().getMerchantRoomCalendar(merchantId, selectedRoom.id, from, to)
-        : null,
-    enabled: !!selectedRoom,
-  })
-
-  const daysByDate = useMemo<Record<string, DayCell>>(() => {
-    const days = calendarQuery.data?.days ?? []
-    return Object.fromEntries(days.map(d => [d.date, d]))
-  }, [calendarQuery.data])
-
-  const today = todayStr()
-
-  const staySummary = useMemo(() => {
-    if (!checkIn || !checkOut || !selectedRoom) return null
-    const nights = nightsBetween(checkIn, checkOut)
-    if (nights <= 0) return null
-    const rate = selectedRoom.nightly_rate ?? selectedRoom.price ?? 0
-    return { nights, rate, total: rate * nights }
-  }, [checkIn, checkOut, selectedRoom])
-
   const updateDates = useCallback((inDate: string | null, outDate: string | null) => {
     setCheckIn(inDate)
     setCheckOut(outDate)
+    setRangeError('')
     onDatesChange?.(inDate, outDate)
   }, [onDatesChange])
-
-  const handleDateTap = useCallback((dateStr: string) => {
-    const info = daysByDate[dateStr]
-    if (dateStr < today) return
-    if (info && !info.available) return
-
-    setRangeError('')
-    if (!checkIn || (checkIn && checkOut)) {
-      updateDates(dateStr, null)
-      return
-    }
-    if (dateStr <= checkIn) {
-      updateDates(dateStr, null)
-      return
-    }
-    let night = checkIn
-    while (night < dateStr) {
-      const d = new Date(`${night}T12:00:00`)
-      d.setDate(d.getDate() + 1)
-      night = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      if (night < dateStr) {
-        const info2 = daysByDate[night]
-        if (info2 && !info2.available) {
-          setRangeError('Une nuit de cette plage est indisponible')
-          return
-        }
-      }
-    }
-    updateDates(checkIn, dateStr)
-  }, [checkIn, checkOut, daysByDate, today, updateDates])
 
   const handleSubmit = async () => {
     if (!selectedRoom) return
@@ -288,13 +197,6 @@ export function HotelChambresTab({
     )
   }
 
-  const cells: Array<{ key: string; date?: string; day?: number }> = []
-  for (let i = 0; i < startWeekday; i++) cells.push({ key: `pad-${i}` })
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    cells.push({ key: date, date, day: d })
-  }
-
   const ctaLabel = configQuery.data?.cta ?? 'Réserver une chambre'
   const rate = selectedRoom?.nightly_rate ?? selectedRoom?.price
 
@@ -317,122 +219,38 @@ export function HotelChambresTab({
             <RoomCard
               key={room.id}
               room={room}
+              merchantSlug={merchantSlug}
               selected={selectedRoom?.id === room.id}
               onSelect={() => {
                 setSelectedRoomId(room.id)
                 updateDates(null, null)
                 setRangeError('')
               }}
+              onOpenDetails={() => router.push(getRoomPublicPath(merchantSlug, room) as never)}
             />
           ))}
         </ScrollView>
       </View>
 
       {/* ─── Calendrier ─── */}
-      <View style={styles.calendarCard}>
-        <View style={styles.calendarHeader}>
-          <Text style={styles.calendarTitle}>
-            <Ionicons name="calendar-outline" size={18} color={colors.brand500} />
-            {'  '}{MONTH_NAMES[month]} {year}
-          </Text>
-          <View style={styles.calendarNav}>
-            <Pressable
-              onPress={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-              style={styles.navBtn}
-            >
-              <Ionicons name="chevron-back" size={18} color={colors.textMuted} />
-            </Pressable>
-            <Pressable
-              onPress={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-              style={styles.navBtn}
-            >
-              <Ionicons name="chevron-forward" size={18} color={colors.text} />
-            </Pressable>
-          </View>
+      {selectedRoom ? (
+        <View style={styles.calendarSection}>
+          <RoomStayCalendar
+            merchantId={merchantId}
+            roomId={selectedRoom.id}
+            checkIn={checkIn}
+            checkOut={checkOut}
+            onDatesChange={updateDates}
+            nightlyRate={rate}
+            rangeError={rangeError}
+            onRangeError={setRangeError}
+          />
+
+          <Pressable onPress={handleSubmit} style={styles.calendarBookBtn}>
+            <Text style={styles.calendarBookBtnText}>Réserver</Text>
+          </Pressable>
         </View>
-
-        <View style={styles.stayBox}>
-          <Text style={styles.stayLabel}>VOTRE SÉJOUR</Text>
-          <Text style={styles.stayDates}>
-            Arrivée : {checkIn ? formatShortDate(checkIn) : '—'}
-            {'  '}·{'  '}
-            Départ : {checkOut ? formatShortDate(checkOut) : '—'}
-          </Text>
-          {!checkIn ? (
-            <Text style={styles.stayHint}>
-              Cliquez sur une date d&apos;arrivée, puis sur une date de départ
-            </Text>
-          ) : !checkOut ? (
-            <Text style={styles.stayHintActive}>Choisissez votre date de départ</Text>
-          ) : staySummary ? (
-            <Text style={styles.stayTotal}>
-              {staySummary.nights} nuit{staySummary.nights > 1 ? 's' : ''} · {formatPrice(staySummary.total, 'XOF')}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.dayHeaderRow}>
-          {DAY_ABBR.map((d, i) => (
-            <Text key={`day-${i}`} style={styles.dayHeaderText}>{d}</Text>
-          ))}
-        </View>
-
-        {calendarQuery.isLoading ? (
-          <ActivityIndicator color={colors.brand500} style={{ marginVertical: 24 }} />
-        ) : (
-          <View style={styles.calendarGrid}>
-            {cells.map(cell => {
-              if (!cell.date) return <View key={cell.key} style={styles.calCell} />
-              const info = daysByDate[cell.date]
-              const isPast = cell.date < today
-              const isUnavailable = !!info && !info.available
-              const inRange = checkIn && checkOut
-                ? cell.date > checkIn && cell.date < checkOut
-                : false
-              const isCheckIn = cell.date === checkIn
-              const isCheckOut = cell.date === checkOut
-              const isAvailable = !isPast && !isUnavailable
-              const nightlyRate = info?.nightly_rate ?? rate
-
-              return (
-                <Pressable
-                  key={cell.key}
-                  onPress={() => isAvailable && handleDateTap(cell.date!)}
-                  style={[
-                    styles.calCell,
-                    isPast || isUnavailable ? styles.calCellDisabled : styles.calCellAvailable,
-                    (inRange || isCheckIn || isCheckOut) && styles.calCellSelected,
-                    isCheckIn || isCheckOut ? styles.calCellEndpoint : null,
-                  ]}
-                >
-                  <Text style={[
-                    styles.calCellDay,
-                    (inRange || isCheckIn || isCheckOut) && styles.calCellDaySelected,
-                    (isPast || isUnavailable) && styles.calCellDayDisabled,
-                  ]}>
-                    {cell.day}
-                  </Text>
-                  {isAvailable && nightlyRate && !inRange && !isCheckIn && !isCheckOut ? (
-                    <Text style={styles.calCellRate}>
-                      {(nightlyRate / 1000).toFixed(0)}k
-                    </Text>
-                  ) : null}
-                </Pressable>
-              )
-            })}
-          </View>
-        )}
-
-        <Text style={styles.calendarLegend}>
-          Vert = disponible · sélectionnez arrivée puis départ
-        </Text>
-
-        {rangeError ? <Text style={styles.rangeError}>{rangeError}</Text> : null}
-
-        <Pressable onPress={handleSubmit} style={styles.calendarBookBtn}>
-          <Text style={styles.calendarBookBtnText}>Réserver</Text>
-        </Pressable>
-      </View>
+      ) : null}
 
       {/* ─── Formulaire réservation ─── */}
       <View
@@ -587,92 +405,7 @@ const styles = StyleSheet.create({
     color: colors.brand600,
     letterSpacing: 0.8,
   },
-  calendarCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  calendarTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
-  calendarNav: { flexDirection: 'row', gap: 8 },
-  navBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stayBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    gap: 4,
-  },
-  stayLabel: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    color: colors.textMuted,
-    letterSpacing: 0.8,
-  },
-  stayDates: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
-  stayHint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted },
-  stayHintActive: { fontFamily: fonts.medium, fontSize: 12, color: colors.brand600 },
-  stayTotal: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },
-  dayHeaderRow: { flexDirection: 'row', marginBottom: 8 },
-  dayHeaderText: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    color: colors.textLight,
-  },
-  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  calCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    padding: 2,
-  },
-  calCellAvailable: { backgroundColor: colors.emerald50 },
-  calCellDisabled: { backgroundColor: colors.surfaceContainerLow, opacity: 0.5 },
-  calCellSelected: { backgroundColor: colors.brand100 },
-  calCellEndpoint: { backgroundColor: colors.brand500 },
-  calCellDay: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
-  calCellDaySelected: { color: '#fff' },
-  calCellDayDisabled: { color: colors.textLight },
-  calCellRate: { fontFamily: fonts.bold, fontSize: 8, color: colors.emerald700, marginTop: 1 },
-  calendarLegend: {
-    fontFamily: fonts.regular,
-    fontSize: 10,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  rangeError: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    color: colors.danger,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
+  calendarSection: { gap: 16 },
   calendarBookBtn: {
     backgroundColor: colors.slate900,
     borderRadius: 12,

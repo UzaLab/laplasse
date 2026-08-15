@@ -22,6 +22,7 @@ import {
 } from '@/src/components/MarketplaceFiltersSheet'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
 import { MobileDrawer } from '@/src/components/MobileDrawer'
+import { BrandLogo } from '@/src/components/BrandLogo'
 import { NetworkErrorBanner } from '@/src/components/NetworkErrorBanner'
 import { SearchAutocomplete } from '@/src/components/SearchAutocomplete'
 import { SpotlightShopsRow } from '@/src/components/SpotlightShopsRow'
@@ -248,7 +249,7 @@ export function MarketplaceView() {
             <Ionicons name="search-outline" size={22} color={colors.textMuted} />
           </Pressable>
 
-          <Text style={styles.brand}>LaPlasse</Text>
+          <BrandLogo variant="full" style={styles.brandLogo} />
 
           <View style={styles.topBarRight}>
             <Pressable
@@ -428,12 +429,7 @@ const styles = StyleSheet.create({
     height: TOP_BAR_HEIGHT,
     paddingHorizontal: homeLayout.gutter,
   },
-  brand: {
-    fontFamily: fonts.extrabold,
-    fontSize: 20,
-    letterSpacing: -0.4,
-    color: colors.brand600,
-  },
+  brandLogo: { height: 28, width: 120 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   iconBtn: {
     width: 36,
