@@ -3,7 +3,7 @@
     "module": "CommonJS",
     "target": "ES2022",
     "lib": ["ES2022"],
-    "moduleResolution": "node16",
+    "moduleResolution": "node",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
