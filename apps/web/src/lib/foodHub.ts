@@ -8,7 +8,12 @@ import {
 } from 'lucide-react'
 import { FOOD_CATEGORY_SLUGS } from '@/lib/merchantVertical'
 import type { ApiMerchant } from '@/lib/api'
-import { businessDayFromDate } from '@laplasse/shared-config'
+
+/** BusinessHour.day in DB: 0 = Monday … 6 = Sunday (not JS getDay()). */
+function businessDayFromDate(date: Date = new Date()): number {
+  const jsDay = date.getDay()
+  return jsDay === 0 ? 6 : jsDay - 1
+}
 
 /** Frais de livraison indicatif affiché sur les cartes hub (fallback). */
 export const FOOD_HUB_DELIVERY_FEE_ESTIMATE = 1500
