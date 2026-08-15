@@ -1,11 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useState } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
+import { DeliveryDisputeSheet } from '@/src/components/orders/DeliveryDisputeSheet'
+import { OrderReturnSheet } from '@/src/components/orders/OrderReturnSheet'
+import { SavStatusBanner } from '@/src/components/orders/SavStatusBanner'
 import { OrderStatusBadge } from '@/src/components/OrderStatusBadge'
 import { EmptyState, LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
+import {
+  isDeliveryDisputeEligible,
+  isFoodOrderSavMessage,
+  isOrderReturnEligible,
+} from '@/src/lib/orderSav'
 import {
   formatOrderRef,
   getSellerName,
@@ -20,6 +29,8 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const [returnOpen, setReturnOpen] = useState(false)
+  const [disputeOpen, setDisputeOpen] = useState(false)
 
   const orderQuery = useQuery({
     queryKey: ['order', id],
@@ -70,8 +81,12 @@ export default function OrderDetailScreen() {
     isActiveOrderStatus(order.status)
 
   const pendingPayment = order.status === 'PENDING' && order.payment?.status === 'PENDING'
+  const canReturn = isOrderReturnEligible(order)
+  const canDispute = isDeliveryDisputeEligible(order)
+  const foodSavHint = isFoodOrderSavMessage(order)
 
   return (
+    <>
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.headerCard}>
         <Text style={styles.ref}>{formatOrderRef(order.id)}</Text>
@@ -89,7 +104,36 @@ export default function OrderDetailScreen() {
         {etaQuery.data?.eta_minutes != null ? (
           <Text style={styles.eta}>Arrivée estimée · ~{etaQuery.data.eta_minutes} min</Text>
         ) : null}
+
+        {canDispute || canReturn ? (
+          <View style={styles.savActions}>
+            {canDispute ? (
+              <Pressable style={styles.savBtn} onPress={() => setDisputeOpen(true)}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.brand700} />
+                <Text style={styles.savBtnText}>Litige</Text>
+              </Pressable>
+            ) : null}
+            {canReturn ? (
+              <Pressable style={styles.savBtn} onPress={() => setReturnOpen(true)}>
+                <Ionicons name="cube-outline" size={16} color={colors.brand700} />
+                <Text style={styles.savBtnText}>SAV</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
       </View>
+
+      <SavStatusBanner order={order} />
+
+      {foodSavHint ? (
+        <View style={styles.foodSavHint}>
+          <Text style={styles.foodSavTitle}>Retour restauration</Text>
+          <Text style={styles.foodSavBody}>
+            Pour une commande restaurant, contactez directement l&apos;établissement via WhatsApp ou
+            téléphone ci-dessous.
+          </Text>
+        </View>
+      ) : null}
 
       {pendingPayment && order.payment?.id ? (
         <PrimaryButton
@@ -149,6 +193,12 @@ export default function OrderDetailScreen() {
         {order.payment?.reference ? (
           <Text style={styles.meta}>Réf. paiement · {order.payment.reference}</Text>
         ) : null}
+        <Pressable
+          style={styles.receiptBtn}
+          onPress={() => router.push(`/orders/${order.id}/receipt` as never)}
+        >
+          <Text style={styles.receiptBtnText}>Voir le reçu / partager</Text>
+        </Pressable>
       </View>
 
       {phone ? (
@@ -167,6 +217,10 @@ export default function OrderDetailScreen() {
         </View>
       ) : null}
     </ScrollView>
+
+    <OrderReturnSheet order={order} open={returnOpen} onClose={() => setReturnOpen(false)} />
+    <DeliveryDisputeSheet order={order} open={disputeOpen} onClose={() => setDisputeOpen(false)} />
+    </>
   )
 }
 
@@ -186,6 +240,29 @@ const styles = StyleSheet.create({
   date: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
   seller: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   eta: { fontFamily: fonts.medium, fontSize: 14, color: colors.brand700 },
+  savActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  savBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.brand200,
+    backgroundColor: colors.brand50,
+  },
+  savBtnText: { fontFamily: fonts.bold, fontSize: 12, color: colors.brand700 },
+  foodSavHint: {
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  foodSavTitle: { fontFamily: fonts.bold, fontSize: 14, color: colors.text },
+  foodSavBody: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, lineHeight: 18 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -216,6 +293,16 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
   totalValue: { fontFamily: fonts.extrabold, fontSize: 18, color: colors.brand700 },
+  receiptBtn: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: radii.pill,
+    backgroundColor: colors.brand50,
+    borderWidth: 1,
+    borderColor: colors.brand200,
+  },
+  receiptBtnText: { fontFamily: fonts.bold, fontSize: 13, color: colors.brand700 },
   actions: { flexDirection: 'row', gap: 12 },
   actionBtn: {
     flex: 1,

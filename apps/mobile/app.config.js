@@ -46,6 +46,21 @@ module.exports = ({ config }) => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-image',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'LaPlasse utilise votre position pour afficher les établissements à proximité sur la carte.',
+      },
+    ],
+    [
+      'react-native-maps',
+      {
+        // Requis sur Android (moteur Google Maps, tuiles OSM via UrlTile — pas de facturation tuiles Google).
+        androidGoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+      },
+    ],
     [
       'expo-splash-screen',
       {
@@ -69,6 +84,7 @@ module.exports = ({ config }) => ({
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
     appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'preprod',
+    googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
     eas: {
       projectId: process.env.EAS_PROJECT_ID ?? '95dff08d-bcca-43bb-9b70-0ef8db630b32',
     },

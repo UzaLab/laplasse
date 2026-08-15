@@ -87,15 +87,26 @@ export interface ApiMerchant {
   is_sponsored?: boolean
   has_active_promo?: boolean
   tags?: string[]
-  featured_vertical?: {
-    kind: string
-    badge: string
-    name: string
-    price: string | null
-    image: string
-    tab: string
-    meta: string | null
-  }
+  featured_product?: ApiShopFeaturedProduct
+  featured_vertical?: ApiVerticalFeaturedItem
+}
+
+export interface ApiShopFeaturedProduct {
+  name: string
+  price: string
+  image: string
+  slug: string
+  shop_slug: string
+}
+
+export interface ApiVerticalFeaturedItem {
+  kind: 'menu' | 'room' | 'service' | 'consultation'
+  badge: string
+  name: string
+  price: string | null
+  image: string
+  tab: string
+  meta: string | null
 }
 
 export interface ApiPaginated<T> {
@@ -241,6 +252,10 @@ export interface CartItem {
   line_total: number
   variant_id?: string | null
   variant?: { id: string; name: string } | null
+  line_kind?: 'menu' | 'product'
+  menu_item_id?: string | null
+  modifiers_label?: string | null
+  selected_modifiers?: Array<{ option_name?: string; price_delta?: number }> | null
   product: MarketplaceProduct & {
     merchant: { id: string; business_name: string; slug: string }
   }
@@ -254,17 +269,39 @@ export interface CartMerchantGroup {
   item_count: number
 }
 
+export interface FoodPreorderSlot {
+  at: string
+  label: string
+}
+
+export interface FoodScheduling {
+  is_open_now: boolean
+  accepts_preorders: boolean
+  requires_preorder: boolean
+  blocked: boolean
+  block_reason?: 'paused' | 'manual_closed' | 'preorders_disabled' | 'no_slots'
+  slots: FoodPreorderSlot[]
+  suggested_preorder_for?: string
+}
+
 export interface Cart {
   id: string
   items: CartItem[]
   subtotal: number
   currency: string
   item_count: number
-  merchant: { id: string; business_name: string; slug: string } | null
+  merchant: {
+    id: string
+    business_name: string
+    slug: string
+    food_min_order_amount?: number | null
+  } | null
   merchants?: CartMerchantGroup[]
   merchant_count?: number
   kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   delivery_options?: { allow_pickup: boolean; allow_delivery: boolean }
+  estimated_prep_minutes?: number | null
+  food_scheduling?: FoodScheduling | null
 }
 
 export interface AppliedPromotionInput {
@@ -447,6 +484,9 @@ export interface Order {
       vehicle: string | null
     } | null
   } | null
+  order_source?: 'MARKETPLACE' | 'FOOD' | string
+  return_request?: OrderReturnRequest | null
+  delivery_dispute?: DeliveryDispute | null
 }
 
 export interface OrderItem {
@@ -463,6 +503,36 @@ export interface OrderItem {
     slug: string
     image_url?: string | null
   } | null
+}
+
+export type OrderReturnReason =
+  | 'DEFECTIVE'
+  | 'WRONG_ITEM'
+  | 'NOT_RECEIVED'
+  | 'CHANGED_MIND'
+  | 'OTHER'
+
+export type OrderReturnStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REFUNDED'
+
+export interface OrderReturnRequest {
+  id: string
+  order_id: string
+  reason: string
+  description?: string | null
+  merchant_note?: string | null
+  status: OrderReturnStatus
+  created_at: string
+}
+
+export type DeliveryDisputeStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED'
+
+export interface DeliveryDispute {
+  id: string
+  reason: string
+  description?: string | null
+  status: DeliveryDisputeStatus
+  created_at: string
+  admin_note?: string | null
 }
 
 export interface OrderEtaSnapshot {

@@ -26,9 +26,11 @@ type LoginMethod = 'email' | 'otp'
 export function LoginForm({
   onSuccess,
   registerHref = '/(auth)/register',
+  initialMethod = 'email',
 }: {
   onSuccess?: () => void
   registerHref?: string
+  initialMethod?: LoginMethod
 }) {
   const router = useRouter()
   const countryCode = useCountryStore(s => s.countryCode) || DEFAULT_COUNTRY
@@ -37,7 +39,7 @@ export function LoginForm({
   const loginWithOtp = useAuthStore(s => s.loginWithOtp)
   const loading = useAuthStore(s => s.loading)
 
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email')
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>(initialMethod)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -146,7 +148,7 @@ export function LoginForm({
           <View style={authStyles.fieldWrap}>
             <View style={authStyles.labelRow}>
               <Text style={authStyles.fieldLabel}>Mot de passe</Text>
-              <Pressable onPress={() => void openWebPath('/forgot-password', countryCode)}>
+              <Pressable onPress={() => router.push('/(auth)/forgot-password' as never)}>
                 <Text style={authStyles.forgotLink}>Mot de passe oublié ?</Text>
               </Pressable>
             </View>

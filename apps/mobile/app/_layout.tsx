@@ -14,6 +14,7 @@ import { useEffect } from 'react'
 import { Platform } from 'react-native'
 import 'react-native-reanimated'
 import { ToastHost } from '@/src/components/ToastHost'
+import { PushNotificationHandler } from '@/src/components/PushNotificationHandler'
 import { resetApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCountryStore } from '@/src/stores/countryStore'
@@ -92,7 +93,9 @@ function AuthGate() {
   }, [hydrated, isAuthenticated, segments, router])
 
   return (
-    <Stack
+    <>
+      <PushNotificationHandler />
+      <Stack
       screenOptions={{
         headerTintColor: colors.brand700,
         headerTitleStyle: { fontFamily: 'Outfit_700Bold' },
@@ -102,10 +105,12 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/forgot-password" options={{ headerShown: false, title: 'Mot de passe oublié' }} />
       <Stack.Screen name="m/[slug]/index" options={{ headerShown: false }} />
       <Stack.Screen name="m/[slug]/boutique" options={{ headerShown: false }} />
       <Stack.Screen name="m/[slug]/p/[productSlug]" options={{ headerShown: false }} />
       <Stack.Screen name="cart" options={{ headerShown: false }} />
+      <Stack.Screen name="commande" options={{ headerShown: false }} />
       <Stack.Screen name="checkout" options={{ headerShown: false }} />
       <Stack.Screen name="payment" options={{ headerShown: false }} />
       <Stack.Screen name="bookings/pay" options={{ headerShown: false }} />
@@ -117,7 +122,9 @@ function AuthGate() {
       <Stack.Screen name="restauration/[slug]" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: 'Paramètres', headerShown: false }} />
       <Stack.Screen name="orders/[id]" options={{ title: 'Commande' }} />
+      <Stack.Screen name="orders/[id]/receipt" options={{ title: 'Reçu' }} />
       <Stack.Screen name="delivery/track/[token]" options={{ title: 'Suivi livraison' }} />
     </Stack>
+    </>
   )
 }

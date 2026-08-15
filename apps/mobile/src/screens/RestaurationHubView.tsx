@@ -6,7 +6,6 @@ import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { HomeTopBar } from '@/src/components/HomeTopBar'
@@ -49,7 +49,7 @@ function MenuSearchRow({ hit, onPress }: { hit: MenuSearchHit; onPress: () => vo
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.menuHit, pressed && styles.pressed]}>
       {hit.image_url ? (
-        <Image source={{ uri: hit.image_url }} style={styles.menuHitImage} />
+        <AppImage uri={hit.image_url} style={styles.menuHitImage} />
       ) : (
         <View style={[styles.menuHitImage, styles.menuHitImageFallback]} />
       )}
@@ -292,7 +292,7 @@ function PromoCard({ merchant, onPress }: { merchant: ApiMerchant; onPress: () =
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.promoCard, pressed && styles.pressed]}>
       {merchant.cover_image ? (
-        <Image source={{ uri: merchant.cover_image }} style={styles.promoImage} />
+        <AppImage uri={merchant.cover_image} style={styles.promoImage} fallbackLetter={merchant.business_name.slice(0, 1)} />
       ) : (
         <View style={[styles.promoImage, styles.menuHitImageFallback]} />
       )}

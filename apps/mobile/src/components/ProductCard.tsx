@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MarketplaceProduct } from '@laplasse/api-client'
 import { Card } from '@/src/components/ui'
@@ -15,7 +16,7 @@ export function ProductCard({
     <Card onPress={onPress}>
       <View style={styles.row}>
         {product.image_url ? (
-          <Image source={{ uri: product.image_url }} style={styles.image} />
+          <AppImage uri={product.image_url} style={styles.image} />
         ) : (
           <View style={[styles.image, styles.imageFallback]} />
         )}

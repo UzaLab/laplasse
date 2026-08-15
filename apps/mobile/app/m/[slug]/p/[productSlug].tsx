@@ -4,19 +4,20 @@ import { useMemo, useState } from 'react'
 import {
   Alert,
   Dimensions,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice, getDefaultCity } from '@laplasse/shared-config'
 import type { MarketplaceProduct, ProductVariant } from '@laplasse/api-client'
 import { HomeProductGridCard } from '@/src/components/HomeProductGridCard'
 import { ProductFavoriteButton } from '@/src/components/ProductFavoriteButton'
+import { ProductHtmlContent } from '@/src/components/ProductHtmlContent'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { LoadingState } from '@/src/components/ui'
@@ -26,10 +27,12 @@ import {
   resolveBoutique,
   resolveProductBoutiqueSlug,
 } from '@/src/lib/boutiqueResolve'
+import { getMarketplaceAddBlockReason, showCartBlockedAlert } from '@/src/lib/cartKind'
+import { hasHtmlContent, stripHtml } from '@/src/lib/htmlUtils'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { useCountryStore } from '@/src/stores/countryStore'
-import { colors, fonts, homeLayout, layout, spacing } from '@/src/theme'
+import { colors, fonts, homeLayout, layout, radii, spacing } from '@/src/theme'
 
 const THUMB_SIZE = (Dimensions.get('window').width - spacing.gutter * 2 - 12 * 3) / 4
 
@@ -49,6 +52,8 @@ export default function ProductScreen() {
   const cityLabel = getDefaultCity(countryCode)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
   const addItem = useCartStore(s => s.addItem)
+  const clear = useCartStore(s => s.clear)
+  const cart = useCartStore(s => s.cart)
   const [adding, setAdding] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
@@ -130,10 +135,20 @@ export default function ProductScreen() {
     ?? boutiqueResolveQuery.data?.displayName
     ?? 'Boutique'
   const productRouteSlug = shopSlug
+  const shortDescriptionText = product.short_description
+    ? (hasHtmlContent(product.short_description)
+        ? stripHtml(product.short_description)
+        : product.short_description.trim())
+    : null
 
   async function onAddToCart(buyNow = false) {
     if (outOfStock) {
       Alert.alert('Stock', 'Ce produit n’est plus disponible.')
+      return
+    }
+    const blocked = getMarketplaceAddBlockReason(cart)
+    if (blocked) {
+      showCartBlockedAlert(blocked, () => void clear())
       return
     }
     setAdding(true)
@@ -165,7 +180,7 @@ export default function ProductScreen() {
         <View style={styles.gallerySection}>
           <View style={styles.mainImageWrap}>
             {images[activeImage] ? (
-              <Image source={{ uri: images[activeImage] }} style={styles.mainImage} />
+              <AppImage uri={images[activeImage]} style={styles.mainImage} contentFit="contain" />
             ) : (
               <View style={[styles.mainImage, styles.imageFallback]}>
                 <Text style={styles.fallbackLetter}>{product.name.slice(0, 1)}</Text>
@@ -191,7 +206,7 @@ export default function ProductScreen() {
                     onPress={() => setActiveImage(index)}
                     style={[styles.thumb, active && styles.thumbActive]}
                   >
-                    <Image source={{ uri }} style={styles.thumbImage} />
+                    <AppImage uri={uri} style={styles.thumbImage} />
                     {isMore ? (
                       <View style={styles.thumbMore}>
                         <Text style={styles.thumbMoreText}>+{images.length - 3}</Text>
@@ -210,7 +225,7 @@ export default function ProductScreen() {
             style={styles.merchantRow}
           >
             {merchant?.logo ? (
-              <Image source={{ uri: merchant.logo }} style={styles.merchantLogo} />
+              <AppImage uri={merchant.logo} style={styles.merchantLogo} fallbackLetter={merchant.business_name.slice(0, 1)} />
             ) : (
               <View style={[styles.merchantLogo, styles.merchantLogoFallback]}>
                 <Ionicons name="storefront-outline" size={14} color={colors.textMuted} />
@@ -242,8 +257,8 @@ export default function ProductScreen() {
             Taxes incluses. Frais de livraison calculés à l&apos;étape suivante.
           </Text>
 
-          {product.short_description ? (
-            <Text style={styles.shortDesc}>{product.short_description}</Text>
+          {shortDescriptionText ? (
+            <Text style={styles.shortDesc}>{shortDescriptionText}</Text>
           ) : null}
 
           <View style={styles.divider} />
@@ -343,13 +358,12 @@ export default function ProductScreen() {
               <Text style={styles.tabActiveText}>Description détaillée</Text>
             </Pressable>
           </View>
-          {activeTab === 'description' && product.description ? (
-            <Text style={styles.description}>{product.description}</Text>
-          ) : product.description ? (
-            <Text style={styles.description}>{product.description}</Text>
-          ) : (
-            <Text style={styles.descriptionMuted}>Aucune description disponible.</Text>
-          )}
+          {activeTab === 'description' ? (
+            <ProductHtmlContent
+              html={product.description}
+              emptyMessage="Aucune description détaillée disponible pour ce produit."
+            />
+          ) : null}
         </View>
 
         {(relatedQuery.data?.length ?? 0) > 0 ? (
@@ -537,22 +551,23 @@ const styles = StyleSheet.create({
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    padding: 6,
-    borderRadius: 12,
+    width: '100%',
+    padding: 4,
+    borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     backgroundColor: colors.background,
   },
   qtyBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surfaceContainer,
   },
   qtyValue: {
-    width: 40,
+    flex: 1,
     textAlign: 'center',
     fontFamily: fonts.bold,
     fontSize: 16,
@@ -560,8 +575,8 @@ const styles = StyleSheet.create({
   },
   actions: { gap: 12, marginBottom: 20 },
   cartBtn: {
-    height: 56,
-    borderRadius: homeLayout.radiusLg,
+    height: 52,
+    borderRadius: radii.pill,
     backgroundColor: colors.slate900,
     flexDirection: 'row',
     alignItems: 'center',
@@ -574,8 +589,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   buyBtn: {
-    height: 56,
-    borderRadius: homeLayout.radiusLg,
+    height: 52,
+    borderRadius: radii.pill,
     backgroundColor: colors.brand50,
     borderWidth: 2,
     borderColor: colors.brand200,
@@ -645,17 +660,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 15,
     color: colors.brand600,
-  },
-  description: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    lineHeight: 26,
-    color: colors.textMuted,
-  },
-  descriptionMuted: {
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    color: colors.textLight,
   },
   relatedSection: {
     backgroundColor: colors.surface,

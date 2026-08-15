@@ -1,6 +1,7 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { MarketplaceSpotlightShop } from '@laplasse/api-client'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { colors, fonts, radii } from '@/src/theme'
 
 export function SpotlightShopsRow({
@@ -26,7 +27,7 @@ export function SpotlightShopsRow({
         >
           <View style={styles.logoWrap}>
             {shop.logo ? (
-              <Image source={{ uri: shop.logo }} style={styles.logo} />
+              <AppImage uri={shop.logo} style={styles.logo} />
             ) : (
               <View style={[styles.logo, styles.logoFallback]}>
                 <Ionicons name="storefront-outline" size={24} color={colors.textLight} />

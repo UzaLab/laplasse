@@ -1,8 +1,10 @@
-import { Alert, ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MarketplaceProduct } from '@laplasse/api-client'
-import { useCartStore } from '@/src/stores/cartStore'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { ProductCardAddControl } from '@/src/components/ProductCardAddControl'
+import { resolveProductQuickAdd } from '@/src/lib/productAddMeta'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
 export function ShopProductCard({
@@ -14,27 +16,11 @@ export function ShopProductCard({
   onPress: () => void
   showBestSeller?: boolean
 }) {
-  const addItem = useCartStore(s => s.addItem)
-  const loading = useCartStore(s => s.loading)
   const displayPrice =
     'promo_price' in product && product.promo_price != null
       ? (product as MarketplaceProduct & { promo_price?: number }).promo_price!
       : product.price
-  const needsVariant = product.has_variants
-
-  async function onAdd() {
-    if (needsVariant) {
-      onPress()
-      return
-    }
-    const variantId = product.variants?.[0]?.id
-    const result = await addItem(product.id, 1, variantId)
-    if (result.error) {
-      Alert.alert('Panier', result.error)
-      return
-    }
-    Alert.alert('Panier', 'Article ajouté')
-  }
+  const { needsVariant, variantId } = resolveProductQuickAdd(product)
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
@@ -44,7 +30,7 @@ export function ShopProductCard({
         </View>
       ) : null}
       {product.image_url ? (
-        <Image source={{ uri: product.image_url }} style={styles.image} />
+        <AppImage uri={product.image_url} style={styles.image} />
       ) : (
         <View style={[styles.image, styles.imageFallback]} />
       )}
@@ -52,18 +38,12 @@ export function ShopProductCard({
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
         <View style={styles.footer}>
           <Text style={styles.price}>{formatPrice(displayPrice, product.currency)}</Text>
-          <Pressable
-            onPress={() => void onAdd()}
-            style={({ pressed: p }) => [styles.addBtn, p && styles.addBtnPressed]}
-            hitSlop={8}
-            accessibilityLabel="Ajouter au panier"
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
-            ) : (
-              <Ionicons name="add" size={20} color={colors.onPrimaryContainer} />
-            )}
-          </Pressable>
+          <ProductCardAddControl
+            productId={product.id}
+            variantId={variantId}
+            needsVariant={needsVariant}
+            onNeedsVariant={onPress}
+          />
         </View>
       </View>
     </Pressable>
@@ -124,13 +104,4 @@ const styles = StyleSheet.create({
     color: colors.primary,
     flex: 1,
   },
-  addBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnPressed: { opacity: 0.85 },
 })

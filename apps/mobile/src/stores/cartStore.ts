@@ -3,9 +3,10 @@ import type { Cart } from '@laplasse/api-client'
 import { getApiClient } from '@/src/lib/api'
 import { addGuestCartLine, clearGuestCart, getGuestCartLines, setGuestCartLines, updateGuestCartLineByLocalId } from '@/src/lib/guestCart'
 import { sanitizeGuestCartLines } from '@/src/lib/guestCartSanitize'
-import { useAuthStore } from '@/src/stores/authStore'
 
 function isAuthenticatedNow() {
+  // require lazy pour éviter le cycle cartStore ↔ authStore au chargement web/HMR
+  const { useAuthStore } = require('@/src/stores/authStore') as typeof import('@/src/stores/authStore')
   return useAuthStore.getState().isAuthenticated
 }
 

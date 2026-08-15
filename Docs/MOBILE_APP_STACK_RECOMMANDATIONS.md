@@ -1,7 +1,10 @@
 # Application mobile LaPlasse — recommandations stack
 
 > Document interne — juin 2026  
-> Contexte : le web public est déjà **mobile-first** (PWA iOS/Android, barre basse, safe areas). Cette note compare les options pour une **app native** (App Store / Play Store) et propose une stack simple à maintenir avec l’existant.
+> **Dernière révision plan : 15 août 2026**  
+> Suivi opérationnel : [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)
+
+Contexte : le web public est **mobile-first** (PWA). Ce document fixe la stack, les décisions produit et la roadmap **Phases 1–4** pour les apps natives (stores).
 
 ---
 
@@ -10,13 +13,14 @@
 | Recommandation | Détail |
 |----------------|--------|
 | **Stack retenue** | **Expo + React Native + TypeScript** |
-| **Navigation** | **Expo Router** (file-based, proche de Next.js App Router) |
-| **Backend** | **Réutiliser l’API NestJS actuelle** (`/api`, JWT, Prisma) — pas de nouveau BFF |
-| **Première cible** | **App consommateur** (découverte, marketplace, commande, suivi livraison) |
-| **Monorepo** | Ajouter `apps/mobile` + éventuellement `packages/*` partagés |
-| **Expo MCP** | **Oui, officiel** — à configurer dans Cursor (voir §7) |
-
-**Pourquoi Expo ?** Même écosystème que le web (React, TypeScript), tooling mature (build, OTA, notifications, store), courbe d’apprentissage la plus faible pour l’équipe actuelle, et bon alignement avec une API REST déjà en place.
+| **Navigation** | **Expo Router** (file-based) |
+| **Backend** | **API NestJS** (`/api`, JWT Bearer, Prisma) — pas de BFF |
+| **App consommateur** | `apps/mobile` — **Phase 1 en finalisation** |
+| **App livreur** | **`apps/courier` — app séparée** (Phase 2, **en pause** jusqu’à fin app principale) |
+| **Marchand** | **Module Pro natif** dans `apps/mobile` (Phase 4) — pas de clone back-office |
+| **Paiement** | **Simulateur natif maintenu** jusqu’à intégration Mobile Money post-stores |
+| **Perf / UX** | **Natif d’abord** — WebView interdit sauf obligation provider |
+| **Monorepo** | `apps/mobile`, `apps/courier`, `packages/api-client`, `packages/shared-config` |
 
 ---
 
@@ -27,256 +31,214 @@
 ```
 laplasse/
 ├── apps/
-│   ├── web/          Next.js 16, React 19, Tailwind v4, TanStack Query, Zustand
-│   └── api/          NestJS 11, Prisma, PostgreSQL, Meilisearch, Redis
-├── Docs/
-└── package.json      pnpm workspaces
+│   ├── web/          Next.js 16, React 19, TanStack Query, Zustand
+│   ├── api/          NestJS 11, Prisma, Meilisearch, Redis
+│   └── mobile/       Expo 57, Expo Router (consommateur + futur module Pro)
+│   └── courier/      (Phase 2) App livreur dédiée
+├── packages/
+│   ├── api-client/
+│   └── shared-config/
+└── Docs/
 ```
 
-- **API REST** : ~30 controllers (auth, merchants, marketplace, delivery, couriers, logistics, bookings…).
-- **Auth** : JWT access + refresh ; cookies httpOnly côté web **et** support **Bearer** + `refresh_token` dans le body (déjà prêt pour mobile).
-- **Recherche** : Meilisearch (endpoint `/search`).
-- **Fichiers** : S3 (images produits, couvertures…).
-- **Notifications** : Web Push (VAPID) + table `DeviceToken` (`platform`, `push_subscription`).
+### 2.2 Personas et périmètre (révisé août 2026)
 
-### 2.2 Expérience mobile web déjà en place
-
-- PWA (`manifest.webmanifest`, service worker, icônes, shortcuts).
-- Pages « app » : home mobile v2, recherche carte, marketplace, fiche établissement, checkout, profil, livreur (`/courier/*`).
-- Chrome mobile : barre basse publique, safe areas iOS, espacement navbar documenté (`mobilePublicChrome.ts`).
-
-**Conséquence :** l’UX mobile est déjà pensée ; l’app native peut **reprendre les parcours** sans repartir de zéro sur le product design.
-
-### 2.3 Personas et périmètre
-
-| Persona | Web aujourd’hui | Priorité app native |
-|---------|-----------------|---------------------|
-| **Consommateur** | Home, search, `/m/[slug]`, boutique, panier, checkout | **P0** |
-| **Livreur** | `/courier/missions`, dashboard | **P1** (GPS, push temps réel) |
-| **Marchand / shop** | Back-office dense (`/merchant`, `/shop/manage`) | **P2 ou web responsive** |
-| **Logistique / admin** | Dashboards larges | **Web uniquement** (tablette/desktop) |
-
-Ne pas viser une seule app « fourre-tout » au départ : une **app consommateur** + plus tard une **app livreur** (ou une app avec rôle switch) est plus simple qu’un clone natif de tout le back-office.
+| Persona | Web | App native | Phase |
+|---------|-----|------------|-------|
+| **Consommateur** | Home, search, checkout, profil | `apps/mobile` | **Phase 1** (finalisation) |
+| **Livreur** | `/courier/*` | **`apps/courier`** (séparée) | **Phase 2** |
+| **Marchand** | `/merchant`, `/shop/manage` | **Module Pro** `(pro)/` dans mobile | **Phase 4** |
+| **Admin / logistique** | Dashboards larges | Web uniquement | — |
 
 ---
 
-## 3. Options comparées
+## 3. Stack recommandée (détail)
 
-### 3.1 Expo + React Native (recommandé)
-
-**Pour**
-
-- React + TypeScript = compétences déjà présentes sur `apps/web`.
-- Expo Router ≈ conventions Next (routes, layouts, deep links).
-- EAS Build / Submit : builds iOS/Android sans Mac local obligatoire pour Android ; CI simple.
-- Modules clés : `expo-notifications`, `expo-location`, `expo-secure-store`, `expo-image`, `expo-router`.
-- Communauté large, doc à jour, intégration IA via **Expo MCP**.
-
-**Contre**
-
-- Pas de partage direct des composants UI Tailwind web → il faut une **couche UI mobile** (NativeWind ou StyleSheet).
-- Certaines libs web (Leaflet, TipTap) n’existent pas telles quelles → alternatives RN.
-
-### 3.2 PWA seule (statu quo amélioré)
-
-**Pour**
-
-- Déjà déployée ; coût quasi nul.
-- Une seule codebase.
-
-**Contre**
-
-- iOS : push et capabilities limitées ; pas de présence App Store (discoverability, confiance).
-- Pas d’accès natif fluide (background GPS livreur, haptics, app switcher).
-- Perception « moins pro » pour partenaires B2B.
-
-**Verdict :** garder la PWA pour acquisition rapide ; **ajouter une app store** pour crédibilité et features natives (push fiable, géoloc livreur).
-
-### 3.3 Capacitor (WebView autour du site Next)
-
-**Pour**
-
-- Réutilise le HTML/CSS existant.
-
-**Contre**
-
-- Performance et UX inférieures (scroll, clavier, transitions).
-- Dette : le site Next n’est pas pensé pour WebView (SSR, cookies, routing).
-- Debugging pénible sur parcours checkout / carte.
-
-**Verdict :** **non recommandé** pour LaPlasse (trop de flows riches : carte, panier, multi-rôles).
-
-### 3.4 Flutter
-
-**Pour**
-
-- UI performante, un seul codebase mobile.
-
-**Contre**
-
-- Dart = nouvelle stack ; **aucune réutilisation** du web/API client TypeScript.
-- Deux mental models (Widget vs React) pour la même équipe.
-
-**Verdict :** pertinent si équipe mobile dédiée Flutter ; **pas optimal** ici.
-
----
-
-## 4. Stack recommandée (détail)
-
-### 4.1 Cœur mobile
+### 3.1 Cœur mobile
 
 | Couche | Choix | Rôle |
 |--------|-------|------|
-| Runtime | **Expo SDK 52+** (viser 53/54 à l’init) | Build, config, modules natifs |
-| Langage | **TypeScript strict** | Aligné web + API |
-| Navigation | **Expo Router v4** | Tabs consommateur, stacks modales, deep links `/m/:slug` |
-| Data | **TanStack Query v5** | Même pattern que `apps/web` |
-| État global | **Zustand** | Session, panier, pays actif |
-| HTTP | **fetch** + client partagé | Bearer JWT, refresh, headers pays |
-| Formulaires | **React Hook Form** + **Zod** | Login, adresses, checkout |
-| UI | **NativeWind v4** (Tailwind RN) *ou* **React Native Paper** | Cohérence visuelle avec la marque amber/slate |
-| Cartes | **react-native-maps** (+ `expo-location`) | Search mobile, fiche établissement, suivi livraison |
-| Images | **expo-image** | CDN / S3, cache, placeholders |
-| Auth storage | **expo-secure-store** | Access + refresh tokens |
-| Push | **expo-notifications** | Commandes, livraison, promos |
-| Analytics | **PostHog RN** ou Expo Analytics | Parité avec le web |
-| Erreurs | **Sentry React Native** | Parité `@sentry/nextjs` |
+| Runtime | **Expo SDK 57+** | Build, OTA, modules natifs |
+| Navigation | **Expo Router** | Tabs consommateur, stacks, `(pro)/`, deep links |
+| Data | **TanStack Query v5** | Aligné web |
+| État | **Zustand** | Session, panier, pays |
+| HTTP | **`packages/api-client`** | Bearer, refresh, headers pays |
+| UI | **StyleSheet + tokens** (`src/theme`) | Outfit, amber `#f59e0b`, slate `#0f172a` — **pas NativeWind** |
+| Cartes | **`react-native-maps`** + `expo-location` | Recherche, suivi, livreur — **pas WebView OSM** |
+| Images | **`expo-image`** | CDN S3, cache, placeholders |
+| HTML riche | **`react-native-render-html`** | Descriptions produit — **pas WebView** |
+| Auth | **expo-secure-store** | Tokens |
+| Push | **expo-notifications** | Commandes, livraison, pro |
+| Paiement (actuel) | **Écrans natifs simulateur** | `/payment`, `/bookings/pay` — API `confirm*Payment` |
+| Paiement (futur) | Deep link / intent retour provider | WebView **uniquement** si page hébergée sans schéma app |
+| Erreurs | **Sentry React Native** | Phase 3 |
+| Analytics | **PostHog RN** | Phase 3 |
+| OTA | **expo-updates** | Phase 3 |
 
-### 4.2 Structure monorepo proposée
+### 3.2 Politique « natif d’abord »
 
-```
-laplasse/
-├── apps/
-│   ├── web/
-│   ├── api/
-│   └── mobile/                 # npx create-expo-app@latest
-├── packages/
-│   ├── api-types/              # DTO / types générés ou copiés depuis l’API
-│   ├── api-client/             # fetch auth, country headers, errors
-│   ├── shared-config/          # pays, brand, constantes (depuis lib/web)
-│   └── eslint-config/          # optionnel
-└── pnpm-workspace.yaml
-```
+| Besoin | ✅ Recommandé | ❌ À éviter |
+|--------|---------------|-------------|
+| Carte recherche / livraison | `react-native-maps` | WebView Leaflet/OSM |
+| Images produits / cover | `expo-image` | `<Image>` sans cache |
+| Description HTML | `react-native-render-html` | WebView pleine page |
+| Checkout / profil / pro | Composants RN | WebView vers Next.js |
+| Mobile Money (futur) | Deep link + écran retour natif | WebView embarquée par défaut |
+| Admin dense (TipTap, tableaux) | Lien externe navigateur | WebView in-app |
 
-**Partage réaliste**
+**Exception actuelle à migrer :** `SearchOsmMap.tsx` (WebView) → Phase 1.
 
-- ✅ Types, constantes pays (`country.ts`), libellés marque, client HTTP, logique panier/checkout **sans UI**.
-- ✅ TanStack Query keys / hooks métier (adaptés).
-- ❌ Composants React DOM (Tailwind web, Leaflet, TipTap).
+### 3.3 Partage monorepo
 
-### 4.3 Consommation de l’API
+- ✅ `api-client`, `shared-config`, types, hooks Query, tokens theme
+- ✅ Même patterns auth / pays / panier
+- ❌ Composants React DOM (Tailwind web, Leaflet)
 
-Le web utilise `authApiFetch` avec **cookies**. Le mobile utilisera :
+---
 
-```typescript
-// Headers
-Authorization: Bearer <access_token>
-X-Country-Code: CI   // même logique que countryRequestHeaders()
+## 4. UI / design system & intégrations
 
-// Refresh (déjà supporté)
-POST /api/auth/refresh
-{ "refresh_token": "<stored_refresh>" }
-```
+### 4.1 Tokens (alignés PWA)
 
-Le JWT strategy lit déjà **cookie OU Bearer** (`jwt.strategy.ts`).  
-À prévoir côté API (petit chantier) :
+| Token | Valeur | Usage |
+|-------|--------|-------|
+| Brand 500 | `#f59e0b` | CTA, accents, étoiles |
+| Brand 600–700 | `#d97706` / `#b45309` | Liens, pressed |
+| Slate 900 | `#0f172a` | Texte, nav active profil |
+| Background | `#FAFAFA` | Fond écrans |
+| Surface | `#ffffff` | Cartes |
+| Rayon cartes | 24–28px | `rounded-2xl` |
+| Boutons | `rounded-full` (pill) | Primaire amber, secondaire outline |
 
-1. Réponses login/register/otp : option `?client=mobile` retournant `{ user, access_token, refresh_token }` **sans dépendre des cookies** (aujourd’hui les tokens sont surtout posés en cookies ; le refresh body existe déjà).
-2. Push : étendre `DeviceToken.platform` (`ios` | `android` | `expo`) + endpoint d’enregistrement token Expo/FCM (aujourd’hui : Web Push VAPID uniquement).
-3. CORS : autoriser l’origine mobile / schéma `laplasse://` si requêtes depuis dev.
+Polices : **Outfit** (400–800) via `@expo-google-fonts/outfit`.
 
-### 4.4 Cartographie écrans P0 (app consommateur)
+Fichiers source : `apps/mobile/src/theme/index.ts`, `src/lib/profileTheme.ts`.
 
-Reprennent les routes web existantes :
+### 4.2 Intégrations UI à respecter
 
-| Écran mobile | Équivalent web | API principale |
-|--------------|----------------|----------------|
-| Onboarding / login | `/login`, OTP | `/auth/*` |
-| Home | `HomeMobileV2Page` | merchants featured, categories, marketplace |
-| Recherche + carte | `/search` mobile | `/search`, `/geo` |
-| Fiche établissement | `/m/[slug]` | `/merchants/:slug` |
-| Boutique / produit | `/m/.../boutique`, `/p/...` | marketplace |
-| Panier / checkout | `/cart`, `/checkout` | orders, payments |
-| Commandes | `/profile/orders` | user orders |
-| Suivi livraison | `/delivery/track/[token]` | delivery |
-| Favoris / profil | `/favoris`, `/profile` | favorites, `/auth/me` |
+| Zone | Pattern |
+|------|---------|
+| **Tabs publiques** | `(tabs)/_layout` — 5 onglets, safe area bottom |
+| **Profil** | `ProfileShell` — drawer gauche→droite, bottom nav slate |
+| **Home** | `MobileDrawer` droite→gauche, `CountrySelect` drapeaux (`shared-config`) |
+| **Feedback** | `ToastHost` + `notify.ts` — pas `Alert.alert` seul (web/APK) |
+| **Checkout** | `CheckoutWizardShell`, stepper amber |
+| **Fiches merchant** | Vues verticales dédiées (shop, hôtel, service, resto) |
+| **Module Pro** (Phase 4) | Header slate-900, icône briefcase, même tokens — identité « pro » sans rupture marque |
 
-**Hors scope P0 :** back-office marchand, admin, logistics, éditeur riche (descriptions HTML → WebView ou rendu simplifié).
+### 4.3 Checklist UI Phase 1 (finalisation)
+
+- [x] Remplacer toutes les `<Image>` critiques par `expo-image`
+- [x] Migrer carte recherche vers `react-native-maps`
+- [ ] Audit contrastes amber/slate sur Android (APK)
+- [x] Infinite scroll + états vides/erreur homogènes (Query)
+- [x] Soumission avis + table resto — composants natifs cohérents fiches merchant
 
 ---
 
 ## 5. Plan de delivery par phases
 
-### Phase 0 — Fondations (1–2 semaines)
+### Phase 0 — Fondations ✅ (terminée)
 
-- Créer `apps/mobile` (Expo Router, TypeScript).
-- Package `packages/api-client` : base URL, auth, refresh, country.
-- Écran login (email + OTP téléphone, comme le web).
-- CI : EAS Build preview (APK + Simulator).
+`apps/mobile`, packages partagés, auth OTP, EAS preview, push token.
 
-### Phase 1 — MVP consommateur (4–6 semaines)
+### Phase 1 — MVP consommateur (finalisation) — ~2–3 sem.
 
-- Home + catégories + liste établissements (`NearbyCard` équivalent).
-- Fiche établissement + boutique + fiche produit.
-- Panier + checkout (paiement : reprendre le flux web existant).
-- Profil commandes + suivi livraison.
-- Push commande (Expo Notifications + extension API).
+**Objectif :** parité fonctionnelle PWA consommateur, **simulateur paiement conservé**.
 
-### Phase 2 — Livreur (3–4 semaines)
+| Domaine | Fait | Reste |
+|---------|------|-------|
+| Home, marketplace, autocomplete | ✅ | — |
+| Fiches + boutique + resto + réservations | ✅ | — |
+| Panier, checkout, simulateur paiement | ✅ | — |
+| Profil hub complet | ✅ | — |
+| Favoris, suivi livraison | ✅ | — |
+| Carte recherche | 🟡 WebView | **Maps natif** |
+| Push | 🟡 Token | Routing au tap |
 
-- App séparée **ou** switch de rôle après login.
-- Missions, accept/refuse, GPS foreground/background, push offre livraison.
-- API delivery déjà orientée « push + timeout offre ».
+**Paiement :** les écrans `/payment` et `/bookings/pay` appellent l’API simulateur (`success` / `failure`). **Pas de Mobile Money** en Phase 1 — documenter dans release notes stores (« paiement test / espèces à la livraison selon marchand »).
 
-### Phase 3 — Polish & stores
+### Phase 2 — Livreur — app séparée `apps/courier` — ⏸ en pause
 
-- Deep links universels (`https://laplasse.ci/m/...` → app).
-- Tests TestFlight / Play Internal.
-- Soumission stores (CIE/SN/BF : comptes dev Apple/Google).
+> **Reporté** jusqu’à finalisation Phase 1 + soumission stores (Phase 3) de l’app consommateur.
 
-**Back-office marchand :** conserver le **web responsive** ; évaluer une app marchand légère seulement si usage terrain (ex. notifications commandes, scan) le justifie.
+#### Recommandation retenue : **app séparée** (vs switch rôle)
+
+| | App séparée | Switch rôle |
+|--|-------------|-------------|
+| GPS background | Ciblé livreurs | Tous utilisateurs |
+| Taille / perf | APK optimisé | Code mort consommateur |
+| Releases | Indépendantes | Risque régression checkout |
+| Store listing | « LaPlasse Livreur » | Persona floue |
+
+**Implémentation :** nouveau `apps/courier`, réutilise `api-client` / `shared-config` / theme. Deux `eas.json`. Auth JWT même API, rôle `courier` requis.
+
+**Périmètre P0 :** onboarding, missions, accept/refuse, GPS, push offres, carte native mission.
+
+### Phase 3 — Polish & stores — 2–3 sem.
+
+- Deep links : `https://laplasse.ci/m/...`, commandes, suivi, notifications
+- Sentry + PostHog
+- Tests (Jest + smoke Detox) + CI mobile
+- `expo-updates` (canal preview)
+- TestFlight / Play Internal → soumission stores (CI, SN, BF)
+
+### Phase 4 — Module Pro marchand — 4–6 sem.
+
+**Décision actée :** module **natif** dans `apps/mobile`, route group **`app/(pro)/`**.
+
+Entrée depuis `/profile` si compte marchand (tuile « Espace Pro »).
+
+| Fonction | Natif P0/P1 | Web seulement |
+|----------|-------------|---------------|
+| Dashboard résumé, alertes | ✅ | — |
+| Commandes (liste, détail, statuts) | ✅ | — |
+| Notifications commandes / RDV | ✅ | — |
+| Stock / visibilité rapide | ✅ P1 | — |
+| Réservations merchant | ✅ P1 | — |
+| Éditeur produit riche, compta, ads avancés | — | ✅ navigateur externe si besoin |
+
+**Pas de WebView** vers `/merchant/dashboard` pour les parcours P0.
 
 ---
 
-## 6. UI / design system
+## 6. Cartographie écrans consommateur (Phase 1)
 
-Le web utilise **Outfit**, amber brand, coins arrondis modérés sur les champs, **boutons en pilule** (`rounded-full`).
-
-Recommandation mobile :
-
-- Reprendre tokens : `#f59e0b` (brand-500), `#0f172a` (slate-900), `#FAFAFA` fond.
-- **NativeWind** : porter les utilitaires Tailwind familiers.
-- Composants de base : `Button` (pill), `Input` (`rounded-xl`), `Card` (`rounded-2xl`), barre d’onglets basse (comme `MobileBottomNav`).
-- Ne pas tenter un pixel-perfect du web ; viser **parité fonctionnelle** et **cohérence marque**.
+| Écran mobile | Route | Statut |
+|--------------|-------|--------|
+| Login / OTP | `(auth)/login` | ✅ |
+| Home | `(tabs)/index` | ✅ |
+| Marketplace | `(tabs)/marketplace` | ✅ |
+| Recherche | `(tabs)/search` | 🟡 |
+| Profil | `/profile/*` | ✅ |
+| Fiche établissement | `/m/[slug]` | ✅ |
+| Boutique / produit | `/m/.../boutique`, `/p/...` | ✅ |
+| Panier / checkout | `/cart`, `/checkout` | ✅ |
+| Paiement simulateur | `/payment` | ✅ |
+| Commandes | `/orders/[id]`, profil orders | ✅ |
+| Suivi livraison | `/delivery/track/[token]` | ✅ |
+| Réservations | `/bookings/pay`, profil bookings | ✅ |
+| Favoris | `/favoris` | ✅ |
 
 ---
 
-## 7. Expo MCP — existe-t-il ? Comment l’utiliser ?
+## 7. Consommation API (mobile)
 
-**Oui.** Expo propose un **MCP server officiel** (remote), documenté sur [docs.expo.dev/mcp](https://docs.expo.dev/mcp/).
+```typescript
+Authorization: Bearer <access_token>
+X-Country-Code: CI
+POST /api/auth/refresh { "refresh_token": "..." }
+```
 
-| Paramètre | Valeur |
-|-----------|--------|
-| Type | Streamable HTTP |
-| URL | `https://mcp.expo.dev/mcp` |
-| Auth | OAuth (compte Expo) |
+Chantiers API — état :
 
-**Capacités typiques**
-
-- Recherche / lecture doc Expo à jour.
-- Installation de libs compatibles (`expo install`).
-- (Avec dev server local SDK 54+) captures simulateur, automation UI, DevTools.
-
-**Dans Cursor aujourd’hui**
-
-- Le MCP **n’est pas activé** dans ce workspace (seuls `cursor-ide-browser`, `user-coolify`, `user-cloudflare` apparaissent).
-- Pour l’ajouter : *Settings → MCP → Add server* avec l’URL ci-dessus, puis OAuth Expo.
-
-**Limites à connaître**
-
-- Fonctionnalité encore en **preview** (certaines features liées au plan Expo).
-- Capacités « locales » (screenshots simulateur) nécessitent le **serveur de dev Expo** lancé avec MCP activé.
-- Ne remplace pas la connaissance métier LaPlasse : le MCP Expo aide sur **Expo/RN**, pas sur votre API NestJS.
+| Chantier | État |
+|----------|------|
+| Tokens JSON mobile | ✅ |
+| Push Expo `DeviceToken` | ✅ |
+| Payload push avec `href` | 🟡 Phase 1 |
+| Paiement simulateur | ✅ |
+| Mobile Money réel | ❌ Post-stores |
 
 ---
 
@@ -284,104 +246,80 @@ Recommandation mobile :
 
 | Risque | Mitigation |
 |--------|------------|
-| Double maintenance web + mobile | Package `api-client` + types partagés ; hooks Query similaires |
-| Auth cookies vs mobile | Endpoint mobile explicite ; SecureStore ; Bearer déjà supporté |
-| Push différent web/native | Unifier `DeviceToken` ; service push abstrait (web-push + FCM/APNs) |
-| Paiement mobile (Mobile Money) | Réutiliser flux web (redirect / WebView contrôlée) en P1 |
-| Carte / perf | `react-native-maps` ; clustering côté API si besoin |
-| Contenu HTML produit | `react-native-render-html` ou WebView isolée |
-| Taille équipe | Une seule app consommateur d’abord ; livreur ensuite |
+| Double maintenance web + mobile | `api-client` + évolution doc |
+| WebView perf | Politique natif §3.2 ; migration maps |
+| Paiement stores sans MM | Simulateur + livraison/COD ; MM en release ultérieure |
+| Deux apps (mobile + courier) | Packages partagés monorepo |
+| Module Pro scope creep | P0 commandes/notifs ; éditeur riche reste web |
+| Push silencieux | Listener + deep link Phase 1 |
 
 ---
 
-## 9. Commandes de bootstrap (référence)
+## 9. Expo MCP
 
-```bash
-# À la racine du monorepo
-cd /home/kadso05/projets/laplasse
-
-# Créer l’app (Expo Router + TypeScript)
-pnpm create expo-app apps/mobile --template tabs
-
-# Dépendances suggérées
-cd apps/mobile
-npx expo install expo-router expo-secure-store expo-notifications expo-location
-pnpm add @tanstack/react-query zustand zod react-hook-form
-
-# Build cloud ( après compte expo.dev )
-pnpm add -D eas-cli
-eas build:configure
-```
-
-Ajouter dans `pnpm-workspace.yaml` :
-
-```yaml
-packages:
-  - 'apps/*'
-  - 'packages/*'
-```
+URL : `https://mcp.expo.dev/mcp` — OAuth Expo. Configuré pour le workspace. Voir [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md).
 
 ---
 
-## 10. Décision recommandée
+## 10. Décisions actées (15 août 2026)
 
-1. **Adopter Expo + React Native + Expo Router** dans `apps/mobile`.
-2. **Ne pas** wrapper le site Next (Capacitor).
-3. **Réutiliser l’API NestJS** telle quelle, avec un **petit adaptateur auth mobile** et **push natif**.
-4. **Lancer par l’app consommateur** en reprenant les écrans déjà validés sur le web mobile (home, search, fiche, boutique, checkout).
-5. **Activer Expo MCP dans Cursor** pour accélérer setup, deps et conformité SDK.
-6. **Garder la PWA** en parallèle (canal léger, SEO, utilisateurs sans install).
-
----
-
-## 11. Prochaines actions concrètes
-
-> **État au 9 août 2026** — détail et parité écran par écran : [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)
-
-### Décisions produit
-
-- [x] **Périmètre P0 = app consommateur uniquement** (pas livreur ni marchand dans v1)
-- [ ] **App livreur** : Phase 2 — app séparée ou switch rôle (à trancher)
-- [ ] **Marchand** : web responsive ; option future module « Pro » dans l'app consommateur
-
-### Phase 0 — Fondations
-
-- [x] Créer `apps/mobile` + `packages/api-client` + `packages/shared-config`
-- [x] PR API : tokens mobile JSON (`auth-client.util.ts`) + push Expo
-- [x] Maquettes : `HomeMobileV2Page` + `NearbyCard` (carrousels, amber/Outfit)
-- [x] Configurer Expo MCP + compte EAS (`@uza.lab/laplasse`)
-- [x] Premier build EAS Android preview (APK test CI/SN)
-- [ ] Login OTP téléphone (parité web)
-
-### Phase 1 — MVP consommateur (en cours)
-
-- [x] Home + catégories + carrousels marketplace
-- [x] Autocomplete Meilisearch (trending + unified)
-- [x] Onglet Marketplace
-- [x] Panier + checkout basique
-- [ ] Recherche carte + rayon (`SearchMobilePage`)
-- [ ] Fiche établissement enrichie (avis, contact, horaires)
-- [ ] Détail commande + suivi livraison
-- [ ] Favoris
-- [ ] Hub restauration / menus
-- [ ] Paiement checkout (Mobile Money)
-
-### Phase 2 — Livreur (planifié)
-
-- [ ] Créer `apps/courier` ou module rôle livreur
-- [ ] Missions, GPS, push offres
+1. ✅ **P0 consommateur** — Phase 1 finalisation
+2. ✅ **Simulateur paiement** maintenu (pas Mobile Money Phase 1)
+3. ✅ **Natif d’abord** — migrer WebView carte ; pas de WebView Pro
+4. ✅ **Livreur = app séparée** `apps/courier`
+5. ✅ **Marchand = module Pro natif** `(pro)/` dans mobile
+6. ✅ **Admin / logistique** — web uniquement
+7. ✅ **PWA** conservée en parallèle
 
 ---
 
-## 12. Suivi de l'évolution
+## 11. Checklist phases (état au 15 août 2026)
 
-Le document **[MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md)** est la source de vérité pour :
+### Phase 0 ✅
 
-- Matrice parité PWA ↔ app native (consommateur)
-- Avancement par phase vs ce plan
-- Journal des jalons et roadmap immédiate
-- Setup dev/build : [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md)
+- [x] `apps/mobile` + packages + EAS + MCP
+- [x] Auth OTP + Bearer
+- [x] Push enregistrement token
+
+### Phase 1 — finalisation
+
+- [x] Home, marketplace, autocomplete, panier, checkout
+- [x] Simulateur paiement commandes + réservations
+- [x] Profil complet, favoris, resto, fiches verticales, suivi livraison
+- [x] Carte **`react-native-maps`** (`SearchNativeMap`)
+- [x] Push tap → navigation
+- [x] Avis (création), table resto, reçu, mot de passe oublié
+- [x] `expo-image` via `AppImage` (composants principaux)
+- [x] Infinite scroll recherche + marketplace
+- [x] SAV commande (retour + litige livraison)
+- [ ] Tests smoke + CI typecheck mobile
+
+### Phase 2 — livreur — ⏸ en pause
+
+- [ ] Créer `apps/courier` + EAS — **reporté après app principale**
+- [ ] Missions, GPS, push offres, carte native
+
+### Phase 3 — stores
+
+- [ ] Deep links complets
+- [ ] Sentry, PostHog, OTA
+- [ ] TestFlight / Play → soumission
+
+### Phase 4 — module Pro
+
+- [ ] Route group `(pro)/` + garde rôle marchand
+- [ ] Dashboard, commandes, notifications P0
+- [ ] Catalogue / réservations P1
 
 ---
 
-*Document rédigé à partir de l'analyse du dépôt `laplasse` (apps/web, apps/api, PWA, auth JWT, notifications). Dernière révision plan : 9 août 2026.*
+## 12. Suivi
+
+| Document | Rôle |
+|----------|------|
+| [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md) | Parité écran par écran, journal jalons |
+| [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md) | Dev, LAN, builds |
+
+---
+
+*Références : `apps/mobile`, `apps/web`, `apps/api`, maquettes `Docs/maquettes/`.*

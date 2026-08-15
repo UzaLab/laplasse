@@ -1,4 +1,5 @@
 import type { ApiMerchant } from '@laplasse/api-client'
+import { businessDayFromDate } from '@laplasse/shared-config'
 import { isFoodCategorySlug } from '@/src/lib/merchantVertical'
 
 export const FOOD_HUB_DELIVERY_FEE_ESTIMATE = 1500
@@ -57,7 +58,7 @@ export function isOpenFromMerchantHours(
   now: Date = new Date(),
 ): boolean {
   if (!hours.length) return true
-  const dayOfWeek = now.getDay()
+  const dayOfWeek = businessDayFromDate(now)
   const todayHours = hours.find(h => h.day === dayOfWeek)
   if (!todayHours || todayHours.is_closed) return false
   if (!todayHours.open_time || !todayHours.close_time) return true

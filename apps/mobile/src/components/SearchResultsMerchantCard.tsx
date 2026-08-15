@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
@@ -24,7 +25,7 @@ export function SearchResultsMerchantCard({
     >
       <View style={styles.imageWrap}>
         {merchant.cover_image ? (
-          <Image source={{ uri: merchant.cover_image }} style={styles.image} />
+          <AppImage uri={merchant.cover_image} style={styles.image} />
         ) : (
           <View style={[styles.image, styles.imageFallback]}>
             <Ionicons name={icon} size={48} color={colors.textLight} />

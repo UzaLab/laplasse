@@ -11,7 +11,7 @@ import {
   SEARCH_MAP_CARD_SNAP,
   SearchMapMerchantCard,
 } from '@/src/components/SearchMapMerchantCard'
-import { SearchOsmMap } from '@/src/components/SearchOsmMap'
+import { SearchNativeMap } from '@/src/components/SearchNativeMap'
 import { SearchRadiusControl } from '@/src/components/SearchRadiusControl'
 import { LoadingState } from '@/src/components/ui'
 import { useSearchMobileNearby } from '@/src/hooks/useSearchMobileNearby'
@@ -129,13 +129,14 @@ export function SearchDiscoverView({ initialCategory = '' }: { initialCategory?:
 
   return (
     <View style={styles.root}>
-      <SearchOsmMap
+      <SearchNativeMap
         merchants={filtered}
         selectedId={selectedId}
         onSelect={handleSelectMerchant}
         center={mapCenter}
         userLocation={userLocation}
         radiusKm={userLocation ? radiusKm : undefined}
+        geoGranted={geoStatus === 'granted'}
       />
 
       <View

@@ -1,11 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getDefaultCity } from '@laplasse/shared-config'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -79,26 +81,57 @@ export default function SearchResultsView({
   const debouncedQuery = useDebouncedValue(query, 350)
   const pageSize = 12
 
-  const searchQuery = useQuery({
+  const categoryFilter = filters.categories.length === 1 ? filters.categories[0] : undefined
+
+  const searchQuery = useInfiniteQuery({
     queryKey: [
       'search',
       debouncedQuery,
       city,
       filters.sort,
-      filters.categories.length === 1 ? filters.categories[0] : null,
+      categoryFilter,
+      countryCode,
     ],
-    queryFn: () =>
+    queryFn: ({ pageParam = 0 }) =>
       getApiClient().unifiedSearchAdvanced({
         q: debouncedQuery,
         type: 'all',
         limit: pageSize,
-        offset: 0,
+        offset: pageParam,
         city,
-        category: filters.categories.length === 1 ? filters.categories[0] : undefined,
+        category: categoryFilter,
         sort: filters.sort,
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _pages, lastPageParam) => {
+      const next = lastPageParam + pageSize
+      const merchantsHasMore = next < lastPage.merchants.meta.total
+      const productsHasMore = next < lastPage.products.meta.total
+      return merchantsHasMore || productsHasMore ? next : undefined
+    },
     enabled: debouncedQuery.length >= 2,
   })
+
+  const searchPages = searchQuery.data?.pages ?? []
+  const searchData = searchPages[0]
+
+  const merchants = useMemo(() => {
+    const merged = searchPages.flatMap(page => page.merchants.data)
+    return applyCategoryFilter(merged, filters.categories)
+  }, [searchPages, filters.categories])
+
+  const products = useMemo(() => {
+    const merged = searchPages.flatMap(page => page.products.data)
+    if (filters.categories.length === 0) return merged
+    return merged.filter(p => {
+      const slug = (p as { category?: { slug?: string } }).category?.slug
+      return slug != null && filters.categories.includes(slug)
+    })
+  }, [searchPages, filters.categories])
+
+  const canLoadMore = tab === 'merchants'
+    ? merchants.length < (searchData?.merchants.meta.total ?? 0)
+    : products.length < (searchData?.products.meta.total ?? 0)
 
   const trendingQuery = useQuery({
     queryKey: ['search-trending', city, countryCode],
@@ -106,25 +139,39 @@ export default function SearchResultsView({
     enabled:
       debouncedQuery.length >= 2
       && searchQuery.isSuccess
-      && (searchQuery.data?.merchants.data.length ?? 0) === 0,
+      && merchants.length === 0,
     staleTime: 60_000,
   })
 
-  const merchants = useMemo(
-    () => applyCategoryFilter(searchQuery.data?.merchants.data ?? [], filters.categories),
-    [searchQuery.data?.merchants.data, filters.categories],
-  )
-  const products = useMemo(() => {
-    const list = searchQuery.data?.products.data ?? []
-    if (filters.categories.length === 0) return list
-    return list.filter(p => {
-      const slug = (p as { category?: { slug?: string } }).category?.slug
-      return slug != null && filters.categories.includes(slug)
-    })
-  }, [searchQuery.data?.products.data, filters.categories])
+  const merchantTotal = filters.categories.length > 1
+    ? merchants.length
+    : (searchData?.merchants.meta.total ?? 0)
+  const productTotal = searchData?.products.meta.total ?? 0
 
-  const merchantTotal = filters.categories.length > 1 ? merchants.length : (searchQuery.data?.merchants.meta.total ?? 0)
-  const productTotal = searchQuery.data?.products.meta.total ?? 0
+  const loadMore = () => {
+    if (searchQuery.hasNextPage && !searchQuery.isFetchingNextPage) {
+      void searchQuery.fetchNextPage()
+    }
+  }
+
+  const loadMoreLock = useRef(false)
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent
+    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 160
+    if (
+      nearBottom
+      && canLoadMore
+      && searchQuery.hasNextPage
+      && !searchQuery.isFetchingNextPage
+      && !loadMoreLock.current
+    ) {
+      loadMoreLock.current = true
+      void searchQuery.fetchNextPage().finally(() => {
+        loadMoreLock.current = false
+      })
+    }
+  }
   const activeTotal = tab === 'merchants' ? merchantTotal : productTotal
   const hasFilters = filters.categories.length > 0 || filters.sort !== 'trust_score'
   const listBottomPad = layout.bottomNavHeight + insets.bottom + 16
@@ -165,6 +212,8 @@ export default function SearchResultsView({
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: scrollTopPad, paddingBottom: listBottomPad }]}
         keyboardShouldPersistTaps="handled"
+        onScroll={handleScroll}
+        scrollEventThrottle={400}
       >
         <View style={styles.searchField}>
           <Ionicons name="search-outline" size={20} color={colors.textMuted} style={styles.searchIcon} />
@@ -259,6 +308,19 @@ export default function SearchResultsView({
               </View>
             )}
 
+            {canLoadMore ? (
+              <Pressable
+                onPress={loadMore}
+                style={({ pressed }) => [styles.loadMoreBtn, pressed && { opacity: 0.85 }]}
+              >
+                {searchQuery.isFetchingNextPage ? (
+                  <ActivityIndicator color={colors.brand600} />
+                ) : (
+                  <Text style={styles.loadMoreText}>Voir plus d&apos;établissements</Text>
+                )}
+              </Pressable>
+            ) : null}
+
             {debouncedQuery && products.length > 0 ? (
               <View style={styles.crossSell}>
                 <View style={styles.crossSellHeader}>
@@ -318,7 +380,19 @@ export default function SearchResultsView({
                 </View>
               )
             })}
-            {searchQuery.isFetching ? (
+            {canLoadMore ? (
+              <Pressable
+                onPress={loadMore}
+                style={({ pressed }) => [styles.loadMoreBtn, pressed && { opacity: 0.85 }]}
+              >
+                {searchQuery.isFetchingNextPage ? (
+                  <ActivityIndicator color={colors.brand600} />
+                ) : (
+                  <Text style={styles.loadMoreText}>Voir plus de produits</Text>
+                )}
+              </Pressable>
+            ) : null}
+            {searchQuery.isFetching && !searchQuery.isFetchingNextPage ? (
               <ActivityIndicator color={colors.brand600} style={{ marginTop: 16 }} />
             ) : null}
           </View>
@@ -500,5 +574,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 14,
     color: colors.brand800,
+  },
+  loadMoreBtn: {
+    marginTop: 16,
+    marginBottom: 8,
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  loadMoreText: {
+    fontFamily: fonts.bold,
+    fontSize: 14,
+    color: colors.brand700,
   },
 })

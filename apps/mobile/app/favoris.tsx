@@ -3,13 +3,13 @@ import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
 import {
   FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
@@ -108,7 +108,7 @@ export default function FavorisScreen() {
               onPress={() => router.push(`/m/${item.slug}`)}
             >
               {item.cover_image ? (
-                <Image source={{ uri: item.cover_image }} style={styles.cover} />
+                <AppImage uri={item.cover_image} style={styles.cover} fallbackLetter={item.business_name.slice(0, 1)} />
               ) : (
                 <View style={[styles.cover, styles.coverFallback]} />
               )}
@@ -147,7 +147,7 @@ export default function FavorisScreen() {
             >
               <View style={styles.productImageWrap}>
                 {item.image_url ? (
-                  <Image source={{ uri: item.image_url }} style={styles.productImage} />
+                  <AppImage uri={item.image_url} style={styles.productImage} />
                 ) : (
                   <View style={[styles.productImage, styles.coverFallback]} />
                 )}

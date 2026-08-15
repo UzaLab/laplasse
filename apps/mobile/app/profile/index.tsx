@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { formatPrice } from '@laplasse/shared-config'
 import {
   ProfileBadge,
@@ -81,16 +82,11 @@ export default function ProfileDashboardScreen() {
       <ProfileCard dark>
         {nextBooking ? (
           <View style={styles.bookingHero}>
-            {nextBooking.merchant.cover_image ? (
-              <Image
-                source={{ uri: nextBooking.merchant.cover_image }}
-                style={styles.bookingCover}
-              />
-            ) : (
-              <View style={[styles.bookingCover, styles.bookingCoverFallback]}>
-                <Ionicons name="location-outline" size={28} color="#64748b" />
-              </View>
-            )}
+            <AppImage
+              uri={nextBooking.merchant.cover_image}
+              style={styles.bookingCover}
+              fallbackLetter={nextBooking.merchant.business_name.slice(0, 1)}
+            />
             <View style={styles.bookingBody}>
               <ProfileBadge label="Prochaine réservation" tone="amber" />
               <Text style={styles.bookingMerchant}>{nextBooking.merchant.business_name}</Text>
@@ -214,13 +210,7 @@ export default function ProfileDashboardScreen() {
                 style={styles.favCard}
                 onPress={() => router.push(`/m/${fav.slug}` as never)}
               >
-                {fav.cover_image ? (
-                  <Image source={{ uri: fav.cover_image }} style={styles.favCover} />
-                ) : (
-                  <View style={[styles.favCover, styles.favCoverFallback]}>
-                    <Ionicons name="storefront-outline" size={24} color={profileTheme.textLight} />
-                  </View>
-                )}
+                <AppImage uri={fav.cover_image} style={styles.favCover} fallbackLetter={fav.business_name.slice(0, 1)} />
                 <Text style={styles.favName} numberOfLines={2}>{fav.business_name}</Text>
                 <Text style={styles.favCat} numberOfLines={1}>{fav.category.name}</Text>
               </Pressable>

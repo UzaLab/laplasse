@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { formatPrice } from '@laplasse/shared-config'
 import type { FeaturedProduct } from '@laplasse/api-client'
 import { colors, fonts, radii, shadows } from '@/src/theme'
@@ -24,7 +25,7 @@ export function CompactProductCard({
       ]}
     >
       {product.image_url ? (
-        <Image source={{ uri: product.image_url }} style={styles.image} />
+        <AppImage uri={product.image_url} style={styles.image} />
       ) : (
         <View style={[styles.image, styles.imageFallback]} />
       )}

@@ -1,6 +1,15 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
@@ -13,9 +22,10 @@ import {
   getCheckoutSession,
   saveCheckoutConfirmation,
 } from '@/src/lib/checkoutSession'
+import { cashChangeDue, cashTenderOptions } from '@/src/lib/foodCashTender'
 import { getApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
-import { colors, fonts, layout, spacing } from '@/src/theme'
+import { colors, fonts, spacing } from '@/src/theme'
 
 export default function PaymentScreen() {
   const router = useRouter()
@@ -25,6 +35,11 @@ export default function PaymentScreen() {
   const [session, setSession] = useState<Awaited<ReturnType<typeof getCheckoutSession>>>(null)
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [cashExact, setCashExact] = useState(false)
+  const [cashTenderAmount, setCashTenderAmount] = useState<number | null>(null)
+
+  const isFoodFlow = session?.flow === 'food'
+  const checkoutFlow = isFoodFlow ? 'food' : 'marketplace'
 
   useEffect(() => {
     void (async () => {
@@ -36,27 +51,50 @@ export default function PaymentScreen() {
       setSession(stored)
       setReady(true)
     })()
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    if (hydrated && !isAuthenticated) {
-      router.replace('/(auth)/login')
-    }
+    if (hydrated && !isAuthenticated) router.replace('/(auth)/login')
   }, [hydrated, isAuthenticated, router])
+
+  useEffect(() => {
+    if (!session || !isFoodFlow) return
+    setCashTenderAmount(null)
+    setCashExact(false)
+  }, [session?.checkoutResult.total, isFoodFlow])
+
+  const tenderOptions = useMemo(
+    () => (session ? cashTenderOptions(session.checkoutResult.total) : []),
+    [session],
+  )
+
+  const cashTenderReady =
+    !isFoodFlow
+    || cashExact
+    || (cashTenderAmount != null && cashTenderAmount >= (session?.checkoutResult.total ?? 0))
 
   async function confirm(method: 'success' | 'failure') {
     if (!session) return
+    if (method === 'success' && isFoodFlow && !cashTenderReady) {
+      Alert.alert('Paiement', 'Indiquez si vous avez le montant exact ou choisissez un billet.')
+      return
+    }
     const paymentIds = session.checkoutResult.orders.map(o => o.paymentId).filter(Boolean)
     if (!paymentIds.length) {
       Alert.alert('Paiement', 'Aucun paiement en attente')
       return
     }
+    const cashTender =
+      isFoodFlow && method === 'success'
+        ? { exact: cashExact, tenderAmount: cashExact ? undefined : (cashTenderAmount ?? undefined) }
+        : undefined
+
     setLoading(true)
     try {
       const result =
         paymentIds.length > 1
-          ? await getApiClient().confirmBatchOrderPayments(paymentIds, method)
-          : await getApiClient().confirmOrderPayment(paymentIds[0], method)
+          ? await getApiClient().confirmBatchOrderPayments(paymentIds, method, cashTender)
+          : await getApiClient().confirmOrderPayment(paymentIds[0], method, cashTender)
 
       const confirmation = buildCheckoutConfirmation(session, method === 'success' ? 'success' : 'failure')
       await saveCheckoutConfirmation(confirmation)
@@ -64,12 +102,14 @@ export default function PaymentScreen() {
 
       router.replace({
         pathname: '/checkout/confirmation',
-        params: { status: confirmation.status, orderIds: confirmation.orderIds.join(',') },
+        params: {
+          status: confirmation.status,
+          orderIds: confirmation.orderIds.join(','),
+          ...(isFoodFlow ? { flow: 'food' } : {}),
+        },
       } as never)
 
-      if (method === 'failure') {
-        Alert.alert('Paiement refusé', result.message)
-      }
+      if (method === 'failure') Alert.alert('Paiement refusé', result.message)
     } catch (err) {
       Alert.alert('Erreur', err instanceof Error ? err.message : 'Paiement impossible')
     } finally {
@@ -79,9 +119,9 @@ export default function PaymentScreen() {
 
   if (!ready || !session) {
     return (
-      <CheckoutWizardShell step={3}>
+      <CheckoutWizardShell step={3} flow={checkoutFlow}>
         <View style={styles.loader}>
-          <ActivityIndicator color={colors.brand500} />
+          <ActivityIndicator color={isFoodFlow ? '#ea580c' : colors.brand500} />
         </View>
       </CheckoutWizardShell>
     )
@@ -98,22 +138,68 @@ export default function PaymentScreen() {
     merchant_count: session.cartSnapshot.merchant_count,
   }
 
+  const changeDue = cashTenderAmount != null ? cashChangeDue(cashTenderAmount, session.checkoutResult.total) : 0
+
   return (
-    <CheckoutWizardShell step={3}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: layout.bottomNavHeight + insets.bottom + 24 },
-        ]}
-      >
-        <View style={styles.iconWrap}>
-          <Ionicons name="phone-portrait-outline" size={36} color={colors.brand600} />
+    <CheckoutWizardShell step={3} flow={checkoutFlow}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={[styles.iconWrap, isFoodFlow && styles.iconWrapFood]}>
+          <Ionicons
+            name={isFoodFlow ? 'cash-outline' : 'phone-portrait-outline'}
+            size={36}
+            color={isFoodFlow ? '#ea580c' : colors.brand600}
+          />
         </View>
-        <Text style={styles.title}>Paiement Mobile Money</Text>
-        <Text style={styles.subtitle}>
-          Wave · Orange Money · MTN MoMo{'\n'}
-          Total · {formatPrice(session.checkoutResult.total, session.checkoutResult.currency)}
+        <Text style={styles.title}>
+          {isFoodFlow ? 'Paiement à la livraison' : 'Paiement Mobile Money'}
         </Text>
+        <Text style={styles.subtitle}>
+          {isFoodFlow
+            ? `Préparez le montant en espèces\nTotal · ${formatPrice(session.checkoutResult.total, session.checkoutResult.currency)}`
+            : `Wave · Orange Money · MTN MoMo\nTotal · ${formatPrice(session.checkoutResult.total, session.checkoutResult.currency)}`}
+        </Text>
+
+        {isFoodFlow ? (
+          <View style={styles.cashBlock}>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>J'ai le montant exact</Text>
+              <Switch
+                value={cashExact}
+                onValueChange={value => {
+                  setCashExact(value)
+                  if (value) setCashTenderAmount(null)
+                }}
+                trackColor={{ true: '#fb923c' }}
+              />
+            </View>
+            {!cashExact ? (
+              <>
+                <Text style={styles.cashHint}>Ou choisissez le billet que vous paierez :</Text>
+                <View style={styles.tenderRow}>
+                  {tenderOptions.map(amount => (
+                    <Pressable
+                      key={amount}
+                      onPress={() => setCashTenderAmount(amount)}
+                      style={[styles.tenderBtn, cashTenderAmount === amount && styles.tenderBtnActive]}
+                    >
+                      <Text style={[styles.tenderText, cashTenderAmount === amount && styles.tenderTextActive]}>
+                        {formatPrice(amount, session.checkoutResult.currency)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {cashTenderAmount != null && cashTenderAmount < session.checkoutResult.total ? (
+                  <Text style={styles.cashError}>Montant insuffisant pour couvrir la commande.</Text>
+                ) : null}
+                {cashTenderAmount != null && changeDue > 0 ? (
+                  <Text style={styles.changeHint}>
+                    Monnaie à rendre : {formatPrice(changeDue, session.checkoutResult.currency)}
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         <CheckoutOrderSummary
           cart={cartSnapshot}
@@ -122,9 +208,18 @@ export default function PaymentScreen() {
           deliveryQuotes={session.deliveryQuotes ?? []}
         />
 
-        <PrimaryButton label="Confirmer le paiement" onPress={() => void confirm('success')} loading={loading} />
-        <SecondaryButton label="Simuler un échec" onPress={() => void confirm('failure')} />
-        <Text style={styles.hint}>Préprod : simulateur instantané côté API.</Text>
+        <PrimaryButton
+          label={isFoodFlow ? 'Confirmer la commande' : 'Confirmer le paiement'}
+          onPress={() => void confirm('success')}
+          loading={loading}
+          disabled={isFoodFlow && !cashTenderReady}
+        />
+        {!isFoodFlow ? (
+          <SecondaryButton label="Simuler un échec" onPress={() => void confirm('failure')} />
+        ) : null}
+        {!isFoodFlow ? (
+          <Text style={styles.hint}>Préprod : simulateur instantané côté API.</Text>
+        ) : null}
       </ScrollView>
     </CheckoutWizardShell>
   )
@@ -142,7 +237,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
   },
+  iconWrapFood: { backgroundColor: '#ffedd5' },
   title: { fontFamily: fonts.extrabold, fontSize: 22, color: colors.text, textAlign: 'center' },
   subtitle: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
+  cashBlock: {
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    padding: 16,
+  },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  switchLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
+  cashHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
+  tenderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tenderBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceContainerLow,
+  },
+  tenderBtnActive: { backgroundColor: '#ea580c', borderColor: '#ea580c' },
+  tenderText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
+  tenderTextActive: { color: '#fff' },
+  cashError: { fontFamily: fonts.medium, fontSize: 12, color: '#dc2626' },
+  changeHint: { fontFamily: fonts.semibold, fontSize: 13, color: '#15803d' },
   hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textLight, textAlign: 'center' },
 })

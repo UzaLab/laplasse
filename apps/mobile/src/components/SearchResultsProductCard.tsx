@@ -1,6 +1,7 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { formatPrice } from '@laplasse/shared-config'
 import type { ApiProductSearchHit } from '@laplasse/api-client'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { colors, fonts, radii, shadows } from '@/src/theme'
 
 export function SearchResultsProductCard({
@@ -21,11 +22,7 @@ export function SearchResultsProductCard({
         pressed && styles.pressed,
       ]}
     >
-      {product.image_url ? (
-        <Image source={{ uri: product.image_url }} style={styles.image} />
-      ) : (
-        <View style={[styles.image, styles.imageFallback]} />
-      )}
+      <AppImage uri={product.image_url} style={styles.image} />
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
         <Text style={styles.price}>{formatPrice(product.price, product.currency)}</Text>

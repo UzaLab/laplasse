@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { MarketplaceSpotlightShop } from '@laplasse/api-client'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { colors, fonts, radii, shadows } from '@/src/theme'
 
 export function ShopCard({
@@ -16,13 +17,11 @@ export function ShopCard({
       onPress={onPress}
       style={({ pressed }) => [styles.card, { width }, pressed && styles.pressed]}
     >
-      {shop.logo ? (
-        <Image source={{ uri: shop.logo }} style={styles.logo} />
-      ) : (
-        <View style={[styles.logo, styles.logoFallback]}>
-          <Text style={styles.letter}>{shop.business_name.slice(0, 1)}</Text>
-        </View>
-      )}
+      <AppImage
+        uri={shop.logo}
+        style={styles.logo}
+        fallbackLetter={shop.business_name.slice(0, 1)}
+      />
       <Text style={styles.name} numberOfLines={2}>{shop.business_name}</Text>
     </Pressable>
   )

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -79,22 +81,6 @@ export function MarketplaceView() {
       friction: 8,
     }).start()
   }, [fabOpacity])
-
-  const handleScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const newY = e.nativeEvent.contentOffset.y
-      const delta = newY - scrollY.current
-      if (newY < 80) {
-        showFab()
-      } else if (delta > 10) {
-        hideFab()
-      } else if (delta < -10) {
-        showFab()
-      }
-      scrollY.current = newY
-    },
-    [showFab, hideFab],
-  )
 
   const [filters, setFilters] = useState<MarketplaceFilterState>(() => ({
     sort: 'newest',
@@ -208,6 +194,28 @@ export function MarketplaceView() {
       setLoadingMore(false)
     }
   }, [loadingMore, hasMore, filters, debouncedSearch, page])
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent
+      const newY = contentOffset.y
+      const delta = newY - scrollY.current
+      if (newY < 80) {
+        showFab()
+      } else if (delta > 10) {
+        hideFab()
+      } else if (delta < -10) {
+        showFab()
+      }
+      scrollY.current = newY
+
+      const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200
+      if (nearBottom && hasMore && !loadingMore && filters.selectedMerchants.length <= 1) {
+        void loadMore()
+      }
+    },
+    [showFab, hideFab, hasMore, loadingMore, filters.selectedMerchants.length, loadMore],
+  )
 
   const resetFilters = () => {
     setSearch('')

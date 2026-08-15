@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -12,14 +11,15 @@ import {
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import type { ApiMerchantDetail, ApiShopPublic, MarketplaceCatalogProduct, MarketplaceProduct } from '@laplasse/api-client'
+import type { ApiMerchantDetail, ApiShopPublic, MarketplaceProduct } from '@laplasse/api-client'
 import {
   MarketplaceFiltersSheet,
   type MarketplaceFilterState,
 } from '@/src/components/MarketplaceFiltersSheet'
-import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
+import { ShopProductCard } from '@/src/components/ShopProductCard'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { LoadingState } from '@/src/components/ui'
 import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
@@ -291,7 +291,7 @@ export function BoutiqueView({ slug }: { slug: string }) {
           {/* ─── Hero ─── */}
           <View style={styles.hero}>
             {merchant.cover_image ? (
-              <Image source={{ uri: merchant.cover_image }} style={styles.cover} />
+              <AppImage uri={merchant.cover_image} style={styles.cover} fallbackLetter={merchant.name.slice(0, 1)} />
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
@@ -305,7 +305,7 @@ export function BoutiqueView({ slug }: { slug: string }) {
             <View style={styles.heroContent}>
               <View style={styles.logoWrap}>
                 {merchant.logo ? (
-                  <Image source={{ uri: merchant.logo }} style={styles.logo} />
+                  <AppImage uri={merchant.logo} style={styles.logo} fallbackLetter={merchant.name.slice(0, 1)} />
                 ) : (
                   <View style={[styles.logo, styles.logoFallback]}>
                     <Ionicons name="storefront" size={28} color={colors.textLight} />
@@ -318,19 +318,15 @@ export function BoutiqueView({ slug }: { slug: string }) {
                   <Text style={styles.officialBadgeText}>Boutique Officielle</Text>
                 </View>
                 <View style={styles.nameRow}>
+                  <Text style={styles.shopName} numberOfLines={2}>{merchant.name}</Text>
                   {trust && trust.badge && trust.badge !== 'new' ? (
-                    <View style={[
-                      styles.trustIconOnly,
-                      trust.badge === 'trusted' ? styles.trustIconTrusted : styles.trustIconGood,
-                    ]}>
-                      <Ionicons
-                        name={trust.badge === 'trusted' ? 'checkmark-circle' : 'shield-outline'}
-                        size={18}
-                        color={trust.badge === 'trusted' ? colors.emerald700 : colors.brand700}
-                      />
-                    </View>
+                    <Ionicons
+                      name={trust.badge === 'trusted' ? 'checkmark-circle' : 'shield-checkmark'}
+                      size={16}
+                      color={trust.badge === 'trusted' ? '#a7f3d0' : 'rgba(255,255,255,0.85)'}
+                      style={styles.trustIcon}
+                    />
                   ) : null}
-                  <Text style={styles.shopName}>{merchant.name}</Text>
                 </View>
                 {locationLabel ? (
                   <View style={styles.locationRow}>
@@ -381,9 +377,8 @@ export function BoutiqueView({ slug }: { slug: string }) {
             <View style={styles.grid}>
               {filtered.map(product => (
                 <View key={product.id} style={styles.gridCell}>
-                  <MarketplaceProductGridCard
-                    product={product as unknown as MarketplaceCatalogProduct}
-                    showMerchantName={false}
+                  <ShopProductCard
+                    product={product}
                     onPress={() => router.push(`/m/${merchantSlug ?? merchant.slug}/p/${product.slug}`)}
                   />
                 </View>
@@ -503,14 +498,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold, fontSize: 10, color: '#fff',
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  shopName: { fontFamily: fonts.extrabold, fontSize: 22, color: '#fff', flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  trustIconOnly: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
+  shopName: { fontFamily: fonts.extrabold, fontSize: 22, color: '#fff', flexShrink: 1 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexWrap: 'wrap',
+    marginTop: 2,
+    maxWidth: '100%',
   },
-  trustIconTrusted: { backgroundColor: colors.emerald50, borderWidth: 1, borderColor: '#a7f3d0' },
-  trustIconGood: { backgroundColor: colors.brand50, borderWidth: 1, borderColor: colors.brand200 },
+  trustIcon: { flexShrink: 0, marginLeft: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   location: { fontFamily: fonts.medium, fontSize: 13, color: 'rgba(255,255,255,0.85)', flex: 1 },
 

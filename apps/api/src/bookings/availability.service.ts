@@ -274,7 +274,7 @@ export class AvailabilityService {
       return { slots: [], closed: true, reason: dateCheck.reason }
     }
 
-    const dayOfWeek = dateCheck.date.getDay()
+    const dayOfWeek = dateCheck.date.getDay() === 0 ? 6 : dateCheck.date.getDay() - 1
     const hourRow = merchant.hours.find(h => h.day === dayOfWeek)
     if (!hourRow || hourRow.is_closed || !hourRow.open_time || !hourRow.close_time) {
       return { slots: [], closed: true, reason: 'Fermé ce jour — horaires non renseignés' }

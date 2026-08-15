@@ -1,5 +1,11 @@
 import { computeFoodStatus } from '../shop-menu/shop-menu.service'
 
+/** BusinessHour.day in DB: 0 = Monday … 6 = Sunday (not JS getDay()). */
+function businessDayFromDate(date: Date): number {
+  const jsDay = date.getDay()
+  return jsDay === 0 ? 6 : jsDay - 1
+}
+
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 type DayKey = (typeof DAY_KEYS)[number]
 
@@ -54,7 +60,7 @@ function isWithinFoodOpeningHours(hours: OpeningHours, at: Date): boolean {
 
 function isOpenFromBusinessHours(hours: MerchantHourRow[], at: Date): boolean {
   if (!hours.length) return true
-  const day = at.getDay()
+  const day = businessDayFromDate(at)
   const entry = hours.find(h => h.day === day)
   if (!entry || entry.is_closed) return false
   if (!entry.open_time || !entry.close_time) return true
@@ -71,7 +77,7 @@ function getScheduleForDay(day: Date, source: FoodScheduleSource): DaySchedule |
     return schedule ?? null
   }
   if (source.hours?.length) {
-    const entry = source.hours.find(h => h.day === day.getDay())
+    const entry = source.hours.find(h => h.day === businessDayFromDate(day))
     if (!entry || entry.is_closed || !entry.open_time || !entry.close_time) return null
     return { open: entry.open_time, close: entry.close_time }
   }

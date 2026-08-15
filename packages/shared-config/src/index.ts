@@ -49,4 +49,10 @@ export function formatPrice(amount: number | null | undefined, currency = 'XOF')
   return `${amount.toLocaleString('fr-FR')} ${label}`
 }
 
+/** BusinessHour.day in DB: 0 = Monday … 6 = Sunday (not JS getDay()). */
+export function businessDayFromDate(date: Date = new Date()): number {
+  const jsDay = date.getDay()
+  return jsDay === 0 ? 6 : jsDay - 1
+}
+
 export * from './apiEnv'

@@ -1,211 +1,223 @@
 # Évolution app mobile LaPlasse
 
-> Dernière mise à jour : **9 août 2026**  
-> Périmètre actuel : **app consommateur uniquement** (`apps/mobile`)  
-> Prochaine app : **livreur** (Phase 2) — app séparée ou switch de rôle, à trancher avant dev  
-> Marchand : **web responsive** pour l’instant ; intégration légère dans l’app consommateur possible plus tard (notifications commandes, bascule rôle)
+> Dernière mise à jour : **15 août 2026**  
+> Apps : **`apps/mobile`** (consommateur + module Pro) · **`apps/courier`** (Phase 2, app séparée)  
+> Source de vérité opérationnelle — plan stratégique : [MOBILE_APP_STACK_RECOMMANDATIONS.md](./MOBILE_APP_STACK_RECOMMANDATIONS.md)
 
 ---
 
-## 1. Positionnement produit
+## 1. Positionnement produit (décisions actées)
 
-| App | Statut | Notes |
-|-----|--------|-------|
-| **Consommateur** | **En cours** (Phase 0 → Phase 1) | Découverte, marketplace, panier, commandes |
-| **Livreur** | **Planifié** (Phase 2) | Missions, GPS, push offres — équivalent `/courier/*` |
-| **Marchand / shop** | **Hors app native P0** | Back-office dense sur web ; évaluation ultérieure d’un module « Pro » dans l’app consommateur |
-| **Admin / logistique** | **Web uniquement** | Dashboards desktop/tablette |
+| App / module | Statut | Décision |
+|--------------|--------|----------|
+| **Consommateur** | Phase 1 — finalisation | App store P0 : découverte, marketplace, commande, profil, réservations |
+| **Livreur** | **En pause** | App séparée `apps/courier` — **après finalisation app principale** (voir §6) |
+| **Module Pro marchand** | Phase 4 — planifié | **Natif** dans `apps/mobile`, route group `(pro)/` — pas de WebView dashboard |
+| **Admin / logistique** | Hors scope mobile | Web desktop/tablette uniquement |
 
-La PWA reste le canal léger et SEO ; l’app store apporte push fiable, deep links et présence stores.
+**Paiement :** simulateur natif **maintenu** (`/payment`, `/bookings/pay`) jusqu’à intégration Mobile Money réelle (chantier API + providers, post-lancement stores).
+
+**Principe technique :** **natif d’abord** — pas de WebView sauf obligation provider (ex. page hébergée Mobile Money sans schéma retour). Cartes → `react-native-maps` ; images → `expo-image` ; HTML produit → `react-native-render-html`.
+
+La PWA reste le canal SEO et acquisition ; l’app store apporte push fiable, deep links et crédibilité partenaires.
 
 ---
 
-## 2. Alignement avec [MOBILE_APP_STACK_RECOMMANDATIONS.md](./MOBILE_APP_STACK_RECOMMANDATIONS.md)
+## 2. Avancement par phase
 
-### Phase 0 — Fondations
-
-| Action plan doc | État | Détail |
-|-----------------|------|--------|
-| Créer `apps/mobile` (Expo Router, TS) | ✅ Fait | SDK 57, Expo Router, monorepo pnpm |
-| `packages/api-client` | ✅ Fait | Auth Bearer, refresh, headers pays, discovery, cart |
-| `packages/shared-config` | ✅ Fait | Pays, `getApiBaseUrl`, constantes |
-| Écran login | 🟡 Partiel | Email + mot de passe ; **OTP téléphone** (web) pas encore |
-| CI EAS preview | ✅ Fait | Profil `preview`, APK Android internal |
-| Expo MCP Cursor | ✅ Fait | Compte uza.lab, build via CLI/MCP |
-| NativeWind | ⏸ Non retenu | StyleSheet + tokens amber/Outfit (parité visuelle sans NativeWind) |
-
-### Phase 1 — MVP consommateur
-
-| Action plan doc | État | Détail |
-|-----------------|------|--------|
-| Home + catégories + établissements | 🟡 ~80 % | Carrousels PWA, autocomplete ; pas encore carte geo home |
-| Fiche établissement + boutique + produit | 🟡 ~50 % | Cover + liste produits ; pas avis, menu, WhatsApp, horaires |
-| Panier + checkout | 🟡 ~70 % | Flux API OK ; paiement Mobile Money / WebView pas encore |
-| Profil commandes + détail | 🟡 ~40 % | Liste basique ; pas écran détail `/profile/orders/[id]` |
-| Suivi livraison | ❌ | `/delivery/track/[token]` absent |
-| Push commande | 🟡 | `expo-notifications` + `POST /notifications/push/expo` ; pas test E2E prod |
-
-### Phase 2 — Livreur
+### Phase 0 — Fondations ✅
 
 | Action | État |
 |--------|------|
-| App ou module livreur | ❌ Non démarré |
-| API delivery (missions, GPS) | ✅ Existe côté web/API |
+| `apps/mobile` Expo Router + TS (SDK 57) | ✅ |
+| `packages/api-client` + `shared-config` | ✅ |
+| Auth Bearer + SecureStore + refresh | ✅ |
+| Login OTP téléphone | ✅ |
+| EAS preview Android | ✅ |
+| Expo MCP Cursor | ✅ |
+| Push Expo — enregistrement token | ✅ |
 
-### Phase 3 — Stores
+### Phase 1 — MVP consommateur 🟡 ~95 %
 
-| Action | État |
-|--------|------|
-| Deep links `laplasse.tech/m/...` | 🟡 Config Android intent filters ; universal links iOS à valider |
-| TestFlight / Play Internal | 🟡 Builds preview OK |
-| Soumission stores | ❌ |
+| Bloc | État | Reste à faire |
+|------|------|---------------|
+| Home + marketplace + autocomplete | ✅ | — |
+| Recherche + carte | ✅ | — |
+| Fiches établissement (shop, hôtel, service, resto) | ✅ | — (avis ✅ ; table resto ✅) |
+| Panier + checkout + simulateur paiement | ✅ | — (Mobile Money **hors Phase 1**) |
+| Profil complet (commandes, réservations, fidélité…) | ✅ | — |
+| Favoris, restauration, détail commande, suivi livraison | ✅ | — (reçu ✅) |
+| Push | ✅ | — |
+| UI / design tokens | ✅ | **`AppImage`** (expo-image) migré sur écrans consommateur |
 
-### Chantiers API (§4.3 doc stack)
+### Phase 2 — Livreur ⏸ En pause
 
-| Chantier | État |
-|----------|------|
-| Tokens JSON mobile (`accessToken` / `refreshToken`) | ✅ `auth-client.util.ts` + header client mobile |
-| Push Expo (`DeviceToken`) | ✅ `expo-push.service.ts` |
-| CORS / schéma `laplasse://` | 🟡 À valider en prod si besoin |
+App **`apps/courier`** reportée — démarrage **après** clôture Phase 1 + Phase 3 stores de l’app principale.
+
+### Phase 3 — Polish & stores ❌
+
+Deep links complets, Sentry, analytics, tests, CI mobile, OTA, soumission App Store / Play.
+
+### Phase 4 — Module Pro marchand ❌
+
+Route group `(pro)/` dans `apps/mobile` — voir §8 et roadmap §7.
 
 ---
 
-## 3. Parité écrans — PWA consommateur vs app native
+## 3. Parité écrans — PWA vs app native
 
-Légende : ✅ OK · 🟡 Partiel · ❌ Absent · ➖ Hors périmètre consommateur
+Légende : ✅ · 🟡 · ❌ · ➖
 
-### Navigation principale
+### Navigation & découverte
 
 | Écran PWA | Route web | App mobile | Statut |
 |-----------|-----------|------------|--------|
-| Accueil | `/` (HomeMobileV2) | `(tabs)/index` | 🟡 Carrousels, autocomplete Meilisearch, greeting |
-| Marketplace | `/marketplace` | `(tabs)/marketplace` | 🟡 Grille produits + boutiques |
-| Recherche | `/search` | `(tabs)/search` | 🟡 Autocomplete + onglets ; **pas carte / rayon** |
-| Profil | `/profile` | `(tabs)/profile` | 🟡 Infos + pays ; pas settings/notifications |
-| Commandes (accès rapide) | `/profile/orders` | `(tabs)/orders` | 🟡 Liste simple |
-| Panier | drawer / `/cart` | `/cart` | 🟡 |
-| Barre basse | `MobileBottomNav` | `(tabs)/_layout` | ✅ Découvrir · Marketplace · Recherche · Commandes · Profil |
+| Accueil | `/` | `(tabs)/index` | ✅ |
+| Marketplace | `/marketplace` | `(tabs)/marketplace` | ✅ |
+| Recherche + carte | `/search` | `(tabs)/search` | 🟡 Maps natif OK ; infinite scroll restant |
+| Profil hub | `/profile` | `/profile/*` | ✅ |
+| Panier | `/cart` | `/cart` | ✅ |
+| Favoris | `/favoris` | `/favoris` | ✅ |
+| Hub restauration | `/restauration` | `/restauration` | ✅ |
 
 ### Auth & compte
 
 | Écran PWA | Route web | App mobile | Statut |
 |-----------|-----------|------------|--------|
-| Connexion email | `/login` | `(auth)/login` | ✅ |
+| Login email + OTP | `/login` | `(auth)/login` | ✅ |
 | Inscription | `/register` | `(auth)/register` | ✅ |
-| OTP téléphone | `/login` (OTP) | — | ❌ |
-| Paramètres profil | `/profile/settings` | — | ❌ |
-| Notifications | `/profile/notifications` | — | ❌ |
-| Favoris | `/favoris` | — | ❌ |
-| Parrainage | `/profile/referral` | — | ❌ |
-| Fidélité | `/profile/loyalty` | — | ❌ |
-| Réservations | `/profile/bookings` | — | ❌ |
-| Avis utilisateur | `/profile/reviews` | — | ❌ |
+| Paramètres | `/profile/settings` | `/profile/settings` | ✅ |
+| Notifications | `/profile/notifications` | `/profile/notifications` | ✅ |
+| Commandes / réservations / avis / fidélité / parrainage | `/profile/*` | `/profile/*` | 🟡 Lecture ✅ ; création avis ❌ |
 
-### Découverte & contenu
+### Commerce & livraison
 
 | Écran PWA | Route web | App mobile | Statut |
 |-----------|-----------|------------|--------|
-| Catégorie | `/categories/[slug]` | filtre search `category` | 🟡 Pas page dédiée |
-| Hub restauration | `/restauration` | — | ❌ |
-| Menu resto | `/m/[slug]/menu` | — | ❌ |
-| Fiche établissement | `/m/[slug]` | `/m/[slug]/index` | 🟡 |
-| Boutique marchand | `/m/[slug]/boutique` | (produits sur fiche) | 🟡 |
-| Fiche produit | `/m/.../p/[slug]` | `/m/[slug]/p/[productSlug]` | 🟡 |
-| Prestations / chambres | `/m/[slug]/prestations`, `chambres` | — | ❌ |
-| Consultations | `/m/[slug]/consultations` | — | ❌ |
+| Checkout | `/checkout` | `/checkout` | ✅ |
+| Paiement | `/checkout/payment` | `/payment` | ✅ Simulateur |
+| Détail commande | `/profile/orders/[id]` | `/orders/[id]` | ✅ |
+| Reçu | `.../receipt` | — | ❌ |
+| Suivi livraison | `/delivery/track/[token]` | `/delivery/track/[token]` | ✅ |
+| Réservation service | prestations | `ServicePrestationsTab` + `/bookings/*` | ✅ Simulateur paiement |
 
-### Commerce
+### Fiches établissement
 
-| Écran PWA | Route web | App mobile | Statut |
-|-----------|-----------|------------|--------|
-| Checkout | `/checkout` | `/checkout` | 🟡 Sans paiement en ligne |
-| Paiement | `/checkout/payment` | — | ❌ |
-| Détail commande | `/profile/orders/[id]` | — | ❌ |
-| Reçu | `/profile/orders/[id]/receipt` | — | ❌ |
-| Suivi livraison | `/delivery/track/[token]` | — | ❌ |
-
-### APIs & Meilisearch (consommateur)
-
-| Capacité | PWA | Mobile `api-client` | Branché UI |
-|----------|-----|---------------------|------------|
-| Catégories | ✅ | ✅ | ✅ Home |
-| Featured merchants | ✅ | ✅ | ✅ Home |
-| Marketplace featured / spotlight | ✅ | ✅ | ✅ Home + Marketplace |
-| Autocomplete unified | ✅ | ✅ | ✅ Home + Search |
-| Trending searches | ✅ | ✅ | ✅ Autocomplete |
-| Search unified (+ pagination) | ✅ | ✅ (offset) | 🟡 Pas infinite scroll |
-| Nearby / carte | ✅ | ✅ | ❌ |
-| Favoris API | ✅ | ❌ | ❌ |
+| Vertical | PWA | Mobile | Statut |
+|----------|-----|--------|--------|
+| Boutique | `/m/[slug]/boutique` | `/m/[slug]/boutique` | ✅ |
+| Hôtel / chambres | chambres | `HotelMerchantView` | ✅ |
+| Service / spa | prestations | `ServiceMerchantView` | ✅ |
+| Restauration | menu + table | menu ✅ ; table ❌ |
 
 ---
 
-## 4. Stack technique en place (réel vs doc)
+## 4. Stack technique (réel vs cible)
 
-| Couche | Recommandation doc | Implémenté |
-|--------|-------------------|------------|
-| Expo SDK | 52+ | **57** |
-| Expo Router | v4 | **~57** (file-based) |
-| TanStack Query | v5 | ✅ |
-| Zustand | ✅ | auth, country, cart |
-| HTTP | `packages/api-client` | ✅ |
-| Auth storage | SecureStore | ✅ + **localStorage web** (dev Metro) |
-| Push | expo-notifications | ✅ enregistrement token |
-| UI | NativeWind ou Paper | **StyleSheet + tokens Outfit/amber** |
-| Cartes | react-native-maps | ❌ Phase 1 suite |
-| Images | expo-image | ❌ (Image RN pour l’instant) |
-| Formulaires RHF + Zod | recommandé | ❌ (useState) |
+| Couche | Aujourd’hui | Cible Phase 1–3 |
+|--------|-------------|-----------------|
+| UI | StyleSheet + `src/theme` (Outfit, amber/slate) | Idem — pas NativeWind |
+| Cartes | **`react-native-maps`** + tuiles **OpenStreetMap** | ✅ (sans Google Maps) |
+| Images | **`expo-image`** via `AppImage` | 🟡 composants principaux |
+| Push | enregistrement + routing au tap | ✅ |
+| Erreurs | console | **Sentry** |
+| Analytics | — | **PostHog RN** (parité web) |
+| OTA | — | **expo-updates** (preview/prod) |
+| Paiement | simulateur natif API | Mobile Money **post-stores** |
 
----
+Tokens UI (`src/theme/index.ts`) :
 
-## 5. Roadmap immédiate (consommateur)
-
-Ordre suggéré pour fermer Phase 1 :
-
-1. **Recherche carte** — `react-native-maps` + `/merchants/nearby` (comme `SearchMobilePage`)
-2. **Fiche établissement riche** — avis, médias, WhatsApp, horaires
-3. **Détail commande + suivi livraison** — `/profile/orders/[id]`, `/delivery/track/[token]`
-4. **Favoris** — écran + API client
-5. **Hub restauration** — autocomplete menus + `/restauration`
-6. **OTP login** — parité web
-7. **Paiement checkout** — WebView ou deep link Mobile Money
-8. **Pagination search** — infinite scroll unified
+- Brand : `#f59e0b` (500), `#d97706` (600), `#0f172a` (slate-900)
+- Fond : `#FAFAFA` · surfaces blanches · coins `rounded-2xl` / pills boutons
+- Profil : `profileTheme.ts` (slate nav active, amber accents)
 
 ---
 
-## 6. Roadmap livreur (Phase 2 — à venir)
+## 5. Roadmap Phase 1 — finalisation consommateur
 
-App **séparée** `apps/courier` (recommandé) ou entrée « Mode livreur » après login :
+Ordre recommandé :
 
-| Écran web | Priorité |
-|-----------|----------|
-| `/courier/dashboard` | P0 |
-| `/courier/missions` | P0 |
-| `/courier/profile`, `/courier/earnings` | P1 |
-| GPS foreground/background | P0 |
-| Push offre livraison | P0 |
+1. **Carte native** — remplacer WebView ; clustering markers ; rayon `SearchRadiusControl` ; intégration résultats search
+2. **Push navigation** — `addNotificationResponseReceivedListener` + cold start ; payload `{ href, orderId, … }`
+3. **Parité résiduelle** — avis (création), table resto, reçu commande, mot de passe oublié, SAV
+4. **UI polish** — migration `expo-image` ; audit couleurs/spacing vs PWA ; infinite scroll search
+5. **Qualité** — tests smoke Jest + 1 parcours Detox ; typecheck/lint en CI
 
-Décision produit en attente : **app livreur standalone** vs **switch rôle** dans une app « LaPlasse » multi-persona.
+**Hors scope Phase 1 :** paiement Mobile Money réel (simulateur conservé).
 
 ---
 
-## 7. Marchand — option future dans l’app consommateur
+## 6. Livreur — recommandation : app séparée
 
-Idée validée comme **piste** (non planifiée) :
+### Décision retenue : **`apps/courier`** (listing store distinct)
 
-- Après login marchand : tuile « Espace Pro » → notifications commandes, stats résumées, lien WebView vers `/merchant/dashboard`
-- Évite une 3ᵉ app store listing tant que le back-office reste web-first
+| Critère | App séparée ✅ | Switch rôle dans `apps/mobile` |
+|---------|----------------|--------------------------------|
+| Permissions GPS background | Uniquement livreurs | Tous les installés |
+| Taille APK / perf | Légère, ciblée | Bloat code consommateur + pro |
+| Cycle de release | Hotfix livraison sans risque checkout | Régression croisée |
+| Store & confiance | « LaPlasse Livreur » clair | Confusion persona |
+| Onboarding | Flux dédié `/courier/onboarding` | Menus conditionnels complexes |
+
+**Mitigation coût double app :** monorepo partagé (`api-client`, `shared-config`, `theme`, hooks Query). Même compte EAS, **deux projets** (`eas.json` par app). Pas de duplication métier.
+
+**Alternative rejetée pour le MVP livreur :** switch rôle — acceptable seulement si équipe < 2 et volume livreurs très faible ; ne scale pas (permissions, review store, navigation).
+
+Kick-off Phase 2 → créer **`Docs/MOBILE_COURIER_EVOLUTION.md`**.
+
+---
+
+## 7. Roadmap Phases 2 · 3 · 4
+
+### Phase 2 — Livreur (`apps/courier`) — 3–4 sem.
+
+| Écran | Priorité | Natif |
+|-------|----------|-------|
+| Onboarding / statut | P0 | ✅ |
+| Dashboard + missions | P0 | ✅ |
+| Accept / refus / statuts | P0 | ✅ |
+| GPS foreground + background | P0 | `expo-location` + task manager |
+| Push offre livraison | P0 | ✅ |
+| Profil + gains | P1 | ✅ |
+| Carte mission | P0 | `react-native-maps` |
+
+### Phase 3 — Polish & stores — 2–3 sem.
+
+- Deep links universels : `/m/*`, `/orders/*`, `/delivery/track/*`, push payloads
+- Sentry + PostHog
+- `expo-updates` OTA (preview channel)
+- TestFlight + Play Internal → soumission CI/SN/BF
+- CI : `pnpm --filter mobile lint typecheck test` + EAS build on tag
+
+### Phase 4 — Module Pro marchand — 4–6 sem.
+
+Entrée : tuile **« Espace Pro »** sur `/profile` si rôle marchand ; route group **`app/(pro)/`**.
+
+| Écran natif | Priorité | Équivalent web |
+|-------------|----------|----------------|
+| Dashboard (CA, commandes du jour, alertes) | P0 | `/merchant` |
+| Liste + détail commandes (accepter, préparer, prêt) | P0 | `/merchant/shop/orders` |
+| Notifications commandes / réservations | P0 | push + in-app |
+| Catalogue rapide (stock, visibilité) | P1 | `/merchant/shop/products` |
+| Réservations / prestations | P1 | bookings merchant |
+| Stats / analytics résumé | P1 | analytics |
+| Promotions, ads | P2 | web fallback **exceptionnel** |
+
+**UI Pro :** réutiliser tokens amber/slate ; barre Pro distincte (icône briefcase, fond slate-900 header) ; **aucune WebView** pour les flux P0/P1.
+
+**Hors module Pro :** éditeur produit riche (TipTap), compta, admin — restent web responsive.
 
 ---
 
 ## 8. Builds & environnements
 
-| Profil EAS | Usage | API |
-|------------|-------|-----|
-| `development` | Dev client | localhost / LAN |
-| `preview` | APK internal test | `https://api.laplasse.tech/api` |
-| `production` | Stores (futur) | prod |
+| Profil EAS | App | Usage | API |
+|------------|-----|-------|-----|
+| `development` | mobile / courier | Dev client | LAN |
+| `preview` | mobile / courier | APK / TestFlight internal | `https://api.laplasse.tech/api` |
+| `production` | mobile / courier | Stores | prod |
 
-Voir [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md) pour MCP, LAN WSL2, commandes.
+Setup : [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md)
 
 ---
 
@@ -214,12 +226,10 @@ Voir [MOBILE_EXPO_SETUP.md](./MOBILE_EXPO_SETUP.md) pour MCP, LAN WSL2, commande
 | Date | Jalon |
 |------|--------|
 | 2026-06 | Rédaction stack recommandations |
-| 2026-08-09 | Scaffold `apps/mobile`, packages partagés, auth API mobile, push Expo |
-| 2026-08-09 | Fix crash APK (Metro, babel, SDK 57, intent filters) |
-| 2026-08-09 | UI parité PWA : home v2, marketplace tab, autocomplete Meilisearch, thème amber/Outfit |
-| 2026-08-09 | Preprod web fix Tailwind `field-input` ; déploiement Coolify OK |
-| 2026-08-09 | Build EAS preview Android réussi (APK installable) |
+| 2026-08-09 | Scaffold mobile, packages, EAS preview, home/marketplace |
+| 2026-08-15 | Profil PWA complet, favoris, OTP, fiches verticales, réservations, suivi livraison |
+| 2026-08-15 | Intégrations natives : `react-native-maps`, `expo-image`, push tap → navigation |
 
 ---
 
-*Maintenir ce fichier à chaque jalon consommateur ; créer `MOBILE_COURIER_EVOLUTION.md` au kick-off Phase 2.*
+*Mettre à jour ce fichier à chaque jalon ; créer `MOBILE_COURIER_EVOLUTION.md` au kick-off Phase 2.*

@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
   Animated,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -13,9 +12,11 @@ import {
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
+import { LeaveReviewButton } from '@/src/components/LeaveReviewButton'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { ServiceBottomActionBar } from '@/src/components/ServiceBottomActionBar'
 import { ServicePrestationsTab } from '@/src/components/ServicePrestationsTab'
@@ -154,7 +155,7 @@ export function ServiceMerchantView({
         >
           <View style={styles.hero}>
             {merchant.cover_image ? (
-              <Image source={{ uri: merchant.cover_image }} style={styles.cover} />
+              <AppImage uri={merchant.cover_image} style={styles.cover} fallbackLetter={merchant.business_name.slice(0, 1)} />
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
@@ -300,6 +301,10 @@ export function ServiceMerchantView({
                 )}
               </View>
             ) : null}
+
+            <View style={styles.reviewCta}>
+              <LeaveReviewButton merchantId={merchant.id} merchantName={merchant.business_name} />
+            </View>
           </View>
         </ScrollView>
 
@@ -462,6 +467,7 @@ const styles = StyleSheet.create({
   desc: { fontFamily: fonts.regular, fontSize: 15, color: colors.text, lineHeight: 24 },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
   contactText: { fontFamily: fonts.medium, fontSize: 14, color: colors.brand700 },
+  reviewCta: { marginTop: 16 },
   hoursSection: { gap: 4 },
   hourRow: {
     flexDirection: 'row',

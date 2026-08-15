@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState, type RefObject } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import type { MerchantServiceConfig } from '@laplasse/api-client'
@@ -74,7 +74,7 @@ function RoomCard({
       style={[styles.roomCard, selected && styles.roomCardSelected]}
     >
       {image ? (
-        <Image source={{ uri: image }} style={styles.roomImage} />
+        <AppImage uri={image} style={styles.roomImage} />
       ) : (
         <View style={styles.roomImagePlaceholder}>
           <Text style={styles.roomImagePlaceholderText}>Pas de photo</Text>

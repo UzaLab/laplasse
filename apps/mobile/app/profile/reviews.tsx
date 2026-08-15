@@ -80,6 +80,13 @@ export default function ProfileReviewsScreen() {
         subtitle="Retrouvez les avis que vous avez laissés sur LaPlasse."
       />
 
+      <Pressable
+        onPress={() => router.push('/profile/reviews/write' as never)}
+        style={styles.writeBtn}
+      >
+        <Text style={styles.writeBtnText}>+ Nouvel avis (depuis une fiche établissement)</Text>
+      </Pressable>
+
       <View style={styles.statsGrid}>
         {[
           { label: 'Total', value: stats.total },
@@ -150,6 +157,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+  },
+  writeBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: profileTheme.accentLight,
+    borderWidth: 1,
+    borderColor: profileTheme.accent,
+  },
+  writeBtnText: {
+    fontFamily: profileTheme.fonts.semibold,
+    fontSize: 13,
+    color: profileTheme.accent,
   },
   statCard: { width: '47%', flexGrow: 1 },
   statValue: {

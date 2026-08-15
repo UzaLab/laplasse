@@ -3,7 +3,6 @@ import type { ApiMerchant, ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -12,9 +11,11 @@ import {
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
+import { LeaveReviewButton } from '@/src/components/LeaveReviewButton'
 import { HotelBottomActionBar } from '@/src/components/HotelBottomActionBar'
 import { HotelChambresTab } from '@/src/components/HotelChambresTab'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
@@ -59,7 +60,7 @@ function SimilarCard({ merchant, onPress }: { merchant: ApiMerchant; onPress: ()
   return (
     <Pressable onPress={onPress} style={styles.similarCard}>
       {merchant.cover_image ? (
-        <Image source={{ uri: merchant.cover_image }} style={styles.similarCover} />
+        <AppImage uri={merchant.cover_image} style={styles.similarCover} fallbackLetter={merchant.business_name.slice(0, 1)} />
       ) : (
         <View style={[styles.similarCover, styles.similarCoverFallback]} />
       )}
@@ -185,7 +186,7 @@ export function HotelMerchantView({
           {/* ─── Hero ─── */}
           <View style={styles.hero}>
             {merchant.cover_image ? (
-              <Image source={{ uri: merchant.cover_image }} style={styles.cover} />
+              <AppImage uri={merchant.cover_image} style={styles.cover} fallbackLetter={merchant.business_name.slice(0, 1)} />
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
@@ -398,6 +399,10 @@ export function HotelMerchantView({
             </View>
 
             {/* ─── Reviews ─── */}
+            <View style={styles.reviewCta}>
+              <LeaveReviewButton merchantId={merchant.id} merchantName={merchant.business_name} />
+            </View>
+
             {reviews.length > 0 ? (
               <View style={styles.reviewsSection}>
                 <View style={styles.reviewsHeader}>
@@ -692,6 +697,7 @@ const styles = StyleSheet.create({
   },
   trustActionText: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
 
+  reviewCta: { marginBottom: 16 },
   reviewsSection: { gap: 12 },
   reviewsHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   reviewsTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },

@@ -3,18 +3,22 @@ import * as Device from 'expo-device'
 import { Platform } from 'react-native'
 import { getApiClient } from '@/src/lib/api'
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-})
+let cachedPushToken: string | null = null
+
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  })
+}
 
 export async function registerForPushNotifications(): Promise<void> {
-  if (!Device.isDevice) return
+  if (Platform.OS === 'web' || !Device.isDevice) return
 
   const { status: existing } = await Notifications.getPermissionsAsync()
   let finalStatus = existing
@@ -32,5 +36,28 @@ export async function registerForPushNotifications(): Promise<void> {
   }
 
   const tokenData = await Notifications.getExpoPushTokenAsync()
+  cachedPushToken = tokenData.data
   await getApiClient().registerExpoPushToken(tokenData.data)
+}
+
+export async function unregisterPushNotifications(): Promise<void> {
+  if (Platform.OS === 'web') return
+  let token = cachedPushToken
+  if (!token && Device.isDevice) {
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync()
+      token = tokenData.data
+    } catch {
+      return
+    }
+  }
+  if (!token) return
+
+  try {
+    await getApiClient().unregisterExpoPushToken(token)
+  } catch {
+    /* ignore */
+  } finally {
+    cachedPushToken = null
+  }
 }

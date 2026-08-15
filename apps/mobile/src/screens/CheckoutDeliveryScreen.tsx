@@ -15,7 +15,12 @@ import { Ionicons } from '@expo/vector-icons'
 import type { DeliveryQuoteItem, GeoCity, GeoCommune, UserAddress } from '@laplasse/api-client'
 import { CheckoutOrderSummary } from '@/src/components/checkout/CheckoutOrderSummary'
 import { CheckoutWizardShell } from '@/src/components/checkout/CheckoutWizardShell'
+import { FoodPreorderSlotPicker } from '@/src/components/checkout/FoodPreorderSlotPicker'
 import { OptionPicker } from '@/src/components/checkout/OptionPicker'
+import {
+  ShopSplitDeliveryForm,
+  type ShopDeliveryState,
+} from '@/src/components/checkout/ShopSplitDeliveryForm'
 import { FieldInput, PrimaryButton } from '@/src/components/ui'
 import {
   buildCheckoutSession,
@@ -30,11 +35,14 @@ import {
   getTotalPromoDiscount,
   toAppliedPromotionInputs,
 } from '@/src/lib/cartPromo'
+import { getCartKind } from '@/src/lib/cartKind'
+import { foodSchedulingBlockMessage } from '@/src/lib/foodOrder'
 import { getGuestCartLines } from '@/src/lib/guestCart'
 import { getApiClient } from '@/src/lib/api'
+import { notify } from '@/src/lib/notify'
 import { clearGuestCart, useCartStore } from '@/src/stores/cartStore'
 import { useAuthStore } from '@/src/stores/authStore'
-import { colors, fonts, layout, spacing } from '@/src/theme'
+import { colors, fonts, spacing } from '@/src/theme'
 
 type DeliveryMode = 'PICKUP' | 'DELIVERY'
 
@@ -71,23 +79,50 @@ export function CheckoutDeliveryScreen() {
   const [saveNewAddress, setSaveNewAddress] = useState(false)
   const [newAddressLabel, setNewAddressLabel] = useState('')
 
+  const [shopDeliveries, setShopDeliveries] = useState<Record<string, ShopDeliveryState>>({})
+  const [communesByShop, setCommunesByShop] = useState<Record<string, GeoCommune[]>>({})
+
   const [deliveryQuotes, setDeliveryQuotes] = useState<DeliveryQuoteItem[]>([])
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [appliedPromos, setAppliedPromos] = useState<Awaited<ReturnType<typeof getCartPromos>>>([])
+
+  const [foodPromoCode, setFoodPromoCode] = useState('')
+  const [foodPromoApplied, setFoodPromoApplied] = useState<{ code: string; discount: number; message: string } | null>(null)
+  const [foodPromoLoading, setFoodPromoLoading] = useState(false)
+  const [foodPreorderFor, setFoodPreorderFor] = useState<string | null>(null)
 
   const cartShopIds = useMemo(
     () => cart?.merchants?.map(m => m.id) ?? (cart?.merchant ? [cart.merchant.id] : []),
     [cart],
   )
-  const promoDiscount = useMemo(() => getTotalPromoDiscount(appliedPromos), [appliedPromos])
+  const isFoodFlow = getCartKind(cart) === 'food'
+  const checkoutFlow = isFoodFlow ? 'food' : 'marketplace'
+  const cartBackRoute = isFoodFlow ? '/commande' : '/cart'
+  const useSplitDelivery = !isFoodFlow && (cart?.merchant_count ?? 0) > 1
+
+  const marketplacePromoDiscount = useMemo(() => getTotalPromoDiscount(appliedPromos), [appliedPromos])
+  const foodPromoDiscount = foodPromoApplied?.discount ?? 0
+  const promoDiscount = isFoodFlow ? foodPromoDiscount : marketplacePromoDiscount
   const freeDeliveryShopIds = useMemo(() => getFreeDeliveryShopIds(appliedPromos), [appliedPromos])
+
+  const hasAnyDelivery = useMemo(() => {
+    if (useSplitDelivery) {
+      return cart?.merchants?.some(m => shopDeliveries[m.id]?.deliveryType === 'DELIVERY') ?? false
+    }
+    return deliveryType === 'DELIVERY'
+  }, [useSplitDelivery, cart?.merchants, shopDeliveries, deliveryType])
+
   const deliveryFee = useMemo(
-    () => computeEffectiveDeliveryFee(deliveryQuotes, freeDeliveryShopIds),
-    [deliveryQuotes, freeDeliveryShopIds],
+    () => (hasAnyDelivery ? computeEffectiveDeliveryFee(deliveryQuotes, freeDeliveryShopIds) : 0),
+    [deliveryQuotes, freeDeliveryShopIds, hasAnyDelivery],
   )
 
   const allowPickup = cart?.delivery_options?.allow_pickup ?? true
   const allowDelivery = cart?.delivery_options?.allow_delivery ?? true
+  const foodScheduling = cart?.food_scheduling ?? null
+  const foodBlocked = isFoodFlow && (foodScheduling?.blocked ?? false)
+  const foodRequiresPreorder = isFoodFlow && (foodScheduling?.requires_preorder ?? false)
+  const canContinueCheckout = !foodBlocked && (!foodRequiresPreorder || !!foodPreorderFor)
 
   const loadCommunesForCity = useCallback(async (citySlug: string) => {
     try {
@@ -107,6 +142,28 @@ export function CheckoutDeliveryScreen() {
     void loadCommunesForCity(addr.city.slug)
   }, [loadCommunesForCity])
 
+  const updateShopDelivery = useCallback((shopId: string, patch: Partial<ShopDeliveryState>) => {
+    setShopDeliveries(prev => ({
+      ...prev,
+      [shopId]: { ...prev[shopId], ...patch },
+    }))
+  }, [])
+
+  const handleShopCityChange = useCallback(async (shopId: string, cityId: string) => {
+    updateShopDelivery(shopId, { deliveryCityId: cityId, deliveryCommuneId: '' })
+    const city = cities.find(c => c.id === cityId)
+    if (!city?.slug) {
+      setCommunesByShop(prev => ({ ...prev, [shopId]: [] }))
+      return
+    }
+    try {
+      const result = await getApiClient().getGeoCommunes(city.slug)
+      setCommunesByShop(prev => ({ ...prev, [shopId]: result.communes }))
+    } catch {
+      setCommunesByShop(prev => ({ ...prev, [shopId]: [] }))
+    }
+  }, [cities, updateShopDelivery])
+
   useEffect(() => {
     void (async () => {
       setLoading(true)
@@ -121,6 +178,7 @@ export function CheckoutDeliveryScreen() {
         setDeliveryDistrict(draft.deliveryDistrict ?? '')
         setDeliveryAddressDetail(draft.deliveryAddressDetail ?? '')
         setSelectedAddressId(draft.selectedAddressId ?? null)
+        if (draft.foodPreorderFor) setFoodPreorderFor(draft.foodPreorderFor)
       }
       try {
         const cityList = await getApiClient().getGeoCities()
@@ -140,10 +198,10 @@ export function CheckoutDeliveryScreen() {
           // ignore
         }
       }
-      setAppliedPromos(await getCartPromos(cartShopIds))
+      if (!isFoodFlow) setAppliedPromos(await getCartPromos(cartShopIds))
       setLoading(false)
     })()
-  }, [applySavedAddress, isAuthenticated, loadCart, user?.phone])
+  }, [applySavedAddress, isAuthenticated, isFoodFlow, loadCart, user?.phone])
 
   useFocusEffect(
     useCallback(() => {
@@ -158,30 +216,108 @@ export function CheckoutDeliveryScreen() {
         })
         .catch(() => {})
       if (user?.phone) setCustomerPhone(user.phone)
-      void getCartPromos(cartShopIds).then(setAppliedPromos)
-    }, [applySavedAddress, cartShopIds, isAuthenticated, loadCart, selectedAddressId, user?.phone]),
+      if (!isFoodFlow) void getCartPromos(cartShopIds).then(setAppliedPromos)
+    }, [applySavedAddress, cartShopIds, isAuthenticated, isFoodFlow, loadCart, selectedAddressId, user?.phone]),
   )
 
   useEffect(() => {
     const city = cities.find(c => c.id === deliveryCityId)
     if (city?.slug) void loadCommunesForCity(city.slug)
-  }, [deliveryCityId, cities])
+  }, [deliveryCityId, cities, loadCommunesForCity])
+
+  useEffect(() => {
+    if (!cart?.merchants?.length || isFoodFlow) return
+    setShopDeliveries(prev => {
+      let changed = false
+      const next = { ...prev }
+      for (const merchant of cart.merchants ?? []) {
+        if (!next[merchant.id]) {
+          changed = true
+          next[merchant.id] = {
+            deliveryType: 'PICKUP',
+            deliveryCityId: deliveryCityId || '',
+            deliveryCommuneId: deliveryCommuneId || '',
+            deliveryDistrict: deliveryDistrict || '',
+            deliveryAddressDetail: deliveryAddressDetail || '',
+          }
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [cart?.merchants, isFoodFlow, deliveryCityId, deliveryCommuneId, deliveryDistrict, deliveryAddressDetail])
+
+  useEffect(() => {
+    if (!foodScheduling?.requires_preorder || foodPreorderFor) return
+    if (foodScheduling.suggested_preorder_for) setFoodPreorderFor(foodScheduling.suggested_preorder_for)
+  }, [foodScheduling, foodPreorderFor])
+
+  useEffect(() => {
+    if (!cart?.items.length) return
+    const kind = getCartKind(cart)
+    if (kind === 'mixed') {
+      Alert.alert('Panier incompatible', 'Videz votre panier avant de continuer.')
+      router.replace('/cart')
+      return
+    }
+    if (isFoodFlow && !isAuthenticated) router.replace('/(auth)/login')
+  }, [cart, isFoodFlow, isAuthenticated, router])
+
+  useEffect(() => {
+    if (isFoodFlow && allowDelivery) {
+      setDeliveryType('DELIVERY')
+      return
+    }
+    if (allowPickup && !allowDelivery) setDeliveryType('PICKUP')
+    else if (!allowPickup && allowDelivery) setDeliveryType('DELIVERY')
+  }, [allowPickup, allowDelivery, isFoodFlow])
 
   const loadDeliveryQuote = useCallback(async () => {
-    if (!cart || deliveryType !== 'DELIVERY' || !deliveryCityId || !deliveryCommuneId) {
+    if (!cart) {
       setDeliveryQuotes([])
       return
     }
+
+    if (useSplitDelivery) {
+      setQuoteLoading(true)
+      const quotes: DeliveryQuoteItem[] = []
+      for (const merchant of cart.merchants ?? []) {
+        const cfg = shopDeliveries[merchant.id]
+        if (!cfg || cfg.deliveryType !== 'DELIVERY') continue
+        if (!cfg.deliveryCityId || !cfg.deliveryCommuneId) continue
+        try {
+          const result = await getApiClient().fetchDeliveryQuote({
+            shop_ids: [merchant.id],
+            city_id: cfg.deliveryCityId,
+            commune_id: cfg.deliveryCommuneId,
+            subtotals: { [merchant.id]: merchant.subtotal },
+            order_flow: 'marketplace',
+          })
+          quotes.push(...result.quotes)
+        } catch {
+          // skip shop
+        }
+      }
+      setDeliveryQuotes(quotes)
+      setQuoteLoading(false)
+      return
+    }
+
+    if (deliveryType !== 'DELIVERY' || !deliveryCityId || !deliveryCommuneId) {
+      setDeliveryQuotes([])
+      return
+    }
+
     setQuoteLoading(true)
     try {
       const subtotals: Record<string, number> = {}
       for (const m of cart.merchants ?? []) subtotals[m.id] = m.subtotal
       const result = await getApiClient().fetchDeliveryQuote({
-        shop_ids: cartShopIds,
+        ...(isFoodFlow
+          ? { merchant_ids: cartShopIds, order_flow: 'food' as const }
+          : { shop_ids: cartShopIds, order_flow: 'marketplace' as const }),
         city_id: deliveryCityId,
         commune_id: deliveryCommuneId,
         subtotals,
-        order_flow: 'marketplace',
       })
       setDeliveryQuotes(result.quotes)
     } catch {
@@ -189,16 +325,11 @@ export function CheckoutDeliveryScreen() {
     } finally {
       setQuoteLoading(false)
     }
-  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, cartShopIds])
+  }, [cart, deliveryType, deliveryCityId, deliveryCommuneId, cartShopIds, isFoodFlow, useSplitDelivery, shopDeliveries])
 
   useEffect(() => {
     void loadDeliveryQuote()
   }, [loadDeliveryQuote])
-
-  useEffect(() => {
-    if (allowPickup && !allowDelivery) setDeliveryType('PICKUP')
-    else if (!allowPickup && allowDelivery) setDeliveryType('DELIVERY')
-  }, [allowPickup, allowDelivery])
 
   const formattedDeliveryAddress = useMemo(() => {
     if (deliveryType !== 'DELIVERY') return undefined
@@ -207,9 +338,68 @@ export function CheckoutDeliveryScreen() {
     return [deliveryDistrict, communeName, cityName, deliveryAddressDetail].filter(Boolean).join(', ')
   }, [deliveryType, deliveryDistrict, deliveryCityId, deliveryCommuneId, deliveryAddressDetail, cities, communes])
 
+  useEffect(() => {
+    void saveCheckoutDraft({
+      deliveryType,
+      deliveryAddress: formattedDeliveryAddress,
+      deliveryCityId,
+      deliveryCommuneId,
+      deliveryDistrict,
+      deliveryAddressDetail,
+      customerPhone,
+      customerNote: customerNote || undefined,
+      selectedAddressId: selectedAddressId ?? undefined,
+      foodPreorderFor: foodPreorderFor ?? undefined,
+    })
+  }, [
+    deliveryType,
+    formattedDeliveryAddress,
+    deliveryCityId,
+    deliveryCommuneId,
+    deliveryDistrict,
+    deliveryAddressDetail,
+    customerPhone,
+    customerNote,
+    selectedAddressId,
+    foodPreorderFor,
+  ])
+
+  const applyFoodPromo = async () => {
+    const code = foodPromoCode.trim().toUpperCase()
+    if (!code || !cart) return
+    const merchantId = cart.merchants?.[0]?.id ?? cart.merchant?.id
+    if (!merchantId) return
+    setFoodPromoLoading(true)
+    try {
+      const data = await getApiClient().validateFoodPromo(code, merchantId, cart.subtotal)
+      if (data.valid && data.discount != null) {
+        setFoodPromoApplied({
+          code,
+          discount: data.discount,
+          message: data.message ?? `−${data.discount.toLocaleString('fr-FR')} FCFA`,
+        })
+        notify.success(data.message ?? 'Code promo appliqué')
+      } else {
+        notify.error(data.message ?? 'Code promo invalide')
+      }
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Code promo invalide')
+    } finally {
+      setFoodPromoLoading(false)
+    }
+  }
+
   const onSubmit = async () => {
     if (!cart?.items.length) {
       Alert.alert('Commande', 'Panier vide')
+      return
+    }
+    if (!canContinueCheckout) {
+      if (foodRequiresPreorder && !foodPreorderFor) {
+        Alert.alert('Créneau requis', 'Sélectionnez un créneau de livraison ou retrait.')
+      } else if (foodBlocked) {
+        Alert.alert('Restaurant', foodSchedulingBlockMessage(cart.food_scheduling))
+      }
       return
     }
     const phone = customerPhone.trim()
@@ -218,6 +408,10 @@ export function CheckoutDeliveryScreen() {
       return
     }
     if (!isAuthenticated) {
+      if (isFoodFlow) {
+        Alert.alert('Commande', 'Connectez-vous pour commander au restaurant')
+        return
+      }
       if (!guestFirstName.trim() || !guestLastName.trim()) {
         Alert.alert('Commande', 'Nom et prénom requis pour commander en invité')
         return
@@ -233,14 +427,20 @@ export function CheckoutDeliveryScreen() {
         }
       }
     }
-    if (deliveryType === 'DELIVERY') {
+
+    if (useSplitDelivery) {
+      for (const merchant of cart.merchants ?? []) {
+        const cfg = shopDeliveries[merchant.id]
+        if (cfg?.deliveryType === 'DELIVERY') {
+          if (!cfg.deliveryCityId || !cfg.deliveryCommuneId || !cfg.deliveryDistrict.trim()) {
+            Alert.alert('Commande', `Adresse incomplète pour ${merchant.business_name}`)
+            return
+          }
+        }
+      }
+    } else if (deliveryType === 'DELIVERY') {
       if (!deliveryCityId || !deliveryCommuneId || !deliveryDistrict.trim()) {
         Alert.alert('Commande', 'Ville, commune et quartier requis pour la livraison')
-        return
-      }
-      const unavailable = deliveryQuotes.filter(q => !q.available)
-      if (unavailable.length) {
-        Alert.alert('Livraison', `Indisponible : ${unavailable.map(q => q.shop_name).join(', ')}`)
         return
       }
       if (saveNewAddress && !selectedAddressId && isAuthenticated) {
@@ -259,16 +459,51 @@ export function CheckoutDeliveryScreen() {
       }
     }
 
+    const unavailable = deliveryQuotes.filter(q => !q.available)
+    if (hasAnyDelivery && unavailable.length) {
+      Alert.alert('Livraison', `Indisponible : ${unavailable.map(q => q.shop_name).join(', ')}`)
+      return
+    }
+
+    const splitPayload = useSplitDelivery
+      ? (cart.merchants ?? []).map(m => {
+          const cfg = shopDeliveries[m.id]!
+          const cityName = cities.find(c => c.id === cfg.deliveryCityId)?.name
+          const communeName = (communesByShop[m.id] ?? []).find(c => c.id === cfg.deliveryCommuneId)?.name
+          const formatted =
+            cfg.deliveryType === 'DELIVERY'
+              ? [cfg.deliveryDistrict, communeName, cityName, cfg.deliveryAddressDetail].filter(Boolean).join(', ')
+              : undefined
+          return {
+            shop_id: m.id,
+            delivery_type: cfg.deliveryType,
+            delivery_city_id: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryCityId : undefined,
+            delivery_commune_id: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryCommuneId : undefined,
+            delivery_district: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryDistrict : undefined,
+            delivery_address_detail: cfg.deliveryType === 'DELIVERY' ? cfg.deliveryAddressDetail : undefined,
+            delivery_address: formatted,
+          }
+        })
+      : undefined
+
+    const effectiveDeliveryType = useSplitDelivery
+      ? (hasAnyDelivery ? 'DELIVERY' : 'PICKUP')
+      : deliveryType
+
     const checkoutPayload = {
-      delivery_type: deliveryType,
-      delivery_city_id: deliveryType === 'DELIVERY' ? deliveryCityId : undefined,
-      delivery_commune_id: deliveryType === 'DELIVERY' ? deliveryCommuneId : undefined,
-      delivery_district: deliveryType === 'DELIVERY' ? deliveryDistrict.trim() : undefined,
-      delivery_address_detail: deliveryType === 'DELIVERY' ? deliveryAddressDetail.trim() || undefined : undefined,
-      delivery_address: formattedDeliveryAddress,
+      delivery_type: effectiveDeliveryType,
+      delivery_city_id: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryCityId : undefined,
+      delivery_commune_id: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryCommuneId : undefined,
+      delivery_district: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryDistrict.trim() : undefined,
+      delivery_address_detail:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryAddressDetail.trim() || undefined : undefined,
+      delivery_address: !useSplitDelivery && deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
       customer_note: customerNote.trim() || undefined,
       customer_phone: phone,
-      applied_promotions: toAppliedPromotionInputs(appliedPromos),
+      applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
+      shop_deliveries: splitPayload,
+      food_promo_code: isFoodFlow && foodPromoApplied ? foodPromoApplied.code : undefined,
+      preorder_for: isFoodFlow && foodPreorderFor ? foodPreorderFor : undefined,
     }
 
     setSubmitting(true)
@@ -297,26 +532,16 @@ export function CheckoutDeliveryScreen() {
 
       await saveCheckoutSession(
         buildCheckoutSession(cart, checkoutResult, {
-          deliveryType,
+          flow: checkoutFlow,
+          deliveryType: effectiveDeliveryType,
           deliveryAddress: formattedDeliveryAddress,
           customerPhone: phone,
           customerNote: customerNote.trim() || undefined,
           discountAmount: promoDiscount,
-          deliveryFee: deliveryType === 'DELIVERY' ? deliveryFee : 0,
-          deliveryQuotes: deliveryType === 'DELIVERY' ? deliveryQuotes : undefined,
+          deliveryFee: hasAnyDelivery ? deliveryFee : 0,
+          deliveryQuotes: hasAnyDelivery ? deliveryQuotes : undefined,
         }),
       )
-      await saveCheckoutDraft({
-        deliveryType,
-        deliveryAddress: formattedDeliveryAddress,
-        deliveryCityId,
-        deliveryCommuneId,
-        deliveryDistrict,
-        deliveryAddressDetail,
-        customerPhone: phone,
-        customerNote: customerNote.trim() || undefined,
-        selectedAddressId: selectedAddressId ?? undefined,
-      })
       useCartStore.getState().setCart(null)
       router.replace('/payment')
     } catch (err) {
@@ -328,7 +553,7 @@ export function CheckoutDeliveryScreen() {
 
   if (loading) {
     return (
-      <CheckoutWizardShell step={2}>
+      <CheckoutWizardShell step={2} flow={checkoutFlow}>
         <View style={styles.loader}>
           <ActivityIndicator color={colors.brand500} />
         </View>
@@ -338,159 +563,199 @@ export function CheckoutDeliveryScreen() {
 
   if (!cart?.items.length) {
     return (
-      <CheckoutWizardShell step={2}>
+      <CheckoutWizardShell step={2} flow={checkoutFlow}>
         <View style={styles.loader}>
           <Text style={styles.empty}>Panier vide</Text>
-          <PrimaryButton label="Retour au panier" onPress={() => router.replace('/cart')} />
+          <PrimaryButton label="Retour au panier" onPress={() => router.replace(cartBackRoute)} />
         </View>
       </CheckoutWizardShell>
     )
   }
 
-  const scrollPad = layout.bottomNavHeight + insets.bottom + 24
+  const scrollPad = insets.bottom + 100
 
   return (
-    <CheckoutWizardShell step={2}>
+    <CheckoutWizardShell step={2} flow={checkoutFlow}>
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: scrollPad }]}
         keyboardShouldPersistTaps="handled"
       >
+        {isFoodFlow && foodBlocked ? (
+          <Text style={styles.foodBlocked}>{foodSchedulingBlockMessage(foodScheduling)}</Text>
+        ) : null}
 
-      {!isAuthenticated ? (
-        <View style={styles.section}>
-          <Pressable
-            onPress={() => router.push('/(auth)/login')}
-            style={styles.loginCard}
-          >
-            <View style={styles.loginIconWrap}>
-              <Ionicons name="log-in-outline" size={22} color={colors.brand700} />
-            </View>
-            <View style={styles.loginCardText}>
-              <Text style={styles.loginCardTitle}>Déjà un compte ?</Text>
-              <Text style={styles.loginCardSubtitle}>Connectez-vous pour retrouver vos adresses et promos</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </Pressable>
-
-          <Text style={styles.guestDivider}>ou continuer en invité</Text>
-
-          <Text style={styles.sectionTitle}>Invité</Text>
-          <FieldInput placeholder="Prénom *" value={guestFirstName} onChangeText={setGuestFirstName} />
-          <FieldInput placeholder="Nom *" value={guestLastName} onChangeText={setGuestLastName} />
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Créer un compte</Text>
-            <Switch value={createAccount} onValueChange={setCreateAccount} trackColor={{ true: colors.brand500 }} />
-          </View>
-          {createAccount ? (
-            <>
-              <FieldInput placeholder="Email *" value={accountEmail} onChangeText={setAccountEmail} autoCapitalize="none" keyboardType="email-address" />
-              <FieldInput placeholder="Mot de passe *" value={accountPassword} onChangeText={setAccountPassword} secureTextEntry />
-            </>
-          ) : null}
-        </View>
-      ) : null}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Contact</Text>
-        <FieldInput placeholder="Téléphone *" value={customerPhone} onChangeText={setCustomerPhone} keyboardType="phone-pad" />
-        <FieldInput placeholder="Note pour le vendeur" value={customerNote} onChangeText={setCustomerNote} multiline />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mode de réception</Text>
-        <View style={styles.modeRow}>
-          {allowPickup ? (
-            <Pressable
-              onPress={() => setDeliveryType('PICKUP')}
-              style={[styles.modeBtn, deliveryType === 'PICKUP' && styles.modeBtnActive]}
-            >
-              <Text style={[styles.modeText, deliveryType === 'PICKUP' && styles.modeTextActive]}>Retrait</Text>
+        {!isAuthenticated && !isFoodFlow ? (
+          <View style={styles.section}>
+            <Pressable onPress={() => router.push('/(auth)/login')} style={styles.loginCard}>
+              <View style={styles.loginIconWrap}>
+                <Ionicons name="log-in-outline" size={22} color={colors.brand700} />
+              </View>
+              <View style={styles.loginCardText}>
+                <Text style={styles.loginCardTitle}>Déjà un compte ?</Text>
+                <Text style={styles.loginCardSubtitle}>Connectez-vous pour retrouver vos adresses et promos</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </Pressable>
-          ) : null}
-          {allowDelivery ? (
-            <Pressable
-              onPress={() => setDeliveryType('DELIVERY')}
-              style={[styles.modeBtn, deliveryType === 'DELIVERY' && styles.modeBtnActive]}
-            >
-              <Text style={[styles.modeText, deliveryType === 'DELIVERY' && styles.modeTextActive]}>Livraison</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-
-      {deliveryType === 'DELIVERY' ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Adresse de livraison</Text>
-
-          {isAuthenticated && savedAddresses.length > 0 ? (
-            <View style={styles.addressList}>
-              {savedAddresses.map(addr => (
-                <Pressable
-                  key={addr.id}
-                  onPress={() => applySavedAddress(addr)}
-                  style={[styles.addressCard, selectedAddressId === addr.id && styles.addressCardActive]}
-                >
-                  <Text style={styles.addressLabel}>{addr.label ?? 'Adresse'}</Text>
-                  <Text style={styles.addressText}>
-                    {[addr.district, addr.commune.name, addr.city.name].filter(Boolean).join(', ')}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-
-          <OptionPicker
-            label="Ville"
-            placeholder="Choisir une ville"
-            value={deliveryCityId}
-            options={cities}
-            onChange={id => {
-              setDeliveryCityId(id)
-              setDeliveryCommuneId('')
-              setSelectedAddressId(null)
-            }}
-          />
-          <OptionPicker
-            label="Commune"
-            placeholder="Choisir une commune"
-            value={deliveryCommuneId}
-            options={communes}
-            onChange={id => {
-              setDeliveryCommuneId(id)
-              setSelectedAddressId(null)
-            }}
-          />
-          <FieldInput placeholder="Quartier *" value={deliveryDistrict} onChangeText={setDeliveryDistrict} />
-          <FieldInput placeholder="Précisions (immeuble, étage…)" value={deliveryAddressDetail} onChangeText={setDeliveryAddressDetail} />
-
-          {isAuthenticated && !selectedAddressId ? (
+            <Text style={styles.guestDivider}>ou continuer en invité</Text>
+            <Text style={styles.sectionTitle}>Invité</Text>
+            <FieldInput placeholder="Prénom *" value={guestFirstName} onChangeText={setGuestFirstName} />
+            <FieldInput placeholder="Nom *" value={guestLastName} onChangeText={setGuestLastName} />
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Enregistrer cette adresse</Text>
-              <Switch value={saveNewAddress} onValueChange={setSaveNewAddress} trackColor={{ true: colors.brand500 }} />
+              <Text style={styles.switchLabel}>Créer un compte</Text>
+              <Switch value={createAccount} onValueChange={setCreateAccount} trackColor={{ true: colors.brand500 }} />
             </View>
-          ) : null}
-          {saveNewAddress && !selectedAddressId ? (
-            <FieldInput placeholder="Libellé (Maison, Bureau…)" value={newAddressLabel} onChangeText={setNewAddressLabel} />
-          ) : null}
+            {createAccount ? (
+              <>
+                <FieldInput placeholder="Email *" value={accountEmail} onChangeText={setAccountEmail} autoCapitalize="none" keyboardType="email-address" />
+                <FieldInput placeholder="Mot de passe *" value={accountPassword} onChangeText={setAccountPassword} secureTextEntry />
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
-          {quoteLoading ? (
-            <ActivityIndicator color={colors.brand500} style={{ marginTop: 8 }} />
-          ) : null}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Contact</Text>
+          <FieldInput placeholder="Téléphone *" value={customerPhone} onChangeText={setCustomerPhone} keyboardType="phone-pad" />
+          <FieldInput placeholder={isFoodFlow ? 'Note pour le restaurant' : 'Note pour le vendeur'} value={customerNote} onChangeText={setCustomerNote} multiline />
         </View>
-      ) : null}
 
-      <CheckoutOrderSummary
-        cart={cart}
-        promoDiscount={promoDiscount}
-        deliveryFee={deliveryType === 'DELIVERY' ? deliveryFee : 0}
-        deliveryQuotes={deliveryType === 'DELIVERY' ? deliveryQuotes : []}
-      />
+        {useSplitDelivery ? (
+          <ShopSplitDeliveryForm
+            cart={cart}
+            cities={cities}
+            communesByShop={communesByShop}
+            shopDeliveries={shopDeliveries}
+            deliveryQuotes={deliveryQuotes}
+            quoteLoading={quoteLoading}
+            onChange={updateShopDelivery}
+            onCityChange={handleShopCityChange}
+          />
+        ) : (
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Mode de réception</Text>
+              <View style={styles.modeRow}>
+                {allowPickup ? (
+                  <Pressable
+                    onPress={() => setDeliveryType('PICKUP')}
+                    style={[styles.modeBtn, deliveryType === 'PICKUP' && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, deliveryType === 'PICKUP' && styles.modeTextActive]}>Retrait</Text>
+                  </Pressable>
+                ) : null}
+                {allowDelivery ? (
+                  <Pressable
+                    onPress={() => setDeliveryType('DELIVERY')}
+                    style={[styles.modeBtn, deliveryType === 'DELIVERY' && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, deliveryType === 'DELIVERY' && styles.modeTextActive]}>Livraison</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
 
-      <PrimaryButton
-        label="Continuer vers le paiement"
-        onPress={() => void onSubmit()}
-        loading={submitting}
-      />
+            {deliveryType === 'DELIVERY' ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Adresse de livraison</Text>
+                {isAuthenticated && savedAddresses.length > 0 ? (
+                  <View style={styles.addressList}>
+                    {savedAddresses.map(addr => (
+                      <Pressable
+                        key={addr.id}
+                        onPress={() => applySavedAddress(addr)}
+                        style={[styles.addressCard, selectedAddressId === addr.id && styles.addressCardActive]}
+                      >
+                        <Text style={styles.addressLabel}>{addr.label ?? 'Adresse'}</Text>
+                        <Text style={styles.addressText}>
+                          {[addr.district, addr.commune.name, addr.city.name].filter(Boolean).join(', ')}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                <OptionPicker
+                  label="Ville"
+                  placeholder="Choisir une ville"
+                  value={deliveryCityId}
+                  options={cities}
+                  onChange={id => {
+                    setDeliveryCityId(id)
+                    setDeliveryCommuneId('')
+                    setSelectedAddressId(null)
+                  }}
+                />
+                <OptionPicker
+                  label="Commune"
+                  placeholder="Choisir une commune"
+                  value={deliveryCommuneId}
+                  options={communes}
+                  onChange={id => {
+                    setDeliveryCommuneId(id)
+                    setSelectedAddressId(null)
+                  }}
+                />
+                <FieldInput placeholder="Quartier *" value={deliveryDistrict} onChangeText={setDeliveryDistrict} />
+                <FieldInput placeholder="Précisions (immeuble, étage…)" value={deliveryAddressDetail} onChangeText={setDeliveryAddressDetail} />
+                {isAuthenticated && !selectedAddressId ? (
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>Enregistrer cette adresse</Text>
+                    <Switch value={saveNewAddress} onValueChange={setSaveNewAddress} trackColor={{ true: colors.brand500 }} />
+                  </View>
+                ) : null}
+                {saveNewAddress && !selectedAddressId ? (
+                  <FieldInput placeholder="Libellé (Maison, Bureau…)" value={newAddressLabel} onChangeText={setNewAddressLabel} />
+                ) : null}
+                {quoteLoading ? <ActivityIndicator color={colors.brand500} style={{ marginTop: 8 }} /> : null}
+              </View>
+            ) : null}
+          </>
+        )}
+
+        {isFoodFlow && foodScheduling ? (
+          <FoodPreorderSlotPicker
+            scheduling={foodScheduling}
+            value={foodPreorderFor}
+            onChange={setFoodPreorderFor}
+          />
+        ) : null}
+
+        {isFoodFlow ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Code promo restaurant</Text>
+            <View style={styles.promoRow}>
+              <View style={styles.promoInputWrap}>
+                <FieldInput
+                  placeholder="Code promo"
+                  value={foodPromoCode}
+                  onChangeText={setFoodPromoCode}
+                  autoCapitalize="characters"
+                />
+              </View>
+              <PrimaryButton
+                label={foodPromoLoading ? '…' : 'Appliquer'}
+                onPress={() => void applyFoodPromo()}
+                loading={foodPromoLoading}
+              />
+            </View>
+            {foodPromoApplied ? (
+              <Text style={styles.promoApplied}>{foodPromoApplied.message}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <CheckoutOrderSummary
+          cart={cart}
+          promoDiscount={promoDiscount}
+          deliveryFee={hasAnyDelivery ? deliveryFee : 0}
+          deliveryQuotes={hasAnyDelivery ? deliveryQuotes : []}
+        />
+
+        <PrimaryButton
+          label="Continuer vers le paiement"
+          onPress={() => void onSubmit()}
+          loading={submitting}
+          disabled={!canContinueCheckout}
+        />
       </ScrollView>
     </CheckoutWizardShell>
   )
@@ -500,6 +765,16 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
   empty: { fontFamily: fonts.semibold, fontSize: 16, color: colors.textMuted },
   scroll: { padding: spacing.gutter, gap: 16, paddingBottom: 40 },
+  foodBlocked: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: '#b91c1c',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: 12,
+    padding: 12,
+  },
   section: { gap: 8 },
   sectionTitle: { fontFamily: fonts.extrabold, fontSize: 16, color: colors.text, marginBottom: 4 },
   loginCard: {
@@ -559,4 +834,7 @@ const styles = StyleSheet.create({
   addressCardActive: { borderColor: colors.brand500, backgroundColor: colors.brand50 },
   addressLabel: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
   addressText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  promoRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  promoInputWrap: { flex: 1 },
+  promoApplied: { fontFamily: fonts.semibold, fontSize: 13, color: '#ea580c' },
 })

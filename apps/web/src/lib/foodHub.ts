@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { FOOD_CATEGORY_SLUGS } from '@/lib/merchantVertical'
 import type { ApiMerchant } from '@/lib/api'
+import { businessDayFromDate } from '@laplasse/shared-config'
 
 /** Frais de livraison indicatif affiché sur les cartes hub (fallback). */
 export const FOOD_HUB_DELIVERY_FEE_ESTIMATE = 1500
@@ -46,13 +47,13 @@ export function computeFoodStatusClient(
   return new Date(food_pause_until) > new Date() ? 'paused' : 'open'
 }
 
-/** Horaires génériques établissement (MerchantHour, jour 0 = dimanche). */
+/** Horaires établissement (BusinessHour.day : 0 = lundi … 6 = dimanche). */
 export function isOpenFromMerchantHours(
   hours: Array<{ day: number; open_time: string | null; close_time: string | null; is_closed: boolean }>,
   now: Date = new Date(),
 ): boolean {
   if (!hours.length) return true
-  const dayOfWeek = now.getDay()
+  const dayOfWeek = businessDayFromDate(now)
   const todayHours = hours.find(h => h.day === dayOfWeek)
   if (!todayHours || todayHours.is_closed) return false
   if (!todayHours.open_time || !todayHours.close_time) return true

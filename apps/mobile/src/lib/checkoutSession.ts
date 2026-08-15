@@ -15,10 +15,12 @@ export interface CheckoutDraft {
   customerPhone?: string
   customerNote?: string
   selectedAddressId?: string
+  foodPreorderFor?: string
 }
 
 export interface CheckoutSession {
   checkoutResult: CheckoutResult
+  flow?: 'marketplace' | 'food'
   cartSnapshot: {
     items: Cart['items']
     subtotal: number
@@ -102,6 +104,7 @@ export function buildCheckoutSession(
   cart: Cart,
   checkoutResult: CheckoutResult,
   meta: {
+    flow?: 'marketplace' | 'food'
     deliveryType: 'PICKUP' | 'DELIVERY'
     deliveryAddress?: string
     customerPhone?: string
@@ -112,6 +115,7 @@ export function buildCheckoutSession(
   },
 ): CheckoutSession {
   return {
+    flow: meta.flow,
     checkoutResult,
     cartSnapshot: {
       items: cart.items,

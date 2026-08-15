@@ -3,7 +3,6 @@ import type { ApiMerchant, ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -12,9 +11,11 @@ import {
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
+import { LeaveReviewButton } from '@/src/components/LeaveReviewButton'
 import { HotelMerchantView } from '@/src/screens/HotelMerchantView'
 import { ServiceMerchantView } from '@/src/screens/ServiceMerchantView'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
@@ -58,7 +59,7 @@ function SimilarMerchantCard({
   return (
     <Pressable onPress={onPress} style={styles.similarCard}>
       {merchant.logo ? (
-        <Image source={{ uri: merchant.logo }} style={styles.similarLogo} />
+        <AppImage uri={merchant.logo} style={styles.similarLogo} fallbackLetter={merchant.business_name.slice(0, 1)} />
       ) : (
         <View style={[styles.similarLogo, styles.similarLogoFallback]}>
           <Ionicons name="storefront-outline" size={20} color={colors.textLight} />
@@ -236,7 +237,7 @@ export function MerchantDetailView({
         >
           <View style={styles.hero}>
             {merchant.cover_image ? (
-              <Image source={{ uri: merchant.cover_image }} style={styles.cover} />
+              <AppImage uri={merchant.cover_image} style={styles.cover} fallbackLetter={merchant.business_name.slice(0, 1)} />
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
@@ -383,7 +384,7 @@ export function MerchantDetailView({
                 {merchant.media.length > 0 ? (
                   <View style={styles.galleryGrid}>
                     {merchant.media.map(item => (
-                      <Image key={item.id} source={{ uri: item.url }} style={styles.galleryImage} />
+                      <AppImage key={item.id} uri={item.url} style={styles.galleryImage} />
                     ))}
                   </View>
                 ) : (
@@ -391,6 +392,10 @@ export function MerchantDetailView({
                 )}
               </View>
             ) : null}
+
+            <View style={styles.reviewCta}>
+              <LeaveReviewButton merchantId={merchant.id} merchantName={merchant.business_name} />
+            </View>
 
             {merchant.reviews.length > 0 ? (
               <View style={styles.section}>
@@ -557,6 +562,7 @@ const styles = StyleSheet.create({
   empty: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted },
   section: { marginTop: 24 },
   sectionTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.text, marginBottom: 12 },
+  reviewCta: { marginTop: 8, marginBottom: 8 },
   reviewCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import type { CartPromoApplication } from '@laplasse/api-client'
-import { formatPrice } from '@laplasse/shared-config'
+import { CheckoutItemCard } from '@/src/components/checkout/CheckoutItemCard'
 import { CheckoutOrderSummary } from '@/src/components/checkout/CheckoutOrderSummary'
 import { CheckoutWizardShell } from '@/src/components/checkout/CheckoutWizardShell'
 import { EmptyState, PrimaryButton } from '@/src/components/ui'
@@ -24,12 +23,11 @@ import {
   getTotalPromoDiscount,
   saveCartPromos,
 } from '@/src/lib/cartPromo'
+import { getCartKind } from '@/src/lib/cartKind'
 import { getApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
-import { colors, fonts, layout, spacing } from '@/src/theme'
-
-const PLACEHOLDER_IMAGE = 'https://cdn.laplasse.ci/static/product-placeholder.png'
+import { colors, fonts, spacing } from '@/src/theme'
 
 export function CartScreen() {
   const router = useRouter()
@@ -50,6 +48,14 @@ export function CartScreen() {
   useEffect(() => {
     if (hydrated) void loadCart()
   }, [hydrated, isAuthenticated, loadCart])
+
+  useEffect(() => {
+    if (!hydrated || !cart?.items.length) return
+    const kind = getCartKind(cart)
+    if (kind === 'food' || kind === 'mixed') {
+      router.replace('/commande')
+    }
+  }, [cart, hydrated, router])
 
   const cartShopIds = useMemo(
     () => cart?.merchants?.map(m => m.id) ?? (cart?.merchant ? [cart.merchant.id] : []),
@@ -97,13 +103,12 @@ export function CartScreen() {
     }
   }, [appliedPromos, cartShopIds, isAuthenticated, promoCode])
 
-  const onCheckout = () => {
-    if (cart?.kind === 'food' || cart?.kind === 'mixed') {
-      Alert.alert('Panier', 'Les commandes restaurant nécessitent une connexion et un parcours dédié.')
-      return
-    }
-    router.push('/checkout')
-  }
+  const handleUpdateQuantity = useCallback(
+    (itemId: string, quantity: number) => updateQuantity(itemId, quantity),
+    [updateQuantity],
+  )
+
+  const onCheckout = () => router.push('/checkout')
 
   if (!hydrated || (loading && !cart && !guestHydrated)) {
     return (
@@ -116,14 +121,14 @@ export function CartScreen() {
   }
 
   const items = cart?.items ?? []
-  const footerPad = layout.bottomNavHeight + insets.bottom + 88
+  const footerPad = insets.bottom + 80
 
   return (
     <CheckoutWizardShell
       step={1}
       footer={
         items.length > 0 ? (
-          <View style={[styles.footer, { paddingBottom: layout.bottomNavHeight + insets.bottom + 12 }]}>
+          <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
             <PrimaryButton label="Procéder à la livraison" onPress={onCheckout} />
           </View>
         ) : null
@@ -139,67 +144,15 @@ export function CartScreen() {
           />
         ) : (
           <>
-            {items.map(item => {
-              const product = item.product
-              const merchantSlug = product.merchant?.slug
-              const isUpdating = updatingItemId === item.id
-              return (
-                <View key={item.id} style={styles.itemCard}>
-                  <Pressable
-                    onPress={() =>
-                      merchantSlug && router.push(`/m/${merchantSlug}/p/${product.slug}`)
-                    }
-                  >
-                    {product.image_url ? (
-                      <Image source={{ uri: product.image_url }} style={styles.thumb} />
-                    ) : (
-                      <Image source={{ uri: PLACEHOLDER_IMAGE }} style={styles.thumb} />
-                    )}
-                  </Pressable>
-                  <View style={styles.itemBody}>
-                    {product.merchant ? (
-                      <Pressable onPress={() => merchantSlug && router.push(`/m/${merchantSlug}/boutique`)}>
-                        <Text style={styles.merchant}>{product.merchant.business_name}</Text>
-                      </Pressable>
-                    ) : null}
-                    <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                    {item.variant ? (
-                      <Text style={styles.variant}>{item.variant.name}</Text>
-                    ) : null}
-                    <Text style={styles.unitPrice}>
-                      {formatPrice(item.unit_price, cart?.currency)} / unité
-                    </Text>
-                    <View style={styles.itemFooter}>
-                      <View style={styles.qtyWrap}>
-                        <Pressable
-                          disabled={isUpdating}
-                          onPress={() => void updateQuantity(item.id, Math.max(0, item.quantity - 1))}
-                          style={styles.qtyBtn}
-                        >
-                          <Ionicons name="remove" size={16} color={colors.textMuted} />
-                        </Pressable>
-                        <Text style={styles.qty}>{item.quantity}</Text>
-                        <Pressable
-                          disabled={isUpdating}
-                          onPress={() => void updateQuantity(item.id, item.quantity + 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Ionicons name="add" size={16} color={colors.textMuted} />
-                        </Pressable>
-                      </View>
-                      <Text style={styles.lineTotal}>{formatPrice(item.line_total, cart?.currency)}</Text>
-                      <Pressable
-                        disabled={isUpdating}
-                        onPress={() => void updateQuantity(item.id, 0)}
-                        hitSlop={8}
-                      >
-                        <Ionicons name="trash-outline" size={20} color={colors.textLight} />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              )
-            })}
+            {items.map(item => (
+              <CheckoutItemCard
+                key={item.id}
+                item={item}
+                currency={cart?.currency}
+                isUpdating={updatingItemId === item.id}
+                onUpdateQuantity={handleUpdateQuantity}
+              />
+            ))}
 
             <Pressable onPress={() => router.push('/(tabs)/marketplace')} style={styles.continueLink}>
               <Ionicons name="arrow-back" size={16} color={colors.brand700} />
@@ -249,41 +202,6 @@ const styles = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { paddingHorizontal: spacing.gutter, paddingTop: 8, gap: 12 },
   title: { fontFamily: fonts.extrabold, fontSize: 24, color: colors.text, marginBottom: 4 },
-  itemCard: {
-    flexDirection: 'row',
-    gap: 12,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  thumb: { width: 88, height: 88, borderRadius: 14, backgroundColor: colors.surfaceContainerLow },
-  itemBody: { flex: 1, minWidth: 0 },
-  merchant: {
-    fontFamily: fonts.bold,
-    fontSize: 10,
-    color: colors.brand700,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  productName: { fontFamily: fonts.bold, fontSize: 16, color: colors.text },
-  variant: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  unitPrice: { fontFamily: fonts.medium, fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  itemFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-  qtyWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: 2,
-  },
-  qtyBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  qty: { fontFamily: fonts.bold, fontSize: 14, minWidth: 24, textAlign: 'center', color: colors.text },
-  lineTotal: { fontFamily: fonts.extrabold, fontSize: 16, color: colors.text, flex: 1, textAlign: 'right' },
   continueLink: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 },
   continueText: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },
   promoBlock: { gap: 8 },

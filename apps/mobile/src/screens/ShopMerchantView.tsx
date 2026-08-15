@@ -3,7 +3,6 @@ import type { ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -12,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
@@ -175,7 +175,7 @@ export function ShopMerchantView({
           {/* Hero */}
           <View style={[styles.hero, { height: HERO_HEIGHT }]}>
             {coverImage ? (
-              <Image source={{ uri: coverImage }} style={styles.cover} />
+              <AppImage uri={coverImage} style={styles.cover} fallbackLetter={merchant?.business_name.slice(0, 1)} />
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
@@ -378,7 +378,7 @@ export function ShopMerchantView({
                 {(merchant?.media.length ?? 0) > 0 ? (
                   <View style={styles.galleryGrid}>
                     {merchant!.media.map(item => (
-                      <Image key={item.id} source={{ uri: item.url }} style={styles.galleryImage} />
+                      <AppImage key={item.id} uri={item.url} style={styles.galleryImage} />
                     ))}
                   </View>
                 ) : (
@@ -429,7 +429,19 @@ export function ShopMerchantView({
                   <Text style={styles.reviewsCount}>({reviewCount} avis)</Text>
                 </View>
 
-                <Pressable style={styles.leaveReviewBtn}>
+                <Pressable
+                  style={styles.leaveReviewBtn}
+                  onPress={() =>
+                    merchant &&
+                    router.push({
+                      pathname: '/profile/reviews/write',
+                      params: {
+                        merchantId: merchant.id,
+                        merchantName: merchant.business_name,
+                      },
+                    } as never)
+                  }
+                >
                   <Ionicons name="create-outline" size={18} color={SHOP_AMBER_TEXT} />
                   <Text style={styles.leaveReviewText}>Laisser un avis</Text>
                 </Pressable>

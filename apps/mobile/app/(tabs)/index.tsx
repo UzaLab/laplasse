@@ -14,6 +14,7 @@ import { NearbyCard } from '@/src/components/NearbyCard'
 import { NetworkErrorBanner } from '@/src/components/NetworkErrorBanner'
 import { SearchAutocomplete } from '@/src/components/SearchAutocomplete'
 import { SectionHeader } from '@/src/components/SectionHeader'
+import { SpotlightShopsCarousel } from '@/src/components/SpotlightShopsCarousel'
 import { LoadingState } from '@/src/components/ui'
 import { useHomeData } from '@/src/hooks/useHomeData'
 import { useAuthStore } from '@/src/stores/authStore'
@@ -126,7 +127,16 @@ export default function HomeScreen() {
                   itemWidth={280}
                   contentContainerStyle={styles.carouselBleed}
                   renderItem={m => (
-                    <NearbyCard merchant={m} onPress={() => router.push(`/m/${m.slug}`)} />
+                    <NearbyCard
+                      merchant={m}
+                      onPress={() => router.push(`/m/${m.slug}`)}
+                      onPressProduct={(merchantSlug, productSlug) =>
+                        router.push(`/m/${merchantSlug}/p/${productSlug}`)
+                      }
+                      onPressVertical={(merchantSlug, tab) =>
+                        router.push(`/m/${merchantSlug}?tab=${tab}`)
+                      }
+                    />
                   )}
                 />
               ) : (
@@ -154,6 +164,17 @@ export default function HomeScreen() {
                     </View>
                   ))}
                 </View>
+              </View>
+            ) : null}
+
+            {data.shops.length > 0 ? (
+              <View style={styles.section}>
+                <SectionHeader title="Boutiques à découvrir" href="/(tabs)/marketplace" />
+                <SpotlightShopsCarousel
+                    shops={data.shops}
+                    onPressShop={slug => router.push(`/m/${slug}/boutique`)}
+                    contentContainerStyle={styles.carouselBleed}
+                  />
               </View>
             ) : null}
           </>

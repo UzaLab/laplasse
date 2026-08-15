@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import {
   ProfileBadge,
@@ -103,7 +104,7 @@ export default function ProfileBookingsScreen() {
             <ProfileCard key={booking.id}>
               <View style={styles.cardTop}>
                 {booking.merchant.cover_image ? (
-                  <Image source={{ uri: booking.merchant.cover_image }} style={styles.cover} />
+                  <AppImage uri={booking.merchant.cover_image} style={styles.cover} fallbackLetter={booking.merchant.business_name.slice(0, 1)} />
                 ) : (
                   <View style={[styles.cover, styles.coverFallback]}>
                     <Ionicons name="calendar-outline" size={22} color={profileTheme.textLight} />

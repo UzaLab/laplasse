@@ -57,6 +57,9 @@ import type {
   ShopTrustScore,
   Order,
   OrderEtaSnapshot,
+  OrderReturnReason,
+  OrderReturnRequest,
+  DeliveryDispute,
   OtpSendResponse,
   ProductSuggestion,
   TrendingSearchItem,
@@ -630,18 +633,60 @@ export class ApiClient {
     return this.request<OrderEtaSnapshot>(`/orders/${orderId}/eta`, undefined, true)
   }
 
-  confirmOrderPayment(paymentId: string, simulateResult: 'success' | 'failure' = 'success') {
-    return this.request<ConfirmPaymentResult>('/orders/pay/confirm', {
+  createOrderReturn(
+    orderId: string,
+    input: { reason: OrderReturnReason; description?: string },
+  ) {
+    return this.request<OrderReturnRequest>(`/orders/${orderId}/returns`, {
       method: 'POST',
-      body: JSON.stringify({ paymentId, simulateResult }),
+      body: JSON.stringify(input),
     }, true)
   }
 
-  confirmBatchOrderPayments(paymentIds: string[], simulateResult: 'success' | 'failure' = 'success') {
+  createDeliveryDispute(orderId: string, input: { reason: string; description?: string }) {
+    return this.request<DeliveryDispute>(`/orders/${orderId}/delivery-dispute`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, true)
+  }
+
+  confirmOrderPayment(
+    paymentId: string,
+    simulateResult: 'success' | 'failure' = 'success',
+    cashTender?: { exact?: boolean; tenderAmount?: number },
+  ) {
+    const body: Record<string, unknown> = { paymentId, simulateResult }
+    if (cashTender?.exact != null) body.food_cash_exact = cashTender.exact
+    if (cashTender?.tenderAmount != null) body.food_cash_tender_amount = cashTender.tenderAmount
+    return this.request<ConfirmPaymentResult>('/orders/pay/confirm', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }, true)
+  }
+
+  confirmBatchOrderPayments(
+    paymentIds: string[],
+    simulateResult: 'success' | 'failure' = 'success',
+    cashTender?: { exact?: boolean; tenderAmount?: number },
+  ) {
+    const body: Record<string, unknown> = { paymentIds, simulateResult }
+    if (cashTender?.exact != null) body.food_cash_exact = cashTender.exact
+    if (cashTender?.tenderAmount != null) body.food_cash_tender_amount = cashTender.tenderAmount
     return this.request<ConfirmPaymentResult>('/orders/pay/confirm-batch', {
       method: 'POST',
-      body: JSON.stringify({ paymentIds, simulateResult }),
+      body: JSON.stringify(body),
     }, true)
+  }
+
+  validateFoodPromo(code: string, merchantId: string, subtotal: number) {
+    return this.request<{ valid: boolean; discount?: number; message?: string }>(
+      '/promotions/validate-food',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code, merchant_id: merchantId, subtotal }),
+      },
+      true,
+    )
   }
 
   getDeliveryTrack(token: string) {
@@ -651,6 +696,13 @@ export class ApiClient {
   registerExpoPushToken(token: string) {
     return this.request<{ ok: boolean }>('/notifications/push/expo', {
       method: 'POST',
+      body: JSON.stringify({ token }),
+    }, true)
+  }
+
+  unregisterExpoPushToken(token: string) {
+    return this.request<{ ok: boolean }>('/notifications/push/expo', {
+      method: 'DELETE',
       body: JSON.stringify({ token }),
     }, true)
   }
@@ -679,6 +731,18 @@ export class ApiClient {
 
   getMyReviews() {
     return this.request<MyReview[]>('/reviews/mine', undefined, true)
+  }
+
+  createReview(input: {
+    merchant_id: string
+    rating: number
+    title?: string
+    content?: string
+  }) {
+    return this.request<MyReview>('/reviews', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }, true)
   }
 
   getNotifications(params: { page?: number; limit?: number; unreadOnly?: boolean } = {}) {

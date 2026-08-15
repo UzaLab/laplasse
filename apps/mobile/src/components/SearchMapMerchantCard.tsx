@@ -1,4 +1,5 @@
-import { Dimensions, Pressable, StyleSheet, Text, View, Image } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
@@ -39,7 +40,7 @@ export function SearchMapMerchantCard({
     >
       <View style={styles.imageWrap}>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.image} />
+          <AppImage uri={cover} style={styles.image} />
         ) : (
           <View style={[styles.image, styles.imageFallback]}>
             <Text style={styles.fallbackLetter}>{merchant.business_name.slice(0, 1)}</Text>

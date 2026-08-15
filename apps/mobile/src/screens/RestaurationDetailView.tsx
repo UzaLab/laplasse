@@ -3,7 +3,6 @@ import type { ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
-  Image,
   Pressable,
   ScrollView,
   Share,
@@ -13,9 +12,13 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { LeaveReviewButton } from '@/src/components/LeaveReviewButton'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
+import { RestaurationCartBar } from '@/src/components/RestaurationCartBar'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { RestaurationMenuPanel } from '@/src/components/RestaurationMenuPanel'
+import { TableBookingPanel } from '@/src/components/TableBookingPanel'
 import { LoadingState } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
 import {
@@ -29,6 +32,7 @@ import {
   resolveMerchantFoodStatus,
 } from '@/src/lib/foodHub'
 import { colors, fonts, homeLayout, radii } from '@/src/theme'
+import { useCartItemCount } from '@/src/hooks/useCartItemCount'
 
 export function RestaurationDetailView({ slug }: { slug: string }) {
   const router = useRouter()
@@ -47,6 +51,8 @@ export function RestaurationDetailView({ slug }: { slug: string }) {
   const prep = merchant?.food_prep_minutes ?? 25
   const minOrder = merchant?.food_min_order_amount
   const cover = merchant?.cover_image || merchant?.logo
+  const cartCount = useCartItemCount()
+  const scrollBottomPad = insets.bottom + (cartCount > 0 ? 88 : 24)
 
   const handleShare = async () => {
     if (!merchant) return
@@ -119,16 +125,16 @@ export function RestaurationDetailView({ slug }: { slug: string }) {
         </View>
 
         <ScrollView
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+          contentContainerStyle={{ paddingBottom: scrollBottomPad }}
           onScroll={e => setScrolled(e.nativeEvent.contentOffset.y > 100)}
           scrollEventThrottle={16}
         >
           <View style={styles.hero}>
-            {cover ? (
-              <Image source={{ uri: cover }} style={styles.heroImage} />
-            ) : (
-              <View style={[styles.heroImage, styles.heroFallback]} />
-            )}
+            <AppImage
+              uri={cover}
+              style={styles.heroImage}
+              fallbackLetter={merchant.business_name.slice(0, 1)}
+            />
             <View style={styles.heroOverlay} />
             <View style={styles.heroContent}>
               <View style={styles.heroBadges}>
@@ -186,9 +192,18 @@ export function RestaurationDetailView({ slug }: { slug: string }) {
           </View>
 
           <View style={styles.menuPanel}>
+            <TableBookingPanel
+              merchantId={merchant.id}
+              merchantName={merchant.business_name}
+            />
             <RestaurationMenuPanel merchantSlug={merchant.slug} />
+            <View style={styles.reviewSection}>
+              <LeaveReviewButton merchantId={merchant.id} merchantName={merchant.business_name} />
+            </View>
           </View>
         </ScrollView>
+
+        <RestaurationCartBar />
       </View>
     </PublicScreenShell>
   )
@@ -288,12 +303,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.brand100,
     padding: homeLayout.gutter,
+    gap: 16,
     minHeight: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.06,
     shadowRadius: 20,
     elevation: 4,
+  },
+  reviewSection: {
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   notFoundText: {

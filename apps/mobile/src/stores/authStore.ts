@@ -3,7 +3,10 @@ import type { AuthUser } from '@laplasse/api-client'
 import { getApiClient } from '@/src/lib/api'
 import { secureStorage } from '@/src/lib/secureStorage'
 import { tokenStorage } from '@/src/lib/tokenStorage'
-import { useCartStore } from '@/src/stores/cartStore'
+
+function cartStore() {
+  return require('@/src/stores/cartStore').useCartStore as typeof import('@/src/stores/cartStore').useCartStore
+}
 
 const ACCESS_KEY = 'laplasse_access'
 const REFRESH_KEY = 'laplasse_refresh'
@@ -42,14 +45,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ])
       if (!accessToken || !refreshToken) {
         set({ hydrated: true, isAuthenticated: false })
-        void useCartStore.getState().loadCart()
+        void cartStore().getState().loadCart()
         return
       }
       set({ accessToken, refreshToken, isAuthenticated: true })
       tokenStorage.setTokens(accessToken, refreshToken)
       const user = await getApiClient().getMe()
       set({ user, hydrated: true, isAuthenticated: true })
-      void useCartStore.getState().loadCart()
+      void cartStore().getState().loadCart()
     } catch {
       await get().clearTokens()
       set({ hydrated: true, isAuthenticated: false })
@@ -83,7 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       await get().setTokens(data.accessToken, data.refreshToken)
       set({ user: data.user, isAuthenticated: true })
-      void useCartStore.getState().loadCart()
+      void cartStore().getState().loadCart()
       return {}
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Connexion impossible' }
@@ -101,7 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       await get().setTokens(data.accessToken, data.refreshToken)
       set({ user: data.user, isAuthenticated: true })
-      void useCartStore.getState().loadCart()
+      void cartStore().getState().loadCart()
       return {}
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Inscription impossible' }
@@ -119,7 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       await get().setTokens(data.accessToken, data.refreshToken)
       set({ user: data.user, isAuthenticated: true })
-      void useCartStore.getState().loadCart()
+      void cartStore().getState().loadCart()
       return {}
     } catch (err) {
       return { error: err instanceof Error ? err.message : 'Code OTP invalide' }
@@ -138,7 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // ignore
     }
     await get().clearTokens()
-    useCartStore.getState().reset()
-    void useCartStore.getState().loadCart()
+    cartStore().getState().reset()
+    void cartStore().getState().loadCart()
   },
 }))

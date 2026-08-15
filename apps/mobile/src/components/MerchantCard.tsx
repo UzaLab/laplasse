@@ -1,5 +1,6 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import type { ApiMerchant } from '@laplasse/api-client'
+import { AppImage } from '@/src/components/ui/AppImage'
 import { Card } from '@/src/components/ui'
 import { colors, fonts } from '@/src/theme'
 
@@ -14,7 +15,7 @@ export function MerchantCard({
     <Card onPress={onPress}>
       <View style={styles.row}>
         {merchant.logo ? (
-          <Image source={{ uri: merchant.logo }} style={styles.logo} />
+          <AppImage uri={merchant.logo} style={styles.logo} fallbackLetter={merchant.business_name.slice(0, 1)} />
         ) : (
           <View style={[styles.logo, styles.logoFallback]}>
             <Text style={styles.logoText}>{merchant.business_name.slice(0, 1)}</Text>
