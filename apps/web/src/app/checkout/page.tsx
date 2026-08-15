@@ -137,9 +137,10 @@ function CheckoutPageContent() {
   const [foodPreorderFor, setFoodPreorderFor] = useState<string | null>(null)
 
   const cartShopIds = useMemo(
-    () => cart?.merchants.map(m => m.id) ?? [],
+    () => cart?.merchants?.map(m => m.id) ?? [],
     [cart?.merchants],
   )
+  const cartMerchants = cart?.merchants ?? []
 
   const appliedPromos = useMemo(
     () => (routeFlow === 'marketplace' ? getCartPromos('marketplace', cartShopIds) : []),
@@ -175,10 +176,10 @@ function CheckoutPageContent() {
 
   const hasAnyDelivery = useMemo(() => {
     if (useSplitDelivery) {
-      return cart?.merchants.some(m => shopDeliveries[m.id]?.deliveryType === 'DELIVERY') ?? false
+      return cartMerchants.some(m => shopDeliveries[m.id]?.deliveryType === 'DELIVERY') ?? false
     }
     return deliveryType === 'DELIVERY'
-  }, [useSplitDelivery, cart?.merchants, shopDeliveries, deliveryType])
+  }, [useSplitDelivery, cartMerchants, shopDeliveries, deliveryType])
 
   const foodPromoDiscount = foodPromoApplied?.discount ?? 0
 
@@ -349,7 +350,7 @@ function CheckoutPageContent() {
     if (useSplitDelivery) {
       setQuoteLoading(true)
       const quotes: DeliveryQuoteItem[] = []
-      for (const merchant of cart.merchants) {
+      for (const merchant of cartMerchants) {
         const cfg = shopDeliveries[merchant.id]
         if (!cfg || cfg.deliveryType !== 'DELIVERY') continue
         if (!cfg.deliveryCityId || !cfg.deliveryCommuneId) continue
@@ -374,19 +375,19 @@ function CheckoutPageContent() {
     }
     setQuoteLoading(true)
     const subtotals = Object.fromEntries(
-      cart.merchants.map(m => [m.id, m.subtotal]),
+      cartMerchants.map(m => [m.id, m.subtotal]),
     )
     const result = await fetchDeliveryQuote(
       isFoodFlow
         ? {
-            merchant_ids: cart.merchants.map(m => m.id),
+            merchant_ids: cartMerchants.map(m => m.id),
             city_id: deliveryCityId,
             commune_id: deliveryCommuneId,
             subtotals,
             order_flow: 'food',
           }
         : {
-            shop_ids: cart.merchants.map(m => m.id),
+            shop_ids: cartMerchants.map(m => m.id),
             city_id: deliveryCityId,
             commune_id: deliveryCommuneId,
             subtotals,
@@ -411,11 +412,11 @@ function CheckoutPageContent() {
   ])
 
   useEffect(() => {
-    if (!cart?.merchants.length || isFoodFlow) return
+    if (!cartMerchants.length || isFoodFlow) return
     setShopDeliveries(prev => {
       let changed = false
       const next = { ...prev }
-      for (const merchant of cart.merchants) {
+      for (const merchant of cartMerchants) {
         if (!next[merchant.id]) {
           changed = true
           next[merchant.id] = {
@@ -429,7 +430,7 @@ function CheckoutPageContent() {
       }
       return changed ? next : prev
     })
-  }, [cart?.merchants, isFoodFlow, deliveryCityId, deliveryCommuneId, deliveryDistrict, deliveryAddressDetail])
+  }, [cartMerchants, isFoodFlow, deliveryCityId, deliveryCommuneId, deliveryDistrict, deliveryAddressDetail])
 
   const updateShopDelivery = useCallback((shopId: string, patch: Partial<ShopDeliveryState>) => {
     setShopDeliveries(prev => ({
@@ -500,7 +501,7 @@ function CheckoutPageContent() {
   const applyFoodPromo = async () => {
     const code = foodPromoCode.trim().toUpperCase()
     if (!code || !cart) return
-    const merchantId = cart.merchants[0]?.id
+    const merchantId = cartMerchants[0]?.id ?? cart?.merchant?.id
     if (!merchantId) return
     setFoodPromoLoading(true)
     try {
@@ -514,7 +515,8 @@ function CheckoutPageContent() {
       if (res.ok) {
         const data = await res.json() as { valid: boolean; discount?: number; message?: string }
         if (data.valid && data.discount != null) {
-          setFoodPromoApplied({ code, discount: data.discount, message: data.message ?? `−${data.discount.toLocaleString('fr-FR')} FCFA` })
+          const discount = Number(data.discount) || 0
+          setFoodPromoApplied({ code, discount, message: data.message ?? `−${discount.toLocaleString('fr-FR')} FCFA` })
           notify.success(data.message ?? 'Code promo appliqué !')
         } else {
           notify.error(data.message ?? 'Code promo invalide')
@@ -566,7 +568,7 @@ function CheckoutPageContent() {
     }
 
     if (useSplitDelivery) {
-      for (const merchant of cart.merchants) {
+      for (const merchant of cartMerchants) {
         const cfg = shopDeliveries[merchant.id]
         if (cfg?.deliveryType === 'DELIVERY') {
           if (!cfg.deliveryCityId || !cfg.deliveryCommuneId || !cfg.deliveryDistrict.trim()) {
@@ -613,7 +615,7 @@ function CheckoutPageContent() {
     }
 
     const splitPayload = useSplitDelivery
-      ? cart.merchants.map(m => {
+      ? cartMerchants.map(m => {
           const cfg = shopDeliveries[m.id]!
           const cityName = cities.find(c => c.id === cfg.deliveryCityId)?.name
           const communeName = (communesByShop[m.id] ?? []).find(c => c.id === cfg.deliveryCommuneId)?.name
@@ -806,7 +808,7 @@ function CheckoutPageContent() {
           </h1>
           {cart.merchant_count > 1 ? (
             <p className="text-slate-500 mt-2 font-medium">
-              {cart.merchant_count} boutiques — {cart.merchants.map(m => m.business_name).join(', ')}
+              {cart.merchant_count} boutiques — {cartMerchants.map(m => m.business_name).join(', ')}
             </p>
           ) : cart.merchant ? (
             <p className="text-slate-500 mt-2 font-medium">{cart.merchant.business_name}</p>

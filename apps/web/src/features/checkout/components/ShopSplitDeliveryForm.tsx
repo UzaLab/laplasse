@@ -36,6 +36,8 @@ export function ShopSplitDeliveryForm({
   onChange,
   onCityChange,
 }: ShopSplitDeliveryFormProps) {
+  const cartMerchants = cart.merchants ?? []
+
   return (
     <div className="space-y-4">
       <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4">
@@ -45,7 +47,7 @@ export function ShopSplitDeliveryForm({
         </p>
       </div>
 
-      {cart.merchants.map(merchant => {
+      {cartMerchants.map(merchant => {
         const cfg = shopDeliveries[merchant.id] ?? {
           deliveryType: 'PICKUP' as const,
           deliveryCityId: '',

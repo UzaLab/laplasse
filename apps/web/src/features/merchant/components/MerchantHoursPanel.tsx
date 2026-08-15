@@ -15,6 +15,7 @@ import {
 import { useAuthStore } from '@/stores/authStore'
 import { merchantApiFetch } from '@/lib/merchantApi'
 import { notify } from '@/lib/notify'
+import { businessDayFromDate } from '@laplasse/shared-config'
 
 export interface HourEntry {
   day: number
@@ -23,14 +24,15 @@ export interface HourEntry {
   is_closed: boolean
 }
 
+/** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
 const DAYS = [
-  { day: 1, label: 'Lundi', short: 'Lun' },
-  { day: 2, label: 'Mardi', short: 'Mar' },
-  { day: 3, label: 'Mercredi', short: 'Mer' },
-  { day: 4, label: 'Jeudi', short: 'Jeu' },
-  { day: 5, label: 'Vendredi', short: 'Ven' },
-  { day: 6, label: 'Samedi', short: 'Sam' },
-  { day: 0, label: 'Dimanche', short: 'Dim' },
+  { day: 0, label: 'Lundi', short: 'Lun' },
+  { day: 1, label: 'Mardi', short: 'Mar' },
+  { day: 2, label: 'Mercredi', short: 'Mer' },
+  { day: 3, label: 'Jeudi', short: 'Jeu' },
+  { day: 4, label: 'Vendredi', short: 'Ven' },
+  { day: 5, label: 'Samedi', short: 'Sam' },
+  { day: 6, label: 'Dimanche', short: 'Dim' },
 ] as const
 
 const DEFAULT_HOURS: HourEntry[] = DAYS.map(d => ({
@@ -62,7 +64,7 @@ export function MerchantHoursPanel() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  const today = new Date().getDay()
+  const today = businessDayFromDate()
   const openDaysCount = useMemo(() => countOpenDays(hours), [hours])
   const todayEntry = hours.find(h => h.day === today)
 
@@ -105,10 +107,10 @@ export function MerchantHoursPanel() {
     setDirty(true)
     setHours(prev =>
       prev.map(h => {
-        if (h.day >= 1 && h.day <= 5) {
+        if (h.day >= 0 && h.day <= 4) {
           return { ...h, open_time: '08:00', close_time: '22:00', is_closed: false }
         }
-        if (h.day === 0) return { ...h, is_closed: true }
+        if (h.day === 6) return { ...h, is_closed: true }
         return h
       }),
     )
@@ -116,7 +118,7 @@ export function MerchantHoursPanel() {
   }
 
   const copyMondayToAll = () => {
-    const monday = hours.find(h => h.day === 1)
+    const monday = hours.find(h => h.day === 0)
     if (!monday) return
     setDirty(true)
     setHours(prev =>

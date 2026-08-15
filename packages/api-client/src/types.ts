@@ -84,6 +84,7 @@ export interface ApiMerchant {
   food_accepts_cash?: boolean
   food_cash_max_amount?: number | null
   food_opening_hours?: Record<string, { open: string; close: string } | null> | null
+  hours?: Array<{ day: number; open_time: string | null; close_time: string | null; is_closed: boolean }>
   is_sponsored?: boolean
   has_active_promo?: boolean
   tags?: string[]

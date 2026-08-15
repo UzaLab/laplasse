@@ -37,20 +37,35 @@ function parseHHMM(time: string): { h: number; m: number } {
   return { h: h ?? 0, m: m ?? 0 }
 }
 
-export function isWithinOpeningHours(
+function getTodayFoodSchedule(
+  at: Date,
   hours: OpeningHours | null | undefined,
-  now: Date = new Date(),
-): boolean {
-  if (!hours) return true
-  const dayKey = DAY_KEYS[now.getDay()]
+): 'unset' | 'closed' | DaySchedule {
+  if (!hours || Object.keys(hours).length === 0) return 'unset'
+  const dayKey = DAY_KEYS[at.getDay()]
+  if (!(dayKey in hours)) return 'unset'
   const schedule = hours[dayKey]
-  if (!schedule) return false
+  if (!schedule) return 'closed'
+  return schedule
+}
+
+function isWithinDaySchedule(schedule: DaySchedule, at: Date): boolean {
   const { h: oh, m: om } = parseHHMM(schedule.open)
   const { h: ch, m: cm } = parseHHMM(schedule.close)
   const openMin = oh * 60 + om
   const closeMin = ch * 60 + cm
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const nowMin = at.getHours() * 60 + at.getMinutes()
   return nowMin >= openMin && nowMin < closeMin
+}
+
+export function isWithinOpeningHours(
+  hours: OpeningHours | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const today = getTodayFoodSchedule(now, hours)
+  if (today === 'unset') return true
+  if (today === 'closed') return false
+  return isWithinDaySchedule(today, now)
 }
 
 export function isOpenFromMerchantHours(
@@ -76,13 +91,17 @@ export function resolveMerchantFoodStatus(
 ): FoodStatus {
   const pauseStatus = computeFoodStatusClient(merchant.food_is_paused, merchant.food_pause_until)
   if (pauseStatus !== 'open') return pauseStatus
-  const foodHours = merchant.food_opening_hours
-  if (foodHours && Object.keys(foodHours).length > 0) {
-    return isWithinOpeningHours(foodHours as OpeningHours, now) ? 'open' : 'closed'
+
+  const foodToday = getTodayFoodSchedule(now, merchant.food_opening_hours as OpeningHours | null | undefined)
+  if (foodToday === 'closed') return 'closed'
+  if (foodToday !== 'unset') {
+    return isWithinDaySchedule(foodToday, now) ? 'open' : 'closed'
   }
+
   if (merchant.hours?.length) {
     return isOpenFromMerchantHours(merchant.hours, now) ? 'open' : 'closed'
   }
+
   return 'open'
 }
 

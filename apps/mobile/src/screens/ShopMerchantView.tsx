@@ -28,23 +28,19 @@ import {
   type ProfileTabId,
 } from '@/src/lib/merchantProfileTabs'
 import { colors, fonts, layout } from '@/src/theme'
+import { businessDayFromDate } from '@laplasse/shared-config'
+import { isOpenFromMerchantHours } from '@/src/lib/foodHub'
 
 const SHOP_AMBER = '#fea619'
 const SHOP_AMBER_TEXT = '#684000'
 const SHOP_PRICE = '#855300'
-const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
+/** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
+const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 const HERO_HEIGHT = 350
 
 function isCurrentlyOpen(merchant: ApiMerchantDetail): boolean {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const hour = now.getHours() * 100 + now.getMinutes()
-  const todayHours = merchant.hours?.find(h => h.day === dayOfWeek)
-  if (!todayHours || todayHours.is_closed) return false
-  if (!todayHours.open_time || !todayHours.close_time) return true
-  const [oh, om] = todayHours.open_time.split(':').map(Number)
-  const [ch, cm] = todayHours.close_time.split(':').map(Number)
-  return hour >= oh * 100 + om && hour < ch * 100 + cm
+  if (!merchant.hours?.length) return true
+  return isOpenFromMerchantHours(merchant.hours)
 }
 
 function trustLabel(score: number): string {
@@ -346,7 +342,7 @@ export function ShopMerchantView({
                     .slice()
                     .sort((a, b) => a.day - b.day)
                     .map(h => {
-                      const isToday = new Date().getDay() === h.day
+                      const isToday = businessDayFromDate() === h.day
                       return (
                         <View key={h.day} style={[styles.hourRow, isToday && styles.hourRowToday]}>
                           <View style={styles.hourDay}>

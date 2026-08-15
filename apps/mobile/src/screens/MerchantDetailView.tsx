@@ -34,9 +34,11 @@ import {
   type ProfileTabId,
 } from '@/src/lib/merchantProfileTabs'
 import { openWhatsApp } from '@/src/lib/whatsapp'
+import { businessDayFromDate } from '@laplasse/shared-config'
 import { colors, fonts, homeLayout, layout, spacing } from '@/src/theme'
 
-const DAY_LABELS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+/** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
+const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
 function formatHours(hours: ApiMerchantDetail['hours']) {
   if (!hours?.length) return []

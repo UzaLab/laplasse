@@ -48,14 +48,29 @@ function parseHHMM(time: string): number {
   return (h ?? 0) * 60 + (m ?? 0)
 }
 
-function isWithinFoodOpeningHours(hours: OpeningHours, at: Date): boolean {
-  const dayKey = DAY_KEYS[at.getDay()]
-  const schedule = hours[dayKey]
-  if (!schedule) return false
+function isWithinDaySchedule(schedule: DaySchedule, at: Date): boolean {
   const nowMin = at.getHours() * 60 + at.getMinutes()
   const openMin = parseHHMM(schedule.open)
   const closeMin = parseHHMM(schedule.close)
   return nowMin >= openMin && nowMin < closeMin
+}
+
+function getTodayFoodSchedule(
+  at: Date,
+  foodHours: OpeningHours | null | undefined,
+): 'unset' | 'closed' | DaySchedule {
+  if (!foodHours || Object.keys(foodHours).length === 0) return 'unset'
+  const dayKey = DAY_KEYS[at.getDay()]
+  if (!(dayKey in foodHours)) return 'unset'
+  const schedule = foodHours[dayKey]
+  if (!schedule) return 'closed'
+  return schedule
+}
+
+function isWithinFoodOpeningHours(hours: OpeningHours, at: Date): boolean {
+  const today = getTodayFoodSchedule(at, hours)
+  if (today === 'unset' || today === 'closed') return false
+  return isWithinDaySchedule(today, at)
 }
 
 function isOpenFromBusinessHours(hours: MerchantHourRow[], at: Date): boolean {
@@ -71,11 +86,10 @@ function isOpenFromBusinessHours(hours: MerchantHourRow[], at: Date): boolean {
 }
 
 function getScheduleForDay(day: Date, source: FoodScheduleSource): DaySchedule | null {
-  const foodHours = source.food_opening_hours
-  if (foodHours && Object.keys(foodHours).length > 0) {
-    const schedule = foodHours[DAY_KEYS[day.getDay()]]
-    return schedule ?? null
-  }
+  const foodToday = getTodayFoodSchedule(day, source.food_opening_hours)
+  if (foodToday === 'closed') return null
+  if (foodToday !== 'unset') return foodToday
+
   if (source.hours?.length) {
     const entry = source.hours.find(h => h.day === businessDayFromDate(day))
     if (!entry || entry.is_closed || !entry.open_time || !entry.close_time) return null
@@ -85,13 +99,10 @@ function getScheduleForDay(day: Date, source: FoodScheduleSource): DaySchedule |
 }
 
 export function isMerchantOpenAtSchedule(at: Date, source: FoodScheduleSource): boolean {
-  const foodHours = source.food_opening_hours
-  if (foodHours && Object.keys(foodHours).length > 0) {
-    return isWithinFoodOpeningHours(foodHours, at)
-  }
-  if (source.hours?.length) {
-    return isOpenFromBusinessHours(source.hours, at)
-  }
+  const foodToday = getTodayFoodSchedule(at, source.food_opening_hours)
+  if (foodToday === 'closed') return false
+  if (foodToday !== 'unset') return isWithinDaySchedule(foodToday, at)
+  if (source.hours?.length) return isOpenFromBusinessHours(source.hours, at)
   return true
 }
 

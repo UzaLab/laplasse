@@ -33,6 +33,7 @@ import {
   getCartPromos,
   getFreeDeliveryShopIds,
   getTotalPromoDiscount,
+  saveCartPromos,
   toAppliedPromotionInputs,
 } from '@/src/lib/cartPromo'
 import { getCartKind } from '@/src/lib/cartKind'
@@ -90,6 +91,8 @@ export function CheckoutDeliveryScreen() {
   const [foodPromoApplied, setFoodPromoApplied] = useState<{ code: string; discount: number; message: string } | null>(null)
   const [foodPromoLoading, setFoodPromoLoading] = useState(false)
   const [foodPreorderFor, setFoodPreorderFor] = useState<string | null>(null)
+  const [marketplacePromoCode, setMarketplacePromoCode] = useState('')
+  const [marketplacePromoLoading, setMarketplacePromoLoading] = useState(false)
 
   const cartShopIds = useMemo(
     () => cart?.merchants?.map(m => m.id) ?? (cart?.merchant ? [cart.merchant.id] : []),
@@ -198,10 +201,22 @@ export function CheckoutDeliveryScreen() {
           // ignore
         }
       }
-      if (!isFoodFlow) setAppliedPromos(await getCartPromos(cartShopIds))
+      if (!isFoodFlow) {
+        setAppliedPromos(await getCartPromos(cartShopIds))
+      } else {
+        setAppliedPromos([])
+      }
       setLoading(false)
     })()
-  }, [applySavedAddress, isAuthenticated, isFoodFlow, loadCart, user?.phone])
+  }, [applySavedAddress, cartShopIds, isAuthenticated, isFoodFlow, loadCart, user?.phone])
+
+  useEffect(() => {
+    if (!cart || isFoodFlow) {
+      if (isFoodFlow) setAppliedPromos([])
+      return
+    }
+    void getCartPromos(cartShopIds).then(setAppliedPromos)
+  }, [cart, cartShopIds, isFoodFlow])
 
   useFocusEffect(
     useCallback(() => {
@@ -373,10 +388,11 @@ export function CheckoutDeliveryScreen() {
     try {
       const data = await getApiClient().validateFoodPromo(code, merchantId, cart.subtotal)
       if (data.valid && data.discount != null) {
+        const discount = Number(data.discount) || 0
         setFoodPromoApplied({
           code,
-          discount: data.discount,
-          message: data.message ?? `−${data.discount.toLocaleString('fr-FR')} FCFA`,
+          discount,
+          message: data.message ?? `−${discount.toLocaleString('fr-FR')} FCFA`,
         })
         notify.success(data.message ?? 'Code promo appliqué')
       } else {
@@ -386,6 +402,31 @@ export function CheckoutDeliveryScreen() {
       notify.error(err instanceof Error ? err.message : 'Code promo invalide')
     } finally {
       setFoodPromoLoading(false)
+    }
+  }
+
+  const applyMarketplacePromo = async () => {
+    const code = marketplacePromoCode.trim()
+    if (!code || !cart) return
+    setMarketplacePromoLoading(true)
+    try {
+      const result = await getApiClient().applyCartPromo(code)
+      const valid = result.applications.filter(a => a.valid)
+      if (!valid.length) {
+        notify.error(result.applications[0]?.message ?? 'Code promo invalide')
+        return
+      }
+      const merged = [
+        ...appliedPromos.filter(p => !valid.some(v => v.shop_id === p.shop_id)),
+        ...valid,
+      ]
+      setAppliedPromos(merged)
+      await saveCartPromos(merged, cartShopIds)
+      notify.success(valid.map(v => v.message ?? 'Code appliqué').join(' · '))
+    } catch (err) {
+      notify.error(err instanceof Error ? err.message : 'Code promo invalide')
+    } finally {
+      setMarketplacePromoLoading(false)
     }
   }
 
@@ -739,6 +780,30 @@ export function CheckoutDeliveryScreen() {
             </View>
             {foodPromoApplied ? (
               <Text style={styles.promoApplied}>{foodPromoApplied.message}</Text>
+            ) : null}
+          </View>
+        ) : isAuthenticated ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Code promo</Text>
+            <View style={styles.promoRow}>
+              <View style={styles.promoInputWrap}>
+                <FieldInput
+                  placeholder="Entrez votre code"
+                  value={marketplacePromoCode}
+                  onChangeText={setMarketplacePromoCode}
+                  autoCapitalize="characters"
+                />
+              </View>
+              <PrimaryButton
+                label={marketplacePromoLoading ? '…' : 'Appliquer'}
+                onPress={() => void applyMarketplacePromo()}
+                loading={marketplacePromoLoading}
+              />
+            </View>
+            {appliedPromos.length > 0 ? (
+              <Text style={styles.promoApplied}>
+                {appliedPromos.map(p => p.message ?? p.code).join(' · ')}
+              </Text>
             ) : null}
           </View>
         ) : null}

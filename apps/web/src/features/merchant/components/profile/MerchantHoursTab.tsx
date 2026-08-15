@@ -1,7 +1,9 @@
 import { Clock } from 'lucide-react'
 import type { ApiMerchantDetail } from '@/lib/api'
+import { businessDayFromDate } from '@laplasse/shared-config'
 
-const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
+/** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
+const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 interface Props {
   merchant: ApiMerchantDetail
@@ -20,7 +22,7 @@ export function MerchantHoursTab({ merchant }: Props) {
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
         {merchant.hours.map(h => {
-          const isToday = new Date().getDay() === h.day
+          const isToday = businessDayFromDate() === h.day
           return (
             <div
               key={h.day}

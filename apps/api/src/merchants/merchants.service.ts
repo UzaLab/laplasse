@@ -1091,7 +1091,7 @@ export class MerchantsService {
   ) {
     const days = hours.map(h => h.day)
     if (days.some(day => day < 0 || day > 6 || !Number.isInteger(day))) {
-      throw new BadRequestException('Chaque jour doit être un entier entre 0 (dimanche) et 6 (samedi)')
+      throw new BadRequestException('Chaque jour doit être un entier entre 0 (lundi) et 6 (dimanche)')
     }
     if (new Set(days).size !== days.length) {
       throw new BadRequestException('Un seul horaire par jour est autorisé')

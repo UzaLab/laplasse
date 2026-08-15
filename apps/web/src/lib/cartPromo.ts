@@ -72,7 +72,10 @@ export function toAppliedPromotionInputs(
 }
 
 export function getTotalPromoDiscount(promos: CartPromoApplication[]): number {
-  return promos.reduce((sum, p) => sum + (p.valid ? p.discount : 0), 0)
+  return promos.reduce(
+    (sum, p) => sum + (p.valid ? Math.max(0, Number(p.discount) || 0) : 0),
+    0,
+  )
 }
 
 export function getFreeDeliveryShopIds(promos: CartPromoApplication[]): Set<string> {

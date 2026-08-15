@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -22,7 +22,7 @@ import {
   getCheckoutSession,
   saveCheckoutConfirmation,
 } from '@/src/lib/checkoutSession'
-import { cashChangeDue, cashTenderOptions } from '@/src/lib/foodCashTender'
+import { cashChangeDue } from '@/src/lib/foodCashTender'
 import { getApiClient } from '@/src/lib/api'
 import { useAuthStore } from '@/src/stores/authStore'
 import { colors, fonts, spacing } from '@/src/theme'
@@ -36,7 +36,7 @@ export default function PaymentScreen() {
   const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
   const [cashExact, setCashExact] = useState(false)
-  const [cashTenderAmount, setCashTenderAmount] = useState<number | null>(null)
+  const [cashTenderInput, setCashTenderInput] = useState('')
 
   const isFoodFlow = session?.flow === 'food'
   const checkoutFlow = isFoodFlow ? 'food' : 'marketplace'
@@ -59,14 +59,15 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     if (!session || !isFoodFlow) return
-    setCashTenderAmount(null)
+    setCashTenderInput('')
     setCashExact(false)
   }, [session?.checkoutResult.total, isFoodFlow])
 
-  const tenderOptions = useMemo(
-    () => (session ? cashTenderOptions(session.checkoutResult.total) : []),
-    [session],
-  )
+  const cashTenderAmount = useMemo(() => {
+    if (cashExact || !cashTenderInput.trim()) return null
+    const parsed = Number(cashTenderInput.replace(/\s/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+  }, [cashExact, cashTenderInput])
 
   const cashTenderReady =
     !isFoodFlow
@@ -76,7 +77,7 @@ export default function PaymentScreen() {
   async function confirm(method: 'success' | 'failure') {
     if (!session) return
     if (method === 'success' && isFoodFlow && !cashTenderReady) {
-      Alert.alert('Paiement', 'Indiquez si vous avez le montant exact ou choisissez un billet.')
+      Alert.alert('Paiement', 'Indiquez le montant exact ou saisissez le montant que vous présenterez.')
       return
     }
     const paymentIds = session.checkoutResult.orders.map(o => o.paymentId).filter(Boolean)
@@ -167,27 +168,22 @@ export default function PaymentScreen() {
                 value={cashExact}
                 onValueChange={value => {
                   setCashExact(value)
-                  if (value) setCashTenderAmount(null)
+                  if (value) setCashTenderInput('')
                 }}
                 trackColor={{ true: '#fb923c' }}
               />
             </View>
             {!cashExact ? (
               <>
-                <Text style={styles.cashHint}>Ou choisissez le billet que vous paierez :</Text>
-                <View style={styles.tenderRow}>
-                  {tenderOptions.map(amount => (
-                    <Pressable
-                      key={amount}
-                      onPress={() => setCashTenderAmount(amount)}
-                      style={[styles.tenderBtn, cashTenderAmount === amount && styles.tenderBtnActive]}
-                    >
-                      <Text style={[styles.tenderText, cashTenderAmount === amount && styles.tenderTextActive]}>
-                        {formatPrice(amount, session.checkoutResult.currency)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <Text style={styles.cashHint}>Montant que je présenterai (FCFA) *</Text>
+                <TextInput
+                  value={cashTenderInput}
+                  onChangeText={setCashTenderInput}
+                  placeholder="Ex : 10000"
+                  placeholderTextColor={colors.textLight}
+                  keyboardType="numeric"
+                  style={styles.cashInput}
+                />
                 {cashTenderAmount != null && cashTenderAmount < session.checkoutResult.total ? (
                   <Text style={styles.cashError}>Montant insuffisant pour couvrir la commande.</Text>
                 ) : null}
@@ -251,18 +247,17 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchLabel: { fontFamily: fonts.medium, fontSize: 14, color: colors.text },
   cashHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
-  tenderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tenderBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
+  cashInput: {
     borderWidth: 1,
     borderColor: colors.borderStrong,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: fonts.bold,
+    fontSize: 15,
+    color: colors.text,
     backgroundColor: colors.surfaceContainerLow,
   },
-  tenderBtnActive: { backgroundColor: '#ea580c', borderColor: '#ea580c' },
-  tenderText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
-  tenderTextActive: { color: '#fff' },
   cashError: { fontFamily: fonts.medium, fontSize: 12, color: '#dc2626' },
   changeHint: { fontFamily: fonts.semibold, fontSize: 13, color: '#15803d' },
   hint: { fontFamily: fonts.regular, fontSize: 12, color: colors.textLight, textAlign: 'center' },
