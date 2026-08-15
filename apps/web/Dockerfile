@@ -11,10 +11,10 @@ ENV PNPM_CHILD_CONCURRENCY=1 \
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json ./apps/web/
-COPY packages/shared-config/package.json ./packages/shared-config/
+COPY packages/shared-config ./packages/shared-config/
 RUN echo "node-linker=hoisted" > .npmrc
 RUN --mount=type=cache,id=laplasse-pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --filter web
+    pnpm install --frozen-lockfile --filter web...
 
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM base AS builder

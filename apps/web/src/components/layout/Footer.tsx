@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Globe, Share2, LinkIcon } from 'lucide-react'
+import { Globe, Share2, LinkIcon, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BrandLogo } from '@/components/BrandLogo'
 import { BRAND_FOOTER_TAGLINE } from '@/lib/brandCopy'
