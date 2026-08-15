@@ -27,6 +27,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web ./apps/web
 COPY packages/shared-config ./packages/shared-config
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+RUN echo "node-linker=hoisted" > .npmrc \
+  && pnpm install --frozen-lockfile --filter web... --prefer-offline
 
 WORKDIR /app/apps/web
 

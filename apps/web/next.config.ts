@@ -33,13 +33,22 @@ const securityHeaders = [
     : []),
 ];
 
+const monorepoRoot = path.join(__dirname, "../..");
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
-  outputFileTracingRoot: path.join(process.cwd(), "../.."),
+  outputFileTracingRoot: monorepoRoot,
   transpilePackages: ["@laplasse/shared-config"],
   // Évite les builds Docker bloqués sur le VPS (pages lentes / API indisponible)
   staticPageGenerationTimeout: 45,
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias as Record<string, string>),
+      "@laplasse/shared-config": path.join(monorepoRoot, "packages/shared-config/src"),
+    };
+    return config;
+  },
   async headers() {
     return [
       {
