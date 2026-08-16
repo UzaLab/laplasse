@@ -34,6 +34,20 @@ export class DeliveryService {
     private readonly logisticsPartners: LogisticsPartnersService,
   ) {}
 
+  private async resolveActivePartnerId(shopId: string | null, merchantId: string | null) {
+    const contractWhere: { status: 'ACTIVE'; shop_id?: string; merchant_id?: string } = { status: 'ACTIVE' }
+    if (shopId) contractWhere.shop_id = shopId
+    else if (merchantId) contractWhere.merchant_id = merchantId
+    else return null
+
+    const contract = await this.prisma.deliveryPartnerContract.findFirst({
+      where: contractWhere,
+      orderBy: { signed_at: 'desc' },
+      select: { logistics_partner_id: true },
+    })
+    return contract?.logistics_partner_id ?? null
+  }
+
   async listCouriers(country?: string, city?: string) {
     return this.prisma.deliveryCourier.findMany({
       where: {
@@ -68,6 +82,17 @@ export class DeliveryService {
       ?? order.shop?.delivery_fulfilment_default
       ?? order.merchant?.delivery_fulfilment_default
       ?? 'PLATFORM_RIDER'
+
+    let partnerId = order.logistics_partner_id ?? null
+    if (fulfilmentMode === 'LOGISTICS_PARTNER' && !partnerId) {
+      partnerId = await this.resolveActivePartnerId(order.shop_id, order.merchant_id)
+      if (partnerId) {
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { logistics_partner_id: partnerId },
+        })
+      }
+    }
 
     const existing = await this.prisma.deliveryJob.findUnique({ where: { order_id: orderId } })
     if (existing) {
@@ -139,7 +164,7 @@ export class DeliveryService {
       data: {
         order_id: orderId,
         fulfilment_mode: fulfilmentMode,
-        logistics_partner_id: order.logistics_partner_id ?? undefined,
+        logistics_partner_id: fulfilmentMode === 'LOGISTICS_PARTNER' ? (partnerId ?? undefined) : undefined,
         required_vehicle: order.required_vehicle ?? undefined,
         pickup_address: pickup || undefined,
         pickup_latitude: pickupCoords.lat,

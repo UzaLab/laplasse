@@ -93,7 +93,7 @@ export function LogisticsDispatchJobCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
               <Store size={18} className="text-indigo-600 shrink-0" />
-              {job.order.shop?.name ?? 'Commerce'}
+              {job.order.shop?.name ?? job.order.merchant?.business_name ?? 'Commerce'}
             </h3>
             <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg ${statusStyle}`}>
               {statusLabel}

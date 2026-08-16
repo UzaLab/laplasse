@@ -428,6 +428,7 @@ export class LogisticsPartnerOpsService {
               delivery_address: true,
               customer_phone: true,
               shop: { select: { id: true, name: true } },
+              merchant: { select: { id: true, business_name: true } },
             },
           },
           courier_profile: {

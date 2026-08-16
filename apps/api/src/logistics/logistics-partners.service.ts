@@ -355,13 +355,26 @@ export class LogisticsPartnersService {
 
   async listPartnerContracts(userId: string) {
     const staff = await this.requirePartnerStaff(userId)
-    return this.prisma.deliveryPartnerContract.findMany({
+    const rows = await this.prisma.deliveryPartnerContract.findMany({
       where: { logistics_partner_id: staff.logistics_partner_id },
       include: {
         shop: { select: { id: true, name: true, slug: true, city: true, logo: true } },
+        merchant: {
+          select: {
+            id: true,
+            business_name: true,
+            slug: true,
+            logo: true,
+            location: { select: { city: true } },
+          },
+        },
       },
       orderBy: { updated_at: 'desc' },
     })
+    return rows.map(row => ({
+      ...row,
+      shop: this.formatContractCounterparty(row),
+    }))
   }
 
   async respondContract(userId: string, contractId: string, accept: boolean) {
@@ -402,6 +415,16 @@ export class LogisticsPartnersService {
             delivery_fulfilment_default: true,
           },
         },
+        merchant: {
+          select: {
+            id: true,
+            business_name: true,
+            slug: true,
+            logo: true,
+            delivery_fulfilment_default: true,
+            location: { select: { city: true, district: true } },
+          },
+        },
       },
     })
     if (!contract) throw new NotFoundException('Contrat introuvable')
@@ -412,12 +435,17 @@ export class LogisticsPartnersService {
     })
     const stats = await this.computeContractStats(
       staff.logistics_partner_id,
-      contract.shop_id ?? '',
+      contract.shop_id,
+      contract.merchant_id,
       contract.sla_eta_max_minutes,
       partner?.sla_eta_default_minutes ?? 45,
     )
 
-    return { ...contract, stats }
+    return {
+      ...contract,
+      shop: this.formatContractCounterparty(contract),
+      stats,
+    }
   }
 
   async updatePartnerContract(
@@ -658,19 +686,34 @@ export class LogisticsPartnersService {
 
   private async computeContractStats(
     partnerId: string,
-    shopId: string,
+    shopId: string | null,
+    merchantId: string | null,
     slaMinutes: number | null,
     defaultSla: number,
   ) {
     const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     const sla = slaMinutes ?? defaultSla
 
+    const orderScope = shopId
+      ? { shop_id: shopId }
+      : merchantId
+        ? { merchant_id: merchantId, shop_id: null }
+        : null
+    if (!orderScope) {
+      return {
+        jobs_30d: 0,
+        revenue_30d: 0,
+        sla_rate: null,
+        last_delivery_at: null,
+      }
+    }
+
     const jobs = await this.prisma.deliveryJob.findMany({
       where: {
         logistics_partner_id: partnerId,
         status: 'DELIVERED',
         delivered_at: { gte: since30 },
-        order: { shop_id: shopId },
+        order: orderScope,
       },
       select: {
         assigned_at: true,
@@ -838,7 +881,7 @@ export class LogisticsPartnersService {
         pickup_longitude: true,
         dropoff_latitude: true,
         dropoff_longitude: true,
-        order: { select: { shop_id: true } },
+        order: { select: { shop_id: true, merchant_id: true } },
       },
     })
     if (!job?.logistics_partner_id || job.status !== 'PENDING') return false
@@ -849,13 +892,21 @@ export class LogisticsPartnersService {
     })
     if (!partner?.auto_dispatch_default) return false
 
-    if (job.order.shop_id) {
+    if (job.order.shop_id || job.order.merchant_id) {
+      const contractWhere: {
+        logistics_partner_id: string
+        status: 'ACTIVE'
+        shop_id?: string
+        merchant_id?: string
+      } = {
+        logistics_partner_id: job.logistics_partner_id,
+        status: 'ACTIVE',
+      }
+      if (job.order.shop_id) contractWhere.shop_id = job.order.shop_id
+      else if (job.order.merchant_id) contractWhere.merchant_id = job.order.merchant_id
+
       const contract = await this.prisma.deliveryPartnerContract.findFirst({
-        where: {
-          shop_id: job.order.shop_id,
-          logistics_partner_id: job.logistics_partner_id,
-          status: 'ACTIVE',
-        },
+        where: contractWhere,
         select: { auto_dispatch: true },
       })
       if (contract && !contract.auto_dispatch) return false
@@ -1131,6 +1182,41 @@ export class LogisticsPartnersService {
       where: { id },
       data: { verification: status, is_active: status === 'VERIFIED' },
     })
+  }
+
+  private formatContractCounterparty(contract: {
+    shop: {
+      id: string
+      name: string
+      slug: string
+      city: string
+      logo: string | null
+    } | null
+    merchant: {
+      id: string
+      business_name: string
+      slug: string
+      logo: string | null
+      location: { city: string | null } | null
+    } | null
+  }) {
+    if (contract.shop) return contract.shop
+    if (contract.merchant) {
+      return {
+        id: contract.merchant.id,
+        name: contract.merchant.business_name,
+        slug: contract.merchant.slug,
+        city: contract.merchant.location?.city ?? '—',
+        logo: contract.merchant.logo,
+      }
+    }
+    return {
+      id: 'unknown',
+      name: 'Commerce',
+      slug: '',
+      city: '—',
+      logo: null as string | null,
+    }
   }
 
   private async requirePartnerStaff(userId: string) {

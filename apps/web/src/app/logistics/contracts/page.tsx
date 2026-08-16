@@ -91,21 +91,23 @@ export default function LogisticsContractsPage() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {contracts.map(c => (
+            {contracts.map(c => {
+              const shop = c.shop
+              return (
               <li key={c.id} className="bg-white rounded-2xl border border-slate-100 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    {c.shop.logo ? (
+                    {shop?.logo ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.shop.logo} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
+                      <img src={shop.logo} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
                     ) : (
                       <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center text-sm font-black shrink-0">
-                        {c.shop.name.slice(0, 1)}
+                        {(shop?.name ?? '?').slice(0, 1)}
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 truncate">{c.shop.name}</p>
-                      <p className="text-sm text-slate-500">{c.shop.city}</p>
+                      <p className="font-bold text-slate-900 truncate">{shop?.name ?? 'Commerce'}</p>
+                      <p className="text-sm text-slate-500">{shop?.city ?? '—'}</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -142,7 +144,7 @@ export default function LogisticsContractsPage() {
                   </div>
                 </div>
               </li>
-            ))}
+            )})}
           </ul>
         )}
       </div>

@@ -3798,7 +3798,10 @@ export class MarketplaceService {
     }
 
     if (dto.status === 'OUT_FOR_DELIVERY' && order.delivery_type === 'DELIVERY') {
-      await this.deliveryService.createJobForOrder(orderId)
+      const existingJob = await this.prisma.deliveryJob.findUnique({ where: { order_id: orderId } })
+      if (!existingJob) {
+        await this.deliveryService.dispatchOrder(orderId, {})
+      }
     }
 
     const updated = await this.prisma.order.update({

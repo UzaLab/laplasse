@@ -137,20 +137,20 @@ export default function LogisticsContractDetailPage() {
           </Link>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-3">
-              {contract.shop.logo ? (
+              {contract.shop?.logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={contract.shop.logo} alt="" className="w-14 h-14 rounded-2xl object-cover" />
               ) : (
                 <div className="w-14 h-14 rounded-2xl bg-slate-900 text-indigo-400 flex items-center justify-center text-xl font-black">
-                  {contract.shop.name.slice(0, 1)}
+                  {(contract.shop?.name ?? '?').slice(0, 1)}
                 </div>
               )}
               <div>
                 <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  {contract.shop.name}
+                  {contract.shop?.name ?? 'Commerce'}
                 </h1>
                 <p className="text-slate-500 mt-0.5">
-                  {contract.shop.city} · {STATUS_LABELS[contract.status] ?? contract.status}
+                  {contract.shop?.city ?? '—'} · {STATUS_LABELS[contract.status] ?? contract.status}
                 </p>
               </div>
             </div>
