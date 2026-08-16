@@ -20,13 +20,16 @@ const mobileAssets = path.join(root, 'apps/mobile/assets/images')
 const BRAND_BG = '#FAFAFA'
 const BRAND_DARK = '#0f182b'
 
+const APP_ICON_SVG = 'logo_application_mobile.svg'
+const SPLASH_IMAGE = 'Splash-screen.jpg'
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
 
 async function writePwaIcons(iconSvg) {
   ensureDir(webIcons)
-  fs.copyFileSync(path.join(docs, 'Icone.svg'), path.join(webIcons, 'icon.svg'))
+  fs.copyFileSync(path.join(docs, APP_ICON_SVG), path.join(webIcons, 'icon.svg'))
   fs.copyFileSync(path.join(docs, 'Logo_svg.svg'), path.join(webIcons, 'logo.svg'))
   fs.copyFileSync(path.join(docs, 'Logo_svg_new.png'), path.join(webIcons, 'logo.png'))
 
@@ -104,11 +107,19 @@ async function writeMobileAssets(iconSvg) {
     .toFile(path.join(mobileAssets, 'android-icon-monochrome.png'))
   console.log('✓ mobile android-icon-monochrome.png')
 
+  const splashSrc = path.join(docs, SPLASH_IMAGE)
+  fs.copyFileSync(splashSrc, path.join(mobileAssets, 'splash.jpg'))
+  await sharp(splashSrc)
+    .resize(1284, 2778, { fit: 'cover', position: 'centre' })
+    .jpeg({ quality: 92 })
+    .toFile(path.join(mobileAssets, 'splash-native.jpg'))
+  console.log('✓ mobile splash.jpg, splash-native.jpg')
+
   await sharp(iconSvg)
     .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toFile(path.join(mobileAssets, 'splash-icon.png'))
-  console.log('✓ mobile splash-icon.png')
+  console.log('✓ mobile splash-icon.png (fallback)')
 
   fs.copyFileSync(path.join(docs, 'Logo_svg_new.png'), path.join(mobileAssets, 'logo.png'))
   await sharp(iconSvg).resize(64, 64).png().toFile(path.join(mobileAssets, 'logo-mark.png'))
@@ -116,7 +127,7 @@ async function writeMobileAssets(iconSvg) {
 }
 
 async function main() {
-  const iconSvg = fs.readFileSync(path.join(docs, 'Icone.svg'))
+  const iconSvg = fs.readFileSync(path.join(docs, APP_ICON_SVG))
   await writePwaIcons(iconSvg)
   await writeNextAppIcons(iconSvg)
   await writeMobileAssets(iconSvg)

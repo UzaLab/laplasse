@@ -18,6 +18,7 @@ import { NotificationBell } from '@/features/profile/components/NotificationBell
 import { BackofficeUserMenu } from '@/components/layout/BackofficeUserMenu'
 import { ShopMobileNav } from '@/features/shop/components/ShopMobileNav'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
+import { BackofficeSidebarBrand } from '@/components/layout/BackofficeSidebarBrand'
 import { BACKOFFICE_MAIN_PAD_SHOP } from '@/lib/mobilePublicChrome'
 
 interface ShopShellProps {
@@ -94,19 +95,7 @@ export function ShopShell({ children }: ShopShellProps) {
   const SidebarInner = (
     <>
       <div className="backoffice-topbar flex items-center backoffice-gutter-x border-b border-slate-100 shrink-0">
-        <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-          <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
-            <span className="text-amber-400 font-black text-sm">LP</span>
-          </div>
-          <div className="min-w-0">
-            <span className="text-base font-black text-slate-900 tracking-tight leading-none block">
-              La<span className="text-amber-500">Plasse</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-              Espace boutique
-            </span>
-          </div>
-        </Link>
+        <BackofficeSidebarBrand href="/" subtitle="Espace boutique" />
         <button
           className="ml-auto lg:hidden text-slate-400 hover:text-slate-900 transition-colors"
           onClick={() => setSidebarOpen(false)}

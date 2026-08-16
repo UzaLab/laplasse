@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { CourierMobileNav } from '@/features/courier/components/CourierMobileNav'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
+import { BackofficeSidebarBrand } from '@/components/layout/BackofficeSidebarBrand'
+import { BrandLogo } from '@/components/BrandLogo'
 import { useCourierLocationSync } from '@/features/courier/hooks/useCourierLocationSync'
 import { useAuthStore } from '@/stores/authStore'
 import { authApiFetch } from '@/lib/authFetch'
@@ -88,19 +90,7 @@ export function CourierShell({ children }: CourierShellProps) {
   const SidebarInner = (
     <>
       <div className="backoffice-topbar flex items-center backoffice-gutter-x border-b border-slate-100 shrink-0">
-        <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-          <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
-            <span className="text-emerald-400 font-black text-sm">LP</span>
-          </div>
-          <div className="min-w-0">
-            <span className="text-base font-black text-slate-900 tracking-tight leading-none block">
-              La<span className="text-emerald-500">Plasse</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-              Espace livreur
-            </span>
-          </div>
-        </Link>
+        <BackofficeSidebarBrand href="/" subtitle="Espace livreur" />
         <button
           className="ml-auto lg:hidden text-slate-400 hover:text-slate-900 transition-colors"
           onClick={() => setSidebarOpen(false)}

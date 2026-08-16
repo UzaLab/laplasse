@@ -8,6 +8,8 @@ import { Building2, Compass, FileText, LayoutDashboard, LogOut, Menu, Package, B
 } from 'lucide-react'
 import { LogisticsMobileNav } from '@/features/logistics/components/LogisticsMobileNav'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
+import { BackofficeSidebarBrand } from '@/components/layout/BackofficeSidebarBrand'
+import { BrandLogo } from '@/components/BrandLogo'
 import { NotificationBell } from '@/features/profile/components/NotificationBell'
 import { useAuthStore } from '@/stores/authStore'
 import { authApiFetch } from '@/lib/authFetch'
@@ -101,19 +103,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
   const SidebarInner = (
     <>
       <div className="backoffice-topbar flex items-center backoffice-gutter-x border-b border-slate-100 shrink-0">
-        <Link href="/" className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
-          <div className="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center shrink-0">
-            <span className="text-indigo-400 font-black text-sm">LP</span>
-          </div>
-          <div className="min-w-0">
-            <span className="text-base font-black text-slate-900 tracking-tight leading-none block">
-              La<span className="text-indigo-500">Plasse</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-              Espace logistique
-            </span>
-          </div>
-        </Link>
+        <BackofficeSidebarBrand href="/" subtitle="Espace logistique" />
         <button
           className="ml-auto lg:hidden text-slate-400 hover:text-slate-900 transition-colors"
           onClick={() => setSidebarOpen(false)}
@@ -131,9 +121,7 @@ export function LogisticsShell({ children }: LogisticsShellProps) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={partner.logo} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-slate-900 text-indigo-400 flex items-center justify-center text-xs font-black shrink-0">
-                LP
-              </div>
+              <BrandLogo variant="mark" markClassName="h-8 w-8 shrink-0" />
             )}
             <div className="min-w-0">
               <p className="text-sm font-extrabold text-slate-900 truncate">
