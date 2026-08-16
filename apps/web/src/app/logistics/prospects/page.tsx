@@ -101,6 +101,9 @@ export default function LogisticsProspectsPage() {
                   )}
                   <div className="min-w-0">
                     <p className="font-bold text-slate-900">{p.name}</p>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                      {p.kind === 'merchant' ? 'Restaurant / food' : 'Boutique'}
+                    </p>
                     <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
                       <MapPin size={13} />
                       {[p.district, p.city].filter(Boolean).join(', ')}

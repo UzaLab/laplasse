@@ -70,6 +70,7 @@ export class AuthService {
         vehicle: true, is_online: true, rating_avg: true, rating_count: true,
         current_latitude: true, current_longitude: true, last_location_at: true,
         phone: true, plate_number: true, completed_jobs: true,
+        id_document_url: true,
       },
     },
     logistics_partner: { select: this.logisticsPartnerSelect },

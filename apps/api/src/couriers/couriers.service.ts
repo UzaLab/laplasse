@@ -33,6 +33,7 @@ const COURIER_PROFILE_SELECT = {
   rating_avg: true,
   rating_count: true,
   completed_jobs: true,
+  id_document_url: true,
   created_at: true,
 } as const
 

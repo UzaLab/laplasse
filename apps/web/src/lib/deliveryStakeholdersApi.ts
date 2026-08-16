@@ -452,6 +452,7 @@ export interface PartnerContractDetail extends PartnerContractSummary {
 
 export interface PartnerProspect {
   id: string
+  kind: 'shop' | 'merchant'
   name: string
   slug: string
   city: string

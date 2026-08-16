@@ -244,6 +244,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
         const ok = await this.expoPush.send(token, {
           title: payload.title,
           body: payload.body,
+          type: payload.type,
           data: payload.data ?? undefined,
         })
         if (ok) {

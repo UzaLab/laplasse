@@ -3,15 +3,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Check, Loader2, Search } from 'lucide-react'
 import {
+  acceptDeliveryContract,
   acceptMerchantDeliveryContract,
   fetchMerchantDeliveryContracts,
   fetchPublicLogisticsPartners,
+  fetchShopDeliveryContracts,
+  requestDeliveryContract,
   requestMerchantDeliveryContract,
   type DeliveryPartnerContract,
   type PublicLogisticsPartner,
 } from '@/lib/deliveryStakeholdersApi'
 import { PartnerScoreCard, PartnerScoreLegend } from '@/features/merchant/components/shop/PartnerScoreCard'
 import { notify } from '@/lib/notify'
+import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
 const CONTRACT_STATUS: Record<string, string> = {
   PENDING_PARTNER: 'En attente partenaire',
@@ -35,9 +39,9 @@ function ContractStatusBadge({ status }: { status: string }) {
 
 export function ShopDeliveryContractsPanel({
   merchantId,
+  shopId,
   countryCode: countryCodeProp,
-}: {
-  merchantId: string
+}: DeliveryHubScope & {
   countryCode?: string
 }) {
   const [contracts, setContracts] = useState<DeliveryPartnerContract[]>([])
@@ -48,11 +52,13 @@ export function ShopDeliveryContractsPanel({
   const [accepting, setAccepting] = useState<string | null>(null)
 
   const load = async () => {
-    if (!merchantId) return
+    if (!merchantId && !shopId) return
     setLoading(true)
     const country = (countryCodeProp ?? 'CI').toUpperCase()
     const [contractList, partnerList] = await Promise.all([
-      fetchMerchantDeliveryContracts(merchantId),
+      shopId
+        ? fetchShopDeliveryContracts(shopId)
+        : fetchMerchantDeliveryContracts(merchantId!),
       fetchPublicLogisticsPartners(country),
     ])
     setContracts(contractList)
@@ -63,7 +69,7 @@ export function ShopDeliveryContractsPanel({
   useEffect(() => {
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [merchantId, countryCodeProp])
+  }, [merchantId, shopId, countryCodeProp])
 
   const partnerById = useMemo(
     () => new Map(partners.map(p => [p.id, p])),
@@ -89,9 +95,11 @@ export function ShopDeliveryContractsPanel({
   }, [partners, existingPartnerIds, search])
 
   const handleRequest = async (partnerId: string) => {
-    if (!merchantId) return
+    if (!merchantId && !shopId) return
     setRequesting(partnerId)
-    const { error } = await requestMerchantDeliveryContract(merchantId, partnerId)
+    const { error } = shopId
+      ? await requestDeliveryContract(shopId, partnerId)
+      : await requestMerchantDeliveryContract(merchantId!, partnerId)
     setRequesting(null)
     if (error) {
       notify.error(error)
@@ -102,9 +110,11 @@ export function ShopDeliveryContractsPanel({
   }
 
   const handleAccept = async (contractId: string) => {
-    if (!merchantId) return
+    if (!merchantId && !shopId) return
     setAccepting(contractId)
-    const { error } = await acceptMerchantDeliveryContract(merchantId, contractId)
+    const { error } = shopId
+      ? await acceptDeliveryContract(shopId, contractId)
+      : await acceptMerchantDeliveryContract(merchantId!, contractId)
     setAccepting(null)
     if (error) {
       notify.error(error)

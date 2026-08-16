@@ -1796,6 +1796,13 @@ model CourierProfile {
   current_latitude     Float?
   current_longitude    Float?
   last_location_at     DateTime?
+  id_document_type     String?
+  id_document_number   String?
+  id_document_url      String?
+  license_document_url String?
+  kyc_submitted_at     DateTime?
+  kyc_reviewed_at      DateTime?
+  kyc_rejection_note   String?
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
 

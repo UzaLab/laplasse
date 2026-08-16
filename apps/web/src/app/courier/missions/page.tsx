@@ -41,7 +41,7 @@ export default function CourierMissionsPage() {
     queryKey: ['courier-jobs-available'],
     queryFn: fetchAvailableJobs,
     enabled: ready && canWork && isOnline,
-    refetchInterval: 8_000,
+    refetchInterval: 3_000,
   })
 
   const rejectMutation = useMutation({

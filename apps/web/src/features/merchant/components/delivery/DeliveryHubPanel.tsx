@@ -6,6 +6,7 @@ import { ShopDeliveryOverviewPanel } from '@/features/merchant/components/shop/S
 import { ShopDeliveryZonesPanel } from '@/features/merchant/components/shop/ShopDeliveryZonesPanel'
 import { ShopCourierStaffPanel } from '@/features/merchant/components/shop/ShopCourierStaffPanel'
 import { ShopDeliveryContractsPanel } from '@/features/merchant/components/shop/ShopDeliveryContractsPanel'
+import { hasDeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -42,7 +43,8 @@ const TABS = [
 export type DeliveryHubTabId = (typeof TABS)[number]['id']
 
 interface DeliveryHubPanelProps {
-  merchantId: string
+  merchantId?: string
+  shopId?: string
   loading?: boolean
   basePath: string
   countryCode?: string
@@ -50,6 +52,7 @@ interface DeliveryHubPanelProps {
 
 export function DeliveryHubPanel({
   merchantId,
+  shopId,
   loading = false,
   basePath,
   countryCode,
@@ -66,7 +69,7 @@ export function DeliveryHubPanel({
     router.replace(`${basePath}${qs ? `?${qs}` : ''}`)
   }
 
-  if (loading || !merchantId) {
+  if (loading || !hasDeliveryHubScope(merchantId, shopId)) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -75,6 +78,7 @@ export function DeliveryHubPanel({
   }
 
   const activeTab = TABS.find(t => t.id === tab) ?? TABS[0]
+  const scopeProps = shopId ? { shopId } : { merchantId: merchantId! }
 
   return (
     <>
@@ -128,12 +132,12 @@ export function DeliveryHubPanel({
       </p>
 
       {tab === 'overview' && (
-        <ShopDeliveryOverviewPanel merchantId={merchantId} onNavigateTab={id => setTab(id as DeliveryHubTabId)} />
+        <ShopDeliveryOverviewPanel {...scopeProps} onNavigateTab={id => setTab(id as DeliveryHubTabId)} />
       )}
-      {tab === 'zones' && <ShopDeliveryZonesPanel merchantId={merchantId} />}
-      {tab === 'team' && <ShopCourierStaffPanel merchantId={merchantId} />}
+      {tab === 'zones' && <ShopDeliveryZonesPanel {...scopeProps} />}
+      {tab === 'team' && <ShopCourierStaffPanel {...scopeProps} />}
       {tab === 'partners' && (
-        <ShopDeliveryContractsPanel merchantId={merchantId} countryCode={countryCode} />
+        <ShopDeliveryContractsPanel {...scopeProps} countryCode={countryCode} />
       )}
     </>
   )

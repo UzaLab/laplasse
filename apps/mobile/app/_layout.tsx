@@ -37,7 +37,8 @@ const queryClient = new QueryClient({
 })
 
 export default function RootLayout() {
-  const [splashDone, setSplashDone] = useState(false)
+  const [splashDone, setSplashDone] = useState(Platform.OS === 'web')
+
   const [loaded, error] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -47,15 +48,17 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
-    if (error) {
-      console.warn('Font load failed, continuing with system fonts', error)
+    if (Platform.OS === 'web') {
       void SplashScreen.hideAsync()
     }
-  }, [error])
+  }, [])
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync()
-  }, [loaded])
+    if (error) {
+      console.warn('Font load failed, continuing with system fonts', error)
+      if (Platform.OS !== 'web') void SplashScreen.hideAsync()
+    }
+  }, [error])
 
   useEffect(() => {
     tokenStorage.setOnUnauthorized(() => useAuthStore.getState().logout())
@@ -73,10 +76,16 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthGate />
       <ToastHost />
       <StatusBar style="dark" />
-      {!splashDone ? <AnimatedAppSplash onFinish={() => setSplashDone(true)} /> : null}
+      {splashDone ? (
+        <>
+          <PushNotificationHandler />
+          <AuthGate />
+        </>
+      ) : (
+        <AnimatedAppSplash onFinish={() => setSplashDone(true)} />
+      )}
     </QueryClientProvider>
   )
 }
@@ -96,9 +105,7 @@ function AuthGate() {
   }, [hydrated, isAuthenticated, segments, router])
 
   return (
-    <>
-      <PushNotificationHandler />
-      <Stack
+    <Stack
       screenOptions={{
         headerTintColor: colors.brand700,
         headerTitleStyle: { fontFamily: 'Outfit_700Bold' },
@@ -129,6 +136,5 @@ function AuthGate() {
       <Stack.Screen name="orders/[id]/receipt" options={{ title: 'Reçu' }} />
       <Stack.Screen name="delivery/track/[token]" options={{ title: 'Suivi livraison' }} />
     </Stack>
-    </>
   )
 }

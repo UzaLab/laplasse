@@ -19,6 +19,37 @@ export interface AuthUser {
   phone: string | null
   role: string
   created_at: string
+  courier_profile?: {
+    id: string
+    status: string
+    city: string
+    country: string
+    vehicle: string
+    phone?: string
+    plate_number?: string | null
+    is_online?: boolean
+    rating_avg?: number
+    rating_count?: number
+    completed_jobs?: number
+    current_latitude?: number | null
+    current_longitude?: number | null
+    last_location_at?: string | null
+    id_document_url?: string | null
+  } | null
+  logistics_partner?: {
+    id: string
+    legal_name: string
+    trade_name: string | null
+    slug: string
+    city: string
+    country: string
+    phone: string
+    verification: string
+    is_active: boolean
+    onboarding_step?: number
+    logo?: string | null
+    _count?: { couriers: number; contracts: number }
+  } | null
 }
 
 export interface AuthTokensResponse {
@@ -420,6 +451,8 @@ export interface GeoCity {
   name: string
   slug: string
   is_default?: boolean
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface GeoCommune {
@@ -427,6 +460,8 @@ export interface GeoCommune {
   name: string
   slug: string
   city_id: string
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface DeliveryQuoteItem {

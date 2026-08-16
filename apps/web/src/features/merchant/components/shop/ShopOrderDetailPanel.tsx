@@ -108,6 +108,7 @@ export function ShopOrderDetailPanel({
     ? getMerchantPrimaryNextStatus(order.status, order.delivery_type)
     : null
   const primaryAllowed = primaryNext && allowedTargets.includes(primaryNext)
+    && !(order.delivery_type === 'DELIVERY' && primaryNext === 'OUT_FOR_DELIVERY')
   const dangerActions = allowedTargets.filter(s => MERCHANT_DANGER_STATUSES.includes(s))
   const rollbackTarget = order ? MERCHANT_ROLLBACK[order.status] : null
 
@@ -223,7 +224,7 @@ export function ShopOrderDetailPanel({
             fulfilmentMode={order.delivery_fulfilment_mode}
             deliveryJob={order.delivery_job}
             onDispatched={() => void refetch()}
-            settingsHref={scope.merchantId && !scope.shopId ? '/merchant/delivery-zones' : undefined}
+            settingsHref={scope.merchantId && !scope.shopId ? '/merchant/delivery-zones' : '/shop/manage/delivery-zones'}
           />
         )}
 

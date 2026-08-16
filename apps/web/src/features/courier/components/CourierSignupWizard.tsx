@@ -18,6 +18,7 @@ import { PublicPageHeader } from '@/components/layout/PublicPageHeader'
 import { registerCourier } from '@/lib/courierApi'
 import { VEHICLE_OPTIONS, type DeliveryVehicle } from '@/lib/courierLabels'
 import { buildLoginUrl } from '@/lib/authIntent'
+import { useAuthReady } from '@/hooks/useAuthReady'
 
 type SignupRef =
   | { type: 'partner'; value: string }
@@ -44,6 +45,7 @@ export function CourierSignupWizard() {
   const refRaw = searchParams.get('ref')
   const signupRef = parseSignupRef(refRaw)
   const { isAuthenticated, user, updateUser } = useAuthStore()
+  const { hydrated } = useAuthReady()
   const countryCode = getCountryCode()
   const countryLabel = getCountryLabel(countryCode)
   const phonePlaceholder = getPhonePlaceholder(countryCode)
@@ -59,6 +61,7 @@ export function CourierSignupWizard() {
   const [cityName, setCityName] = useState(getDefaultCity(countryCode))
 
   useEffect(() => {
+    if (!hydrated) return
     if (!isAuthenticated) {
       router.push(buildLoginUrl(signupRedirectPath(refRaw), 'courier'))
       return
@@ -66,7 +69,7 @@ export function CourierSignupWizard() {
     if (user?.courier_profile) {
       router.replace('/courier/dashboard')
     }
-  }, [isAuthenticated, user, router, refRaw])
+  }, [hydrated, isAuthenticated, user, router, refRaw])
 
   const { data: cities = [], isLoading: citiesLoading } = useQuery({
     queryKey: ['courier-signup-cities', countryCode],
@@ -143,6 +146,14 @@ export function CourierSignupWizard() {
     })
 
     router.push('/courier/onboarding?new=true')
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA]">
+        <Loader2 className="animate-spin text-slate-300" size={28} />
+      </div>
+    )
   }
 
   return (

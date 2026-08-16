@@ -7,11 +7,14 @@ import { vehiclesCompatible } from './delivery-vehicle.util'
 export const DELIVERY_OFFER_TIMEOUT_SEC = 30
 const MAX_OFFER_ATTEMPTS = 15
 const EXPIRE_POLL_MS = 12_000
+const NO_COURIER_COOLDOWN_MS = 45_000
+const NO_COURIER_MERCHANT_NOTIFY_AT = 5
 
 @Injectable()
 export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DeliveryOfferService.name)
   private expireTimer: ReturnType<typeof setInterval> | null = null
+  private readonly noCourierNotified = new Set<string>()
 
   constructor(
     private readonly prisma: PrismaService,
@@ -158,10 +161,19 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
       include: {
         order: {
           select: {
+            id: true,
             delivery_city_id: true,
             delivery_commune_id: true,
-            shop: { select: { name: true, city: true, country: true } },
-            merchant: { select: { business_name: true, location: { select: { country: true } } } },
+            shop_id: true,
+            merchant_id: true,
+            shop: { select: { name: true, city: true, country: true, owner_id: true } },
+            merchant: {
+              select: {
+                business_name: true,
+                owner_id: true,
+                location: { select: { country: true } },
+              },
+            },
           },
         },
         offer_rejections: { select: { courier_profile_id: true } },
@@ -255,7 +267,7 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
     const candidate = zoneMatched[0] ?? null
 
     if (!candidate) {
-      this.logger.log(`Job ${job.id}: no online courier in zone (vehicle=${job.required_vehicle ?? 'any'})`)
+      await this.handleNoCourierAvailable(job, 'platform')
       return
     }
 
@@ -275,9 +287,14 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
     await this.notificationQueue.enqueuePush({
       userId: candidate.user_id,
       type: 'delivery_job_offered',
-      title: 'Nouvelle course disponible',
-      body: `${shopName} — acceptez dans ${DELIVERY_OFFER_TIMEOUT_SEC} secondes`,
-      data: { job_id: job.id, type: 'delivery_job_offered' },
+      title: '🚨 Nouvelle course — acceptez maintenant',
+      body: `${shopName} · ${DELIVERY_OFFER_TIMEOUT_SEC}s pour répondre`,
+      data: {
+        job_id: job.id,
+        notif_type: 'delivery_job_offered',
+        seconds_left: DELIVERY_OFFER_TIMEOUT_SEC,
+        href: '/courier/missions',
+      },
     })
 
     this.logger.log(`Job ${job.id} offered to courier ${candidate.id}`)
@@ -320,14 +337,20 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
 
     // Même scoring composite que les platform riders (distance + charge + note + expérience)
     const pickup = { lat: job.pickup_latitude, lng: job.pickup_longitude }
-    couriers.sort((a, b) =>
+    const zoneMatched: typeof couriers = []
+    for (const c of couriers) {
+      if (await orderMatchesZones(this.prisma, job.order, c.id, c.country)) {
+        zoneMatched.push(c)
+      }
+    }
+    zoneMatched.sort((a, b) =>
       this.scoreCourier(pickup, { ...b, _count: { jobs: b._count.jobs } })
       - this.scoreCourier(pickup, { ...a, _count: { jobs: a._count.jobs } }),
     )
 
-    const candidate = couriers[0] ?? null
+    const candidate = zoneMatched[0] ?? null
     if (!candidate) {
-      this.logger.log(`Job ${job.id}: no online partner fleet courier`)
+      await this.handleNoCourierAvailable(job, 'partner')
       return
     }
 
@@ -347,12 +370,109 @@ export class DeliveryOfferService implements OnModuleInit, OnModuleDestroy {
     await this.notificationQueue.enqueuePush({
       userId: candidate.user_id,
       type: 'delivery_job_offered',
-      title: 'Course partenaire',
-      body: `${shopName} — acceptez dans ${DELIVERY_OFFER_TIMEOUT_SEC} secondes`,
-      data: { job_id: job.id, type: 'delivery_job_offered' },
+      title: '🚨 Course partenaire — acceptez maintenant',
+      body: `${shopName} · ${DELIVERY_OFFER_TIMEOUT_SEC}s pour répondre`,
+      data: {
+        job_id: job.id,
+        notif_type: 'delivery_job_offered',
+        logistics_partner_id: job.logistics_partner_id,
+        seconds_left: DELIVERY_OFFER_TIMEOUT_SEC,
+        href: '/logistics/dispatch',
+      },
     })
 
     this.logger.log(`Job ${job.id} offered to partner courier ${candidate.id}`)
+  }
+
+  /**
+   * Backoff quand aucun livreur en ligne dans la zone — évite le spam de logs et notifie le commerce.
+   */
+  private async handleNoCourierAvailable(
+    job: NonNullable<Awaited<ReturnType<DeliveryOfferService['loadJobForOffer']>>>,
+    fleet: 'platform' | 'partner',
+  ) {
+    const fresh = await this.prisma.deliveryJob.findUnique({
+      where: { id: job.id },
+      select: { updated_at: true, rejected_count: true },
+    })
+    if (!fresh) return
+
+    if (Date.now() - fresh.updated_at.getTime() < NO_COURIER_COOLDOWN_MS) {
+      return
+    }
+
+    const nextRejected = fresh.rejected_count + 1
+    await this.prisma.deliveryJob.update({
+      where: { id: job.id },
+      data: { rejected_count: { increment: 1 } },
+    })
+
+    this.logger.log(
+      `Job ${job.id}: no online courier in zone (fleet=${fleet}, vehicle=${job.required_vehicle ?? 'any'}, attempt=${nextRejected})`,
+    )
+
+    if (nextRejected >= MAX_OFFER_ATTEMPTS) {
+      await this.escalateStuckJob(job)
+      return
+    }
+
+    if (nextRejected >= NO_COURIER_MERCHANT_NOTIFY_AT && !this.noCourierNotified.has(job.id)) {
+      this.noCourierNotified.add(job.id)
+      await this.notifyDispatchDelay(job)
+    }
+  }
+
+  /** Alerte le commerce / partenaire logistique qu'aucun livreur n'est disponible. */
+  private async notifyDispatchDelay(
+    job: NonNullable<Awaited<ReturnType<DeliveryOfferService['loadJobForOffer']>>>,
+  ) {
+    const shopName = job.order.merchant?.business_name ?? job.order.shop?.name ?? 'Commerce'
+    const orderRef = job.order.id.slice(0, 8).toUpperCase()
+
+    const merchantUserId = job.order.merchant?.owner_id ?? job.order.shop?.owner_id
+    if (merchantUserId) {
+      await this.notificationQueue.enqueuePush({
+        userId: merchantUserId,
+        type: 'delivery_dispatch_delayed',
+        title: 'Livraison en attente de livreur',
+        body: `Commande ${orderRef} (${shopName}) : aucun livreur disponible dans la zone pour le moment.`,
+        data: {
+          job_id: job.id,
+          order_id: job.order.id,
+          notif_type: 'delivery_dispatch_delayed',
+        },
+      })
+    }
+
+    if (job.logistics_partner_id) {
+      const staff = await this.prisma.logisticsPartnerStaff.findMany({
+        where: { logistics_partner_id: job.logistics_partner_id },
+        select: { user_id: true },
+        take: 20,
+      })
+      const partner = await this.prisma.logisticsPartner.findUnique({
+        where: { id: job.logistics_partner_id },
+        select: { owner_user_id: true },
+      })
+      const userIds = new Set(staff.map(s => s.user_id))
+      if (partner?.owner_user_id) userIds.add(partner.owner_user_id)
+
+      for (const userId of userIds) {
+        await this.notificationQueue.enqueuePush({
+          userId,
+          type: 'delivery_dispatch_delayed',
+          title: 'Course sans livreur disponible',
+          body: `${shopName} · commande ${orderRef} — vérifiez votre flotte en ligne.`,
+          data: {
+            job_id: job.id,
+            order_id: job.order.id,
+            logistics_partner_id: job.logistics_partner_id,
+            notif_type: 'delivery_dispatch_delayed',
+            href: '/logistics/dispatch',
+          },
+        })
+      }
+    }
   }
 
   /**

@@ -36,10 +36,7 @@ const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: str
 function orderActions(order: Order): { status: OrderStatus; label: string }[] {
   const base = NEXT_STATUS[order.status] ?? []
   if (order.status === 'READY' && order.delivery_type === 'DELIVERY') {
-    return [
-      { status: 'OUT_FOR_DELIVERY', label: 'Expédier (livraison)' },
-      { status: 'COMPLETED', label: 'Terminer (retrait)' },
-    ]
+    return [{ status: 'COMPLETED', label: 'Terminer (retrait)' }]
   }
   return base
 }

@@ -578,9 +578,28 @@ export class LogisticsPartnersService {
     })
     const communeById = new Map(communes.map(c => [c.id, c]))
 
-    const prospects = shops.map(shop => {
+    const zoneCommuneFilter = {
+      some: {
+        OR: [
+          {
+            all_communes: true,
+            city: { communes: { some: { id: { in: communeIds } } } },
+          },
+          { communes: { some: { commune_id: { in: communeIds } } } },
+        ],
+      },
+    }
+
+    const mapZonesToProspect = (
+      zones: Array<{
+        rules: Array<{
+          all_communes: boolean
+          communes: Array<{ commune_id: string }>
+        }>
+      }>,
+    ) => {
       const matchedCommuneIds = new Set<string>()
-      for (const zone of shop.delivery_zones) {
+      for (const zone of zones) {
         for (const rule of zone.rules) {
           if (rule.all_communes) {
             communeIds.forEach(id => matchedCommuneIds.add(id))
@@ -592,9 +611,20 @@ export class LogisticsPartnersService {
         }
       }
       const primaryCommune = communeIds.map(id => communeById.get(id)).find(Boolean)
+      return {
+        matched_communes: [...matchedCommuneIds]
+          .map(id => communeById.get(id)?.name)
+          .filter(Boolean) as string[],
+        latitude: primaryCommune?.latitude ?? null,
+        longitude: primaryCommune?.longitude ?? null,
+      }
+    }
 
+    const shopProspects = shops.map(shop => {
+      const geo = mapZonesToProspect(shop.delivery_zones)
       return {
         id: shop.id,
+        kind: 'shop' as const,
         name: shop.name,
         slug: shop.slug,
         city: shop.city,
@@ -602,20 +632,88 @@ export class LogisticsPartnersService {
         logo: shop.logo,
         delivery_fulfilment_default: shop.delivery_fulfilment_default,
         estimated_deliveries_30d: shop._count.orders,
-        matched_communes: [...matchedCommuneIds]
-          .map(id => communeById.get(id)?.name)
-          .filter(Boolean),
-        latitude: primaryCommune?.latitude ?? null,
-        longitude: primaryCommune?.longitude ?? null,
+        ...geo,
       }
     })
 
-    prospects.sort((a, b) => b.estimated_deliveries_30d - a.estimated_deliveries_30d)
+    const merchants = await this.prisma.merchant.findMany({
+      where: {
+        is_active: true,
+        verification_status: 'VERIFIED',
+        delivery_fulfilment_default: { not: 'MERCHANT_OWN' },
+        location: { country: partner.country },
+        delivery_zones: {
+          some: {
+            is_active: true,
+            shop_id: null,
+            rules: zoneCommuneFilter,
+          },
+        },
+        NOT: {
+          delivery_contracts: {
+            some: {
+              logistics_partner_id: partner.id,
+              status: { in: [...blockedStatuses] },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        business_name: true,
+        slug: true,
+        logo: true,
+        delivery_fulfilment_default: true,
+        location: { select: { city: true, district: true } },
+        delivery_zones: {
+          where: { is_active: true, shop_id: null },
+          select: {
+            rules: {
+              select: {
+                all_communes: true,
+                communes: { select: { commune_id: true } },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            orders: {
+              where: {
+                created_at: { gte: since30 },
+                delivery_type: 'DELIVERY',
+              },
+            },
+          },
+        },
+      },
+      orderBy: { business_name: 'asc' },
+      take: 100,
+    })
+
+    const merchantProspects = merchants.map(merchant => {
+      const geo = mapZonesToProspect(merchant.delivery_zones)
+      return {
+        id: merchant.id,
+        kind: 'merchant' as const,
+        name: merchant.business_name,
+        slug: merchant.slug,
+        city: merchant.location?.city ?? '',
+        district: merchant.location?.district ?? null,
+        logo: merchant.logo,
+        delivery_fulfilment_default: merchant.delivery_fulfilment_default,
+        estimated_deliveries_30d: merchant._count.orders,
+        ...geo,
+      }
+    })
+
+    const prospects = [...shopProspects, ...merchantProspects]
+      .sort((a, b) => b.estimated_deliveries_30d - a.estimated_deliveries_30d)
 
     return { prospects, communes_configured: true }
   }
 
-  async proposePartnership(userId: string, shopId: string) {
+  async proposePartnership(userId: string, prospectId: string) {
     const staff = await this.requirePartnerStaff(userId)
     const partner = await this.prisma.logisticsPartner.findUnique({
       where: { id: staff.logistics_partner_id },
@@ -627,10 +725,28 @@ export class LogisticsPartnersService {
     }
 
     const { prospects } = await this.listPartnerProspects(userId)
-    if (!prospects.some(p => p.id === shopId)) {
+    const prospect = prospects.find(p => p.id === prospectId)
+    if (!prospect) {
       throw new BadRequestException('Ce commerce n\'est pas éligible à une proposition')
     }
 
+    if (prospect.kind === 'merchant') {
+      return this.proposePartnershipToMerchant(partner, prospectId)
+    }
+    return this.proposePartnershipToShop(partner, prospectId)
+  }
+
+  private async proposePartnershipToShop(
+    partner: {
+      id: string
+      trade_name: string | null
+      legal_name: string
+      slug: string
+      sla_eta_default_minutes: number | null
+      auto_dispatch_default: boolean
+    },
+    shopId: string,
+  ) {
     const shop = await this.prisma.shop.findUnique({
       where: { id: shopId },
       select: { id: true, name: true, owner_id: true },
@@ -646,7 +762,7 @@ export class LogisticsPartnersService {
           where: { id: existingProposal.id },
           data: {
             status: 'PENDING_MERCHANT',
-            sla_eta_max_minutes: partner.sla_eta_default_minutes,
+            sla_eta_max_minutes: partner.sla_eta_default_minutes ?? 45,
           },
           include: { shop: { select: { name: true } } },
         })
@@ -655,7 +771,7 @@ export class LogisticsPartnersService {
             shop_id: shopId,
             logistics_partner_id: partner.id,
             status: 'PENDING_MERCHANT',
-            sla_eta_max_minutes: partner.sla_eta_default_minutes,
+            sla_eta_max_minutes: partner.sla_eta_default_minutes ?? 45,
             auto_dispatch: partner.auto_dispatch_default,
           },
           include: { shop: { select: { name: true } } },
@@ -677,7 +793,69 @@ export class LogisticsPartnersService {
         partner_slug: partner.slug,
         partner_score: scoreDetail.score,
         partner_grade: grade,
-        href: '/merchant/shop/delivery-zones?tab=partners',
+        href: '/shop/manage/delivery-zones?tab=partners',
+      },
+    })
+
+    return contract
+  }
+
+  private async proposePartnershipToMerchant(
+    partner: {
+      id: string
+      trade_name: string | null
+      legal_name: string
+      slug: string
+      sla_eta_default_minutes: number | null
+      auto_dispatch_default: boolean
+    },
+    merchantId: string,
+  ) {
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: { id: true, business_name: true, owner_id: true },
+    })
+    if (!merchant) throw new NotFoundException('Établissement introuvable')
+
+    const existingProposal = await this.prisma.deliveryPartnerContract.findFirst({
+      where: { merchant_id: merchantId, logistics_partner_id: partner.id },
+    })
+
+    const contract = existingProposal
+      ? await this.prisma.deliveryPartnerContract.update({
+          where: { id: existingProposal.id },
+          data: {
+            status: 'PENDING_MERCHANT',
+            sla_eta_max_minutes: partner.sla_eta_default_minutes ?? 45,
+          },
+        })
+      : await this.prisma.deliveryPartnerContract.create({
+          data: {
+            merchant_id: merchantId,
+            logistics_partner_id: partner.id,
+            status: 'PENDING_MERCHANT',
+            sla_eta_max_minutes: partner.sla_eta_default_minutes ?? 45,
+            auto_dispatch: partner.auto_dispatch_default,
+          },
+        })
+
+    const scoreDetail = await this.scoring.computeForPartner(partner.id)
+    const partnerLabel = partner.trade_name ?? partner.legal_name
+    const grade = scoreDetail.grade ?? '—'
+
+    await this.notificationQueue.enqueuePush({
+      userId: merchant.owner_id,
+      type: 'delivery_contract_proposal',
+      title: 'Proposition de livraison',
+      body: `${partnerLabel} (score ${grade}) souhaite assurer les livraisons de ${merchant.business_name}.`,
+      data: {
+        contract_id: contract.id,
+        merchant_id: merchantId,
+        partner_id: partner.id,
+        partner_slug: partner.slug,
+        partner_score: scoreDetail.score,
+        partner_grade: grade,
+        href: '/merchant/delivery-zones?tab=partners',
       },
     })
 

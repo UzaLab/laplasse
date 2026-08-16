@@ -9,6 +9,11 @@ module.exports = ({ config }) => ({
   icon: './assets/images/icon.png',
   scheme: 'laplasse',
   userInterfaceStyle: 'automatic',
+  splash: {
+    image: './assets/images/splash-icon.png',
+    resizeMode: 'contain',
+    backgroundColor: '#FAFAFA',
+  },
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'tech.laplasse.app',
@@ -64,9 +69,10 @@ module.exports = ({ config }) => ({
     [
       'expo-splash-screen',
       {
-        image: './assets/images/splash.jpg',
-        resizeMode: 'cover',
+        image: './assets/images/splash-icon.png',
+        resizeMode: 'contain',
         backgroundColor: '#FAFAFA',
+        imageWidth: 200,
       },
     ],
     [

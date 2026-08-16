@@ -7,6 +7,7 @@ import {
   LayoutDashboard, MapPin, UserCircle2, LogOut, Menu, X, Bell, Compass, Package, Wallet,
 } from 'lucide-react'
 import { CourierMobileNav } from '@/features/courier/components/CourierMobileNav'
+import { CourierOfferBanner } from '@/features/courier/components/CourierOfferBanner'
 import { SidebarNavGroup } from '@/components/layout/SidebarNavGroup'
 import { BackofficeSidebarBrand } from '@/components/layout/BackofficeSidebarBrand'
 import { BrandLogo } from '@/components/BrandLogo'
@@ -201,6 +202,7 @@ export function CourierShell({ children }: CourierShellProps) {
       </main>
 
       <CourierMobileNav />
+      <CourierOfferBanner />
     </div>
   )
 }

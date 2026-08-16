@@ -46,15 +46,17 @@ self.addEventListener('push', event => {
 
   const innerData = payload.data && typeof payload.data === 'object' ? payload.data : {}
   const notifData = { ...innerData, type: payload.type ?? innerData.type }
+  const urgent = notifData.type === 'delivery_job_offered'
 
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      tag: notifData.type ?? 'laplasse',
+      tag: urgent ? `offer-${notifData.job_id ?? 'laplasse'}` : (notifData.type ?? 'laplasse'),
       data: notifData,
-      vibrate: [200, 100, 200],
+      vibrate: urgent ? [400, 200, 400, 200, 400] : [200, 100, 200],
+      requireInteraction: urgent,
     }),
   )
 })

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import { Platform, StyleSheet, Text, View } from 'react-native'
+import * as SplashScreen from 'expo-splash-screen'
 import Animated, {
   Easing,
   runOnJS,
@@ -16,12 +17,19 @@ const MIN_VISIBLE_MS = 2400
 const EXIT_MS = 400
 
 export function AnimatedAppSplash({ onFinish }: { onFinish: () => void }) {
+  const [nativeHidden, setNativeHidden] = useState(false)
   const screenOpacity = useSharedValue(1)
   const logoOpacity = useSharedValue(0)
   const logoScale = useSharedValue(0.94)
   const ringOpacity = useSharedValue(0)
   const sloganOpacity = useSharedValue(0)
   const ringRotation = useSharedValue(0)
+
+  const hideNativeSplash = useCallback(() => {
+    if (nativeHidden) return
+    setNativeHidden(true)
+    void SplashScreen.hideAsync()
+  }, [nativeHidden])
 
   useEffect(() => {
     logoOpacity.value = withDelay(80, withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) }))
@@ -67,7 +75,11 @@ export function AnimatedAppSplash({ onFinish }: { onFinish: () => void }) {
   }))
 
   return (
-    <Animated.View style={[styles.root, screenStyle]} pointerEvents="none">
+    <Animated.View
+      style={[styles.root, screenStyle]}
+      pointerEvents="none"
+      onLayout={hideNativeSplash}
+    >
       <View style={styles.orbTop} />
       <View style={styles.orbBottom} />
 
@@ -75,7 +87,7 @@ export function AnimatedAppSplash({ onFinish }: { onFinish: () => void }) {
 
       <View style={styles.centerBlock}>
         <Animated.View style={[styles.logoWrap, logoStyle]}>
-          <BrandLogo variant="full" style={styles.logoFull} />
+          <BrandLogo style={styles.logoFull} />
         </Animated.View>
 
         <Animated.View style={[styles.loadingRing, ringStyle]} />
@@ -93,7 +105,7 @@ export function AnimatedAppSplash({ onFinish }: { onFinish: () => void }) {
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
     elevation: 9999,
     backgroundColor: colors.background,

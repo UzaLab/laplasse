@@ -143,9 +143,9 @@ function LoginForm() {
   const phonePlaceholder = getPhonePlaceholder(getCountryCode())
 
   const signupHref = authIntent === 'courier'
-    ? '/courier/signup'
+    ? buildRegisterUrl('/courier/signup', 'courier')
     : authIntent === 'logistics'
-      ? '/logistics/signup'
+      ? buildRegisterUrl('/logistics/signup', 'logistics')
       : authIntent === 'merchant'
         ? '/merchant/signup'
         : '/merchant/signup'
@@ -189,7 +189,7 @@ function LoginForm() {
             </p>
           )}
 
-          {authIntent !== 'default' && authIntent !== 'courier' && (
+          {authIntent !== 'default' && (
             <div className="mb-6 p-4 rounded-2xl bg-brand-50/80 border border-brand-100 text-sm text-slate-700 leading-relaxed">
               {intentCopy.registerPrompt}{' '}
               <Link href={registerHref} className="font-bold text-brand-700 hover:text-brand-800">

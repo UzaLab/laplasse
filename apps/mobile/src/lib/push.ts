@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications'
 import * as Device from 'expo-device'
+import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { getApiClient } from '@/src/lib/api'
 
@@ -15,6 +16,15 @@ if (Platform.OS !== 'web') {
       shouldShowList: true,
     }),
   })
+}
+
+async function getExpoPushToken(): Promise<string> {
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId
+  if (typeof projectId !== 'string' || !projectId) {
+    throw new Error('EAS projectId manquant dans app.config.js')
+  }
+  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId })
+  return tokenData.data
 }
 
 export async function registerForPushNotifications(): Promise<void> {
@@ -35,9 +45,8 @@ export async function registerForPushNotifications(): Promise<void> {
     })
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync()
-  cachedPushToken = tokenData.data
-  await getApiClient().registerExpoPushToken(tokenData.data)
+  cachedPushToken = await getExpoPushToken()
+  await getApiClient().registerExpoPushToken(cachedPushToken)
 }
 
 export async function unregisterPushNotifications(): Promise<void> {
@@ -45,8 +54,7 @@ export async function unregisterPushNotifications(): Promise<void> {
   let token = cachedPushToken
   if (!token && Device.isDevice) {
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync()
-      token = tokenData.data
+      token = await getExpoPushToken()
     } catch {
       return
     }

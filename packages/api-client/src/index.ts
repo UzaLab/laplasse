@@ -855,6 +855,240 @@ export class ApiClient {
       body: JSON.stringify(input),
     }, true)
   }
+
+  // ─── Courier (livreur) ───────────────────────────────────────────────────────
+
+  getCourierProfile() {
+    return this.request<import('./delivery-types').CourierProfileSummary>('/couriers/me', undefined, true)
+  }
+
+  registerCourier(payload: {
+    city: string
+    phone: string
+    country_code?: string
+    vehicle?: string
+    plate_number?: string
+    partner_ref?: string
+    shop_ref?: string
+    merchant_ref?: string
+  }) {
+    return this.request<{ profile: import('./delivery-types').CourierProfileSummary; role: string }>(
+      '/couriers/register',
+      { method: 'POST', body: JSON.stringify(payload) },
+      true,
+    )
+  }
+
+  updateCourierProfile(payload: { vehicle?: string; plate_number?: string }) {
+    return this.request<import('./delivery-types').CourierProfileSummary>(
+      '/couriers/me/profile',
+      { method: 'PATCH', body: JSON.stringify(payload) },
+      true,
+    )
+  }
+
+  setCourierOnline(isOnline: boolean) {
+    return this.request<import('./delivery-types').CourierProfileSummary>(
+      '/couriers/me/online',
+      { method: 'PATCH', body: JSON.stringify({ is_online: isOnline }) },
+      true,
+    )
+  }
+
+  updateCourierLocation(latitude: number, longitude: number) {
+    return this.request<import('./delivery-types').CourierProfileSummary>(
+      '/couriers/me/location',
+      { method: 'POST', body: JSON.stringify({ latitude, longitude }) },
+      true,
+    )
+  }
+
+  getCourierZones() {
+    return this.request<import('./delivery-types').CourierServiceZoneRow[]>('/couriers/me/zones', undefined, true)
+  }
+
+  upsertCourierZone(payload: { city_id: string; all_communes: boolean; commune_ids?: string[] }) {
+    return this.request<import('./delivery-types').CourierServiceZoneRow>(
+      '/couriers/me/zones',
+      { method: 'PUT', body: JSON.stringify(payload) },
+      true,
+    )
+  }
+
+  deleteCourierZone(zoneId: string) {
+    return this.request<{ ok: boolean }>(`/couriers/me/zones/${zoneId}`, { method: 'DELETE' }, true)
+  }
+
+  getCourierAvailableJobs() {
+    return this.request<import('./delivery-types').CourierJobRow[]>('/couriers/me/jobs/available', undefined, true)
+  }
+
+  getCourierActiveJob() {
+    return this.request<import('./delivery-types').CourierJobRow | null>('/couriers/me/jobs/active', undefined, true)
+  }
+
+  getCourierJobHistory() {
+    return this.request<import('./delivery-types').CourierJobRow[]>('/couriers/me/jobs/history', undefined, true)
+  }
+
+  acceptCourierJob(jobId: string) {
+    return this.request<import('./delivery-types').CourierJobRow>(
+      `/couriers/me/jobs/${jobId}/accept`,
+      { method: 'POST' },
+      true,
+    )
+  }
+
+  rejectCourierJob(jobId: string) {
+    return this.request<{ ok: boolean }>(`/couriers/me/jobs/${jobId}/reject`, { method: 'POST' }, true)
+  }
+
+  advanceCourierJob(jobId: string, status: import('./delivery-types').DeliveryJobStatus, proofOtp?: string) {
+    return this.request<import('./delivery-types').CourierJobRow>(
+      `/couriers/me/jobs/${jobId}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status, ...(proofOtp ? { proof_otp: proofOtp } : {}) }) },
+      true,
+    )
+  }
+
+  async uploadCourierProofPhoto(jobId: string, formData: FormData) {
+    const headers = await this.buildHeaders(true)
+    delete headers['Content-Type']
+    const res = await fetch(this.url(`/couriers/me/jobs/${jobId}/proof-photo`), {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    if (!res.ok) throw new ApiError(res.status, await this.parseError(res))
+    return res.json() as Promise<{ proof_photo_url: string }>
+  }
+
+  getCourierWallet() {
+    return this.request<import('./delivery-types').CourierWalletSummary>('/couriers/me/wallet', undefined, true)
+  }
+
+  getCourierWalletEntries(page = 1, limit = 15) {
+    return this.request<import('./delivery-types').CourierWalletEntriesPage>(
+      `/couriers/me/wallet/entries?page=${page}&limit=${limit}`,
+      undefined,
+      true,
+    )
+  }
+
+  // ─── Logistics partner ───────────────────────────────────────────────────────
+
+  registerLogisticsPartner(input: {
+    legal_name: string
+    trade_name?: string
+    city: string
+    phone: string
+    email?: string
+    country?: string
+  }) {
+    return this.request<import('./delivery-types').LogisticsPartnerMe>(
+      '/logistics/register',
+      { method: 'POST', body: JSON.stringify(input) },
+      true,
+    )
+  }
+
+  getLogisticsPartnerMe() {
+    return this.request<import('./delivery-types').LogisticsPartnerMe | null>('/logistics/me', undefined, true)
+  }
+
+  getPartnerFleet() {
+    return this.request<import('./delivery-types').PartnerFleetCourier[]>('/logistics/me/fleet', undefined, true)
+  }
+
+  linkPartnerFleetCourier(email: string) {
+    return this.request<import('./delivery-types').PartnerFleetCourier>(
+      '/logistics/me/fleet/link',
+      { method: 'POST', body: JSON.stringify({ email }) },
+      true,
+    )
+  }
+
+  unlinkPartnerFleetCourier(courierId: string) {
+    return this.request<{ ok: boolean }>(`/logistics/me/fleet/${courierId}`, { method: 'DELETE' }, true)
+  }
+
+  getPartnerJobs() {
+    return this.request<import('./delivery-types').PartnerDeliveryJob[]>('/logistics/me/jobs', undefined, true)
+  }
+
+  getPartnerJobsList(opts?: { status?: string; days?: number; take?: number }) {
+    const qs = new URLSearchParams()
+    if (opts?.status) qs.set('status', opts.status)
+    if (opts?.days) qs.set('days', String(opts.days))
+    if (opts?.take) qs.set('take', String(opts.take))
+    const q = qs.toString()
+    return this.request<import('./delivery-types').PartnerDeliveryJob[]>(
+      `/logistics/me/jobs/list${q ? `?${q}` : ''}`,
+      undefined,
+      true,
+    )
+  }
+
+  getPartnerJob(jobId: string) {
+    return this.request<import('./delivery-types').PartnerDeliveryJob>(
+      `/logistics/me/jobs/${jobId}`,
+      undefined,
+      true,
+    )
+  }
+
+  assignPartnerJob(jobId: string, courierProfileId: string) {
+    return this.request<{ ok: boolean }>(
+      `/logistics/me/jobs/${jobId}/assign`,
+      { method: 'PATCH', body: JSON.stringify({ courier_profile_id: courierProfileId }) },
+      true,
+    )
+  }
+
+  getPartnerStats() {
+    return this.request<import('./delivery-types').PartnerStats>('/logistics/me/stats', undefined, true)
+  }
+
+  getLogisticsPartnerSettings() {
+    return this.request<import('./delivery-types').LogisticsPartnerSettings | null>(
+      '/logistics/me/settings',
+      undefined,
+      true,
+    )
+  }
+
+  saveLogisticsOnboarding(input: {
+    step: number
+    legal_name?: string
+    trade_name?: string
+    rccm_number?: string
+    address?: string
+    city?: string
+    country?: string
+    phone?: string
+    email?: string
+    fleet_size_range?: string
+    vehicle_types?: string[]
+    commune_ids?: string[]
+    sla_eta_default_minutes?: number
+    auto_dispatch_default?: boolean
+    payout_method?: string
+    payout_number?: string
+  }) {
+    return this.request<import('./delivery-types').LogisticsPartnerSettings>(
+      '/logistics/me/onboarding',
+      { method: 'PATCH', body: JSON.stringify(input) },
+      true,
+    )
+  }
+
+  uploadLogisticsKycDocument(formData: FormData) {
+    return this.request<{ kyc_document_url?: string | null }>(
+      '/logistics/me/kyc',
+      { method: 'POST', body: formData },
+      true,
+    )
+  }
 }
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
@@ -862,3 +1096,4 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 }
 
 export * from './types'
+export * from './delivery-types'

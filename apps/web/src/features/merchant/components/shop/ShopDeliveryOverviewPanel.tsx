@@ -2,8 +2,10 @@
 
 import { Building2, MapPin, Truck, Users } from 'lucide-react'
 import { merchantApiFetch } from '@/lib/merchantApi'
+import { shopApiFetch } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 import { useEffect, useState } from 'react'
+import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
 import type { FulfilmentMode } from '@/lib/deliveryFulfilmentModes'
 import { fulfilmentPricingExplanation } from '@/lib/deliveryFulfilmentModes'
@@ -38,22 +40,37 @@ const MODES: Array<{
   },
 ]
 
-interface ShopDeliveryOverviewPanelProps {
-  merchantId: string
+interface ShopDeliveryOverviewPanelProps extends DeliveryHubScope {
   onNavigateTab: (tab: string) => void
 }
 
-export function ShopDeliveryOverviewPanel({ merchantId, onNavigateTab }: ShopDeliveryOverviewPanelProps) {
+export function ShopDeliveryOverviewPanel({ merchantId, shopId, onNavigateTab }: ShopDeliveryOverviewPanelProps) {
   const [mode, setMode] = useState<FulfilmentMode>('PLATFORM_RIDER')
   const [saving, setSaving] = useState(false)
   const [zoneCount, setZoneCount] = useState(0)
 
   useEffect(() => {
-    if (!merchantId) return
+    if (!merchantId && !shopId) return
     void (async () => {
+      if (shopId) {
+        const [profileRes, zonesRes] = await Promise.all([
+          shopApiFetch(`/shops/${shopId}/manage`, shopId),
+          shopApiFetch(`/shops/${shopId}/delivery-zones`, shopId),
+        ])
+        if (profileRes.ok) {
+          const profile = await profileRes.json() as { delivery_fulfilment_default?: FulfilmentMode }
+          setMode(profile.delivery_fulfilment_default ?? 'PLATFORM_RIDER')
+        }
+        if (zonesRes.ok) {
+          const zones = await zonesRes.json() as unknown[]
+          setZoneCount(zones.length)
+        }
+        return
+      }
+
       const [profileRes, zonesRes] = await Promise.all([
-        merchantApiFetch('/merchants/me/profile', merchantId),
-        merchantApiFetch('/merchants/me/delivery-zones', merchantId),
+        merchantApiFetch('/merchants/me/profile', merchantId!),
+        merchantApiFetch('/merchants/me/delivery-zones', merchantId!),
       ])
       if (profileRes.ok) {
         const profile = await profileRes.json() as { delivery_fulfilment_default?: FulfilmentMode }
@@ -64,16 +81,22 @@ export function ShopDeliveryOverviewPanel({ merchantId, onNavigateTab }: ShopDel
         setZoneCount(zones.length)
       }
     })()
-  }, [merchantId])
+  }, [merchantId, shopId])
 
   const saveMode = async (next: FulfilmentMode) => {
-    if (!merchantId) return
+    if (!merchantId && !shopId) return
     setSaving(true)
-    const res = await merchantApiFetch('/merchants/me/delivery-settings', merchantId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ delivery_fulfilment_default: next }),
-    })
+    const res = shopId
+      ? await shopApiFetch(`/shops/${shopId}`, shopId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ delivery_fulfilment_default: next }),
+        })
+      : await merchantApiFetch('/merchants/me/delivery-settings', merchantId!, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ delivery_fulfilment_default: next }),
+        })
     setSaving(false)
     if (!res.ok) {
       notify.error('Erreur lors de la sauvegarde')
