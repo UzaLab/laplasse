@@ -72,5 +72,5 @@ export function useScrollRevealBar() {
     ],
   }
 
-  return { onScroll, animatedStyle, interactive }
+  return { onScroll, animatedStyle, interactive, show, hide }
 }

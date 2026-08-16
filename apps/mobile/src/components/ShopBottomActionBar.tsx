@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { openWhatsApp } from '@/src/lib/whatsapp'
-import { colors, fonts, radii } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 
 interface Props {
   whatsapp?: string | null
@@ -17,83 +16,87 @@ export function ShopBottomActionBar({
   onBoutique,
   onScrollTop,
 }: Props) {
-  const insets = useSafeAreaInsets()
   const contact = whatsapp ?? phone
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-      {contact ? (
-        <Pressable
-          style={styles.chatBtn}
-          onPress={() =>
-            whatsapp
-              ? openWhatsApp(whatsapp, 'Bonjour, je souhaite commander via LaPlasse.')
-              : undefined
-          }
-          accessibilityLabel="WhatsApp"
-        >
-          <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
+    <View style={styles.outer}>
+      <View style={styles.wrap}>
+        {contact ? (
+          <Pressable
+            style={styles.chatBtn}
+            onPress={() => {
+              if (whatsapp) {
+                openWhatsApp(whatsapp, 'Bonjour, je souhaite commander via LaPlasse.')
+              } else if (phone) {
+                void Linking.openURL(`tel:${phone}`)
+              }
+            }}
+            accessibilityLabel="WhatsApp"
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+          </Pressable>
+        ) : null}
+
+        <Pressable onPress={onBoutique} style={styles.boutiqueBtn}>
+          <Ionicons name="storefront-outline" size={18} color="#fff" />
+          <Text style={styles.boutiqueText}>Boutique</Text>
         </Pressable>
-      ) : null}
 
-      <Pressable onPress={onBoutique} style={styles.boutiqueBtn}>
-        <Ionicons name="storefront-outline" size={18} color="#fff" />
-        <Text style={styles.boutiqueText}>Boutique</Text>
-      </Pressable>
-
-      <Pressable onPress={onScrollTop} style={styles.topBtn} accessibilityLabel="Retour en haut">
-        <Ionicons name="arrow-up" size={22} color={colors.text} />
-      </Pressable>
+        <Pressable onPress={onScrollTop} style={styles.topBtn} accessibilityLabel="Retour en haut">
+          <Ionicons name="arrow-up" size={20} color={colors.text} />
+        </Pressable>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
   wrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    backgroundColor: 'rgba(249,249,249,0.96)',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderStrong,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    gap: 8,
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 10,
   },
   chatBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#25D366',
+    backgroundColor: '#22c55e',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#25D366',
+    flexShrink: 0,
+    shadowColor: '#22c55e',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   boutiqueBtn: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     height: 48,
-    borderRadius: radii.button,
+    borderRadius: 12,
     backgroundColor: '#131b2e',
   },
-  boutiqueText: { fontFamily: fonts.semibold, fontSize: 15, color: '#fff' },
+  boutiqueText: { fontFamily: fonts.bold, fontSize: 14, color: '#fff' },
   topBtn: {
     width: 48,
     height: 48,
@@ -101,5 +104,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 })

@@ -105,6 +105,7 @@ export default function HomeScreen() {
           <View style={styles.searchWrap}>
             <SearchAutocomplete
               appearance="home"
+              suggestionsLayout="inline"
               placeholder="Établissements, plats, boutiques, produits…"
             />
           </View>

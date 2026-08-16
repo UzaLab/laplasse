@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { BrandLogo } from '@/src/components/BrandLogo'
 import { useCartItemCount } from '@/src/hooks/useCartItemCount'
+import { goBackOrReplace } from '@/src/lib/navigation'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
 export function PublicTopBar({
@@ -21,7 +22,7 @@ export function PublicTopBar({
     <View style={[styles.wrap, { paddingTop: insets.top }]}>
       <View style={styles.row}>
         <Pressable
-          onPress={onBack ?? (() => router.back())}
+          onPress={onBack ?? (() => goBackOrReplace(router, '/(tabs)'))}
           style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
           accessibilityLabel="Retour"
         >

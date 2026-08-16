@@ -286,6 +286,7 @@ export function MarketplaceView() {
             paddingBottom: layout.fabBottomGap + 56,
           },
         ]}
+        keyboardShouldPersistTaps="handled"
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -293,8 +294,11 @@ export function MarketplaceView() {
           <SearchAutocomplete
             placeholder="Rechercher un produit…"
             productsOnly
+            suggestionsLayout="inline"
+            navigateOnSubmit={false}
             value={search}
             onValueChange={setSearch}
+            onSubmit={setSearch}
           />
         </View>
 
@@ -469,6 +473,7 @@ const styles = StyleSheet.create({
   searchWrap: {
     paddingHorizontal: spacing.gutter,
     paddingTop: 12,
+    zIndex: 2,
   },
   spotlightSection: { gap: 12 },
   sectionTitle: {

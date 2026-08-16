@@ -18,6 +18,7 @@ import { FavoriteButton } from '@/src/components/FavoriteButton'
 import { LeaveReviewButton } from '@/src/components/LeaveReviewButton'
 import { HotelMerchantView } from '@/src/screens/HotelMerchantView'
 import { ServiceMerchantView } from '@/src/screens/ServiceMerchantView'
+import { ShopMerchantView } from '@/src/screens/ShopMerchantView'
 import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
 import { PrestationsTab } from '@/src/components/PrestationsTab'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
@@ -25,7 +26,8 @@ import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { RestaurationMenuPanel } from '@/src/components/RestaurationMenuPanel'
 import { LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
-import { loadBoutiqueProducts, resolveBoutique, getBoutiquePath, shouldOpenBoutiqueDirect } from '@/src/lib/boutiqueResolve'
+import { loadBoutiqueProducts, resolveBoutique } from '@/src/lib/boutiqueResolve'
+import { goBackOrReplace } from '@/src/lib/navigation'
 import { getMerchantVertical, isFoodCategorySlug } from '@/src/lib/merchantVertical'
 import {
   getDefaultProfileTab,
@@ -90,6 +92,7 @@ export function MerchantDetailView({
   })
 
   const merchant = resolveQuery.data?.merchant
+  const shopSlug = resolveQuery.data?.shopSlug ?? slug
   const hasMarketplace = !!merchant?.has_marketplace || !!resolveQuery.data?.shop
 
   const tabs = useMemo(
@@ -104,13 +107,6 @@ export function MerchantDetailView({
   const [activeTab, setActiveTab] = useState<ProfileTabId>(() =>
     isValidProfileTab(initialTab, tabs) ? initialTab : defaultTab,
   )
-
-  useEffect(() => {
-    if (!resolveQuery.data) return
-    if (shouldOpenBoutiqueDirect(resolveQuery.data)) {
-      router.replace(getBoutiquePath(resolveQuery.data.shopSlug))
-    }
-  }, [resolveQuery.data, router])
 
   useEffect(() => {
     if (!merchant) return
@@ -150,18 +146,10 @@ export function MerchantDetailView({
       <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Établissement introuvable</Text>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => goBackOrReplace(router, '/(tabs)/search')}>
             <Text style={styles.backLink}>Retour</Text>
           </Pressable>
         </View>
-      </PublicScreenShell>
-    )
-  }
-
-  if (resolveQuery.data && shouldOpenBoutiqueDirect(resolveQuery.data)) {
-    return (
-      <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
-        <LoadingState />
       </PublicScreenShell>
     )
   }
@@ -171,7 +159,7 @@ export function MerchantDetailView({
       <PublicScreenShell activeRoute="marketplace" showBottomNav={false}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Établissement introuvable</Text>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => goBackOrReplace(router, '/(tabs)/search')}>
             <Text style={styles.backLink}>Retour</Text>
           </Pressable>
         </View>
@@ -193,6 +181,10 @@ export function MerchantDetailView({
 
   if (getMerchantVertical(merchant.category.slug) === 'appointment') {
     return <ServiceMerchantView slug={slug} initialTab={initialTab} />
+  }
+
+  if (getMerchantVertical(merchant.category.slug) === 'retail') {
+    return <ShopMerchantView slug={slug} initialTab={initialTab} />
   }
 
   const contactPhone = merchant.whatsapp ?? merchant.phone
@@ -219,7 +211,7 @@ export function MerchantDetailView({
           ]}
         >
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace(router, '/(tabs)/search')}
             style={[styles.headerBtn, scrolled && styles.headerBtnScrolled]}
           >
             <Ionicons name="arrow-back" size={20} color={colors.brand800} />
@@ -305,7 +297,7 @@ export function MerchantDetailView({
                 {hasMarketplace ? (
                   <>
                     <Pressable
-                      onPress={() => router.push(`/m/${slug}/boutique`)}
+                      onPress={() => router.push(`/m/${shopSlug}/boutique`)}
                       style={styles.boutiqueLink}
                     >
                       <Text style={styles.boutiqueLinkText}>Voir toute la boutique</Text>
@@ -326,7 +318,7 @@ export function MerchantDetailView({
                                 },
                               }}
                               showMerchantName={false}
-                              onPress={() => router.push(`/m/${slug}/p/${product.slug}`)}
+                              onPress={() => router.push(`/m/${shopSlug}/p/${product.slug}`)}
                             />
                           </View>
                         ))}
@@ -451,7 +443,7 @@ export function MerchantDetailView({
             <View style={{ flex: 1 }}>
               <PrimaryButton
                 label="Boutique"
-                onPress={() => router.push(`/m/${slug}/boutique`)}
+                onPress={() => router.push(`/m/${shopSlug}/boutique`)}
               />
             </View>
           ) : (

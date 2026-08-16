@@ -225,19 +225,65 @@ export interface ProductVariant {
   image_url?: string | null
 }
 
+export interface ProductPromotionBadge {
+  id: string
+  title: string
+  type: string
+  value: number
+  code?: string | null
+  discount_amount?: number
+  promo_price?: number | null
+}
+
+export interface ProductSpecification {
+  label: string
+  value: string
+}
+
+export interface ProductAttributeValue {
+  attribute_id: string
+  value: string
+  attribute?: {
+    id: string
+    label: string
+    key?: string
+    unit?: string | null
+  }
+}
+
 export interface MarketplaceProduct {
   id: string
   name: string
   slug: string
   short_description?: string | null
   description?: string | null
+  composition?: string | null
   price: number
+  original_price?: number
+  promo_price?: number | null
   currency: string
   image_url?: string | null
   images?: string[]
   stock_quantity?: number
   has_variants?: boolean
   variants?: ProductVariant[]
+  condition?: ProductCondition
+  origin?: ProductOrigin
+  weight_grams?: number | null
+  dimensions?: string | null
+  preparation_delay_days?: number | null
+  specifications?: ProductSpecification[]
+  attribute_values?: ProductAttributeValue[]
+  category?: {
+    id: string
+    name: string
+    slug: string
+    legal_notice?: string | null
+  } | null
+  promotion?: ProductPromotionBadge | null
+  created_at?: string
+  is_best_seller?: boolean
+  sales_count?: number
   merchant?: {
     id: string
     business_name: string
@@ -657,9 +703,13 @@ export interface FeaturedProduct {
   image_url?: string | null
   original_price?: number
   promo_price?: number | null
+  promotion?: ProductPromotionBadge | null
   merchant: { business_name: string; slug: string }
   is_sponsored?: boolean
   has_variants?: boolean
+  created_at?: string
+  is_best_seller?: boolean
+  sales_count?: number
 }
 
 export interface MarketplaceSpotlightShop {

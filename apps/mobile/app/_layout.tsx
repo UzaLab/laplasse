@@ -10,9 +10,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
 import 'react-native-reanimated'
+import { AnimatedAppSplash } from '@/src/components/AnimatedAppSplash'
 import { ToastHost } from '@/src/components/ToastHost'
 import { PushNotificationHandler } from '@/src/components/PushNotificationHandler'
 import { resetApiClient } from '@/src/lib/api'
@@ -36,6 +37,7 @@ const queryClient = new QueryClient({
 })
 
 export default function RootLayout() {
+  const [splashDone, setSplashDone] = useState(false)
   const [loaded, error] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -74,6 +76,7 @@ export default function RootLayout() {
       <AuthGate />
       <ToastHost />
       <StatusBar style="dark" />
+      {!splashDone ? <AnimatedAppSplash onFinish={() => setSplashDone(true)} /> : null}
     </QueryClientProvider>
   )
 }

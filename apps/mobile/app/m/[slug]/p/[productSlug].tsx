@@ -15,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice, getDefaultCity } from '@laplasse/shared-config'
 import type { MarketplaceProduct, ProductVariant } from '@laplasse/api-client'
-import { HomeProductGridCard } from '@/src/components/HomeProductGridCard'
+import { MarketplaceProductGridCard } from '@/src/components/MarketplaceProductGridCard'
+import { ProductDetailTabs } from '@/src/components/ProductDetailTabs'
 import { ProductFavoriteButton } from '@/src/components/ProductFavoriteButton'
-import { ProductHtmlContent } from '@/src/components/ProductHtmlContent'
+import { ProductCardBadges } from '@/src/components/ProductCardBadges'
+import { ProductRecommendationsRow } from '@/src/components/ProductRecommendationsRow'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { LoadingState } from '@/src/components/ui'
@@ -29,6 +31,7 @@ import {
 } from '@/src/lib/boutiqueResolve'
 import { getMarketplaceAddBlockReason, showCartBlockedAlert } from '@/src/lib/cartKind'
 import { hasHtmlContent, stripHtml } from '@/src/lib/htmlUtils'
+import { getProductDisplayPrices } from '@/src/lib/productPromoUtils'
 import { useAuthStore } from '@/src/stores/authStore'
 import { useCartStore } from '@/src/stores/cartStore'
 import { useCountryStore } from '@/src/stores/countryStore'
@@ -58,7 +61,6 @@ export default function ProductScreen() {
   const [quantity, setQuantity] = useState(1)
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null)
   const [activeImage, setActiveImage] = useState(0)
-  const [activeTab] = useState<'description'>('description')
 
   const productQuery = useQuery({
     queryKey: ['product', slug, productSlug],
@@ -72,10 +74,16 @@ export default function ProductScreen() {
     enabled: !!slug,
   })
 
+  const reviewsMetaQuery = useQuery({
+    queryKey: ['product-reviews-meta', productSlug, slug],
+    queryFn: () => getApiClient().getProductReviews(String(productSlug), String(slug)),
+    enabled: !!slug && !!productSlug,
+  })
+
   const relatedQuery = useQuery({
     queryKey: ['merchant-products-related', slug, productSlug],
     queryFn: async () => {
-      const res = await getApiClient().getMerchantProducts(String(slug), 8)
+      const res = await getApiClient().getMerchantProducts(String(slug), 12)
       return res.data.filter(p => p.slug !== productSlug)
     },
     enabled: !!slug && !!productSlug,
@@ -95,7 +103,15 @@ export default function ProductScreen() {
 
   const displayPrice = useMemo(() => {
     if (!product) return 0
-    return activeVariant?.price ?? product.price
+    const base = activeVariant?.price ?? product.price
+    const promo = getProductDisplayPrices({ ...product, price: base })
+    return promo.displayPrice
+  }, [product, activeVariant])
+
+  const originalPrice = useMemo(() => {
+    if (!product) return null
+    const base = activeVariant?.price ?? product.price
+    return getProductDisplayPrices({ ...product, price: base }).originalPrice
   }, [product, activeVariant])
 
   const maxQty = useMemo(() => {
@@ -179,6 +195,12 @@ export default function ProductScreen() {
       >
         <View style={styles.gallerySection}>
           <View style={styles.mainImageWrap}>
+            <ProductCardBadges
+              promotion={product.promotion}
+              createdAt={product.created_at}
+              isBestSeller={product.is_best_seller}
+              salesCount={product.sales_count}
+            />
             {images[activeImage] ? (
               <AppImage uri={images[activeImage]} style={styles.mainImage} contentFit="contain" />
             ) : (
@@ -253,6 +275,9 @@ export default function ProductScreen() {
           </View>
 
           <Text style={styles.price}>{formatPrice(displayPrice, product.currency)}</Text>
+          {originalPrice != null ? (
+            <Text style={styles.originalPrice}>{formatPrice(originalPrice, product.currency)}</Text>
+          ) : null}
           <Text style={styles.priceHint}>
             Taxes incluses. Frais de livraison calculés à l&apos;étape suivante.
           </Text>
@@ -352,19 +377,14 @@ export default function ProductScreen() {
           </View>
         </View>
 
-        <View style={styles.tabsSection}>
-          <View style={styles.tabHeader}>
-            <Pressable style={styles.tabActive}>
-              <Text style={styles.tabActiveText}>Description détaillée</Text>
-            </Pressable>
-          </View>
-          {activeTab === 'description' ? (
-            <ProductHtmlContent
-              html={product.description}
-              emptyMessage="Aucune description détaillée disponible pour ce produit."
-            />
-          ) : null}
-        </View>
+        <ProductDetailTabs
+          product={product}
+          shopSlug={productRouteSlug}
+          merchantName={merchantName}
+          reviewCount={reviewsMetaQuery.data?.reviews.length ?? 0}
+        />
+
+        <ProductRecommendationsRow productId={product.id} />
 
         {(relatedQuery.data?.length ?? 0) > 0 ? (
           <View style={styles.relatedSection}>
@@ -381,20 +401,26 @@ export default function ProductScreen() {
             >
               {relatedQuery.data!.map(p => (
                 <View key={p.id} style={styles.relatedCell}>
-                  <HomeProductGridCard
+                  <MarketplaceProductGridCard
                     product={{
                       id: p.id,
                       name: p.name,
                       slug: p.slug,
                       price: p.price,
-                      promo_price: null,
+                      promo_price: p.promo_price ?? null,
+                      original_price: p.original_price,
+                      promotion: p.promotion,
                       currency: p.currency,
                       image_url: p.image_url ?? null,
+                      created_at: p.created_at,
+                      is_best_seller: p.is_best_seller,
+                      sales_count: p.sales_count,
                       merchant: {
                         business_name: merchantName,
                         slug: productRouteSlug,
                       },
                     }}
+                    showMerchantName={false}
                     onPress={() => router.push(`/m/${productRouteSlug}/p/${p.slug}`)}
                   />
                 </View>
@@ -423,6 +449,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
     borderColor: colors.border,
+    position: 'relative',
   },
   mainImage: { width: '100%', height: '100%' },
   imageFallback: { alignItems: 'center', justifyContent: 'center' },
@@ -508,6 +535,13 @@ const styles = StyleSheet.create({
     fontFamily: fonts.extrabold,
     fontSize: 32,
     color: colors.brand600,
+    marginBottom: 4,
+  },
+  originalPrice: {
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    color: colors.textLight,
+    textDecorationLine: 'line-through',
     marginBottom: 4,
   },
   priceHint: {
@@ -636,30 +670,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.textMuted,
-  },
-  tabsSection: {
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.gutter,
-    paddingVertical: 24,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  tabHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-    marginBottom: 16,
-  },
-  tabActive: {
-    paddingBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.brand500,
-    marginBottom: -1,
-  },
-  tabActiveText: {
-    fontFamily: fonts.bold,
-    fontSize: 15,
-    color: colors.brand600,
   },
   relatedSection: {
     backgroundColor: colors.surface,

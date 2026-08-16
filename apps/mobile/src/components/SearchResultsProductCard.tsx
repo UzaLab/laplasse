@@ -26,7 +26,6 @@ export function SearchResultsProductCard({
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
         <Text style={styles.price}>{formatPrice(product.price, product.currency)}</Text>
-        <Text style={styles.merchant} numberOfLines={1}>{product.merchant.business_name}</Text>
       </View>
     </Pressable>
   )
@@ -35,33 +34,28 @@ export function SearchResultsProductCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.card - 4,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     overflow: 'hidden',
     ...shadows.card,
+    flex: 1,
   },
   flex: { flex: 1 },
   pressed: { opacity: 0.92 },
-  image: { width: '100%', height: 120 },
-  imageFallback: { backgroundColor: colors.brand50 },
+  image: { width: '100%', aspectRatio: 1 },
   body: { padding: 10 },
   name: {
-    fontFamily: fonts.semibold,
-    fontSize: 13,
+    fontFamily: fonts.bold,
+    fontSize: 12,
     color: colors.text,
-    minHeight: 34,
+    minHeight: 32,
+    lineHeight: 16,
   },
   price: {
     fontFamily: fonts.bold,
-    fontSize: 14,
+    fontSize: 12,
     color: colors.brand700,
     marginTop: 4,
-  },
-  merchant: {
-    fontFamily: fonts.regular,
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 2,
   },
 })

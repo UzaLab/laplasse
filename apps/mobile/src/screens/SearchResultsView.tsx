@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getDefaultCity } from '@laplasse/shared-config'
 import type { ApiMerchant } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
@@ -57,6 +57,27 @@ function pickDefaultTab(totals: Record<Tab, number>): Tab {
 function applyCategoryFilter(merchants: ApiMerchant[], categories: string[]) {
   if (categories.length === 0) return merchants
   return merchants.filter(m => categories.includes(m.category.slug))
+}
+
+function renderTwoColumnGrid<T>(
+  items: T[],
+  colWidth: number,
+  keyFn: (item: T) => string,
+  renderItem: (item: T) => ReactNode,
+) {
+  return Array.from({ length: Math.ceil(items.length / 2) }, (_, rowIndex) => {
+    const row = items.slice(rowIndex * 2, rowIndex * 2 + 2)
+    return (
+      <View key={row.map(keyFn).join('-')} style={styles.gridRow}>
+        {row.map(item => (
+          <View key={keyFn(item)} style={{ width: colWidth }}>
+            {renderItem(item)}
+          </View>
+        ))}
+        {row.length === 1 ? <View style={{ width: colWidth }} /> : null}
+      </View>
+    )
+  })
 }
 
 export default function SearchResultsView({
@@ -390,14 +411,19 @@ export default function SearchResultsView({
                 ) : null}
               </>
             ) : (
-              <View style={styles.merchantList}>
-                {merchants.map(m => (
-                  <SearchResultsMerchantCard
-                    key={m.id}
-                    merchant={m}
-                    onPress={() => router.push(merchantHref(m) as never)}
-                  />
-                ))}
+              <View style={styles.resultGrid}>
+                {renderTwoColumnGrid(
+                  merchants,
+                  productColWidth,
+                  m => m.id,
+                  m => (
+                    <SearchResultsMerchantCard
+                      merchant={m}
+                      compact
+                      onPress={() => router.push(merchantHref(m) as never)}
+                    />
+                  ),
+                )}
               </View>
             )}
 
@@ -441,14 +467,19 @@ export default function SearchResultsView({
             {merchants.length === 0 && (trendingQuery.data?.length ?? 0) > 0 ? (
               <View style={styles.crossSell}>
                 <Text style={styles.crossSellTitle}>Populaires à {city}</Text>
-                <View style={styles.merchantList}>
-                  {trendingQuery.data!.map(m => (
-                    <SearchResultsMerchantCard
-                      key={m.id}
-                      merchant={m}
-                      onPress={() => router.push(merchantHref(m) as never)}
-                    />
-                  ))}
+                <View style={styles.resultGrid}>
+                  {renderTwoColumnGrid(
+                    trendingQuery.data!,
+                    productColWidth,
+                    m => m.id,
+                    m => (
+                      <SearchResultsMerchantCard
+                        merchant={m}
+                        compact
+                        onPress={() => router.push(merchantHref(m) as never)}
+                      />
+                    ),
+                  )}
                 </View>
               </View>
             ) : null}
@@ -458,14 +489,19 @@ export default function SearchResultsView({
             {menus.length === 0 ? (
               <EmptyState title="Aucun plat" subtitle={`Pour « ${debouncedQuery} »`} />
             ) : (
-              <View style={styles.merchantList}>
-                {menus.map(item => (
-                  <SearchResultsMenuCard
-                    key={item.id}
-                    item={item}
-                    onPress={() => router.push(`/restauration/${item.merchant.slug}`)}
-                  />
-                ))}
+              <View style={styles.resultGrid}>
+                {renderTwoColumnGrid(
+                  menus,
+                  productColWidth,
+                  item => item.id,
+                  item => (
+                    <SearchResultsMenuCard
+                      item={item}
+                      compact
+                      onPress={() => router.push(`/restauration/${item.merchant.slug}`)}
+                    />
+                  ),
+                )}
               </View>
             )}
             {canLoadMore ? (
@@ -485,36 +521,37 @@ export default function SearchResultsView({
           shops.length === 0 ? (
             <EmptyState title="Aucune boutique" subtitle={`Pour « ${debouncedQuery} »`} />
           ) : (
-            <View style={styles.merchantList}>
-              {shops.map(shop => (
-                <SearchResultsShopCard
-                  key={shop.slug}
-                  name={shop.name}
-                  onPress={() => router.push(`/m/${shop.slug}/boutique`)}
-                />
-              ))}
+            <View style={styles.resultGrid}>
+              {renderTwoColumnGrid(
+                shops,
+                productColWidth,
+                shop => shop.slug,
+                shop => (
+                  <SearchResultsShopCard
+                    name={shop.name}
+                    compact
+                    onPress={() => router.push(`/m/${shop.slug}` as never)}
+                  />
+                ),
+              )}
             </View>
           )
         ) : products.length === 0 ? (
           <EmptyState title="Aucun produit" subtitle={`Pour « ${debouncedQuery} »`} />
         ) : (
-          <View style={styles.productGrid}>
-            {Array.from({ length: Math.ceil(products.length / 2) }, (_, rowIndex) => {
-              const row = products.slice(rowIndex * 2, rowIndex * 2 + 2)
-              return (
-                <View key={row.map(p => p.id).join('-')} style={styles.productRow}>
-                  {row.map(p => (
-                    <SearchResultsProductCard
-                      key={p.id}
-                      product={p}
-                      width={productColWidth}
-                      onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
-                    />
-                  ))}
-                  {row.length === 1 ? <View style={{ width: productColWidth }} /> : null}
-                </View>
-              )
-            })}
+          <View style={styles.resultGrid}>
+            {renderTwoColumnGrid(
+              products,
+              productColWidth,
+              p => p.id,
+              p => (
+                <SearchResultsProductCard
+                  product={p}
+                  width={productColWidth}
+                  onPress={() => router.push(`/m/${p.merchant.slug}/p/${p.slug}`)}
+                />
+              ),
+            )}
             {canLoadMore ? (
               <Pressable
                 onPress={loadMore}
@@ -665,6 +702,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   merchantList: { gap: 16 },
+  resultGrid: { gap: 12 },
+  gridRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   productGrid: { gap: 12 },
   productRow: { gap: 12, marginBottom: 12 },
   crossSell: {

@@ -8,6 +8,7 @@ import { ProfileBadge, ProfileCard, ProfilePageTitle } from '@/src/components/pr
 import { ProfileScreenScroll } from '@/src/components/profile/ProfileShell'
 import { FieldInput, PrimaryButton, SecondaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
+import { goBackOrReplace } from '@/src/lib/navigation'
 import { notify } from '@/src/lib/notify'
 import { profileTheme } from '@/src/lib/profileTheme'
 import { useAuthStore } from '@/src/stores/authStore'
@@ -207,7 +208,10 @@ export default function ProfileSettingsScreen() {
         }}
       />
 
-      <Pressable style={styles.backLink} onPress={() => router.push('/profile' as never)}>
+      <Pressable
+        style={styles.backLink}
+        onPress={() => goBackOrReplace(router, '/profile')}
+      >
         <Ionicons name="arrow-back" size={16} color={profileTheme.textMuted} />
         <Text style={styles.backLinkText}>Retour au profil</Text>
       </Pressable>

@@ -6,16 +6,14 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateProductReviewDto } from './dto/product-review.dto'
-import { AdminNotificationsService } from '../notifications/admin-notifications.service'
+
+const PURCHASED_ORDER_STATUSES = ['COMPLETED', 'DELIVERED'] as const
 
 @Injectable()
 export class ProductReviewsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly adminNotifications: AdminNotificationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async listByProductSlug(slug: string, shopSlug?: string) {
+  async listByProductSlug(slug: string, shopSlug?: string, userId?: string) {
     const product = await this.resolveProduct(slug, shopSlug)
     const rows = await this.prisma.productReview.findMany({
       where: { product_id: product.id, status: 'APPROVED' },
@@ -31,6 +29,10 @@ export class ProductReviewsService {
         ? rows.reduce((s, r) => s + r.rating, 0) / rows.length
         : null
 
+    const viewer = userId
+      ? await this.getViewerEligibility(userId, product.id)
+      : undefined
+
     return {
       product_id: product.id,
       average_rating: avg ? Math.round(avg * 10) / 10 : null,
@@ -45,24 +47,16 @@ export class ProductReviewsService {
           avatar: r.user.avatar,
         },
       })),
+      viewer,
     }
   }
 
   async create(userId: string, slug: string, dto: CreateProductReviewDto, shopSlug?: string) {
     const product = await this.resolveProduct(slug, shopSlug)
 
-    const purchased = await this.prisma.orderItem.findFirst({
-      where: {
-        product_id: product.id,
-        order: {
-          user_id: userId,
-          status: 'COMPLETED',
-        },
-      },
-      select: { order_id: true },
-    })
+    const purchased = await this.findCompletedPurchase(userId, product.id)
     if (!purchased) {
-      throw new ForbiddenException('Vous devez avoir acheté ce produit pour laisser un avis')
+      throw new ForbiddenException('Vous devez avoir commandé ce produit pour laisser un avis')
     }
 
     const existing = await this.prisma.productReview.findUnique({
@@ -79,16 +73,55 @@ export class ProductReviewsService {
         order_id: purchased.order_id,
         rating: dto.rating,
         comment: dto.comment?.trim() || null,
-        status: 'PENDING',
+        status: 'APPROVED',
       },
       include: {
         user: { select: { full_name: true, avatar: true } },
       },
     })
 
-    void this.adminNotifications.productReviewPending(review.id, product.name)
+    return {
+      id: review.id,
+      rating: review.rating,
+      comment: review.comment,
+      created_at: review.created_at.toISOString(),
+      user: {
+        name: review.user.full_name ?? 'Client',
+        avatar: review.user.avatar,
+      },
+    }
+  }
 
-    return review
+  private async getViewerEligibility(userId: string, productId: string) {
+    const [purchased, existing] = await Promise.all([
+      this.findCompletedPurchase(userId, productId),
+      this.prisma.productReview.findUnique({
+        where: { product_id_user_id: { product_id: productId, user_id: userId } },
+        select: { id: true },
+      }),
+    ])
+
+    const hasPurchased = Boolean(purchased)
+    const alreadyReviewed = Boolean(existing)
+
+    return {
+      has_purchased: hasPurchased,
+      already_reviewed: alreadyReviewed,
+      can_review: hasPurchased && !alreadyReviewed,
+    }
+  }
+
+  private findCompletedPurchase(userId: string, productId: string) {
+    return this.prisma.orderItem.findFirst({
+      where: {
+        product_id: productId,
+        order: {
+          user_id: userId,
+          status: { in: [...PURCHASED_ORDER_STATUSES] },
+        },
+      },
+      select: { order_id: true },
+    })
   }
 
   private async resolveProduct(slug: string, shopSlug?: string) {

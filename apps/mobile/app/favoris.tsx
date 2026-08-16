@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import {
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,14 +12,17 @@ import { AppImage } from '@/src/components/ui/AppImage'
 import { Ionicons } from '@expo/vector-icons'
 import { formatPrice } from '@laplasse/shared-config'
 import { FavoriteButton } from '@/src/components/FavoriteButton'
-import { PublicScreenShell } from '@/src/components/PublicScreenShell'
-import { PublicTopBar } from '@/src/components/PublicTopBar'
 import { ProductFavoriteButton } from '@/src/components/ProductFavoriteButton'
+import {
+  ProfileFilterTabs,
+  ProfilePageTitle,
+} from '@/src/components/profile/ProfileUi'
+import { ProfileShell } from '@/src/components/profile/ProfileShell'
 import { EmptyState, LoadingState, PrimaryButton } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
 import { profileTheme } from '@/src/lib/profileTheme'
 import { useAuthStore } from '@/src/stores/authStore'
-import { fonts, layout, spacing } from '@/src/theme'
+import { fonts, layout } from '@/src/theme'
 
 type Tab = 'merchants' | 'products'
 
@@ -43,59 +45,63 @@ export default function FavorisScreen() {
   })
 
   const filteredMerchants = useMemo(() => merchantsQuery.data ?? [], [merchantsQuery.data])
-
   const filteredProducts = useMemo(() => productsQuery.data ?? [], [productsQuery.data])
 
   if (!hydrated) {
     return (
-      <PublicScreenShell activeRoute="profile">
-        <PublicTopBar showCart />
+      <ProfileShell>
         <LoadingState />
-      </PublicScreenShell>
+      </ProfileShell>
     )
   }
 
   if (!isAuthenticated) {
     return (
-      <PublicScreenShell activeRoute="profile">
-        <PublicTopBar showCart />
+      <ProfileShell>
         <View style={styles.center}>
           <EmptyState title="Connectez-vous" subtitle="Retrouvez vos établissements et produits favoris." />
           <PrimaryButton label="Se connecter" onPress={() => router.push('/(auth)/login')} />
         </View>
-      </PublicScreenShell>
+      </ProfileShell>
     )
   }
 
   const loading = tab === 'merchants' ? merchantsQuery.isLoading : productsQuery.isLoading
 
-  return (
-    <PublicScreenShell activeRoute="profile">
-      <PublicTopBar showCart />
-      <View style={styles.header}>
-        <Text style={styles.title}>Mes favoris</Text>
-        <View style={styles.tabs}>
-          {(['merchants', 'products'] as const).map(key => (
-            <Pressable
-              key={key}
-              onPress={() => setTab(key)}
-              style={[styles.tab, tab === key && styles.tabActive]}
-            >
-              <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>
-                {key === 'merchants' ? 'Établissements' : 'Produits'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+  const header = (
+    <View style={styles.header}>
+      <ProfilePageTitle
+        title="Mes favoris"
+        subtitle="Retrouvez vos établissements et produits enregistrés."
+      />
+      <ProfileFilterTabs
+        tabs={[
+          { id: 'merchants' as const, label: 'Établissements' },
+          { id: 'products' as const, label: 'Produits' },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+    </View>
+  )
 
-      {loading ? (
+  if (loading) {
+    return (
+      <ProfileShell>
+        {header}
         <LoadingState />
-      ) : tab === 'merchants' ? (
+      </ProfileShell>
+    )
+  }
+
+  return (
+    <ProfileShell>
+      {tab === 'merchants' ? (
         <FlatList
           data={filteredMerchants}
           keyExtractor={m => m.id}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={header}
           ListEmptyComponent={
             <EmptyState
               title="Aucun favori"
@@ -137,6 +143,7 @@ export default function FavorisScreen() {
           numColumns={2}
           columnWrapperStyle={styles.productRow}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={header}
           ListEmptyComponent={
             <EmptyState title="Aucun produit favori" subtitle="Parcourez le marketplace." />
           }
@@ -161,32 +168,23 @@ export default function FavorisScreen() {
           )}
         />
       )}
-    </PublicScreenShell>
+    </ProfileShell>
   )
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, padding: spacing.gutter, justifyContent: 'center' },
-  header: { paddingHorizontal: spacing.gutter, paddingBottom: 12 },
-  title: {
-    fontFamily: fonts.extrabold,
-    fontSize: 24,
-    color: profileTheme.text,
-    marginBottom: 12,
+  center: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    gap: 16,
   },
-  tabs: { flexDirection: 'row', gap: 8 },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: profileTheme.surface,
-    borderWidth: 1,
-    borderColor: profileTheme.border,
+  header: { gap: 16, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8 },
+  list: {
+    paddingHorizontal: 20,
+    paddingBottom: layout.bottomNavInset + 24,
+    gap: 12,
   },
-  tabActive: { backgroundColor: profileTheme.navActiveBg, borderColor: profileTheme.navActiveBg },
-  tabText: { fontFamily: fonts.semibold, fontSize: 13, color: profileTheme.textMuted },
-  tabTextActive: { color: '#fff' },
-  list: { padding: spacing.gutter, paddingBottom: layout.bottomNavHeight + 16, gap: 12 },
   merchantCard: {
     backgroundColor: profileTheme.surface,
     borderRadius: profileTheme.cardRadiusSm,
@@ -205,7 +203,13 @@ const styles = StyleSheet.create({
   productCard: { flex: 1, maxWidth: '48%' },
   productImageWrap: { position: 'relative' },
   productImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
-  productHeart: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 999 },
+  productHeart: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 999,
+  },
   productName: { fontFamily: fonts.medium, fontSize: 14, color: profileTheme.text, marginTop: 8 },
   productPrice: { fontFamily: fonts.bold, fontSize: 14, color: profileTheme.accent, marginTop: 4 },
 })

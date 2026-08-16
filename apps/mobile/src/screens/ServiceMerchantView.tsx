@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
+  Dimensions,
   Linking,
   Pressable,
   ScrollView,
@@ -23,12 +24,15 @@ import { ServicePrestationsTab } from '@/src/components/ServicePrestationsTab'
 import { LoadingState } from '@/src/components/ui'
 import { useScrollRevealBar } from '@/src/hooks/useScrollRevealBar'
 import { getApiClient } from '@/src/lib/api'
+import { goBackOrReplace } from '@/src/lib/navigation'
 import { isValidProfileTab, type ProfileTabId } from '@/src/lib/merchantProfileTabs'
-import { colors, fonts, layout } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 import { businessDayFromDate } from '@laplasse/shared-config'
 import { isOpenFromMerchantHours } from '@/src/lib/foodHub'
 
 const HERO_HEIGHT = 340
+const ACTION_BAR_CLEARANCE = 72
+const CONTENT_BOTTOM_GAP = 15
 /** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
 const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
@@ -56,9 +60,35 @@ export function ServiceMerchantView({
   const insets = useSafeAreaInsets()
   const scrollRef = useRef<ScrollView>(null)
   const bookingAnchorRef = useRef<View>(null)
-  const bookingY = useRef(0)
+  const bookingContentY = useRef(800)
   const [preselectedServiceId, setPreselectedServiceId] = useState<string | null>(null)
-  const { onScroll, animatedStyle, interactive } = useScrollRevealBar()
+  const [bookingFormVisible, setBookingFormVisible] = useState(false)
+  const { onScroll, animatedStyle, interactive, show, hide } = useScrollRevealBar()
+
+  const checkBookingVisibility = useCallback(() => {
+    bookingAnchorRef.current?.measureInWindow((_x, y, _w, height) => {
+      if (height <= 0) return
+      const windowH = Dimensions.get('window').height
+      const visibleBottom = windowH - 96
+      const intersection = Math.min(visibleBottom, y + height) - Math.max(0, y)
+      setBookingFormVisible(intersection / height >= 0.25)
+    })
+  }, [])
+
+  const handleScroll = useCallback(
+    (e: Parameters<typeof onScroll>[0]) => {
+      onScroll(e)
+      checkBookingVisibility()
+    },
+    [onScroll, checkBookingVisibility],
+  )
+
+  useEffect(() => {
+    if (bookingFormVisible) hide()
+    else show()
+  }, [bookingFormVisible, hide, show])
+
+  const barInteractive = interactive && !bookingFormVisible
 
   const merchantQuery = useQuery({
     queryKey: ['merchant', slug],
@@ -85,6 +115,12 @@ export function ServiceMerchantView({
     return defaultTab
   })
 
+  useEffect(() => {
+    if (activeTab === 'prestations') {
+      setTimeout(checkBookingVisibility, 100)
+    }
+  }, [activeTab, checkBookingVisibility])
+
   const prestationsLabel = useMemo(
     () => (isPharmacy ? 'Consultations' : 'Prestations'),
     [isPharmacy],
@@ -103,7 +139,7 @@ export function ServiceMerchantView({
       <PublicScreenShell activeRoute="marketplace">
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Établissement introuvable</Text>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => goBackOrReplace(router, '/(tabs)/search')}>
             <Text style={styles.backLink}>← Retour</Text>
           </Pressable>
         </View>
@@ -135,7 +171,7 @@ export function ServiceMerchantView({
     setActiveTab('prestations')
     if (serviceId) setPreselectedServiceId(serviceId)
     setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: bookingY.current || 800, animated: true })
+      scrollRef.current?.scrollTo({ y: bookingContentY.current, animated: true })
     }, 80)
   }
 
@@ -145,9 +181,11 @@ export function ServiceMerchantView({
         <ScrollView
           ref={scrollRef}
           stickyHeaderIndices={[1]}
-          onScroll={onScroll}
+          onScroll={handleScroll}
           scrollEventThrottle={16}
-          contentContainerStyle={{ paddingBottom: layout.bottomNavInset + 100 }}
+          contentContainerStyle={{
+            paddingBottom: ACTION_BAR_CLEARANCE + CONTENT_BOTTOM_GAP,
+          }}
         >
           <View style={styles.hero}>
             {merchant.cover_image ? (
@@ -155,10 +193,11 @@ export function ServiceMerchantView({
             ) : (
               <View style={[styles.cover, styles.coverFallback]} />
             )}
-            <View style={styles.heroGradient} />
+            <View style={styles.heroGradientTop} />
+            <View style={styles.heroGradientBottom} />
 
             <View style={[styles.heroTopBar, { paddingTop: insets.top + 8 }]}>
-              <Pressable onPress={() => router.back()} style={styles.heroActionBtn}>
+              <Pressable onPress={() => goBackOrReplace(router, '/(tabs)/search')} style={styles.heroActionBtn}>
                 <Ionicons name="arrow-back" size={20} color="#fff" />
               </Pressable>
               <View style={styles.heroActions}>
@@ -189,15 +228,16 @@ export function ServiceMerchantView({
                   <Ionicons name="time-outline" size={12} color="#fff" />
                   <Text style={styles.badgeOpenText}>{isOpen ? 'Ouvert' : 'Fermé'}</Text>
                 </View>
-                {merchant.avg_rating != null && merchant.review_count > 0 ? (
-                  <View style={styles.badgeRating}>
-                    <Ionicons name="star" size={12} color={colors.brand500} />
-                    <Text style={styles.badgeRatingText}>
-                      {merchant.avg_rating} ({merchant.review_count} avis)
-                    </Text>
-                  </View>
-                ) : null}
               </ScrollView>
+
+              {merchant.avg_rating != null && merchant.review_count > 0 ? (
+                <View style={styles.heroRatingRow}>
+                  <Ionicons name="star" size={14} color="#fff" />
+                  <Text style={styles.heroRatingText}>
+                    {merchant.avg_rating.toFixed(1)} ({merchant.review_count} avis)
+                  </Text>
+                </View>
+              ) : null}
 
               <Text style={styles.heroName}>{merchant.business_name}</Text>
               {locationLabel ? (
@@ -237,7 +277,10 @@ export function ServiceMerchantView({
                 merchantName={merchant.business_name}
                 categorySlug={merchant.category.slug}
                 bookingAnchorRef={bookingAnchorRef}
-                onBookingLayout={y => { bookingY.current = y + 400 }}
+                onBookingLayout={y => {
+                  bookingContentY.current = HERO_HEIGHT + 52 + 16 + y
+                  checkBookingVisibility()
+                }}
                 preselectedServiceId={preselectedServiceId}
                 onPreselectedConsumed={() => setPreselectedServiceId(null)}
                 onScrollToBooking={scrollToBooking}
@@ -308,7 +351,7 @@ export function ServiceMerchantView({
           style={[
             styles.actionBarWrap,
             animatedStyle,
-            { pointerEvents: interactive ? 'auto' : 'none' },
+            { pointerEvents: barInteractive ? 'auto' : 'none' },
           ]}
         >
           <ServiceBottomActionBar
@@ -342,7 +385,19 @@ const styles = StyleSheet.create({
   coverFallback: { backgroundColor: colors.slate900 },
   heroGradient: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: 'transparent',
+  },
+  heroGradientBottom: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  heroGradientTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
   heroTopBar: {
     position: 'absolute',
@@ -379,7 +434,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   badgeCategory: {
-    backgroundColor: colors.brand500,
+    backgroundColor: '#f59e0b',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -387,7 +442,7 @@ const styles = StyleSheet.create({
   badgeCategoryText: {
     fontFamily: fonts.bold,
     fontSize: 10,
-    color: '#fff',
+    color: '#0f172a',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
@@ -410,16 +465,13 @@ const styles = StyleSheet.create({
   badgeOpenYes: { backgroundColor: '#22c55e' },
   badgeOpenNo: { backgroundColor: '#ef4444' },
   badgeOpenText: { fontFamily: fonts.semibold, fontSize: 11, color: '#fff' },
-  badgeRating: {
+  heroRatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    marginBottom: 4,
   },
-  badgeRatingText: { fontFamily: fonts.semibold, fontSize: 11, color: '#fff' },
+  heroRatingText: { fontFamily: fonts.medium, fontSize: 13, color: '#fff' },
   heroName: {
     fontFamily: fonts.extrabold,
     fontSize: 28,

@@ -3,6 +3,7 @@ import type { ApiMerchantDetail } from '@laplasse/api-client'
 import { useRouter } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
 import {
+  Animated,
   Linking,
   Pressable,
   ScrollView,
@@ -19,7 +20,9 @@ import { ShopBottomActionBar } from '@/src/components/ShopBottomActionBar'
 import { ShopProductCard } from '@/src/components/ShopProductCard'
 import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { LoadingState } from '@/src/components/ui'
+import { useScrollRevealBar } from '@/src/hooks/useScrollRevealBar'
 import { getApiClient } from '@/src/lib/api'
+import { goBackOrReplace } from '@/src/lib/navigation'
 import { loadBoutiqueProducts, resolveBoutique } from '@/src/lib/boutiqueResolve'
 import {
   getDefaultProfileTab,
@@ -27,7 +30,7 @@ import {
   isValidProfileTab,
   type ProfileTabId,
 } from '@/src/lib/merchantProfileTabs'
-import { colors, fonts, layout } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 import { businessDayFromDate } from '@laplasse/shared-config'
 import { isOpenFromMerchantHours } from '@/src/lib/foodHub'
 
@@ -37,6 +40,9 @@ const SHOP_PRICE = '#855300'
 /** BusinessHour.day in DB: 0 = lundi … 6 = dimanche */
 const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 const HERO_HEIGHT = 350
+/** Hauteur barre CTA + marge sous le dernier contenu */
+const ACTION_BAR_CLEARANCE = 72
+const CONTENT_BOTTOM_GAP = 15
 
 function isCurrentlyOpen(merchant: ApiMerchantDetail): boolean {
   if (!merchant.hours?.length) return true
@@ -64,6 +70,7 @@ export function ShopMerchantView({
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const scrollRef = useRef<ScrollView>(null)
+  const { onScroll, animatedStyle, interactive } = useScrollRevealBar()
 
   const resolveQuery = useQuery({
     queryKey: ['boutique-resolve', slug],
@@ -159,6 +166,7 @@ export function ShopMerchantView({
   }
 
   const trustRingColor = trustScore >= 80 ? '#009668' : SHOP_AMBER
+  const scrollBottomPad = ACTION_BAR_CLEARANCE + CONTENT_BOTTOM_GAP
 
   return (
     <PublicScreenShell activeRoute="marketplace">
@@ -166,7 +174,9 @@ export function ShopMerchantView({
         <ScrollView
           ref={scrollRef}
           stickyHeaderIndices={[1]}
-          contentContainerStyle={{ paddingBottom: layout.bottomNavInset + 100 }}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: scrollBottomPad }}
         >
           {/* Hero */}
           <View style={[styles.hero, { height: HERO_HEIGHT }]}>
@@ -178,7 +188,7 @@ export function ShopMerchantView({
             <View style={styles.heroGradient} />
 
             <View style={[styles.heroTopBar, { paddingTop: insets.top + 8 }]}>
-              <Pressable onPress={() => router.back()} style={styles.heroActionBtn}>
+              <Pressable onPress={() => goBackOrReplace(router, '/(tabs)/search')} style={styles.heroActionBtn}>
                 <Ionicons name="arrow-back" size={20} color="#fff" />
               </Pressable>
               <View style={styles.heroActions}>
@@ -493,12 +503,20 @@ export function ShopMerchantView({
           </View>
         </ScrollView>
 
-        <ShopBottomActionBar
-          whatsapp={whatsapp}
-          phone={phone}
-          onBoutique={goToBoutique}
-          onScrollTop={scrollToTop}
-        />
+        <Animated.View
+          style={[
+            styles.actionBarWrap,
+            animatedStyle,
+            { pointerEvents: interactive ? 'auto' : 'none' },
+          ]}
+        >
+          <ShopBottomActionBar
+            whatsapp={whatsapp}
+            phone={phone}
+            onBoutique={goToBoutique}
+            onScrollTop={scrollToTop}
+          />
+        </Animated.View>
       </View>
     </PublicScreenShell>
   )
@@ -506,6 +524,12 @@ export function ShopMerchantView({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  actionBarWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   notFoundText: { fontFamily: fonts.semibold, fontSize: 18, color: colors.text },
   backLink: { fontFamily: fonts.bold, fontSize: 14, color: colors.brand700 },

@@ -1093,9 +1093,9 @@ export class MarketplaceService {
       })
       if (meili?.data.length) {
         const ids = meili.data.map(p => p.id)
-        return this.fetchPublicProductsByIds(shop, ids)
+        const fetched = await this.fetchPublicProductsByIds(shop, ids)
+        if (fetched.length > 0) return fetched
       }
-      if (meili) return []
     }
 
     let categoryId: string | undefined
@@ -1114,6 +1114,14 @@ export class MarketplaceService {
         status: 'ACTIVE',
         slug: { not: { startsWith: MENU_MIRROR_SLUG_PREFIX } },
         ...(categoryId ? { category_id: categoryId } : {}),
+        ...(query?.q?.trim()
+          ? {
+              OR: [
+                { name: { contains: query.q.trim(), mode: 'insensitive' as const } },
+                { description: { contains: query.q.trim(), mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
       },
       orderBy: [{ sort_order: 'asc' }, { created_at: 'desc' }],
       select: {
@@ -3928,15 +3936,17 @@ export class MarketplaceService {
       })
       if (meili?.data.length) {
         const data = await this.enrichMeiliCatalogProducts(meili.data)
-        if (!paginate) return data
-        return {
-          data,
-          meta: {
-            total: meili.meta.total,
-            limit: limit!,
-            offset,
-            hasMore: offset + data.length < meili.meta.total,
-          },
+        if (data.length > 0) {
+          if (!paginate) return data
+          return {
+            data,
+            meta: {
+              total: meili.meta.total,
+              limit: limit!,
+              offset,
+              hasMore: offset + data.length < meili.meta.total,
+            },
+          }
         }
       }
     }

@@ -221,11 +221,13 @@ export function merchantSearchRating(merchant: ApiMerchant): string | null {
   return null
 }
 
-export function merchantLocationLine(merchant: ApiMerchant): string {
-  const district = merchant.location?.district
-  const city = merchant.location?.city
+export function merchantLocationLine(
+  merchant: ApiMerchant & { district?: string | null; city?: string | null },
+): string {
+  const district = merchant.location?.district ?? merchant.district ?? null
+  const city = merchant.location?.city ?? merchant.city ?? null
   const parts = [district, city].filter(Boolean)
-  const base = parts.join(', ') || city || ''
+  const base = parts.join(', ') || city || district || ''
   if (merchant.distance_km != null && merchant.distance_km > 0) {
     return base ? `${base} · ${merchant.distance_km.toFixed(1)} km` : `${merchant.distance_km.toFixed(1)} km`
   }

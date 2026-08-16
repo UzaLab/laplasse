@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Star } from 'lucide-react'
 import { fetchPublicJson } from '@/lib/marketplaceApi'
+import { authApiFetch } from '@/lib/authFetch'
 import { useAuthStore } from '@/stores/authStore'
 import { notify } from '@/lib/notify'
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
 interface Review {
   id: string
@@ -14,6 +13,19 @@ interface Review {
   comment: string | null
   created_at: string
   user: { name: string; avatar: string | null }
+}
+
+interface ViewerEligibility {
+  has_purchased: boolean
+  already_reviewed: boolean
+  can_review: boolean
+}
+
+interface ReviewsPayload {
+  average_rating: number | null
+  count: number
+  reviews: Review[]
+  viewer?: ViewerEligibility
 }
 
 interface Props {
@@ -26,49 +38,65 @@ export function ProductReviewsSection({ productSlug, shopSlug }: Props) {
   const [loading, setLoading] = useState(true)
   const [average, setAverage] = useState<number | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
+  const [viewer, setViewer] = useState<ViewerEligibility | null>(null)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     const qs = shopSlug ? `?shop=${encodeURIComponent(shopSlug)}` : ''
-    const result = await fetchPublicJson<{
-      average_rating: number | null
-      reviews: Review[]
-    }>(`/product-reviews/products/${productSlug}${qs}`)
-    if (result.ok) {
-      setAverage(result.data.average_rating)
-      setReviews(result.data.reviews)
+    const path = `/product-reviews/products/${productSlug}${qs}`
+
+    let payload: ReviewsPayload | null = null
+
+    if (isAuthenticated) {
+      const res = await authApiFetch(path)
+      if (res.ok) {
+        payload = (await res.json()) as ReviewsPayload
+      }
+    }
+
+    if (!payload) {
+      const result = await fetchPublicJson<ReviewsPayload>(path, { credentials: 'include' })
+      if (result.ok) payload = result.data
+    }
+
+    if (payload) {
+      setAverage(payload.average_rating)
+      setReviews(payload.reviews)
+      setViewer(payload.viewer ?? null)
     }
     setLoading(false)
-  }
+  }, [isAuthenticated, productSlug, shopSlug])
 
   useEffect(() => {
     void load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productSlug, shopSlug])
+  }, [load])
 
   const submit = async () => {
     if (!isAuthenticated) {
       notify.error('Connectez-vous pour laisser un avis')
       return
     }
+    if (!viewer?.can_review) {
+      notify.error('Vous devez avoir commandé ce produit pour laisser un avis')
+      return
+    }
     setSubmitting(true)
     try {
       const qs = shopSlug ? `?shop=${encodeURIComponent(shopSlug)}` : ''
-      const res = await fetch(`${API}/product-reviews/products/${productSlug}${qs}`, {
+      const res = await authApiFetch(`/product-reviews/products/${productSlug}${qs}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ rating, comment: comment.trim() || undefined }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.message ?? 'Impossible de publier l\'avis')
       }
-      notify.success('Merci ! Votre avis sera publié après modération.')
+      notify.success('Merci ! Votre avis a été publié.')
       setComment('')
+      setRating(5)
       void load()
     } catch (e) {
       notify.error(e instanceof Error ? e.message : 'Erreur')
@@ -86,7 +114,7 @@ export function ProductReviewsSection({ productSlug, shopSlug }: Props) {
   }
 
   return (
-    <section className="mt-10 pt-10 border-t border-slate-100">
+    <section>
       <h2 className="text-xl font-extrabold text-slate-900 mb-2">Avis clients</h2>
       {average != null && (
         <p className="text-sm text-slate-600 mb-6 flex items-center gap-1">
@@ -96,7 +124,7 @@ export function ProductReviewsSection({ productSlug, shopSlug }: Props) {
         </p>
       )}
 
-      {isAuthenticated && (
+      {isAuthenticated && viewer?.can_review && (
         <div className="mb-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
           <p className="text-sm font-bold text-slate-700 mb-2">Votre note</p>
           <div className="flex gap-1 mb-3">
@@ -131,6 +159,20 @@ export function ProductReviewsSection({ productSlug, shopSlug }: Props) {
             {submitting ? 'Envoi…' : 'Publier mon avis'}
           </button>
         </div>
+      )}
+
+      {isAuthenticated && viewer && !viewer.can_review && (
+        <p className="text-sm text-slate-500 mb-6">
+          {viewer.already_reviewed
+            ? 'Vous avez déjà laissé un avis pour ce produit.'
+            : 'Seuls les clients ayant commandé ce produit peuvent laisser un avis.'}
+        </p>
+      )}
+
+      {!isAuthenticated && (
+        <p className="text-sm text-slate-500 mb-6">
+          Connectez-vous pour laisser un avis après avoir commandé ce produit.
+        </p>
       )}
 
       {reviews.length === 0 ? (

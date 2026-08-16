@@ -324,9 +324,59 @@ export class ApiClient {
 
   getMerchantProducts(slug: string, limit = 24, offset = 0) {
     const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) })
-    return this.request<{ data: MarketplaceProduct[]; meta: { total: number } }>(
+    return this.request<MarketplaceProduct[] | { data: MarketplaceProduct[]; meta: { total: number } }>(
       `/merchants/${slug}/products?${qs}`,
-    )
+    ).then(result => {
+      if (Array.isArray(result)) {
+        return { data: result, meta: { total: result.length } }
+      }
+      return result
+    })
+  }
+
+  getMarketplaceRecommendations(productId?: string, limit = 10) {
+    const qs = new URLSearchParams()
+    if (productId) qs.set('productId', productId)
+    qs.set('limit', String(limit))
+    return this.request<MarketplaceCatalogProduct[]>(`/marketplace/recommendations?${qs}`)
+  }
+
+  getProductReviews(productSlug: string, shopSlug?: string) {
+    const qs = shopSlug ? `?shop=${encodeURIComponent(shopSlug)}` : ''
+    return this.request<{
+      average_rating: number | null
+      count: number
+      reviews: Array<{
+        id: string
+        rating: number
+        comment: string | null
+        created_at: string
+        user: { name: string; avatar: string | null }
+      }>
+      viewer?: {
+        has_purchased: boolean
+        already_reviewed: boolean
+        can_review: boolean
+      }
+    }>(`/product-reviews/products/${productSlug}${qs}`)
+  }
+
+  createProductReview(
+    productSlug: string,
+    body: { rating: number; comment?: string },
+    shopSlug?: string,
+  ) {
+    const qs = shopSlug ? `?shop=${encodeURIComponent(shopSlug)}` : ''
+    return this.request<{
+      id: string
+      rating: number
+      comment: string | null
+      created_at: string
+      user: { name: string; avatar: string | null }
+    }>(`/product-reviews/products/${productSlug}${qs}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
   }
 
   getProduct(merchantSlug: string, productSlug: string) {

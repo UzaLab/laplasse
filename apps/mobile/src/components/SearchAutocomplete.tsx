@@ -45,12 +45,17 @@ interface SearchAutocompleteProps {
   initialQuery?: string
   autoFocus?: boolean
   onSubmit?: (q: string) => void
+  /** When false, submit only calls onSubmit (no navigation to search tab). */
+  navigateOnSubmit?: boolean
   /** Style barre recherche home, carte ou plein écran */
   appearance?: 'default' | 'home' | 'map' | 'fullscreen'
   value?: string
   onValueChange?: (v: string) => void
   productsOnly?: boolean
   menusOnly?: boolean
+  /** Inline panel (scroll) vs overlay dropdown — use inline on marketplace. */
+  suggestionsLayout?: 'dropdown' | 'inline'
+  suggestionLimit?: number
 }
 
 export function SearchAutocomplete({
@@ -58,13 +63,17 @@ export function SearchAutocomplete({
   initialQuery = '',
   autoFocus = false,
   onSubmit,
+  navigateOnSubmit = true,
   appearance = 'default',
   value,
   onValueChange,
   productsOnly = false,
   menusOnly = false,
+  suggestionsLayout = 'dropdown',
+  suggestionLimit,
 }: SearchAutocompleteProps) {
   const router = useRouter()
+  const limit = suggestionLimit ?? (productsOnly || menusOnly ? 8 : AUTOCOMPLETE_LIMIT)
   const [internalQuery, setInternalQuery] = useState(initialQuery)
   const query = value ?? internalQuery
   const setQuery = onValueChange ?? setInternalQuery
@@ -84,14 +93,14 @@ export function SearchAutocomplete({
     queryKey: ['autocomplete', debounced, productsOnly, menusOnly],
     queryFn: async () => {
       if (productsOnly) {
-        const result = await getApiClient().autocompleteProducts(debounced, AUTOCOMPLETE_LIMIT)
-        return { merchants: [], products: result.products.slice(0, AUTOCOMPLETE_LIMIT), menus: [] }
+        const result = await getApiClient().autocompleteProducts(debounced, limit)
+        return { merchants: [], products: result.products.slice(0, limit), menus: [] }
       }
       if (menusOnly) {
-        const menus = await getApiClient().autocompleteMenus(debounced, AUTOCOMPLETE_LIMIT)
-        return { merchants: [], products: [], menus: menus.slice(0, AUTOCOMPLETE_LIMIT) }
+        const menus = await getApiClient().autocompleteMenus(debounced, limit)
+        return { merchants: [], products: [], menus: menus.slice(0, limit) }
       }
-      return getApiClient().autocompleteUnified(debounced, AUTOCOMPLETE_LIMIT)
+      return getApiClient().autocompleteUnified(debounced, limit)
     },
     enabled: open && debounced.length >= 2,
     staleTime: 30_000,
@@ -108,12 +117,12 @@ export function SearchAutocomplete({
       const trimmed = q.trim()
       if (!trimmed) return
       setFocused(false)
-      if (onSubmit) {
-        onSubmit(trimmed)
+      onSubmit?.(trimmed)
+      if (navigateOnSubmit) {
+        router.push({ pathname: '/(tabs)/search', params: { q: trimmed } })
       }
-      router.push({ pathname: '/(tabs)/search', params: { q: trimmed } })
     },
-    [onSubmit, router],
+    [navigateOnSubmit, onSubmit, router],
   )
 
   const loading = suggestQuery.isFetching
@@ -133,10 +142,26 @@ export function SearchAutocomplete({
             : styles.inputRowFocused),
   ]
 
+  const isInlinePanel = suggestionsLayout === 'inline'
+
   const panelStyle = [
     styles.panel,
+    !isFullscreen && !isInlinePanel && styles.panelDropdown,
     isFullscreen && styles.panelFullscreen,
   ]
+
+  const productSuggestions = suggestQuery.data?.products ?? []
+  const showProductSection = productSuggestions.length > 0 && !menusOnly
+  const showSearchFallback =
+    debounced.length >= 2 &&
+    !loading &&
+    (productsOnly
+      ? productSuggestions.length === 0
+      : menusOnly
+        ? (suggestQuery.data?.menus?.length ?? 0) === 0
+        : (suggestQuery.data?.merchants?.length ?? 0) === 0 &&
+          productSuggestions.length === 0 &&
+          (suggestQuery.data?.menus?.length ?? 0) === 0)
 
   return (
     <View style={[styles.wrap, isFullscreen && styles.wrapFullscreen]}>
@@ -183,6 +208,50 @@ export function SearchAutocomplete({
                     </Pressable>
                   ))
                 )}
+              </>
+            ) : debounced.length < 2 && (productsOnly || menusOnly) ? (
+              <Text style={styles.hintText}>
+                Tapez au moins 2 caractères pour voir les suggestions.
+              </Text>
+            ) : productsOnly ? (
+              <>
+                {showProductSection ? (
+                  <>
+                    <Text style={styles.sectionLabel}>Produits</Text>
+                    {productSuggestions.map(p => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => {
+                          setFocused(false)
+                          router.push(`/m/${p.merchant.slug}/p/${p.slug}`)
+                        }}
+                        style={({ pressed }) => [styles.suggestionRow, pressed && styles.pressed]}
+                      >
+                        <Ionicons name="pricetag-outline" size={16} color={colors.textMuted} />
+                        <View style={styles.suggestionContent}>
+                          <HighlightText
+                            html={p._highlight}
+                            fallback={p.name}
+                            style={styles.suggestionText}
+                          />
+                          <Text style={styles.suggestionMeta}>
+                            {formatPrice(p.price, p.currency)} · {p.merchant.business_name}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : null}
+
+                {showSearchFallback ? (
+                  <Pressable
+                    onPress={() => navigate(debounced)}
+                    style={({ pressed }) => [styles.suggestionRow, pressed && styles.pressed]}
+                  >
+                    <Ionicons name="search" size={16} color={colors.brand600} />
+                    <Text style={styles.suggestionText}>Rechercher « {debounced} »</Text>
+                  </Pressable>
+                ) : null}
               </>
             ) : (
               <>
@@ -271,7 +340,7 @@ export function SearchAutocomplete({
                 {(suggestQuery.data?.products ?? []).length > 0 && !menusOnly ? (
                   <>
                     <Text style={styles.sectionLabel}>Produits</Text>
-                    {suggestQuery.data!.products.slice(0, AUTOCOMPLETE_LIMIT).map(p => (
+                    {suggestQuery.data!.products.slice(0, limit).map(p => (
                       <Pressable
                         key={p.id}
                         onPress={() => {
@@ -297,6 +366,8 @@ export function SearchAutocomplete({
                 ) : null}
 
                 {!loading &&
+                !productsOnly &&
+                !menusOnly &&
                 (suggestQuery.data?.merchants?.length ?? 0) === 0 &&
                 (suggestQuery.data?.products?.length ?? 0) === 0 &&
                 (suggestQuery.data?.menus?.length ?? 0) === 0 ? (
@@ -393,6 +464,14 @@ const styles = StyleSheet.create({
     maxHeight: 320,
     overflow: 'hidden',
   },
+  panelDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    zIndex: 40,
+    elevation: 40,
+  },
   panelFullscreen: {
     marginTop: 12,
     flex: 1,
@@ -431,4 +510,12 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.brand50 },
   loader: { padding: 16 },
+  hintText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    lineHeight: 18,
+  },
 })

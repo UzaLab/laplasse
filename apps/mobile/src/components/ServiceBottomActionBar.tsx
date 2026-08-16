@@ -1,8 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { openWhatsApp } from '@/src/lib/whatsapp'
-import { colors, fonts, homeLayout, radii } from '@/src/theme'
+import { colors, fonts } from '@/src/theme'
 
 interface Props {
   prestationsLabel?: string
@@ -21,30 +20,32 @@ export function ServiceBottomActionBar({
   onPrestations,
   onReserver,
 }: Props) {
-  const insets = useSafeAreaInsets()
   const contact = whatsapp ?? phone
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-      {contact ? (
-        <Pressable
-          style={styles.chatBtn}
-          onPress={() =>
-            whatsapp
-              ? openWhatsApp(whatsapp, `Bonjour, je souhaite réserver via LaPlasse.`)
-              : undefined
-          }
-          accessibilityLabel="WhatsApp"
-        >
-          <Ionicons name="logo-whatsapp" size={22} color="#fff" />
-        </Pressable>
-      ) : null}
+    <View style={styles.outer}>
+      <View style={styles.wrap}>
+        {contact ? (
+          <Pressable
+            style={styles.chatBtn}
+            onPress={() => {
+              if (whatsapp) {
+                openWhatsApp(whatsapp, 'Bonjour, je souhaite réserver via LaPlasse.')
+              } else if (phone) {
+                void Linking.openURL(`tel:${phone}`)
+              }
+            }}
+            accessibilityLabel="WhatsApp"
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+          </Pressable>
+        ) : null}
 
-      <View style={styles.actions}>
-        <Pressable onPress={onPrestations} style={styles.secondaryBtn}>
+        <Pressable onPress={onPrestations} style={styles.prestationsBtn}>
           <Ionicons name="list-outline" size={18} color={colors.text} />
-          <Text style={styles.secondaryText} numberOfLines={1}>{prestationsLabel}</Text>
+          <Text style={styles.prestationsText} numberOfLines={1}>{prestationsLabel}</Text>
         </Pressable>
+
         <Pressable onPress={onReserver} style={styles.primaryBtn}>
           <Ionicons name="calendar-outline" size={18} color="#fff" />
           <Text style={styles.primaryText} numberOfLines={1}>{bookingCta}</Text>
@@ -55,23 +56,25 @@ export function ServiceBottomActionBar({
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderTopWidth: 1,
-    borderTopColor: colors.borderStrong,
-    borderTopLeftRadius: homeLayout.radiusXl,
-    borderTopRightRadius: homeLayout.radiusXl,
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 10,
   },
   chatBtn: {
     width: 48,
@@ -80,37 +83,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#22c55e',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
     shadowColor: '#22c55e',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
-  actions: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'stretch', gap: 8 },
-  secondaryBtn: {
-    flex: 1,
-    flexBasis: 0,
-    flexDirection: 'row',
+  prestationsBtn: {
+    width: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 48,
-    borderRadius: radii.button,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: colors.surface,
+    gap: 2,
+    flexShrink: 0,
   },
-  secondaryText: { fontFamily: fonts.bold, fontSize: 13, color: colors.text },
+  prestationsText: {
+    fontFamily: fonts.semibold,
+    fontSize: 10,
+    color: colors.text,
+    textAlign: 'center',
+  },
   primaryBtn: {
     flex: 1,
-    flexBasis: 0,
+    minWidth: 0,
+    maxWidth: 200,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     height: 48,
-    borderRadius: radii.button,
+    borderRadius: 12,
     backgroundColor: colors.slate900,
+    marginLeft: 'auto',
   },
-  primaryText: { fontFamily: fonts.bold, fontSize: 13, color: '#fff' },
+  primaryText: { fontFamily: fonts.bold, fontSize: 14, color: '#fff' },
 })

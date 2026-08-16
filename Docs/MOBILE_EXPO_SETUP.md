@@ -73,11 +73,23 @@ L'API écoute déjà sur `0.0.0.0:3001` ([main.ts](../apps/api/src/main.ts)).
 
 ## 6. Builds preview
 
+### Cloud (file d’attente EAS)
+
 ```bash
 cd apps/mobile
 eas build --profile development --platform android
 eas build --profile preview --platform all
 ```
+
+### Local APK (validé WSL2 — recommandé pour itérations rapides)
+
+```bash
+# Depuis la racine du monorepo
+BUILD_LOW_RESOURCE=1 pnpm mobile:build:preview
+```
+
+Guide complet : **[MOBILE_BUILD_LOCAL_APK.md](./MOBILE_BUILD_LOCAL_APK.md)**  
+(APK dans `apps/mobile/dist/`, ~15 min au 1er build, Java 17 + Android SDK + Docker requis.)
 
 ## 7. Confirmation pour l'agent
 
@@ -96,5 +108,6 @@ Après chaque start/stop du serveur Expo, **reconnecter le MCP** (toggle off/on)
 
 | Document | Contenu |
 |----------|---------|
+| [MOBILE_BUILD_LOCAL_APK.md](./MOBILE_BUILD_LOCAL_APK.md) | Build APK local EAS (WSL, script, dépannage) |
 | [MOBILE_APP_STACK_RECOMMANDATIONS.md](./MOBILE_APP_STACK_RECOMMANDATIONS.md) | Choix stack, phases, personas |
 | [MOBILE_EVOLUTION.md](./MOBILE_EVOLUTION.md) | Parité PWA, avancement, journal, roadmap |
