@@ -11,9 +11,8 @@ import { FulfilmentPricingBanner } from '@/features/merchant/components/Fulfilme
 import { DeliveryZonesManager } from '@/features/merchant/components/DeliveryZonesManager'
 import type { DeliveryZoneRow } from '@/lib/deliveryZoneUtils'
 import { buildZoneApiBody } from '@/lib/deliveryZoneUtils'
-import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
-export function ShopDeliveryZonesPanel({ merchantId, shopId }: DeliveryHubScope) {
+export function ShopDeliveryZonesPanel({ merchantId, shopId }: { merchantId?: string; shopId?: string }) {
   const [zones, setZones] = useState<DeliveryZoneRow[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<FulfilmentMode>('PLATFORM_RIDER')

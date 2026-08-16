@@ -15,7 +15,6 @@ import {
 } from '@/lib/deliveryStakeholdersApi'
 import { PartnerScoreCard, PartnerScoreLegend } from '@/features/merchant/components/shop/PartnerScoreCard'
 import { notify } from '@/lib/notify'
-import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
 const CONTRACT_STATUS: Record<string, string> = {
   PENDING_PARTNER: 'En attente partenaire',
@@ -41,7 +40,9 @@ export function ShopDeliveryContractsPanel({
   merchantId,
   shopId,
   countryCode: countryCodeProp,
-}: DeliveryHubScope & {
+}: {
+  merchantId?: string
+  shopId?: string
   countryCode?: string
 }) {
   const [contracts, setContracts] = useState<DeliveryPartnerContract[]>([])

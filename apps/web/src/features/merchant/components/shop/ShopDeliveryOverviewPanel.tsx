@@ -5,7 +5,6 @@ import { merchantApiFetch } from '@/lib/merchantApi'
 import { shopApiFetch } from '@/lib/shopApi'
 import { notify } from '@/lib/notify'
 import { useEffect, useState } from 'react'
-import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
 import type { FulfilmentMode } from '@/lib/deliveryFulfilmentModes'
 import { fulfilmentPricingExplanation } from '@/lib/deliveryFulfilmentModes'
@@ -40,7 +39,9 @@ const MODES: Array<{
   },
 ]
 
-interface ShopDeliveryOverviewPanelProps extends DeliveryHubScope {
+interface ShopDeliveryOverviewPanelProps {
+  merchantId?: string
+  shopId?: string
   onNavigateTab: (tab: string) => void
 }
 

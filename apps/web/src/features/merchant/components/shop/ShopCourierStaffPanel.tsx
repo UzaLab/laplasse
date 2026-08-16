@@ -15,9 +15,8 @@ import {
 } from '@/lib/deliveryStakeholdersApi'
 import { LogisticsFleetInviteCard } from '@/features/logistics/components/LogisticsFleetInviteCard'
 import { notify } from '@/lib/notify'
-import type { DeliveryHubScope } from '@/features/merchant/components/delivery/deliveryHubScope'
 
-export function ShopCourierStaffPanel({ merchantId, shopId }: DeliveryHubScope) {
+export function ShopCourierStaffPanel({ merchantId, shopId }: { merchantId?: string; shopId?: string }) {
   const [staff, setStaff] = useState<ShopCourierStaff[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
@@ -96,7 +95,7 @@ export function ShopCourierStaffPanel({ merchantId, shopId }: DeliveryHubScope) 
       </div>
 
       {invite ? (
-        <LogisticsFleetInviteCard url={invite.url} label={invite.shop_name} />
+        <LogisticsFleetInviteCard url={invite.url} partnerName={invite.shop_name} />
       ) : null}
 
       <form onSubmit={e => void handleLink(e)} className="bg-white border border-slate-100 rounded-2xl p-5 space-y-4">
@@ -131,26 +130,33 @@ export function ShopCourierStaffPanel({ merchantId, shopId }: DeliveryHubScope) 
         </div>
       ) : (
         <ul className="space-y-3">
-          {staff.map(member => (
+          {staff.map(c => (
             <li
-              key={member.id}
-              className="bg-white border border-slate-100 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3"
+              key={c.id}
+              className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between gap-4"
             >
               <div>
-                <p className="font-bold text-slate-900">{member.full_name ?? member.email}</p>
-                <p className="text-sm text-slate-500">{member.email}</p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  {member.is_online ? 'En ligne' : 'Hors ligne'} · {member.vehicle ?? 'Véhicule non renseigné'}
+                <p className="font-bold text-slate-900">{c.user.full_name ?? c.user.email}</p>
+                <p className="text-sm text-slate-500">
+                  {c.phone}
+                  {c.vehicle ? ` · ${c.vehicle}` : ''}
+                  {' · '}
+                  <span className={c.is_online ? 'text-emerald-600' : 'text-slate-400'}>
+                    {c.is_online ? 'En ligne' : 'Hors ligne'}
+                  </span>
+                  {c.status === 'PENDING_REVIEW' && (
+                    <span className="text-amber-600"> · En attente validation</span>
+                  )}
                 </p>
               </div>
               <button
                 type="button"
-                disabled={removing === member.id}
-                onClick={() => void handleUnlink(member.id)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                disabled={removing === c.id}
+                onClick={() => void handleUnlink(c.id)}
+                className="text-slate-400 hover:text-red-500 p-2"
+                aria-label="Retirer"
               >
-                {removing === member.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                Retirer
+                {removing === c.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             </li>
           ))}

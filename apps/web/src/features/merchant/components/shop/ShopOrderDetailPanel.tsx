@@ -107,7 +107,7 @@ export function ShopOrderDetailPanel({
   const primaryNext = order
     ? getMerchantPrimaryNextStatus(order.status, order.delivery_type)
     : null
-  const primaryAllowed = primaryNext && allowedTargets.includes(primaryNext)
+  const primaryAllowed = order && primaryNext && allowedTargets.includes(primaryNext)
     && !(order.delivery_type === 'DELIVERY' && primaryNext === 'OUT_FOR_DELIVERY')
   const dangerActions = allowedTargets.filter(s => MERCHANT_DANGER_STATUSES.includes(s))
   const rollbackTarget = order ? MERCHANT_ROLLBACK[order.status] : null
