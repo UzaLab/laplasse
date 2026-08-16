@@ -276,8 +276,17 @@ export class LogisticsPartnersService {
   }
 
   async listContractsForShop(shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { merchant_id: true },
+    })
     return this.prisma.deliveryPartnerContract.findMany({
-      where: { shop_id: shopId },
+      where: {
+        OR: [
+          { shop_id: shopId },
+          ...(shop?.merchant_id ? [{ merchant_id: shop.merchant_id }] : []),
+        ],
+      },
       include: {
         partner: {
           select: {

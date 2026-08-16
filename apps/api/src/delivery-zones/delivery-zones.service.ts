@@ -345,6 +345,20 @@ export class DeliveryZonesService {
             sla_eta_max_minutes: true,
           },
         },
+        merchant: {
+          select: {
+            delivery_contracts: {
+              where: { status: 'ACTIVE' },
+              orderBy: { signed_at: 'desc' },
+              take: 1,
+              select: {
+                logistics_partner_id: true,
+                fee_override: true,
+                sla_eta_max_minutes: true,
+              },
+            },
+          },
+        },
       },
     })
     const shopById = Object.fromEntries(shops.map(s => [s.id, s]))
@@ -365,11 +379,14 @@ export class DeliveryZonesService {
         continue
       }
 
+      const activeContract =
+        shop.delivery_contracts[0] ?? shop.merchant?.delivery_contracts[0] ?? null
+
       const quote = await this.resolveFulfilmentQuote({
         fulfilmentMode: shop.delivery_fulfilment_default ?? 'PLATFORM_RIDER',
         shopId: shop.id,
         displayName: shop.name,
-        contract: shop.delivery_contracts[0] ?? null,
+        contract: activeContract,
         cityId: input.city_id,
         communeId: input.commune_id,
         subtotal: input.subtotals?.[shopId] ?? 0,
