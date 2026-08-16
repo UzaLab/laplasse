@@ -123,6 +123,7 @@ export interface PartnerDeliveryJob {
     delivery_address: string | null
     customer_phone?: string | null
     shop: { id?: string; name: string; slug?: string } | null
+    merchant?: { id?: string; business_name: string; slug?: string } | null
   }
   courier_profile: {
     id: string
