@@ -12,7 +12,7 @@ import {
   upsertCourierZone,
   type CourierServiceZoneRow,
 } from '@/lib/courierApi'
-import { CourierOsmMapLazy } from '@/features/courier/components/CourierOsmMapLazy'
+import { LaPlasseMapLazy } from '@/features/maps/components/LaPlasseMapLazy'
 
 interface Props {
   profileCity: string
@@ -247,12 +247,12 @@ export function CourierZonesEditor({ profileCity, profileCountry }: Props) {
         </div>
 
         <div className="space-y-4">
-          <CourierOsmMapLazy
+          <LaPlasseMapLazy
             zones={mapZones}
             className="h-72 w-full rounded-2xl overflow-hidden border border-slate-200"
           />
           <p className="text-[11px] text-slate-400 leading-relaxed px-1">
-            Carte OpenStreetMap — chaque commune sélectionnée apparaît avec un pin et un cercle de couverture.
+            Chaque commune sélectionnée apparaît avec un pin et un cercle de couverture.
             Les zones qui se chevauchent indiquent votre périmètre global.
           </p>
           <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-sm text-emerald-900">

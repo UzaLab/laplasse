@@ -59,7 +59,7 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
   const [filter, setFilter] = useState<FoodHubFilter>('all')
   const [menuHits, setMenuHits] = useState<MenuSearchHit[]>([])
   const [menuSearchLoading, setMenuSearchLoading] = useState(false)
-  const { userLocation, geoStatus, requestGeolocation } = useUserGeolocation()
+  const { userLocation, userAddressLabel, geoStatus, requestGeolocation } = useUserGeolocation()
 
   useEffect(() => {
     const q = menuQuery.trim()
@@ -122,9 +122,11 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
             </p>
           )}
           {geoStatus === 'granted' && userLocation && (
-            <p className="text-xs text-emerald-700 font-semibold mb-3 flex items-center gap-1.5">
-              <MapPin size={12} />
-              Établissements triés selon votre position
+            <p className="text-xs text-emerald-700 font-semibold mb-3 leading-relaxed">
+              Établissements proches de vous
+              {userAddressLabel ? (
+                <span className="font-medium text-emerald-800/90"> : {userAddressLabel}</span>
+              ) : null}
             </p>
           )}
           {(geoStatus === 'denied' || geoStatus === 'unsupported') && (

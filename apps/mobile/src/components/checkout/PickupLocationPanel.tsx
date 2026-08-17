@@ -3,7 +3,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import type { CartPickupLocation } from '@laplasse/api-client'
 import { shouldUseOsmWebMap } from '@/src/lib/googleMaps'
-import { openDirectionsTo } from '@/src/lib/mapsUtils'
+import { openDirectionsTo, openDirectionsToAddress } from '@/src/lib/mapsUtils'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
 export function PickupLocationPanel({ locations }: { locations: CartPickupLocation[] }) {
@@ -13,6 +13,8 @@ export function PickupLocationPanel({ locations }: { locations: CartPickupLocati
     <View style={styles.wrap}>
       {locations.map(loc => {
         const hasCoords = loc.latitude != null && loc.longitude != null
+        const hasAddress = Boolean(loc.address?.trim())
+
         return (
           <View key={loc.id} style={styles.card}>
             <View style={styles.header}>
@@ -22,7 +24,9 @@ export function PickupLocationPanel({ locations }: { locations: CartPickupLocati
               <View style={styles.body}>
                 <Text style={styles.name}>{loc.name}</Text>
                 <Text style={styles.address}>
-                  {loc.address ?? 'Adresse non renseignée par l\'établissement'}
+                  {hasAddress
+                    ? loc.address
+                    : 'Adresse exacte non renseignée — contactez l\'établissement si besoin.'}
                 </Text>
               </View>
             </View>
@@ -53,6 +57,14 @@ export function PickupLocationPanel({ locations }: { locations: CartPickupLocati
               >
                 <Ionicons name="navigate" size={16} color={colors.brand600} />
                 <Text style={styles.directionsText}>Itinéraire Google Maps</Text>
+              </Pressable>
+            ) : hasAddress ? (
+              <Pressable
+                onPress={() => void openDirectionsToAddress(loc.address!)}
+                style={styles.directionsBtn}
+              >
+                <Ionicons name="navigate" size={16} color={colors.brand600} />
+                <Text style={styles.directionsText}>Voir sur Google Maps</Text>
               </Pressable>
             ) : null}
           </View>

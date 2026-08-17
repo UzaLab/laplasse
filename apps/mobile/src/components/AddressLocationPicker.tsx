@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import * as Location from 'expo-location'
 import { Ionicons } from '@expo/vector-icons'
+import type { GeoPlaceResult } from '@laplasse/api-client'
+import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
+import { getApiClient } from '@/src/lib/api'
 import { shouldUseOsmWebMap } from '@/src/lib/googleMaps'
 import { colors, fonts, homeLayout } from '@/src/theme'
 
@@ -39,6 +50,12 @@ export function AddressLocationPicker({
   const mapRef = useRef<MapView>(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [placeQuery, setPlaceQuery] = useState('')
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState<GeoPlaceResult[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  const debouncedQuery = useDebouncedValue(placeQuery, 450)
 
   const fallback = useMemo(() => defaultCenter(city, commune), [city, commune])
   const pin = latitude != null && longitude != null
@@ -61,6 +78,36 @@ export function AddressLocationPicker({
     }, 200)
   }, [pin.lat, pin.lng, mapReady])
 
+  useEffect(() => {
+    const q = debouncedQuery.trim()
+    if (q.length < 2) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setSearchLoading(true)
+
+    void getApiClient()
+      .searchGeoPlaces(q, { lat: pin.lat, lng: pin.lng, limit: 8 })
+      .then(results => {
+        if (cancelled) return
+        setSearchResults(results)
+        setSearchLoading(false)
+        setSearchOpen(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSearchResults([])
+        setSearchLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery, pin.lat, pin.lng])
+
   const useMyLocation = useCallback(async () => {
     setGpsLoading(true)
     try {
@@ -73,13 +120,46 @@ export function AddressLocationPicker({
     }
   }, [onChange])
 
+  const selectPlace = (place: GeoPlaceResult) => {
+    onChange({ latitude: place.latitude, longitude: place.longitude })
+    setPlaceQuery(place.label.split(',')[0]?.trim() ?? place.label)
+    setSearchOpen(false)
+    setSearchResults([])
+  }
+
   if (shouldUseOsmWebMap()) {
     return (
       <View style={styles.fallbackBox}>
         <Text style={styles.fallbackTitle}>Point GPS précis</Text>
         <Text style={styles.fallbackHint}>
-          Configurez une clé Google Maps pour afficher la carte. Utilisez « Ma position » pour enregistrer vos coordonnées.
+          Configurez une clé Google Maps pour afficher la carte. Recherchez une adresse ou utilisez « Ma position ».
         </Text>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search" size={16} color={colors.textMuted} style={styles.searchIcon} />
+          <TextInput
+            value={placeQuery}
+            onChangeText={setPlaceQuery}
+            placeholder="Rechercher une adresse…"
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {searchLoading ? <ActivityIndicator size="small" color={colors.brand600} /> : null}
+        </View>
+        {searchOpen && searchResults.length > 0 ? (
+          <FlatList
+            data={searchResults}
+            keyExtractor={item => item.id}
+            keyboardShouldPersistTaps="handled"
+            style={styles.resultsList}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => selectPlace(item)} style={styles.resultRow}>
+                <Ionicons name="location-outline" size={16} color={colors.brand600} />
+                <Text style={styles.resultText} numberOfLines={2}>{item.label}</Text>
+              </Pressable>
+            )}
+          />
+        ) : null}
         <Pressable onPress={() => void useMyLocation()} style={styles.gpsBtn} disabled={gpsLoading}>
           {gpsLoading ? (
             <ActivityIndicator color={colors.brand600} size="small" />
@@ -112,6 +192,34 @@ export function AddressLocationPicker({
           )}
         </Pressable>
       </View>
+
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={16} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          value={placeQuery}
+          onChangeText={text => {
+            setPlaceQuery(text)
+            if (text.trim().length >= 2) setSearchOpen(true)
+          }}
+          placeholder="Rechercher une adresse…"
+          placeholderTextColor={colors.textMuted}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+        {searchLoading ? <ActivityIndicator size="small" color={colors.brand600} /> : null}
+      </View>
+
+      {searchOpen && searchResults.length > 0 ? (
+        <View style={styles.resultsBox}>
+          {searchResults.map(item => (
+            <Pressable key={item.id} onPress={() => selectPlace(item)} style={styles.resultRow}>
+              <Ionicons name="location-outline" size={16} color={colors.brand600} />
+              <Text style={styles.resultText} numberOfLines={2}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.mapWrap}>
         <MapView
           ref={mapRef}
@@ -154,6 +262,42 @@ const styles = StyleSheet.create({
   },
   gpsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   gpsBtnText: { fontFamily: fonts.bold, fontSize: 12, color: colors.brand600 },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: homeLayout.radiusLg,
+    paddingHorizontal: 10,
+    backgroundColor: colors.surface,
+    minHeight: 44,
+  },
+  searchIcon: { marginRight: 6 },
+  searchInput: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.text,
+    paddingVertical: 8,
+  },
+  resultsBox: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: homeLayout.radiusLg,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  resultsList: { maxHeight: 180 },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  resultText: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.text, lineHeight: 18 },
   mapWrap: {
     height: 180,
     borderRadius: homeLayout.radiusLg,

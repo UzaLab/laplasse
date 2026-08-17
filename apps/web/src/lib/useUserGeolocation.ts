@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { fetchReverseGeocode } from '@/lib/geoApi'
 
 export type GeoStatus = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'
 
@@ -11,6 +12,7 @@ export interface UserCoordinates {
 
 export function useUserGeolocation(autoRequest = true) {
   const [userLocation, setUserLocation] = useState<UserCoordinates | null>(null)
+  const [userAddressLabel, setUserAddressLabel] = useState<string | null>(null)
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle')
 
   const requestGeolocation = useCallback(() => {
@@ -37,5 +39,24 @@ export function useUserGeolocation(autoRequest = true) {
     if (autoRequest) requestGeolocation()
   }, [autoRequest, requestGeolocation])
 
-  return { userLocation, geoStatus, requestGeolocation }
+  useEffect(() => {
+    if (!userLocation) {
+      setUserAddressLabel(null)
+      return
+    }
+
+    let cancelled = false
+    void fetchReverseGeocode(userLocation.lat, userLocation.lng).then(res => {
+      if (cancelled) return
+      if (res.ok && res.data.label) {
+        setUserAddressLabel(res.data.label)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userLocation])
+
+  return { userLocation, userAddressLabel, geoStatus, requestGeolocation }
 }

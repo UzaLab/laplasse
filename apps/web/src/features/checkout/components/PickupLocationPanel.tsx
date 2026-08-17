@@ -2,7 +2,7 @@
 
 import { MapPin, Navigation } from 'lucide-react'
 import { StaticLocationMap } from '@/features/maps/components/StaticLocationMap'
-import { openDirectionsTo } from '@/lib/mapsUtils'
+import { openDirectionsTo, openDirectionsToAddress } from '@/lib/mapsUtils'
 
 export interface PickupLocation {
   id: string
@@ -15,15 +15,22 @@ export interface PickupLocation {
 interface Props {
   locations: PickupLocation[]
   className?: string
+  title?: string
 }
 
-export function PickupLocationPanel({ locations, className }: Props) {
+export function PickupLocationPanel({
+  locations,
+  className,
+  title = 'Lieu de retrait',
+}: Props) {
   if (!locations.length) return null
 
   return (
     <div className={className ?? 'space-y-4'}>
+      <p className="text-sm font-bold text-slate-900">{title}</p>
       {locations.map(loc => {
         const hasCoords = loc.latitude != null && loc.longitude != null
+        const hasAddress = Boolean(loc.address?.trim())
 
         return (
           <div
@@ -36,32 +43,44 @@ export function PickupLocationPanel({ locations, className }: Props) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-900">{loc.name}</p>
-                {loc.address ? (
+                {hasAddress ? (
                   <p className="text-sm text-slate-600 mt-0.5 leading-relaxed">{loc.address}</p>
                 ) : (
-                  <p className="text-sm text-slate-400 mt-0.5">Adresse non renseignée par l&apos;établissement</p>
+                  <p className="text-sm text-slate-400 mt-0.5">
+                    Adresse exacte non renseignée — contactez l&apos;établissement si besoin.
+                  </p>
                 )}
               </div>
             </div>
 
             {hasCoords && (
-              <>
-                <StaticLocationMap
-                  latitude={loc.latitude!}
-                  longitude={loc.longitude!}
-                  label={loc.name}
-                  heightClass="h-44"
-                />
-                <button
-                  type="button"
-                  onClick={() => openDirectionsTo(loc.latitude!, loc.longitude!)}
-                  className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-800"
-                >
-                  <Navigation size={16} />
-                  Itinéraire Google Maps
-                </button>
-              </>
+              <StaticLocationMap
+                latitude={loc.latitude!}
+                longitude={loc.longitude!}
+                label={loc.name}
+                heightClass="h-44"
+              />
             )}
+
+            {hasCoords ? (
+              <button
+                type="button"
+                onClick={() => openDirectionsTo(loc.latitude!, loc.longitude!)}
+                className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-800"
+              >
+                <Navigation size={16} />
+                Itinéraire Google Maps
+              </button>
+            ) : hasAddress ? (
+              <button
+                type="button"
+                onClick={() => openDirectionsToAddress(loc.address!)}
+                className="inline-flex items-center gap-2 text-sm font-bold text-brand-600 hover:text-brand-800"
+              >
+                <Navigation size={16} />
+                Voir sur Google Maps
+              </button>
+            ) : null}
           </div>
         )
       })}

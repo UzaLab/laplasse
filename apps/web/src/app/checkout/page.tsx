@@ -61,6 +61,7 @@ import {
 } from '@/lib/addressesApi'
 import { AddressLocationPickerLazy } from '@/features/addresses/components/AddressLocationPickerLazy'
 import { PickupLocationPanel } from '@/features/checkout/components/PickupLocationPanel'
+import { useCartPickupLocations } from '@/lib/useCartPickupLocations'
 
 import {
   getDeliveryVehicleLabel,
@@ -100,6 +101,7 @@ function CheckoutPageContent() {
   const { hydrated, isAuthenticated, user } = useAuthReady()
   const setAuth = useAuthStore(s => s.setAuth)
   const [cart, setCart] = useState<Cart | null>(null)
+  const pickupLocations = useCartPickupLocations(cart)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
@@ -883,8 +885,8 @@ function CheckoutPageContent() {
                   )}
                 </div>
 
-                {!useSplitDelivery && deliveryType === 'PICKUP' && (cart?.pickup_locations?.length ?? 0) > 0 && (
-                  <PickupLocationPanel locations={cart!.pickup_locations!} />
+                {!useSplitDelivery && deliveryType === 'PICKUP' && pickupLocations.length > 0 && (
+                  <PickupLocationPanel locations={pickupLocations} />
                 )}
 
                 {deliveryType === 'DELIVERY' && (

@@ -4,6 +4,7 @@ import type { Cart, DeliveryQuoteItem, GeoCity, GeoCommune } from '@laplasse/api
 import { OptionPicker } from '@/src/components/checkout/OptionPicker'
 import { FieldInput } from '@/src/components/ui'
 import { PickupLocationPanel } from '@/src/components/checkout/PickupLocationPanel'
+import { useCartPickupLocations } from '@/src/hooks/useCartPickupLocations'
 import { colors, fonts } from '@/src/theme'
 
 export type ShopDeliveryState = {
@@ -34,6 +35,7 @@ export function ShopSplitDeliveryForm({
   onCityChange: (shopId: string, cityId: string) => void
 }) {
   const merchants = cart.merchants ?? []
+  const pickupLocations = useCartPickupLocations(cart)
 
   return (
     <View style={styles.wrap}>
@@ -80,7 +82,7 @@ export function ShopSplitDeliveryForm({
 
             {cfg.deliveryType === 'PICKUP' ? (
               <PickupLocationPanel
-                locations={(cart.pickup_locations ?? []).filter(p => p.id === merchant.id)}
+                locations={pickupLocations.filter(p => p.id === merchant.id)}
               />
             ) : null}
 

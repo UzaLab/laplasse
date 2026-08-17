@@ -16,6 +16,8 @@ import {
 } from '@/lib/country'
 import { fetchGeoCities, fetchGeoCommunes, type GeoCity } from '@/lib/geoApi'
 import { notify } from '@/lib/notify'
+import { coordsFromGeoEntity } from '@/lib/cityCoords'
+import { LaPlasseMapLazy } from '@/features/maps/components/LaPlasseMapLazy'
 import { useAuthStore } from '@/stores/authStore'
 import { authApiFetch } from '@/lib/authFetch'
 import { invalidateAuthSession } from '@/lib/authSession'
@@ -126,6 +128,20 @@ export default function LogisticsSettingsPage() {
     enabled: !!activeCity?.slug,
   })
   const communes = communesData ?? []
+
+  const coverageMapZones = useMemo(() => {
+    return communes
+      .filter(c => form.commune_ids.includes(c.id))
+      .map(c => {
+        const coords = coordsFromGeoEntity(c)
+        return {
+          lat: coords.lat,
+          lng: coords.lng,
+          label: c.name,
+          radiusMeters: 2800,
+        }
+      })
+  }, [communes, form.commune_ids])
 
   const refreshAuth = async () => {
     invalidateAuthSession()
@@ -427,6 +443,17 @@ export default function LogisticsSettingsPage() {
                 ))
               )}
             </div>
+            {coverageMapZones.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <LaPlasseMapLazy
+                  zones={coverageMapZones}
+                  className="h-64 w-full rounded-2xl overflow-hidden border border-slate-200"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Aperçu de vos communes couvertes — pins et périmètres approximatifs.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

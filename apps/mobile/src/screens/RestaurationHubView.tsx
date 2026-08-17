@@ -85,7 +85,7 @@ export function RestaurationHubView({
   const [menuQuery, setMenuQuery] = useState(initialQuery)
   const [category, setCategory] = useState(initialCategory)
   const [filter, setFilter] = useState<FoodHubFilter>('all')
-  const { userLocation, geoStatus, requestGeolocation } = useUserGeolocation()
+  const { userLocation, userAddressLabel, geoStatus, requestGeolocation } = useUserGeolocation()
 
   const debouncedMenuQuery = useDebouncedValue(menuQuery, 350)
 
@@ -267,7 +267,12 @@ export function RestaurationHubView({
                     : 'Restaurants à proximité'}
                 </Text>
                 {geoStatus === 'granted' && userLocation ? (
-                  <Text style={styles.geoHint}>Établissements triés selon votre position</Text>
+                  <Text style={styles.geoHint}>
+                    Établissements proches de vous
+                    {userAddressLabel ? (
+                      <Text style={styles.geoAddressInline}> : {userAddressLabel}</Text>
+                    ) : null}
+                  </Text>
                 ) : null}
                 {(geoStatus === 'denied' || geoStatus === 'unsupported') ? (
                   <Pressable onPress={() => void requestGeolocation()}>
@@ -516,6 +521,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.emerald700,
     marginBottom: 8,
+    lineHeight: 18,
+  },
+  geoAddressInline: {
+    fontFamily: fonts.medium,
+    color: colors.emerald700,
   },
   geoLink: {
     fontFamily: fonts.bold,

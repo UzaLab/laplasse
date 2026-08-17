@@ -7,6 +7,7 @@ import type { DeliveryQuoteItem, GeoCity, GeoCommune } from '@/lib/geoApi'
 import { getDeliveryVehicleLabel } from '@/lib/deliveryVehicles'
 import { formatDeliveryEtaShort } from '@/lib/deliveryEta'
 import { PickupLocationPanel } from '@/features/checkout/components/PickupLocationPanel'
+import { useCartPickupLocations } from '@/lib/useCartPickupLocations'
 
 export interface ShopDeliveryState {
   deliveryType: 'PICKUP' | 'DELIVERY'
@@ -38,6 +39,7 @@ export function ShopSplitDeliveryForm({
   onCityChange,
 }: ShopSplitDeliveryFormProps) {
   const cartMerchants = cart.merchants ?? []
+  const pickupLocations = useCartPickupLocations(cart)
 
   return (
     <div className="space-y-4">
@@ -92,7 +94,7 @@ export function ShopSplitDeliveryForm({
 
             {cfg.deliveryType === 'PICKUP' && (
               <PickupLocationPanel
-                locations={(cart.pickup_locations ?? []).filter(p => p.id === merchant.id)}
+                locations={pickupLocations.filter(p => p.id === merchant.id)}
                 className="pt-2 border-t border-slate-100"
               />
             )}

@@ -97,9 +97,9 @@ function OnboardingContent() {
         <div className="mt-8 p-5 rounded-2xl bg-slate-900 text-white flex gap-3">
           <ShieldCheck size={22} className="text-emerald-400 shrink-0" />
           <div>
-            <p className="font-bold">Carte OpenStreetMap</p>
+            <p className="font-bold">Google Maps</p>
             <p className="text-sm text-slate-400 mt-1">
-              Le suivi GPS et le choix des zones utiliseront OpenStreetMap — open source, sans clé API.
+              Le suivi GPS, le choix des zones et les itinéraires utilisent Google Maps pour une localisation précise.
             </p>
           </div>
         </div>

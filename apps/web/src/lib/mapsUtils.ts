@@ -43,3 +43,14 @@ export function openDirectionsTo(destLat: number, destLng: number): void {
     { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
   )
 }
+
+/** Lien Google Maps vers une adresse textuelle (sans coordonnées GPS). */
+export function googleMapsSearchUrl(query: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+}
+
+/** Itinéraire vers une adresse textuelle si pas de coordonnées. */
+export function openDirectionsToAddress(address: string): void {
+  if (!address.trim()) return
+  window.open(googleMapsSearchUrl(address), '_blank', 'noopener,noreferrer')
+}

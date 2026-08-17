@@ -80,4 +80,12 @@ export class GeoController {
       mode,
     )
   }
+
+  @Get('reverse')
+  reverseGeocode(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+  ) {
+    return this.geoService.reverseGeocode(Number(lat), Number(lng))
+  }
 }

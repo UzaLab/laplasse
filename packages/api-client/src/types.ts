@@ -473,6 +473,14 @@ export interface GeoCommune {
   longitude?: number | null
 }
 
+export interface GeoPlaceResult {
+  id: string
+  label: string
+  latitude: number
+  longitude: number
+  type: string | null
+}
+
 export interface DeliveryQuoteItem {
   shop_id: string
   merchant_id?: string

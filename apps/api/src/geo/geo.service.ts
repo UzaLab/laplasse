@@ -367,6 +367,37 @@ export class GeoService {
     }
   }
 
+  async reverseGeocode(lat: number, lng: number) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      throw new BadRequestException('Coordonnées invalides')
+    }
+
+    const label = await this.googleMaps.reverseGeocode(lat, lng)
+    if (label) return { label, provider: 'google' as const }
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(lat),
+        lon: String(lng),
+        format: 'json',
+      })
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
+        { headers: { 'User-Agent': 'LaPlasse/1.0 (checkout geolocation)' } },
+      )
+      if (res.ok) {
+        const data = (await res.json()) as { display_name?: string }
+        if (data.display_name) {
+          return { label: data.display_name, provider: 'osm' as const }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return { label: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, provider: 'coords' as const }
+  }
+
   private async searchPlacesNominatim(
     q: string,
     opts?: { country?: string; lat?: number; lng?: number; limit?: number },

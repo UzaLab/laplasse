@@ -24,6 +24,7 @@ import {
 import { FieldInput, PrimaryButton } from '@/src/components/ui'
 import { AddressLocationPicker } from '@/src/components/AddressLocationPicker'
 import { PickupLocationPanel } from '@/src/components/checkout/PickupLocationPanel'
+import { useCartPickupLocations } from '@/src/hooks/useCartPickupLocations'
 import {
   buildCheckoutSession,
   getCheckoutDraft,
@@ -106,6 +107,7 @@ export function CheckoutDeliveryScreen() {
     [cart],
   )
   const cartShopIdsKey = cartShopIds.join(',')
+  const pickupLocations = useCartPickupLocations(cart)
   const isFoodFlow = getCartKind(cart) === 'food'
   const checkoutFlow = isFoodFlow ? 'food' : 'marketplace'
   const cartBackRoute = isFoodFlow ? '/commande' : '/cart'
@@ -734,10 +736,10 @@ export function CheckoutDeliveryScreen() {
               </View>
             </View>
 
-            {deliveryType === 'PICKUP' && (cart?.pickup_locations?.length ?? 0) > 0 ? (
+            {deliveryType === 'PICKUP' && pickupLocations.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Lieu de retrait</Text>
-                <PickupLocationPanel locations={cart!.pickup_locations!} />
+                <PickupLocationPanel locations={pickupLocations} />
               </View>
             ) : null}
 

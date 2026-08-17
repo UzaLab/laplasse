@@ -23,8 +23,8 @@ import { JOB_STATUS_LABELS } from '@/lib/courierJobLabels'
 import { vehicleLabel } from '@/lib/courierLabels'
 import { PAGE_CONTAINER } from '@/lib/pageLayout'
 
-const CourierOsmMap = dynamic(
-  () => import('@/features/courier/components/CourierOsmMap').then(m => m.CourierOsmMap),
+const LaPlasseMapLazy = dynamic(
+  () => import('@/features/maps/components/LaPlasseMapLazy').then(m => m.LaPlasseMapLazy),
   { ssr: false, loading: () => <div className="h-64 lg:h-full min-h-[16rem] bg-slate-100 animate-pulse rounded-2xl" /> },
 )
 
@@ -298,7 +298,7 @@ export function DeliveryTrackClient({ token }: Props) {
               )}
             </div>
             {showMap ? (
-              <CourierOsmMap
+              <LaPlasseMapLazy
                 zones={mapZones}
                 routePolyline={routePolyline}
                 className="flex-1 min-h-[280px] lg:min-h-[420px] w-full rounded-none border-0"
@@ -312,7 +312,7 @@ export function DeliveryTrackClient({ token }: Props) {
             )}
             <p className="text-[11px] text-slate-400 px-5 py-3 border-t border-slate-50">
               Rafraîchissement {data.status === 'IN_TRANSIT' || data.status === 'PICKED_UP' ? '4' : '8'}s en route
-              {routeProvider === 'google' ? ' · Google Maps' : routeProvider === 'fallback' ? ' · estimation' : ' · OpenStreetMap'}
+              {routeProvider === 'google' ? ' · Google Maps' : routeProvider === 'fallback' ? ' · estimation' : ' · carte'}
             </p>
           </section>
         </div>

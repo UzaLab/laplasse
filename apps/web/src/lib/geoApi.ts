@@ -65,6 +65,12 @@ export async function searchGeoPlaces(
   return fetchPublicJson<GeoPlaceResult[]>(`/geo/places/search?${params.toString()}`)
 }
 
+export async function fetchReverseGeocode(lat: number, lng: number) {
+  return fetchPublicJson<{ label: string; provider: string }>(
+    `/geo/reverse?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`,
+  )
+}
+
 export interface DeliveryQuoteItem {
   shop_id: string
   merchant_id?: string

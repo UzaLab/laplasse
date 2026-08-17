@@ -34,3 +34,11 @@ export async function openDirectionsTo(destLat: number, destLng: number): Promis
   }
   await Linking.openURL(googleMapsDirectionsUrl(destLat, destLng))
 }
+
+export async function openDirectionsToAddress(address: string): Promise<void> {
+  const params = new URLSearchParams({
+    api: '1',
+    query: address.trim(),
+  })
+  await Linking.openURL(`https://www.google.com/maps/search/?${params.toString()}`)
+}

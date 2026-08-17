@@ -21,6 +21,7 @@ import type {
   DeliveryQuoteItem,
   GeoCity,
   GeoCommune,
+  GeoPlaceResult,
   GuestCartItemInput,
   GuestCheckoutInput,
   UserAddress,
@@ -676,6 +677,29 @@ export class ApiClient {
     const c = country ?? this.options.getCountryCode()
     return this.request<{ city: GeoCity; communes: GeoCommune[] }>(
       `/geo/cities/${encodeURIComponent(citySlug)}/communes?country=${encodeURIComponent(c)}`,
+    )
+  }
+
+  searchGeoPlaces(
+    query: string,
+    opts?: { country?: string; lat?: number; lng?: number; limit?: number },
+  ) {
+    const q = query.trim()
+    if (q.length < 2) return Promise.resolve([] as GeoPlaceResult[])
+
+    const params = new URLSearchParams({ q })
+    const country = opts?.country ?? this.options.getCountryCode()
+    params.set('country', country)
+    if (opts?.lat != null) params.set('lat', String(opts.lat))
+    if (opts?.lng != null) params.set('lng', String(opts.lng))
+    if (opts?.limit != null) params.set('limit', String(opts.limit))
+
+    return this.request<GeoPlaceResult[]>(`/geo/places/search?${params.toString()}`)
+  }
+
+  reverseGeocode(lat: number, lng: number) {
+    return this.request<{ label: string; provider: string }>(
+      `/geo/reverse?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`,
     )
   }
 
