@@ -1,13 +1,20 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import dynamic from 'next/dynamic'
 import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import type { ApiMerchant } from '@/lib/api'
 import { brandColors } from '@/lib/brandColors'
+import { hasGoogleMapsWebKey } from '@/lib/googleMaps'
 import type { UserCoordinates } from './useSearchMobileNearby'
+
+const GoogleSearchMobileMap = dynamic(
+  () => import('./GoogleSearchMobileMap').then(m => m.GoogleSearchMobileMap),
+  { ssr: false },
+)
 
 interface SearchMobileMapProps {
   merchants: ApiMerchant[]
@@ -133,7 +140,18 @@ const userLocationIcon = L.divIcon({
   iconAnchor: [9, 9],
 })
 
-export function SearchMobileMap({
+export function SearchMobileMap(props: SearchMobileMapProps) {
+  const [googleFailed, setGoogleFailed] = useState(false)
+  const useGoogle = hasGoogleMapsWebKey() && !googleFailed
+
+  if (useGoogle) {
+    return <GoogleSearchMobileMap {...props} onFailed={() => setGoogleFailed(true)} />
+  }
+
+  return <SearchMobileOsmMap {...props} />
+}
+
+function SearchMobileOsmMap({
   merchants,
   selectedId,
   onSelect,

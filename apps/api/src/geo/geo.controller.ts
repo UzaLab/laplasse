@@ -46,4 +46,38 @@ export class GeoController {
       limit: limit ? Number(limit) : undefined,
     })
   }
+
+  @Get('directions')
+  getDirections(
+    @Query('originLat') originLat: string,
+    @Query('originLng') originLng: string,
+    @Query('destLat') destLat: string,
+    @Query('destLng') destLng: string,
+    @Query('mode') mode?: 'driving' | 'walking' | 'bicycling',
+  ) {
+    return this.geoService.getDirections(
+      Number(originLat),
+      Number(originLng),
+      Number(destLat),
+      Number(destLng),
+      mode,
+    )
+  }
+
+  @Get('distance')
+  getDistance(
+    @Query('originLat') originLat: string,
+    @Query('originLng') originLng: string,
+    @Query('destLat') destLat: string,
+    @Query('destLng') destLng: string,
+    @Query('mode') mode?: 'driving' | 'walking' | 'bicycling',
+  ) {
+    return this.geoService.getTravelDistance(
+      Number(originLat),
+      Number(originLng),
+      Number(destLat),
+      Number(destLng),
+      mode,
+    )
+  }
 }

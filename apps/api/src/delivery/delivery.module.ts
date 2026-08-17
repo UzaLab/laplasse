@@ -9,9 +9,10 @@ import { DeliveryFeeSplitService } from './delivery-fee-split.service'
 import { QueueModule } from '../queue/queue.module'
 import { LogisticsModule } from '../logistics/logistics.module'
 import { NotificationsModule } from '../notifications/notifications.module'
+import { GeoModule } from '../geo/geo.module'
 
 @Module({
-  imports: [QueueModule, forwardRef(() => LogisticsModule), NotificationsModule],
+  imports: [QueueModule, forwardRef(() => LogisticsModule), NotificationsModule, GeoModule],
   controllers: [DeliveryController],
   providers: [
     DeliveryService,

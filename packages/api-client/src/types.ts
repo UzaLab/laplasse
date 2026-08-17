@@ -351,6 +351,14 @@ export interface CartMerchantGroup {
   item_count: number
 }
 
+export interface CartPickupLocation {
+  id: string
+  name: string
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+}
+
 export interface FoodPreorderSlot {
   at: string
   label: string
@@ -382,6 +390,7 @@ export interface Cart {
   merchant_count?: number
   kind?: 'empty' | 'marketplace' | 'food' | 'mixed'
   delivery_options?: { allow_pickup: boolean; allow_delivery: boolean }
+  pickup_locations?: CartPickupLocation[]
   estimated_prep_minutes?: number | null
   food_scheduling?: FoodScheduling | null
 }

@@ -1,8 +1,7 @@
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 
-/** Clé injectée au build via app.config.js (Maps SDK Android — tuiles OSM par-dessus). */
-export function getGoogleMapsApiKey(): string {
+export function getGoogleMapsAndroidApiKey(): string {
   const fromExtra = Constants.expoConfig?.extra?.googleMapsApiKey
   if (typeof fromExtra === 'string' && fromExtra.trim().length > 0) {
     return fromExtra.trim()
@@ -11,14 +10,28 @@ export function getGoogleMapsApiKey(): string {
   return typeof fromEnv === 'string' ? fromEnv.trim() : ''
 }
 
-export function hasGoogleMapsAndroidKey(): boolean {
-  return getGoogleMapsApiKey().length > 10
+export function getGoogleMapsIosApiKey(): string {
+  const fromExtra = Constants.expoConfig?.extra?.googleMapsIosApiKey
+  if (typeof fromExtra === 'string' && fromExtra.trim().length > 0) {
+    return fromExtra.trim()
+  }
+  const fromEnv = process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY
+  return typeof fromEnv === 'string' ? fromEnv.trim() : ''
+}
+
+/** @deprecated use getGoogleMapsAndroidApiKey */
+export function getGoogleMapsApiKey(): string {
+  return getGoogleMapsAndroidApiKey()
+}
+
+export function hasGoogleMapsNativeKey(): boolean {
+  const key = Platform.OS === 'ios' ? getGoogleMapsIosApiKey() : getGoogleMapsAndroidApiKey()
+  return key.length > 10
 }
 
 /**
- * Sur Android sans clé Google Maps SDK, react-native-maps provoque un crash natif.
- * Fallback WebView OSM (100 % tuiles OSM, pas d'appels tuiles Google).
+ * Sans clé Google Maps SDK native, fallback WebView OSM (évite crash Android).
  */
 export function shouldUseOsmWebMap(): boolean {
-  return Platform.OS === 'android' && !hasGoogleMapsAndroidKey()
+  return !hasGoogleMapsNativeKey()
 }

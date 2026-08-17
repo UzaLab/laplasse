@@ -4,6 +4,7 @@ import type { ApiMerchant, MenuSearchHit } from '@laplasse/api-client'
 import { formatPrice } from '@laplasse/shared-config'
 import { useRouter } from 'expo-router'
 import { useMemo, useState } from 'react'
+import { sortByDistance } from '@laplasse/shared-config'
 import {
   ActivityIndicator,
   Pressable,
@@ -23,6 +24,7 @@ import { PublicScreenShell } from '@/src/components/PublicScreenShell'
 import { RestaurationHubCard } from '@/src/components/RestaurationHubCard'
 import { LoadingState } from '@/src/components/ui'
 import { useDebouncedValue } from '@/src/hooks/useDebouncedValue'
+import { useUserGeolocation } from '@/src/hooks/useUserGeolocation'
 import { getApiClient } from '@/src/lib/api'
 import {
   FOOD_HUB_CATEGORY_CHIPS,
@@ -83,6 +85,7 @@ export function RestaurationHubView({
   const [menuQuery, setMenuQuery] = useState(initialQuery)
   const [category, setCategory] = useState(initialCategory)
   const [filter, setFilter] = useState<FoodHubFilter>('all')
+  const { userLocation, geoStatus, requestGeolocation } = useUserGeolocation()
 
   const debouncedMenuQuery = useDebouncedValue(menuQuery, 350)
 
@@ -110,6 +113,14 @@ export function RestaurationHubView({
     () => filterFoodMerchants(merchants, { category: category || undefined, filter }),
     [merchants, category, filter],
   )
+
+  const sortedFiltered = useMemo(() => {
+    if (!userLocation) return filtered
+    return sortByDistance(filtered, userLocation.lat, userLocation.lng, m => ({
+      latitude: m.location?.latitude,
+      longitude: m.location?.longitude,
+    }))
+  }, [filtered, userLocation])
 
   const promos = useMemo(() => {
     const withPromo = merchants.filter(m => m.has_active_promo && m.cover_image)
@@ -255,7 +266,15 @@ export function RestaurationHubView({
                     ? FOOD_HUB_CATEGORY_CHIPS.find(c => c.slug === category)?.label ?? 'Restaurants'
                     : 'Restaurants à proximité'}
                 </Text>
-                {filtered.length === 0 ? (
+                {geoStatus === 'granted' && userLocation ? (
+                  <Text style={styles.geoHint}>Établissements triés selon votre position</Text>
+                ) : null}
+                {(geoStatus === 'denied' || geoStatus === 'unsupported') ? (
+                  <Pressable onPress={() => void requestGeolocation()}>
+                    <Text style={styles.geoLink}>Activer la localisation pour voir les restaurants proches</Text>
+                  </Pressable>
+                ) : null}
+                {sortedFiltered.length === 0 ? (
                   <View style={styles.emptyBox}>
                     <Text style={styles.emptyBoxText}>Aucun restaurant trouvé.</Text>
                     <Pressable
@@ -270,7 +289,7 @@ export function RestaurationHubView({
                   </View>
                 ) : (
                   <View style={styles.restaurantList}>
-                    {filtered.map(m => (
+                    {sortedFiltered.map(m => (
                       <RestaurationHubCard
                         key={m.id}
                         merchant={m}
@@ -491,6 +510,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.brand700,
     marginTop: 12,
+  },
+  geoHint: {
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    color: colors.emerald700,
+    marginBottom: 8,
+  },
+  geoLink: {
+    fontFamily: fonts.bold,
+    fontSize: 12,
+    color: colors.brand600,
+    marginBottom: 8,
   },
   errorWrap: {
     flex: 1,

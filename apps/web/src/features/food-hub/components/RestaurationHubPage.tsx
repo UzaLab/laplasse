@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { SlidersHorizontal, Star, Clock, Truck, Loader2 } from 'lucide-react'
+import { SlidersHorizontal, Star, Clock, Truck, Loader2, MapPin } from 'lucide-react'
 import type { ApiMerchant } from '@/lib/api'
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout'
 import { countryRequestHeaders } from '@/lib/country'
@@ -24,6 +24,8 @@ import {
   MOBILE_COMPACT_HEADER_PAD_LOOSE,
 } from '@/lib/mobilePublicChrome'
 import { cn } from '@/lib/utils'
+import { sortByDistance } from '@laplasse/shared-config'
+import { useUserGeolocation } from '@/lib/useUserGeolocation'
 
 const FILTER_CHIPS: { id: FoodHubFilter; label: string; icon: typeof Clock }[] = [
   { id: 'fast', label: 'Moins de 30 min', icon: Clock },
@@ -57,6 +59,7 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
   const [filter, setFilter] = useState<FoodHubFilter>('all')
   const [menuHits, setMenuHits] = useState<MenuSearchHit[]>([])
   const [menuSearchLoading, setMenuSearchLoading] = useState(false)
+  const { userLocation, geoStatus, requestGeolocation } = useUserGeolocation()
 
   useEffect(() => {
     const q = menuQuery.trim()
@@ -78,6 +81,14 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
     () => filterFoodMerchants(merchants, { category: category || undefined, filter }),
     [merchants, category, filter],
   )
+
+  const sortedFiltered = useMemo(() => {
+    if (!userLocation) return filtered
+    return sortByDistance(filtered, userLocation.lat, userLocation.lng, m => ({
+      latitude: m.location?.latitude,
+      longitude: m.location?.longitude,
+    }))
+  }, [filtered, userLocation])
 
   // Promos réelles : restaurants avec has_active_promo=true (Phase 3b)
   const promos = useMemo(
@@ -104,6 +115,28 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
           <p className="text-base text-slate-500 mb-4">
             Restaurants, plats et commandes en livraison
           </p>
+          {geoStatus === 'loading' && (
+            <p className="text-xs text-slate-400 mb-3 flex items-center gap-1.5">
+              <Loader2 size={12} className="animate-spin" />
+              Localisation en cours…
+            </p>
+          )}
+          {geoStatus === 'granted' && userLocation && (
+            <p className="text-xs text-emerald-700 font-semibold mb-3 flex items-center gap-1.5">
+              <MapPin size={12} />
+              Établissements triés selon votre position
+            </p>
+          )}
+          {(geoStatus === 'denied' || geoStatus === 'unsupported') && (
+            <button
+              type="button"
+              onClick={requestGeolocation}
+              className="text-xs font-bold text-brand-600 hover:text-brand-800 mb-3 inline-flex items-center gap-1.5"
+            >
+              <MapPin size={12} />
+              Activer la localisation pour voir les restaurants proches
+            </button>
+          )}
           <SearchAutocomplete
             placeholder="Rechercher un plat, un menu…"
             size="md"
@@ -276,7 +309,7 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
                 : 'Restaurants à proximité'}
             </h2>
 
-            {filtered.length === 0 ? (
+            {sortedFiltered.length === 0 ? (
               <div className="text-center py-16 px-6 bg-white rounded-3xl border border-amber-100">
                 <p className="text-slate-500 font-medium">Aucun restaurant trouvé.</p>
                 <button
@@ -289,7 +322,7 @@ export function RestaurationHubPage({ merchants, initialCategory = '', initialQu
               </div>
             ) : (
               <div className="space-y-6">
-                {filtered.map(merchant => (
+                {sortedFiltered.map(merchant => (
                   <RestaurationHubCard key={merchant.id} merchant={merchant} variant="featured" />
                 ))}
               </div>

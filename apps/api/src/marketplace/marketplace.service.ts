@@ -688,6 +688,64 @@ export class MarketplaceService {
     }
   }
 
+  private buildPickupLocations(
+    rawItems: Parameters<MarketplaceService['mapRawCartItem']>[0][],
+  ) {
+    const map = new Map<
+      string,
+      {
+        id: string
+        name: string
+        address: string | null
+        latitude: number | null
+        longitude: number | null
+      }
+    >()
+
+    for (const item of rawItems) {
+      if (item.menu_item?.merchant) {
+        const m = item.menu_item.merchant as typeof item.menu_item.merchant & {
+          location?: {
+            address?: string | null
+            district?: string | null
+            city?: string | null
+            latitude?: number | null
+            longitude?: number | null
+          } | null
+        }
+        const loc = m.location
+        const addressParts = [loc?.address, loc?.district, loc?.city].filter(Boolean)
+        map.set(m.id, {
+          id: m.id,
+          name: m.business_name,
+          address: addressParts.length ? addressParts.join(', ') : null,
+          latitude: loc?.latitude ?? null,
+          longitude: loc?.longitude ?? null,
+        })
+      } else if (item.product?.shop) {
+        const s = item.product.shop as {
+          id: string
+          name: string
+          address?: string | null
+          district?: string | null
+          city?: string | null
+          latitude?: number | null
+          longitude?: number | null
+        }
+        const addressParts = [s.address, s.district, s.city].filter(Boolean)
+        map.set(s.id, {
+          id: s.id,
+          name: s.name,
+          address: addressParts.length ? addressParts.join(', ') : null,
+          latitude: s.latitude ?? null,
+          longitude: s.longitude ?? null,
+        })
+      }
+    }
+
+    return Array.from(map.values())
+  }
+
   private buildCartResponse(
     cart: { id: string },
     rawItems: Parameters<MarketplaceService['mapRawCartItem']>[0][],
@@ -695,6 +753,7 @@ export class MarketplaceService {
     const items = rawItems.map(i => this.mapRawCartItem(i))
     const subtotal = items.reduce((sum, i) => sum + i.line_total, 0)
     const kind = this.detectCartKindFromMapped(items)
+    const pickup_locations = this.buildPickupLocations(rawItems)
 
     if (kind === 'food') {
       const merchantMap = new Map<
@@ -768,6 +827,7 @@ export class MarketplaceService {
           : null,
         item_count: items.reduce((n, i) => n + i.quantity, 0),
         delivery_options: { allow_pickup: true, allow_delivery: true },
+        pickup_locations,
       }
     }
 
@@ -831,6 +891,7 @@ export class MarketplaceService {
         allow_pickup: items.length > 0 && items.every(i => i.product.allow_pickup),
         allow_delivery: items.length > 0 && items.every(i => i.product.allow_delivery),
       },
+      pickup_locations,
     }
   }
 
@@ -1663,6 +1724,15 @@ export class MarketplaceService {
           food_opening_hours: true,
           food_is_paused: true,
           food_pause_until: true,
+          location: {
+            select: {
+              address: true,
+              district: true,
+              city: true,
+              latitude: true,
+              longitude: true,
+            },
+          },
           hours: {
             select: {
               day: true,

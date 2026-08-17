@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, View } from 'react-native'
-import MapView, { Circle, Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps'
+import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { SearchOsmWebMap } from '@/src/components/SearchOsmWebMap'
 import {
   deltaFromRadiusKm,
@@ -8,7 +8,6 @@ import {
   type SearchNativeMapProps,
 } from '@/src/components/searchNativeMapShared'
 import { shouldUseOsmWebMap } from '@/src/lib/googleMaps'
-import { OSM_TILE_URL } from '@/src/lib/mapTiles'
 import { colors } from '@/src/theme'
 
 export function SearchNativeMap(props: SearchNativeMapProps) {
@@ -90,8 +89,8 @@ function SearchNativeMapImpl({
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        mapType="none"
+        provider={PROVIDER_GOOGLE}
+        mapType="standard"
         initialRegion={region}
         showsUserLocation={showUserLocation}
         showsMyLocationButton={false}
@@ -102,7 +101,6 @@ function SearchNativeMapImpl({
         loadingEnabled
         onMapReady={() => setMapReady(true)}
       >
-        <UrlTile urlTemplate={OSM_TILE_URL} maximumZ={19} flipY={false} />
         {showUserLocation && userLocation && radiusKm ? (
           <Circle
             center={{

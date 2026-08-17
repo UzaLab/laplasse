@@ -1,22 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
-import L from 'leaflet'
+import dynamic from 'next/dynamic'
 import { Crosshair, Loader2, MapPin, Search, X } from 'lucide-react'
-import 'leaflet/dist/leaflet.css'
 import { coordsFromGeoEntity } from '@/lib/cityCoords'
 import { getCountryCode } from '@/lib/country'
 import { searchGeoPlaces, type GeoPlaceResult } from '@/lib/geoApi'
 import { useDebounce } from '@/lib/hooks/useDebounce'
+import { hasGoogleMapsWebKey } from '@/lib/googleMaps'
 
-const pinIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-})
+const GoogleMapPickerCanvas = dynamic(
+  () => import('@/features/maps/components/GoogleMapPickerCanvas').then(m => m.GoogleMapPickerCanvas),
+  { ssr: false },
+)
+
+const OsmMapPickerCanvas = dynamic(
+  () => import('@/features/maps/components/OsmMapPickerCanvas').then(m => m.OsmMapPickerCanvas),
+  { ssr: false },
+)
 
 interface GeoHint {
   latitude?: number | null
@@ -35,39 +36,6 @@ interface Props {
   className?: string
 }
 
-function MapRecenter({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) {
-  const map = useMap()
-  useEffect(() => {
-    map.setView([lat, lng], zoom)
-  }, [map, lat, lng, zoom])
-  return null
-}
-
-function DraggablePin({
-  position,
-  onDrag,
-}: {
-  position: [number, number]
-  onDrag: (lat: number, lng: number) => void
-}) {
-  const markerRef = useRef<L.Marker | null>(null)
-
-  return (
-    <Marker
-      draggable
-      position={position}
-      icon={pinIcon}
-      ref={markerRef}
-      eventHandlers={{
-        dragend: () => {
-          const ll = markerRef.current?.getLatLng()
-          if (ll) onDrag(ll.lat, ll.lng)
-        },
-      }}
-    />
-  )
-}
-
 export function AddressLocationPicker({
   latitude,
   longitude,
@@ -82,10 +50,12 @@ export function AddressLocationPicker({
   const [searchResults, setSearchResults] = useState<GeoPlaceResult[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
   const [mapZoom, setMapZoom] = useState(15)
+  const [googleFailed, setGoogleFailed] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
 
   const debouncedQuery = useDebounce(placeQuery, 450)
   const countryCode = city?.country ?? getCountryCode()
+  const useGoogle = hasGoogleMapsWebKey() && !googleFailed
 
   const defaultCenter = useMemo(() => {
     if (latitude != null && longitude != null) return { lat: latitude, lng: longitude }
@@ -180,8 +150,12 @@ export function AddressLocationPicker({
 
   const searchHint = [commune?.name, city?.name].filter(Boolean).join(', ')
 
+  const handleDrag = (lat: number, lng: number) => {
+    onChange({ latitude: lat, longitude: lng })
+  }
+
   return (
-    <div className={className ?? 'laplasse-leaflet-host space-y-2'}>
+    <div className={className ?? 'space-y-2'}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
           Point GPS sur la carte
@@ -233,7 +207,7 @@ export function AddressLocationPicker({
             {searchLoading && (
               <div className="flex items-center gap-2 px-3 py-3 text-sm text-slate-500">
                 <Loader2 size={14} className="animate-spin" />
-                Recherche OpenStreetMap…
+                Recherche de lieux…
               </div>
             )}
             {!searchLoading && searchResults.length === 0 && debouncedQuery.trim().length >= 2 && (
@@ -259,24 +233,24 @@ export function AddressLocationPicker({
         )}
       </div>
 
-      <div className="laplasse-leaflet-map h-52 w-full rounded-2xl border border-slate-200">
-        <MapContainer
-          center={[pin.lat, pin.lng]}
+      {useGoogle ? (
+        <GoogleMapPickerCanvas
+          lat={pin.lat}
+          lng={pin.lng}
           zoom={mapZoom}
-          scrollWheelZoom
-          className="h-full w-full"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <MapRecenter lat={pin.lat} lng={pin.lng} zoom={mapZoom} />
-          <DraggablePin
-            position={[pin.lat, pin.lng]}
-            onDrag={(lat, lng) => onChange({ latitude: lat, longitude: lng })}
-          />
-        </MapContainer>
-      </div>
+          onDrag={handleDrag}
+          onFailed={() => setGoogleFailed(true)}
+        />
+      ) : (
+        <OsmMapPickerCanvas
+          lat={pin.lat}
+          lng={pin.lng}
+          zoom={mapZoom}
+          onDrag={handleDrag}
+          className="laplasse-leaflet-host laplasse-leaflet-map h-52 w-full rounded-2xl border border-slate-200"
+        />
+      )}
+
       <p className="text-[11px] text-slate-400">
         Recherchez un lieu ou déplacez le pin pour indiquer l&apos;entrée exacte.
         {latitude != null && longitude != null && (

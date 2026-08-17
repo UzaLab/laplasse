@@ -17,6 +17,9 @@ module.exports = ({ config }) => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'tech.laplasse.livraison',
+    config: {
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY ?? '',
+    },
   },
   android: {
     adaptiveIcon: {
@@ -46,6 +49,12 @@ module.exports = ({ config }) => ({
         isAndroidForegroundServiceEnabled: true,
         androidForegroundServiceIcon: './assets/images/icon.png',
         isIosBackgroundLocationEnabled: true,
+      },
+    ],
+    [
+      'react-native-maps',
+      {
+        androidGoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
       },
     ],
     [
@@ -79,6 +88,7 @@ module.exports = ({ config }) => ({
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
     appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'preprod',
     googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+    googleMapsIosApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY ?? '',
     eas: {
       projectId: process.env.EAS_COURIER_PROJECT_ID ?? '2202715b-f3ed-4547-9043-7a9dbe53ea0a',
     },

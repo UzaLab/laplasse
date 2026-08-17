@@ -6,6 +6,7 @@ import {
   parseCoord,
   resolveGeoCoords,
 } from './geo-coords.util'
+import { GoogleMapsService } from './google-maps.service'
 
 const CITY_PUBLIC_SELECT = {
   id: true,
@@ -28,7 +29,10 @@ const COMMUNE_PUBLIC_SELECT = {
 
 @Injectable()
 export class GeoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly googleMaps: GoogleMapsService,
+  ) {}
 
   async findCities(country = 'CI') {
     return this.prisma.geoCity.findMany({
@@ -295,7 +299,7 @@ export class GeoService {
     })
   }
 
-  /** Recherche de lieux via Nominatim (OpenStreetMap). */
+  /** Recherche de lieux — Google Places en priorité, Nominatim (OSM) en backup. */
   async searchPlaces(
     query: string,
     opts?: { country?: string; lat?: number; lng?: number; limit?: number },
@@ -303,6 +307,70 @@ export class GeoService {
     const q = query.trim()
     if (q.length < 2) return []
 
+    if (this.googleMaps.isEnabled()) {
+      const google = await this.googleMaps.searchPlaces(q, opts)
+      if (google.length) return google
+    }
+
+    return this.searchPlacesNominatim(q, opts)
+  }
+
+  async getDirections(
+    originLat: number,
+    originLng: number,
+    destLat: number,
+    destLng: number,
+    mode?: 'driving' | 'walking' | 'bicycling',
+  ) {
+    if (!Number.isFinite(originLat) || !Number.isFinite(originLng)
+      || !Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+      throw new BadRequestException('Coordonnées invalides')
+    }
+
+    const google = await this.googleMaps.getDirections(
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+      mode,
+    )
+    if (google) return google
+    return this.googleMaps.fallbackDirections(originLat, originLng, destLat, destLng)
+  }
+
+  async getTravelDistance(
+    originLat: number,
+    originLng: number,
+    destLat: number,
+    destLng: number,
+    mode?: 'driving' | 'walking' | 'bicycling',
+  ) {
+    if (!Number.isFinite(originLat) || !Number.isFinite(originLng)
+      || !Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+      throw new BadRequestException('Coordonnées invalides')
+    }
+
+    const google = await this.googleMaps.getTravelDistance(
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+      mode,
+    )
+    if (google) return google
+
+    const km = haversineKm(originLat, originLng, destLat, destLng)
+    return {
+      distance_meters: Math.round(km * 1000),
+      duration_seconds: Math.max(60, Math.round((km / 25) * 3600)),
+      provider: 'fallback' as const,
+    }
+  }
+
+  private async searchPlacesNominatim(
+    q: string,
+    opts?: { country?: string; lat?: number; lng?: number; limit?: number },
+  ) {
     const params = new URLSearchParams({
       q,
       format: 'json',
@@ -348,4 +416,16 @@ export class GeoService {
       }))
       .filter(r => Number.isFinite(r.latitude) && Number.isFinite(r.longitude))
   }
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLng = ((lng2 - lng1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2
+    + Math.cos((lat1 * Math.PI) / 180)
+    * Math.cos((lat2 * Math.PI) / 180)
+    * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }

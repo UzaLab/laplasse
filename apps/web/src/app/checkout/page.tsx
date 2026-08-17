@@ -60,6 +60,7 @@ import {
   type UserAddress,
 } from '@/lib/addressesApi'
 import { AddressLocationPickerLazy } from '@/features/addresses/components/AddressLocationPickerLazy'
+import { PickupLocationPanel } from '@/features/checkout/components/PickupLocationPanel'
 
 import {
   getDeliveryVehicleLabel,
@@ -881,6 +882,10 @@ function CheckoutPageContent() {
                     </div>
                   )}
                 </div>
+
+                {!useSplitDelivery && deliveryType === 'PICKUP' && (cart?.pickup_locations?.length ?? 0) > 0 && (
+                  <PickupLocationPanel locations={cart!.pickup_locations!} />
+                )}
 
                 {deliveryType === 'DELIVERY' && (
                   <>

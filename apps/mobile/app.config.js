@@ -18,6 +18,9 @@ module.exports = ({ config }) => ({
     supportsTablet: true,
     bundleIdentifier: 'tech.laplasse.app',
     associatedDomains: ['applinks:laplasse.tech', 'applinks:*.laplasse.tech'],
+    config: {
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY ?? '',
+    },
   },
   android: {
     adaptiveIcon: {
@@ -90,6 +93,7 @@ module.exports = ({ config }) => ({
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
     appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'preprod',
     googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+    googleMapsIosApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY ?? '',
     eas: {
       projectId: process.env.EAS_PROJECT_ID ?? '95dff08d-bcca-43bb-9b70-0ef8db630b32',
     },

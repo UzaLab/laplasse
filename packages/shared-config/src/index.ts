@@ -56,3 +56,4 @@ export function businessDayFromDate(date: Date = new Date()): number {
 }
 
 export * from './apiEnv'
+export * from './geo'

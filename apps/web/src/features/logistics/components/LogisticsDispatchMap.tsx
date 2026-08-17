@@ -1,11 +1,18 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { MapPin } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import { cn } from '@/lib/utils'
+import { hasGoogleMapsWebKey } from '@/lib/googleMaps'
+
+const GoogleLogisticsDispatchMap = dynamic(
+  () => import('./GoogleLogisticsDispatchMap').then(m => m.GoogleLogisticsDispatchMap),
+  { ssr: false },
+)
 
 export interface DispatchMapCourier {
   id: string
@@ -86,7 +93,18 @@ function MapResizeFix({ pointCount }: { pointCount: number }) {
   return null
 }
 
-export function LogisticsDispatchMap({
+export function LogisticsDispatchMap(props: Props) {
+  const [googleFailed, setGoogleFailed] = useState(false)
+  const useGoogle = hasGoogleMapsWebKey() && !googleFailed
+
+  if (useGoogle) {
+    return <GoogleLogisticsDispatchMap {...props} onFailed={() => setGoogleFailed(true)} />
+  }
+
+  return <LogisticsDispatchOsmMap {...props} />
+}
+
+function LogisticsDispatchOsmMap({
   couriers,
   jobs,
   selectedJobId,

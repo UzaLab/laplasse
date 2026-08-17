@@ -6,6 +6,7 @@ import { formatPrice } from '@/lib/marketplaceApi'
 import type { DeliveryQuoteItem, GeoCity, GeoCommune } from '@/lib/geoApi'
 import { getDeliveryVehicleLabel } from '@/lib/deliveryVehicles'
 import { formatDeliveryEtaShort } from '@/lib/deliveryEta'
+import { PickupLocationPanel } from '@/features/checkout/components/PickupLocationPanel'
 
 export interface ShopDeliveryState {
   deliveryType: 'PICKUP' | 'DELIVERY'
@@ -88,6 +89,13 @@ export function ShopSplitDeliveryForm({
                 </button>
               ))}
             </div>
+
+            {cfg.deliveryType === 'PICKUP' && (
+              <PickupLocationPanel
+                locations={(cart.pickup_locations ?? []).filter(p => p.id === merchant.id)}
+                className="pt-2 border-t border-slate-100"
+              />
+            )}
 
             {cfg.deliveryType === 'DELIVERY' && (
               <div className="space-y-3 pt-2 border-t border-slate-100">

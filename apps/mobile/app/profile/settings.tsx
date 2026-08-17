@@ -192,6 +192,11 @@ export default function ProfileSettingsScreen() {
             <Text style={styles.addressMeta}>
               {[address.commune.name, address.city.name].filter(Boolean).join(', ')}
             </Text>
+            {address.latitude != null && address.longitude != null ? (
+              <Text style={styles.addressGps}>
+                GPS : {address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}
+              </Text>
+            ) : null}
             <Pressable onPress={() => confirmDeleteAddress(address)} style={styles.deleteBtn}>
               <Ionicons name="trash-outline" size={16} color={profileTheme.danger} />
               <Text style={styles.deleteText}>Supprimer</Text>
@@ -264,6 +269,12 @@ const styles = StyleSheet.create({
   addressMeta: {
     fontFamily: profileTheme.fonts.regular,
     fontSize: 13,
+    color: profileTheme.textLight,
+    marginTop: 4,
+  },
+  addressGps: {
+    fontFamily: profileTheme.fonts.medium,
+    fontSize: 11,
     color: profileTheme.textLight,
     marginTop: 4,
   },

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { fetchPublicJson } from '@/lib/marketplaceApi'
+import { fetchGeoDirections } from '@/lib/geoApi'
 import { DeliveryStatusTimeline } from '@/features/delivery/components/DeliveryStatusTimeline'
 import { JOB_STATUS_LABELS } from '@/lib/courierJobLabels'
 import { vehicleLabel } from '@/lib/courierLabels'
@@ -84,8 +85,9 @@ export function DeliveryTrackClient({ token }: Props) {
 
   const isTerminal = data ? ['DELIVERED', 'CANCELLED', 'FAILED'].includes(data.status) : false
 
-  // OSRM route polyline — fetched when courier + dropoff coords are available
+  // Itinéraire livreur → client via API (Google Directions, fallback OSM/straight line)
   const [routePolyline, setRoutePolyline] = useState<[number, number][] | undefined>()
+  const [routeProvider, setRouteProvider] = useState<'google' | 'fallback' | null>(null)
   const routeKey = useRef('')
 
   useEffect(() => {
@@ -97,29 +99,25 @@ export function DeliveryTrackClient({ token }: Props) {
       || !data?.dropoff_longitude
     ) {
       setRoutePolyline(undefined)
+      setRouteProvider(null)
       return
     }
     const key = `${data.courier_latitude.toFixed(4)},${data.courier_longitude.toFixed(4)};${data.dropoff_latitude.toFixed(4)},${data.dropoff_longitude.toFixed(4)}`
-    // Only fetch when courier position changes meaningfully (>~44m, 4 decimal places)
     if (key === routeKey.current) return
     routeKey.current = key
 
-    const url =
-      `https://router.project-osrm.org/route/v1/driving/` +
-      `${data.courier_longitude},${data.courier_latitude};` +
-      `${data.dropoff_longitude},${data.dropoff_latitude}` +
-      `?overview=full&geometries=geojson`
-
-    fetch(url, { signal: AbortSignal.timeout(5000) })
-      .then(r => r.ok ? r.json() : null)
-      .then((json: { routes?: Array<{ geometry: { coordinates: [number, number][] } }> } | null) => {
-        const coords = json?.routes?.[0]?.geometry?.coordinates
-        if (coords && coords.length > 1) {
-          // OSRM returns [lng, lat] — Leaflet wants [lat, lng]
-          setRoutePolyline(coords.map(([lng, lat]) => [lat, lng]))
-        }
-      })
-      .catch(() => {/* OSRM unavailable — map shows pins only */})
+    void fetchGeoDirections({
+      originLat: data.courier_latitude,
+      originLng: data.courier_longitude,
+      destLat: data.dropoff_latitude,
+      destLng: data.dropoff_longitude,
+      mode: 'driving',
+    }).then(result => {
+      if (result.ok && result.data.polyline.length > 1) {
+        setRoutePolyline(result.data.polyline)
+        setRouteProvider(result.data.provider)
+      }
+    })
   }, [data?.courier_latitude, data?.courier_longitude, data?.dropoff_latitude, data?.dropoff_longitude, isTerminal])
 
   const mapZones = useMemo(() => {
@@ -313,7 +311,8 @@ export function DeliveryTrackClient({ token }: Props) {
               </div>
             )}
             <p className="text-[11px] text-slate-400 px-5 py-3 border-t border-slate-50">
-              Rafraîchissement {data.status === 'IN_TRANSIT' || data.status === 'PICKED_UP' ? '4' : '8'}s en route · OpenStreetMap
+              Rafraîchissement {data.status === 'IN_TRANSIT' || data.status === 'PICKED_UP' ? '4' : '8'}s en route
+              {routeProvider === 'google' ? ' · Google Maps' : routeProvider === 'fallback' ? ' · estimation' : ' · OpenStreetMap'}
             </p>
           </section>
         </div>

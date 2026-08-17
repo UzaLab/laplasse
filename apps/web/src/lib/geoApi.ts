@@ -79,6 +79,28 @@ export interface DeliveryQuoteItem {
   message?: string
 }
 
+export async function fetchGeoDirections(input: {
+  originLat: number
+  originLng: number
+  destLat: number
+  destLng: number
+  mode?: 'driving' | 'walking' | 'bicycling'
+}) {
+  const params = new URLSearchParams({
+    originLat: String(input.originLat),
+    originLng: String(input.originLng),
+    destLat: String(input.destLat),
+    destLng: String(input.destLng),
+  })
+  if (input.mode) params.set('mode', input.mode)
+  return fetchPublicJson<{
+    polyline: [number, number][]
+    distance_meters: number
+    duration_seconds: number
+    provider: 'google' | 'fallback'
+  }>(`/geo/directions?${params.toString()}`)
+}
+
 export async function fetchDeliveryQuote(input: {
   shop_ids?: string[]
   merchant_ids?: string[]

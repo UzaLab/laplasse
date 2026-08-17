@@ -43,9 +43,9 @@ export default function CourierOnboardingScreen() {
         ))}
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Carte OpenStreetMap</Text>
+          <Text style={styles.infoTitle}>Carte Google Maps</Text>
           <Text style={styles.infoBody}>
-            Le suivi GPS et le choix des zones utilisent OpenStreetMap — open source, sans clé API.
+            Le suivi GPS et le choix des zones utilisent Google Maps. OpenStreetMap reste disponible en secours si la carte ne charge pas.
           </Text>
         </View>
 

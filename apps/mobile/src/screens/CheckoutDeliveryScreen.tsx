@@ -22,6 +22,8 @@ import {
   type ShopDeliveryState,
 } from '@/src/components/checkout/ShopSplitDeliveryForm'
 import { FieldInput, PrimaryButton } from '@/src/components/ui'
+import { AddressLocationPicker } from '@/src/components/AddressLocationPicker'
+import { PickupLocationPanel } from '@/src/components/checkout/PickupLocationPanel'
 import {
   buildCheckoutSession,
   getCheckoutDraft,
@@ -77,6 +79,8 @@ export function CheckoutDeliveryScreen() {
   const [deliveryCommuneId, setDeliveryCommuneId] = useState('')
   const [deliveryDistrict, setDeliveryDistrict] = useState('')
   const [deliveryAddressDetail, setDeliveryAddressDetail] = useState('')
+  const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null)
+  const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null)
 
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null)
@@ -146,6 +150,8 @@ export function CheckoutDeliveryScreen() {
     setDeliveryCommuneId(addr.commune_id)
     setDeliveryDistrict(addr.district)
     setDeliveryAddressDetail(addr.address_detail ?? '')
+    setDeliveryLatitude(addr.latitude ?? null)
+    setDeliveryLongitude(addr.longitude ?? null)
     void loadCommunesForCity(addr.city.slug)
   }, [loadCommunesForCity])
 
@@ -518,6 +524,8 @@ export function CheckoutDeliveryScreen() {
             commune_id: deliveryCommuneId,
             district: deliveryDistrict.trim(),
             address_detail: deliveryAddressDetail.trim() || undefined,
+            latitude: deliveryLatitude ?? undefined,
+            longitude: deliveryLongitude ?? undefined,
             is_default: savedAddresses.length === 0,
           })
         } catch {
@@ -564,7 +572,12 @@ export function CheckoutDeliveryScreen() {
       delivery_district: !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryDistrict.trim() : undefined,
       delivery_address_detail:
         !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryAddressDetail.trim() || undefined : undefined,
-      delivery_address: !useSplitDelivery && deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
+      delivery_address:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? formattedDeliveryAddress : undefined,
+      delivery_latitude:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryLatitude ?? undefined : undefined,
+      delivery_longitude:
+        !useSplitDelivery && deliveryType === 'DELIVERY' ? deliveryLongitude ?? undefined : undefined,
       customer_note: customerNote.trim() || undefined,
       customer_phone: phone,
       applied_promotions: isFoodFlow ? [] : toAppliedPromotionInputs(appliedPromos),
@@ -721,6 +734,13 @@ export function CheckoutDeliveryScreen() {
               </View>
             </View>
 
+            {deliveryType === 'PICKUP' && (cart?.pickup_locations?.length ?? 0) > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Lieu de retrait</Text>
+                <PickupLocationPanel locations={cart!.pickup_locations!} />
+              </View>
+            ) : null}
+
             {deliveryType === 'DELIVERY' ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Adresse de livraison</Text>
@@ -763,6 +783,18 @@ export function CheckoutDeliveryScreen() {
                 />
                 <FieldInput placeholder="Quartier *" value={deliveryDistrict} onChangeText={setDeliveryDistrict} />
                 <FieldInput placeholder="Précisions (immeuble, étage…)" value={deliveryAddressDetail} onChangeText={setDeliveryAddressDetail} />
+                {deliveryCityId && deliveryCommuneId ? (
+                  <AddressLocationPicker
+                    latitude={deliveryLatitude}
+                    longitude={deliveryLongitude}
+                    onChange={coords => {
+                      setDeliveryLatitude(coords?.latitude ?? null)
+                      setDeliveryLongitude(coords?.longitude ?? null)
+                    }}
+                    city={cities.find(c => c.id === deliveryCityId)}
+                    commune={communes.find(c => c.id === deliveryCommuneId)}
+                  />
+                ) : null}
                 {isAuthenticated && !selectedAddressId ? (
                   <View style={styles.switchRow}>
                     <Text style={styles.switchLabel}>Enregistrer cette adresse</Text>

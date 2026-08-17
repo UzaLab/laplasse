@@ -4,6 +4,7 @@ import { DeliveryJobStatus, DeliveryVehicle } from '../../generated/prisma/clien
 import { NotificationQueueService } from '../queue/notification-queue.service'
 import { coordsFromCityName } from './delivery-gps.util'
 import { haversineDistanceKm, travelMinutesForVehicle } from './delivery-geo.util'
+import { GoogleMapsService } from '../geo/google-maps.service'
 
 export interface EtaSnapshot {
   prep_remaining_minutes: number
@@ -23,6 +24,7 @@ export class DeliveryEtaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationQueue: NotificationQueueService,
+    private readonly googleMaps: GoogleMapsService,
   ) {}
 
   prepRemainingMinutes(order: {
@@ -70,7 +72,7 @@ export class DeliveryEtaService {
     let travelMinutes = job?.eta_travel_minutes ?? 30
 
     if (job) {
-      travelMinutes = this.computeJobTravelMinutes(job, order.delivery_latitude, order.delivery_longitude)
+      travelMinutes = await this.computeJobTravelMinutes(job, order.delivery_latitude, order.delivery_longitude)
     }
 
     const etaMinutes = prepRemaining + travelMinutes
@@ -292,7 +294,7 @@ export class DeliveryEtaService {
     return this.refreshOrderEta(job.order_id)
   }
 
-  private computeJobTravelMinutes(
+  private async computeJobTravelMinutes(
     job: {
       status: DeliveryJobStatus
       pickup_latitude: number | null
@@ -309,7 +311,7 @@ export class DeliveryEtaService {
     },
     orderDropLat: number | null,
     orderDropLng: number | null,
-  ): number {
+  ): Promise<number> {
     const vehicle = job.courier_profile?.vehicle ?? 'MOTO'
     const dropLat = job.dropoff_latitude ?? orderDropLat
     const dropLng = job.dropoff_longitude ?? orderDropLng
@@ -320,6 +322,16 @@ export class DeliveryEtaService {
 
     if (job.status === 'PICKED_UP' || job.status === 'IN_TRANSIT') {
       if (courierLat != null && courierLng != null && dropLat != null && dropLng != null) {
+        const googleMinutes = await this.googleTravelMinutesAsync(
+          courierLat,
+          courierLng,
+          dropLat,
+          dropLng,
+          vehicle,
+          TRANSIT_BUFFER_MIN,
+        )
+        if (googleMinutes != null) return googleMinutes
+
         const km = haversineDistanceKm(courierLat, courierLng, dropLat, dropLng)
         return travelMinutesForVehicle(km, vehicle, TRANSIT_BUFFER_MIN)
       }
@@ -327,22 +339,71 @@ export class DeliveryEtaService {
 
     if (job.status === 'ASSIGNED' || job.status === 'PENDING') {
       if (courierLat != null && courierLng != null && pickupLat != null && pickupLng != null) {
-        const toPickup = haversineDistanceKm(courierLat, courierLng, pickupLat, pickupLng)
+        const toPickupGoogle = await this.googleTravelMinutesAsync(
+          courierLat,
+          courierLng,
+          pickupLat,
+          pickupLng,
+          vehicle,
+          PICKUP_BUFFER_MIN,
+        )
         const pickupToDrop =
+          dropLat != null && dropLng != null
+            ? await this.googleTravelMinutesAsync(
+                pickupLat,
+                pickupLng,
+                dropLat,
+                dropLng,
+                vehicle,
+                TRANSIT_BUFFER_MIN,
+              )
+            : null
+
+        if (toPickupGoogle != null) {
+          return toPickupGoogle + (pickupToDrop ?? travelMinutesForVehicle(3, vehicle, TRANSIT_BUFFER_MIN))
+        }
+
+        const toPickup = haversineDistanceKm(courierLat, courierLng, pickupLat, pickupLng)
+        const pickupToDropKm =
           dropLat != null && dropLng != null
             ? haversineDistanceKm(pickupLat, pickupLng, dropLat, dropLng)
             : 3
         return travelMinutesForVehicle(toPickup, vehicle, PICKUP_BUFFER_MIN)
-          + travelMinutesForVehicle(pickupToDrop, vehicle, TRANSIT_BUFFER_MIN)
+          + travelMinutesForVehicle(pickupToDropKm, vehicle, TRANSIT_BUFFER_MIN)
       }
     }
 
     if (pickupLat != null && pickupLng != null && dropLat != null && dropLng != null) {
+      const googleMinutes = await this.googleTravelMinutesAsync(
+        pickupLat,
+        pickupLng,
+        dropLat,
+        dropLng,
+        vehicle,
+        PICKUP_BUFFER_MIN + TRANSIT_BUFFER_MIN,
+      )
+      if (googleMinutes != null) return googleMinutes
+
       const km = haversineDistanceKm(pickupLat, pickupLng, dropLat, dropLng)
       return travelMinutesForVehicle(km, vehicle, PICKUP_BUFFER_MIN + TRANSIT_BUFFER_MIN)
     }
 
     return job.status === 'IN_TRANSIT' ? 15 : 30
+  }
+
+  private async googleTravelMinutesAsync(
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number,
+    vehicle: DeliveryVehicle,
+    bufferMin: number,
+  ): Promise<number | null> {
+    if (!this.googleMaps.isEnabled()) return null
+    const mode = 'driving'
+    const result = await this.googleMaps.getTravelDistance(fromLat, fromLng, toLat, toLng, mode)
+    if (!result || result.provider !== 'google') return null
+    return Math.max(1, Math.ceil(result.duration_seconds / 60) + bufferMin)
   }
 
   resolvePickupCoords(input: {

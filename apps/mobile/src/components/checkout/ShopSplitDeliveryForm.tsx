@@ -3,6 +3,7 @@ import { formatPrice } from '@laplasse/shared-config'
 import type { Cart, DeliveryQuoteItem, GeoCity, GeoCommune } from '@laplasse/api-client'
 import { OptionPicker } from '@/src/components/checkout/OptionPicker'
 import { FieldInput } from '@/src/components/ui'
+import { PickupLocationPanel } from '@/src/components/checkout/PickupLocationPanel'
 import { colors, fonts } from '@/src/theme'
 
 export type ShopDeliveryState = {
@@ -76,6 +77,12 @@ export function ShopSplitDeliveryForm({
                 </Pressable>
               ))}
             </View>
+
+            {cfg.deliveryType === 'PICKUP' ? (
+              <PickupLocationPanel
+                locations={(cart.pickup_locations ?? []).filter(p => p.id === merchant.id)}
+              />
+            ) : null}
 
             {cfg.deliveryType === 'DELIVERY' ? (
               <View style={styles.addressBlock}>
