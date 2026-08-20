@@ -21,10 +21,16 @@ export interface GoogleDistanceResult {
   provider: 'google' | 'fallback'
 }
 
-function httpTimeoutSignal(ms: number): AbortSignal {
-  const controller = new AbortController()
-  setTimeout(() => controller.abort(), ms)
-  return controller.signal
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Google Maps fetch timeout')), timeoutMs)
+  })
+  try {
+    return await Promise.race([fetch(url), timeout])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 @Injectable()
@@ -80,9 +86,9 @@ export class GoogleMapsService {
     }
 
     try {
-      const autoRes = await fetch(
+      const autoRes = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(6000) },
+        6000,
       )
       if (!autoRes.ok) return []
 
@@ -133,9 +139,9 @@ export class GoogleMapsService {
       fields: 'geometry',
     })
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/place/details/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(5000) },
+        5000,
       )
       if (!res.ok) return null
       const json = (await res.json()) as {
@@ -168,9 +174,9 @@ export class GoogleMapsService {
     }
 
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(6000) },
+        6000,
       )
       if (!res.ok) return []
       const json = (await res.json()) as {
@@ -206,9 +212,9 @@ export class GoogleMapsService {
       language: 'fr',
     })
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(5000) },
+        5000,
       )
       if (!res.ok) return null
       const json = (await res.json()) as {
@@ -241,9 +247,9 @@ export class GoogleMapsService {
     })
 
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(8000) },
+        8000,
       )
       if (!res.ok) return null
 
@@ -296,9 +302,9 @@ export class GoogleMapsService {
     })
 
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`,
-        { signal: httpTimeoutSignal(6000) },
+        6000,
       )
       if (!res.ok) return null
 
