@@ -22,6 +22,7 @@ import type {
   GeoCity,
   GeoCommune,
   GeoPlaceResult,
+  GeoDirectionsResult,
   GuestCartItemInput,
   GuestCheckoutInput,
   UserAddress,
@@ -701,6 +702,24 @@ export class ApiClient {
     return this.request<{ label: string; provider: string }>(
       `/geo/reverse?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`,
     )
+  }
+
+  getGeoDirections(input: {
+    originLat: number
+    originLng: number
+    destLat: number
+    destLng: number
+    mode?: 'driving' | 'walking' | 'bicycling'
+  }) {
+    const params = new URLSearchParams({
+      originLat: String(input.originLat),
+      originLng: String(input.originLng),
+      destLat: String(input.destLat),
+      destLng: String(input.destLng),
+    })
+    if (input.mode) params.set('mode', input.mode)
+
+    return this.request<GeoDirectionsResult>(`/geo/directions?${params.toString()}`)
   }
 
   getMyAddresses() {

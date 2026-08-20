@@ -481,6 +481,13 @@ export interface GeoPlaceResult {
   type: string | null
 }
 
+export interface GeoDirectionsResult {
+  polyline: [number, number][]
+  distance_meters: number
+  duration_seconds: number
+  provider: 'google' | 'fallback'
+}
+
 export interface DeliveryQuoteItem {
   shop_id: string
   merchant_id?: string
@@ -674,6 +681,9 @@ export interface DeliveryTrackingData {
   tracking_token: string
   status: string
   eta_minutes: number | null
+  eta_arrival_at?: string | null
+  prep_remaining_minutes?: number
+  travel_minutes?: number
   pickup_address: string | null
   dropoff_address: string | null
   dropoff_latitude: number | null

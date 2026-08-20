@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { DeliveryTrackMap } from '@/src/components/delivery/DeliveryTrackMap'
 import { EmptyState, LoadingState } from '@/src/components/ui'
 import { getApiClient } from '@/src/lib/api'
 import { colors, fonts, spacing } from '@/src/theme'
@@ -16,6 +17,15 @@ const STATUS_LABELS: Record<string, string> = {
   FAILED: 'Échec',
 }
 
+const TERMINAL_STATUSES = new Set(['DELIVERED', 'CANCELLED', 'FAILED'])
+
+function formatArrivalTime(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
 export default function DeliveryTrackScreen() {
   const { token } = useLocalSearchParams<{ token: string }>()
 
@@ -25,7 +35,7 @@ export default function DeliveryTrackScreen() {
     enabled: !!token,
     refetchInterval: (query: { state: { data?: { status?: string } } }) => {
       const status = query.state.data?.status
-      if (!status || ['DELIVERED', 'CANCELLED', 'FAILED'].includes(status)) return false
+      if (!status || TERMINAL_STATUSES.has(status)) return false
       if (status === 'IN_TRANSIT' || status === 'PICKED_UP') return 4_000
       return 8_000
     },
@@ -43,16 +53,37 @@ export default function DeliveryTrackScreen() {
   }
 
   const statusLabel = STATUS_LABELS[data.status] ?? data.status
+  const isActive = !TERMINAL_STATUSES.has(data.status)
+  const arrivalTime = formatArrivalTime(data.eta_arrival_at)
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <Ionicons name="bicycle" size={32} color={colors.brand600} />
         <Text style={styles.status}>{statusLabel}</Text>
-        {data.eta_minutes != null ? (
-          <Text style={styles.eta}>~{data.eta_minutes} min</Text>
+        {isActive && data.eta_minutes != null ? (
+          <Text style={styles.eta}>
+            Arrivée estimée
+            {arrivalTime ? ` vers ${arrivalTime}` : ''}
+            {' '}
+            · ~{data.eta_minutes} min
+          </Text>
+        ) : null}
+        {isActive && (data.prep_remaining_minutes ?? 0) > 0 ? (
+          <Text style={styles.etaSecondary}>
+            Préparation · ~{data.prep_remaining_minutes} min restantes
+          </Text>
         ) : null}
       </View>
+
+      <DeliveryTrackMap
+        status={data.status}
+        courierLatitude={data.courier_latitude}
+        courierLongitude={data.courier_longitude}
+        dropoffLatitude={data.dropoff_latitude}
+        dropoffLongitude={data.dropoff_longitude}
+        dropoffAddress={data.dropoff_address}
+      />
 
       {data.delivery_code ? (
         <View style={styles.codeCard}>
@@ -89,15 +120,6 @@ export default function DeliveryTrackScreen() {
           ) : null}
         </View>
       ) : null}
-
-      <View style={styles.mapPlaceholder}>
-        <Ionicons name="map-outline" size={40} color={colors.textLight} />
-        <Text style={styles.mapHint}>
-          {data.courier_latitude && data.dropoff_latitude
-            ? 'Position coursier mise à jour en temps réel'
-            : 'Carte disponible sur la version web'}
-        </Text>
-      </View>
     </ScrollView>
   )
 }
@@ -115,7 +137,21 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   status: { fontFamily: fonts.extrabold, fontSize: 20, color: colors.text, marginTop: 8 },
-  eta: { fontFamily: fonts.medium, fontSize: 15, color: colors.brand700, marginTop: 4 },
+  eta: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    color: colors.brand700,
+    marginTop: 6,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    lineHeight: 20,
+  },
+  etaSecondary: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
   codeCard: {
     backgroundColor: colors.slate900,
     borderRadius: 16,
@@ -146,13 +182,4 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   callText: { fontFamily: fonts.bold, fontSize: 14, color: '#fff' },
-  mapPlaceholder: {
-    height: 160,
-    borderRadius: 16,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  mapHint: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, textAlign: 'center', paddingHorizontal: 24 },
 })
