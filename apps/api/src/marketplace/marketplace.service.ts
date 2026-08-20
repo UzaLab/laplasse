@@ -3846,8 +3846,8 @@ export class MarketplaceService {
       where: { id: orderId, ...ctx.scope },
       include: {
         user: { select: { id: true } },
-        merchant: { select: { food_prep_minutes: true, business_name: true } },
-        shop: { select: { name: true } },
+        merchant: { select: { food_prep_minutes: true, business_name: true, delivery_fulfilment_default: true } },
+        shop: { select: { name: true, delivery_fulfilment_default: true } },
       },
     })
     if (!order) throw new NotFoundException('Commande introuvable')
@@ -3874,23 +3874,45 @@ export class MarketplaceService {
       }
     }
 
+    let effectiveStatus = dto.status
+
+    // Réseau LaPlasse / partenaire : « prête » lance automatiquement la recherche de livreur.
+    if (dto.status === 'READY' && order.delivery_type === 'DELIVERY') {
+      const existingJob = await this.prisma.deliveryJob.findUnique({ where: { order_id: orderId } })
+      if (!existingJob) {
+        const mode =
+          order.delivery_fulfilment_mode
+          ?? order.shop?.delivery_fulfilment_default
+          ?? order.merchant?.delivery_fulfilment_default
+          ?? 'PLATFORM_RIDER'
+        if (mode === 'PLATFORM_RIDER' || mode === 'LOGISTICS_PARTNER') {
+          try {
+            await this.deliveryService.dispatchOrder(orderId, { fulfilment_mode: mode })
+            effectiveStatus = 'OUT_FOR_DELIVERY'
+          } catch {
+            // Ex. partenaire logistique sans contrat — le marchand pourra expédier manuellement.
+          }
+        }
+      }
+    }
+
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: dto.status },
+      data: { status: effectiveStatus },
     })
 
     if (dto.status === 'PREPARING') {
       const prepMinutes = order.merchant?.food_prep_minutes ?? 25
       await this.deliveryEta.startPrepTimer(orderId, prepMinutes).catch(() => {})
     } else if (
-      ['READY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(dto.status) &&
+      ['READY', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(effectiveStatus) &&
       order.delivery_type !== 'PICKUP'
     ) {
       void this.deliveryEta.refreshOrderEta(orderId).catch(() => {})
     }
 
     const pushMessage = buildOrderStatusPushMessage(
-      dto.status,
+      effectiveStatus,
       order.delivery_type,
       order.merchant?.business_name ?? order.shop?.name,
     )
@@ -3901,8 +3923,9 @@ export class MarketplaceService {
       body: pushMessage.body,
       data: {
         order_id: order.id,
-        status: dto.status,
+        status: effectiveStatus,
         delivery_type: order.delivery_type,
+        href: `/profile/orders/${order.id}`,
       },
     })
 

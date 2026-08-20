@@ -27,7 +27,7 @@ export function PushNotificationHandler() {
   useEffect(() => {
     if (Platform.OS === 'web' || !hydrated) return
     if (isAuthenticated) {
-      void registerForPushNotifications().catch(() => {})
+      void registerForPushNotifications()
       return
     }
     void unregisterPushNotifications().catch(() => {})

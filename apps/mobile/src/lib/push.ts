@@ -10,7 +10,7 @@ if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
-      shouldPlaySound: false,
+      shouldPlaySound: true,
       shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
@@ -27,26 +27,41 @@ async function getExpoPushToken(): Promise<string> {
   return tokenData.data
 }
 
+function logPushError(context: string, error: unknown) {
+  if (__DEV__) {
+    console.warn(`[push] ${context}`, error)
+  }
+}
+
 export async function registerForPushNotifications(): Promise<void> {
   if (Platform.OS === 'web' || !Device.isDevice) return
 
-  const { status: existing } = await Notifications.getPermissionsAsync()
-  let finalStatus = existing
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync()
-    finalStatus = status
-  }
-  if (finalStatus !== 'granted') return
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync()
+    let finalStatus = existing
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync()
+      finalStatus = status
+    }
+    if (finalStatus !== 'granted') {
+      logPushError('permission denied', finalStatus)
+      return
+    }
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.DEFAULT,
-    })
-  }
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'Notifications LaPlasse',
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: 'default',
+        vibrationPattern: [0, 250, 250, 250],
+      })
+    }
 
-  cachedPushToken = await getExpoPushToken()
-  await getApiClient().registerExpoPushToken(cachedPushToken)
+    cachedPushToken = await getExpoPushToken()
+    await getApiClient().registerExpoPushToken(cachedPushToken)
+  } catch (error) {
+    logPushError('register failed', error)
+  }
 }
 
 export async function unregisterPushNotifications(): Promise<void> {

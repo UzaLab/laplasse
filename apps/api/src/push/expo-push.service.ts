@@ -34,7 +34,7 @@ export class ExpoPushService {
       body: payload.body,
       data: payload.data,
       priority: urgent ? 'high' : 'default',
-      ...(urgent ? { channelId: 'delivery' } : {}),
+      channelId: urgent ? 'delivery' : 'default',
     }
 
     const tickets = await this.expo.sendPushNotificationsAsync([message])
